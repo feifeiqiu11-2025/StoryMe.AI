@@ -1,6 +1,5 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "cd storyme-app && npm install && npm run build",
   "outputDirectory": "storyme-app/.next",
-  "framework": "nextjs",
-  "installCommand": "echo 'Dependencies installed via build script'"
+  "installCommand": "npm --version"
 }
