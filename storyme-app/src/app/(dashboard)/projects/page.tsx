@@ -15,6 +15,9 @@ export default function ProjectsPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<any[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -26,15 +29,15 @@ export default function ProjectsPage() {
         const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
         if (supabaseUser) {
-          setUser({
+          const userData = {
             id: supabaseUser.id,
             email: supabaseUser.email,
             name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0],
-          });
+          };
+          setUser(userData);
 
-          // TODO: Fetch user's projects from database
-          // For now, show placeholder
-          setProjects([]);
+          // Fetch user's projects
+          await fetchProjects();
         } else {
           router.push('/login');
         }
@@ -44,7 +47,7 @@ export default function ProjectsPage() {
           const session = JSON.parse(sessionData);
           if (new Date(session.expires_at) > new Date()) {
             setUser(session.user);
-            setProjects([]);
+            await fetchProjects();
           } else {
             localStorage.removeItem('storyme_session');
             router.push('/login');
@@ -58,6 +61,47 @@ export default function ProjectsPage() {
 
     loadUser();
   }, [router]);
+
+  const fetchProjects = async () => {
+    setLoadingProjects(true);
+    try {
+      const response = await fetch('/api/projects');
+      const data = await response.json();
+
+      if (response.ok) {
+        setProjects(data.projects || []);
+      } else {
+        console.error('Failed to fetch projects:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Remove from list
+        setProjects(projects.filter(p => p.id !== projectId));
+        setDeleteConfirm(null);
+      } else {
+        const data = await response.json();
+        alert(`Failed to delete: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Failed to delete project');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -114,7 +158,12 @@ export default function ProjectsPage() {
         </div>
 
         {/* Projects Grid */}
-        {projects.length === 0 ? (
+        {loadingProjects ? (
+          <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading your stories...</p>
+          </div>
+        ) : projects.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
             <div className="text-6xl mb-4">📚</div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
@@ -132,29 +181,97 @@ export default function ProjectsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((project) => (
-              <div
-                key={project.id}
-                className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all transform hover:-translate-y-1"
-              >
-                <div className="p-6">
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    {project.title}
-                  </h3>
-                  <p className="text-gray-600 text-sm mb-4">
-                    {project.description}
-                  </p>
-                  <div className="flex gap-2">
-                    <button className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium text-sm">
-                      View
-                    </button>
-                    <button className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 font-medium text-sm">
-                      Edit
-                    </button>
+            {projects.map((project) => {
+              const firstImage = project.scenes?.[0]?.images?.[0]?.imageUrl;
+              const sceneCount = project.scenes?.length || 0;
+              const createdDate = new Date(project.createdAt).toLocaleDateString();
+
+              return (
+                <div
+                  key={project.id}
+                  className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all transform hover:-translate-y-1"
+                >
+                  {/* Cover Image */}
+                  {firstImage ? (
+                    <div className="relative h-48 bg-gradient-to-br from-blue-100 to-purple-100">
+                      <img
+                        src={firstImage}
+                        alt={project.title}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-48 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
+                      <div className="text-6xl">📖</div>
+                    </div>
+                  )}
+
+                  <div className="p-6">
+                    {/* Title and Meta */}
+                    <div className="mb-3">
+                      <h3 className="text-xl font-bold text-gray-900 mb-1">
+                        {project.title}
+                      </h3>
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <span>{sceneCount} scenes</span>
+                        <span>•</span>
+                        <span>{createdDate}</span>
+                      </div>
+                    </div>
+
+                    {project.description && (
+                      <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                        {project.description}
+                      </p>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <Link
+                        href={`/projects/${project.id}`}
+                        className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium text-sm text-center transition-all"
+                      >
+                        View
+                      </Link>
+                      <button
+                        onClick={() => setDeleteConfirm(project.id)}
+                        className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium text-sm transition-all"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {deleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Delete Story?</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete this story? This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleDeleteProject(deleteConfirm)}
+                  disabled={deleting}
+                  className="flex-1 bg-red-600 text-white px-6 py-3 rounded-xl hover:bg-red-700 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  disabled={deleting}
+                  className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
               </div>
-            ))}
+            </div>
           </div>
         )}
       </div>
