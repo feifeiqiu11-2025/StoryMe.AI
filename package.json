@@ -1,0 +1,10 @@
+{
+  "name": "storyme-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd storyme-app && npm install && npm run build",
+    "dev": "cd storyme-app && npm run dev",
+    "start": "cd storyme-app && npm start"
+  }
+}
