@@ -183,4 +183,34 @@ export class ProjectRepository extends BaseRepository<Project> {
 
     return count || 0;
   }
+
+  /**
+   * Find all projects with scenes (for public gallery)
+   */
+  async findAllWithScenes(): Promise<ProjectWithScenes[]> {
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select(`
+        *,
+        scenes (
+          *,
+          images:generated_images (*)
+        )
+      `)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Map images back to generated_images for proper typing
+    const mapped = (data || []).map(project => ({
+      ...project,
+      scenes: project.scenes?.map((scene: any) => ({
+        ...scene,
+        generated_images: scene.images || [],
+      })),
+    }));
+
+    return mapped as ProjectWithScenes[];
+  }
 }

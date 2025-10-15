@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { GeneratedImage, Character } from '@/lib/types/story';
+import SceneRatingCard from './SceneRatingCard';
 
 interface ImageGalleryProps {
   characters: Character[];
@@ -21,6 +22,12 @@ export default function ImageGallery({
   // Track ratings per image per character
   const [ratings, setRatings] = useState<Record<string, Record<string, 'good' | 'bad'>>>({});
 
+  // Track overall scene ratings
+  const [sceneRatings, setSceneRatings] = useState<Record<string, {
+    overallRating: number;
+    ratingFeedback?: string;
+  }>>({});
+
   const handleRating = (imageId: string, characterId: string, rating: 'good' | 'bad') => {
     setRatings(prev => ({
       ...prev,
@@ -32,7 +39,62 @@ export default function ImageGallery({
     onRating?.(imageId, characterId, rating);
   };
 
+  const handleSceneRating = async (imageId: string, ratings: {
+    overallRating: number;
+    ratingFeedback?: string;
+  }) => {
+    try {
+      // Save to state
+      setSceneRatings(prev => ({
+        ...prev,
+        [imageId]: ratings,
+      }));
+
+      // Save to backend
+      const response = await fetch(`/api/images/${imageId}/rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ratings),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save rating');
+      }
+
+      console.log('Rating saved successfully:', ratings);
+    } catch (error) {
+      console.error('Error saving scene rating:', error);
+      throw error;
+    }
+  };
+
   const successfulImages = generatedImages.filter(img => img.status === 'completed');
+
+  // Calculate overall scene rating statistics
+  const sceneRatingStats = (() => {
+    const allRatings = successfulImages.map(img => ({
+      imageId: img.id,
+      sceneNumber: img.sceneNumber,
+      overall: img.overallRating || sceneRatings[img.id]?.overallRating || 0,
+    }));
+
+    const ratedScenes = allRatings.filter(r => r.overall > 0);
+    const lowRatedScenes = ratedScenes.filter(r => r.overall < 3);
+
+    if (ratedScenes.length === 0) {
+      return null;
+    }
+
+    const avgOverall = ratedScenes.reduce((sum, r) => sum + r.overall, 0) / ratedScenes.length;
+
+    return {
+      totalRated: ratedScenes.length,
+      totalScenes: successfulImages.length,
+      avgOverall,
+      lowRatedScenes,
+      ratedScenes,
+    };
+  })();
 
   // Calculate per-character consistency scores
   const characterScores = characters.map(char => {
@@ -161,6 +223,17 @@ export default function ImageGallery({
 
                 {image.status === 'completed' && (
                   <>
+                    {/* Overall Scene Rating */}
+                    <SceneRatingCard
+                      imageId={image.id}
+                      sceneNumber={image.sceneNumber}
+                      initialRatings={{
+                        overallRating: image.overallRating || sceneRatings[image.id]?.overallRating,
+                        ratingFeedback: image.ratingFeedback || sceneRatings[image.id]?.ratingFeedback,
+                      }}
+                      onSave={(ratings) => handleSceneRating(image.id, ratings)}
+                    />
+
                     {/* Per-character rating buttons */}
                     {image.characterRatings && image.characterRatings.length > 0 && (
                       <div className="space-y-3">
@@ -304,6 +377,90 @@ export default function ImageGallery({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Overall Scene Ratings Analytics */}
+      {sceneRatingStats && (
+        <div className="bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Overall Scene Quality Analytics</h3>
+
+          {/* Summary Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-white rounded-lg p-4 text-center shadow-sm">
+              <div className="text-3xl font-bold text-blue-600">{sceneRatingStats.totalRated}/{sceneRatingStats.totalScenes}</div>
+              <div className="text-xs text-gray-600 mt-1">Scenes Rated</div>
+            </div>
+            <div className="bg-white rounded-lg p-4 text-center shadow-sm">
+              <div className={`text-3xl font-bold ${
+                sceneRatingStats.avgOverall >= 4 ? 'text-green-600' :
+                sceneRatingStats.avgOverall >= 3 ? 'text-yellow-600' :
+                'text-red-600'
+              }`}>
+                {sceneRatingStats.avgOverall.toFixed(1)}
+              </div>
+              <div className="text-xs text-gray-600 mt-1">Average Rating</div>
+            </div>
+            <div className="bg-white rounded-lg p-4 text-center shadow-sm">
+              <div className={`text-3xl font-bold ${
+                sceneRatingStats.lowRatedScenes.length === 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {sceneRatingStats.lowRatedScenes.length}
+              </div>
+              <div className="text-xs text-gray-600 mt-1">Low Rated (&lt;3)</div>
+            </div>
+          </div>
+
+          {/* Low Rated Scenes Alert */}
+          {sceneRatingStats.lowRatedScenes.length > 0 && (
+            <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">⚠️</span>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-red-900 mb-2">
+                    {sceneRatingStats.lowRatedScenes.length} Scene{sceneRatingStats.lowRatedScenes.length > 1 ? 's' : ''} Need{sceneRatingStats.lowRatedScenes.length === 1 ? 's' : ''} Improvement
+                  </h4>
+                  <p className="text-sm text-red-700 mb-3">
+                    The following scenes received low ratings (below 3 stars). Consider regenerating these scenes:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {sceneRatingStats.lowRatedScenes.map(scene => (
+                      <span
+                        key={scene.imageId}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800"
+                      >
+                        Scene {scene.sceneNumber} ({scene.overall}/5)
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* High Rated Scenes */}
+          {sceneRatingStats.ratedScenes.filter(s => s.overall >= 4).length > 0 && (
+            <div className="mt-4 bg-green-50 border-2 border-green-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">✨</span>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-green-900 mb-2">
+                    {sceneRatingStats.ratedScenes.filter(s => s.overall >= 4).length} High Quality Scene{sceneRatingStats.ratedScenes.filter(s => s.overall >= 4).length > 1 ? 's' : ''}
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {sceneRatingStats.ratedScenes.filter(s => s.overall >= 4).map(scene => (
+                      <span
+                        key={scene.imageId}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800"
+                      >
+                        Scene {scene.sceneNumber} ({scene.overall}/5)
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

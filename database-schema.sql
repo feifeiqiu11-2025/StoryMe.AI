@@ -171,10 +171,18 @@ CREATE TABLE generated_images (
   -- Cost Tracking
   cost_usd DECIMAL(10, 4),
 
+  -- Overall Scene Ratings (1-5 stars)
+  overall_rating INTEGER CHECK (overall_rating >= 1 AND overall_rating <= 5),
+  scene_match_score INTEGER CHECK (scene_match_score >= 1 AND scene_match_score <= 5),
+  user_expectation_score INTEGER CHECK (user_expectation_score >= 1 AND user_expectation_score <= 5),
+  rating_feedback TEXT, -- Optional user comment
+  rated_at TIMESTAMP, -- When the rating was submitted
+
   created_at TIMESTAMP DEFAULT NOW(),
 
   INDEX idx_generated_images_project_id (project_id),
-  INDEX idx_generated_images_scene_id (scene_id)
+  INDEX idx_generated_images_scene_id (scene_id),
+  INDEX idx_generated_images_overall_rating (overall_rating)
 );
 
 -- ============================================

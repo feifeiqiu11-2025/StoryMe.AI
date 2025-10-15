@@ -4,8 +4,7 @@
  */
 
 import Link from 'next/link';
-import { sampleStorybooks } from '@/data/sample-storybooks';
-import Image from 'next/image';
+import HeroStoryShowcase from '@/components/landing/HeroStoryShowcase';
 
 export default function HomePage() {
   // Show landing page (removed auth redirect - dashboard handles auth now)
@@ -14,9 +13,9 @@ export default function HomePage() {
       {/* Header with Sign In button */}
       <header className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <div className="text-2xl font-bold">
+          <Link href="/" className="text-2xl font-bold hover:opacity-80 transition-opacity cursor-pointer">
             📚 Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-600">Me</span> ✨
-          </div>
+          </Link>
           <span className="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded-full">BETA</span>
         </div>
         <Link
@@ -72,46 +71,8 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right Column - Hero Visual (50%) */}
-          <div className="lg:block hidden">
-            <div className="relative">
-              {/* Decorative background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 rounded-3xl transform rotate-3"></div>
-
-              {/* Main visual container */}
-              <div className="relative bg-white rounded-3xl shadow-2xl p-8 transform -rotate-1 hover:rotate-0 transition-transform duration-300">
-                {/* Storybook mockup */}
-                <div className="space-y-4">
-                  {/* Book cover */}
-                  <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg">
-                    <div className="text-center space-y-3">
-                      <div className="text-5xl">📖</div>
-                      <h3 className="font-bold text-xl">My Adventure</h3>
-                      <p className="text-sm opacity-90">A story by Emma, age 5</p>
-                    </div>
-                  </div>
-
-                  {/* Book pages preview */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gradient-to-br from-yellow-100 to-orange-100 rounded-lg p-4 aspect-square flex items-center justify-center text-4xl">
-                      🐉
-                    </div>
-                    <div className="bg-gradient-to-br from-green-100 to-blue-100 rounded-lg p-4 aspect-square flex items-center justify-center text-4xl">
-                      🦸‍♀️
-                    </div>
-                  </div>
-
-                  {/* Reading indicator */}
-                  <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
-                    <span className="text-2xl">👦</span>
-                    <span className="text-2xl">👧</span>
-                    <span>+</span>
-                    <span className="text-2xl">👨‍👩‍👧</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Right Column - Hero Visual (50%) - Shows real saved stories */}
+          <HeroStoryShowcase />
         </div>
 
         {/* Personal Story Section */}
@@ -376,110 +337,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Sample Storybooks Gallery */}
-        {sampleStorybooks.length > 0 && (
-          <div className="mb-12 sm:mb-16">
-            <div className="text-center mb-8 sm:mb-12">
-              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3 flex items-center justify-center gap-3">
-                <span className="text-4xl">📚</span>
-                <span>Sample Storybooks</span>
-              </h2>
-              <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-                See what other families have created with StoryMe
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            {sampleStorybooks.map((storybook) => (
-              <div
-                key={storybook.id}
-                className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-gray-100"
-              >
-                {/* Cover Image */}
-                <div className="relative h-64 sm:h-72 bg-gradient-to-br from-blue-50 to-purple-50">
-                  <Image
-                    src={storybook.coverImage}
-                    alt={storybook.title}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-
-                {/* Content */}
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-3">
-                    <h3 className="text-xl font-bold text-gray-900 flex-1">
-                      {storybook.title}
-                    </h3>
-                    <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium ml-2">
-                      {storybook.ageGroup}
-                    </span>
-                  </div>
-
-                  <p className="text-gray-600 text-sm mb-4 leading-relaxed">
-                    {storybook.description}
-                  </p>
-
-                  {/* Characters */}
-                  <div className="flex items-center gap-2 mb-4 flex-wrap">
-                    <span className="text-xs text-gray-500">Characters:</span>
-                    {storybook.characters.map((character, idx) => (
-                      <span
-                        key={idx}
-                        className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full"
-                      >
-                        {character}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Scene Preview */}
-                  <div className="grid grid-cols-3 gap-2 mb-4">
-                    {storybook.scenes.slice(0, 3).map((scene, idx) => (
-                      <div
-                        key={idx}
-                        className="relative h-20 rounded-lg overflow-hidden bg-gray-100"
-                      >
-                        <Image
-                          src={scene.imageUrl}
-                          alt={`Scene ${idx + 1}`}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Footer */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                    <span className="text-xs text-gray-500">
-                      {storybook.scenes.length} scenes
-                    </span>
-                    {storybook.isCustomerSubmission && storybook.customerName && (
-                      <span className="text-xs text-gray-500 italic">
-                        by {storybook.customerName}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-            {/* Add Your Story CTA */}
-            <div className="text-center mt-8 sm:mt-12">
-              <p className="text-gray-600 mb-4 text-base sm:text-lg">
-                Want to share your storybook here?
-              </p>
-              <Link
-                href="/guest"
-                className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
-              >
-                Create Your Storybook
-              </Link>
-            </div>
-          </div>
-        )}
 
         {/* Final CTA */}
         <div className="text-center bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl shadow-2xl p-8 sm:p-12 text-white">

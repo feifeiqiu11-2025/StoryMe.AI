@@ -44,6 +44,13 @@ export interface GeneratedImage {
   status: 'pending' | 'generating' | 'completed' | 'failed';
   characterRatings?: CharacterRating[]; // Per-character consistency ratings
   error?: string;
+
+  // Overall Scene Ratings (1-5 stars)
+  overallRating?: number; // 1-5
+  sceneMatchScore?: number; // 1-5
+  userExpectationScore?: number; // 1-5
+  ratingFeedback?: string;
+  ratedAt?: string;
 }
 
 export interface StorySession {

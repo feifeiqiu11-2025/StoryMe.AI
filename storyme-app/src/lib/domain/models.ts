@@ -157,6 +157,13 @@ export interface GeneratedImage {
   // Cost Tracking
   cost_usd?: number;
 
+  // Overall Scene Ratings (1-5 stars)
+  overall_rating?: number; // 1-5
+  scene_match_score?: number; // 1-5
+  user_expectation_score?: number; // 1-5
+  rating_feedback?: string;
+  rated_at?: string;
+
   created_at: string;
 }
 
