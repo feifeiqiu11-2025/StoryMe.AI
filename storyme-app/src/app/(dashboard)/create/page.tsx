@@ -33,6 +33,11 @@ export default function CreateStoryPage() {
   const [session, setSession] = useState<StorySession | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [libraryCharacters, setLibraryCharacters] = useState<Character[]>([]);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveTitle, setSaveTitle] = useState('');
+  const [saveDescription, setSaveDescription] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     const loadUser = async () => {
@@ -145,6 +150,62 @@ export default function CreateStoryPage() {
       createdAt: new Date(),
     };
     setSession(newSession);
+  };
+
+  const handleSaveStory = async () => {
+    if (!saveTitle.trim()) {
+      setSaveError('Please enter a title for your story');
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError('');
+
+    try {
+      // Prepare scenes data
+      const scenesData = imageGenerationStatus
+        .filter(img => img.status === 'completed')
+        .map(img => ({
+          sceneNumber: img.sceneNumber,
+          description: img.sceneDescription,
+          imageUrl: img.imageUrl,
+          prompt: img.prompt,
+          generationTime: img.generationTime,
+        }));
+
+      if (scenesData.length === 0) {
+        setSaveError('No completed scenes to save');
+        setIsSaving(false);
+        return;
+      }
+
+      // Call save API
+      const response = await fetch('/api/projects/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: saveTitle.trim(),
+          description: saveDescription.trim() || undefined,
+          originalScript: scriptInput,
+          characterIds: characters.map(c => c.id),
+          scenes: scenesData,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to save story');
+      }
+
+      // Success! Redirect to My Stories page
+      router.push('/projects');
+
+    } catch (error) {
+      console.error('Save error:', error);
+      setSaveError(error instanceof Error ? error.message : 'Failed to save story');
+      setIsSaving(false);
+    }
   };
 
   const handleGenerateImages = async () => {
@@ -455,20 +516,25 @@ export default function CreateStoryPage() {
               <p className="text-gray-600 mb-6">
                 Save your story to your library or export it as a PDF.
               </p>
-              <div className="flex gap-4">
+              <div className="flex gap-4 flex-wrap">
                 <button
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-emerald-700 font-semibold shadow-lg transition-all"
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-emerald-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={() => {
-                    // TODO: Save to database
-                    alert('Save functionality coming soon!');
+                    // Generate default title if not set
+                    if (!saveTitle) {
+                      const firstWords = scriptInput.trim().split(' ').slice(0, 5).join(' ');
+                      setSaveTitle(firstWords || 'My Story');
+                    }
+                    setShowSaveModal(true);
                   }}
+                  disabled={isSaving}
                 >
                   💾 Save to Library
                 </button>
                 <button
                   className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl hover:from-orange-700 hover:to-red-700 font-semibold shadow-lg transition-all"
                   onClick={() => {
-                    // TODO: Generate PDF
+                    // TODO: Generate PDF (Phase 3)
                     alert('PDF export coming soon!');
                   }}
                 >
@@ -480,6 +546,96 @@ export default function CreateStoryPage() {
                 >
                   ← Back to Dashboard
                 </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Save Story Modal */}
+        {showSaveModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Save Your Story</h2>
+                <button
+                  onClick={() => {
+                    setShowSaveModal(false);
+                    setSaveError('');
+                  }}
+                  disabled={isSaving}
+                  className="text-gray-400 hover:text-gray-600 text-2xl disabled:opacity-50"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Story Title <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={saveTitle}
+                    onChange={(e) => setSaveTitle(e.target.value)}
+                    disabled={isSaving}
+                    placeholder="Enter a title for your story"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description (Optional)
+                  </label>
+                  <textarea
+                    value={saveDescription}
+                    onChange={(e) => setSaveDescription(e.target.value)}
+                    disabled={isSaving}
+                    placeholder="Add a brief description of your story"
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
+
+                {saveError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-sm text-red-700">{saveError}</p>
+                  </div>
+                )}
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-700">
+                    This will save your story with {imageGenerationStatus.filter(img => img.status === 'completed').length} scenes to your library.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSaveStory}
+                  disabled={isSaving || !saveTitle.trim()}
+                  className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-emerald-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSaving ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Saving...
+                    </span>
+                  ) : (
+                    '💾 Save Story'
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSaveModal(false);
+                    setSaveError('');
+                  }}
+                  disabled={isSaving}
+                  className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>

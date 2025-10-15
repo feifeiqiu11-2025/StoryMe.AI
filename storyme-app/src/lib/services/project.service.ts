@@ -289,4 +289,81 @@ export class ProjectService {
 
     return { total, drafts, processing, completed, errors };
   }
+
+  /**
+   * Save a completed story with all scenes and generated images
+   * This is called after image generation is complete
+   */
+  async saveCompletedStory(
+    userId: string,
+    data: {
+      title: string;
+      description?: string;
+      originalScript: string;
+      characterIds: string[];
+      scenes: Array<{
+        sceneNumber: number;
+        description: string;
+        imageUrl: string;
+        prompt: string;
+        generationTime: number;
+      }>;
+    }
+  ): Promise<ProjectDTO> {
+    const supabase = this.projectRepo['supabase'];
+
+    // 1. Create project
+    const project = await this.projectRepo.create({
+      user_id: userId,
+      title: data.title,
+      description: data.description,
+      original_script: data.originalScript,
+      status: 'completed',
+    });
+
+    // 2. Link characters to project
+    await this.linkCharactersToProject(project.id, data.characterIds);
+
+    // 3. Increment character usage counts
+    for (const charId of data.characterIds) {
+      await this.characterRepo.incrementUsageCount(charId);
+    }
+
+    // 4. Save scenes with images
+    for (const sceneData of data.scenes) {
+      // Create scene
+      const { data: scene, error: sceneError } = await supabase
+        .from('scenes')
+        .insert({
+          project_id: project.id,
+          scene_number: sceneData.sceneNumber,
+          description: sceneData.description,
+          character_ids: data.characterIds,
+        })
+        .select()
+        .single();
+
+      if (sceneError) {
+        throw new Error(`Failed to save scene ${sceneData.sceneNumber}: ${sceneError.message}`);
+      }
+
+      // Save generated image
+      const { error: imageError } = await supabase
+        .from('generated_images')
+        .insert({
+          scene_id: scene.id,
+          project_id: project.id,
+          image_url: sceneData.imageUrl,
+          prompt: sceneData.prompt,
+          generation_time: sceneData.generationTime,
+          status: 'completed',
+        });
+
+      if (imageError) {
+        throw new Error(`Failed to save image for scene ${sceneData.sceneNumber}: ${imageError.message}`);
+      }
+    }
+
+    return projectToDTO(project);
+  }
 }
