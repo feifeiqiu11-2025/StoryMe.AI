@@ -88,11 +88,17 @@ export default function ImageGallery({
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {characters.map(char => (
             <div key={char.id} className="text-center">
-              <img
-                src={char.referenceImage.url}
-                alt={char.name}
-                className="w-24 h-24 object-cover rounded-lg shadow-md border-2 border-white mx-auto"
-              />
+              {char.referenceImage.url ? (
+                <img
+                  src={char.referenceImage.url}
+                  alt={char.name}
+                  className="w-24 h-24 object-cover rounded-lg shadow-md border-2 border-white mx-auto"
+                />
+              ) : (
+                <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg shadow-md border-2 border-white mx-auto flex items-center justify-center text-3xl">
+                  👤
+                </div>
+              )}
               <p className="text-sm font-medium text-gray-900 mt-2">{char.name}</p>
               {char.isPrimary && (
                 <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Primary</span>
@@ -235,11 +241,17 @@ export default function ImageGallery({
             {characterScores.map(({ character, goodCount, totalCount, score }) => (
               <div key={character.id} className="bg-white border rounded-lg p-4">
                 <div className="flex items-center gap-3 mb-2">
-                  <img
-                    src={character.referenceImage.url}
-                    alt={character.name}
-                    className="w-12 h-12 object-cover rounded-lg"
-                  />
+                  {character.referenceImage.url ? (
+                    <img
+                      src={character.referenceImage.url}
+                      alt={character.name}
+                      className="w-12 h-12 object-cover rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg flex items-center justify-center text-xl">
+                      👤
+                    </div>
+                  )}
                   <div>
                     <p className="font-semibold text-gray-900">{character.name}</p>
                     {character.isPrimary && (

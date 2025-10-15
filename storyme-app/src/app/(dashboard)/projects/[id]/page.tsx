@@ -195,7 +195,7 @@ export default function StoryViewerPage() {
             {/* Scene Display */}
             <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
               {/* Image */}
-              {currentImage ? (
+              {currentImage?.imageUrl ? (
                 <div className="relative aspect-video bg-gradient-to-br from-blue-100 to-purple-100">
                   <img
                     src={currentImage.imageUrl}
