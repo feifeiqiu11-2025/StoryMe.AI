@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd storyme-app && npm run build",
+  "devCommand": "cd storyme-app && npm run dev",
+  "installCommand": "cd storyme-app && npm install",
+  "outputDirectory": "storyme-app/.next"
+}
