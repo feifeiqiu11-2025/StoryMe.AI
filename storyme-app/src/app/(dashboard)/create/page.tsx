@@ -15,6 +15,7 @@ import ImageGallery from '@/components/story/ImageGallery';
 import { Character, Scene, StorySession, GeneratedImage } from '@/lib/types/story';
 import { parseScriptIntoScenes } from '@/lib/scene-parser';
 import Link from 'next/link';
+import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 
 const CHARACTERS_STORAGE_KEY = 'storyme_character_library';
 
@@ -38,6 +39,7 @@ export default function CreateStoryPage() {
   const [saveDescription, setSaveDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [generatingPDF, setGeneratingPDF] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -205,6 +207,41 @@ export default function CreateStoryPage() {
       console.error('Save error:', error);
       setSaveError(error instanceof Error ? error.message : 'Failed to save story');
       setIsSaving(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    const completedScenes = imageGenerationStatus.filter(img => img.status === 'completed');
+
+    if (completedScenes.length === 0) {
+      alert('No completed scenes to generate PDF');
+      return;
+    }
+
+    setGeneratingPDF(true);
+
+    try {
+      // Generate default title if not set
+      const title = saveTitle || scriptInput.trim().split(' ').slice(0, 5).join(' ') || 'My Story';
+
+      const scenesData = completedScenes.map(img => ({
+        sceneNumber: img.sceneNumber,
+        description: img.sceneDescription,
+        imageUrl: img.imageUrl,
+      }));
+
+      await generateAndDownloadStoryPDF({
+        title,
+        description: saveDescription,
+        scenes: scenesData,
+        author: user?.name || 'My Family',
+      });
+
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setGeneratingPDF(false);
     }
   };
 
@@ -532,13 +569,18 @@ export default function CreateStoryPage() {
                   💾 Save to Library
                 </button>
                 <button
-                  className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl hover:from-orange-700 hover:to-red-700 font-semibold shadow-lg transition-all"
-                  onClick={() => {
-                    // TODO: Generate PDF (Phase 3)
-                    alert('PDF export coming soon!');
-                  }}
+                  className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl hover:from-orange-700 hover:to-red-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleDownloadPDF}
+                  disabled={generatingPDF}
                 >
-                  📄 Download PDF
+                  {generatingPDF ? (
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Generating PDF...
+                    </span>
+                  ) : (
+                    '📄 Download PDF'
+                  )}
                 </button>
                 <Link
                   href="/dashboard"

@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
+import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 
 export default function StoryViewerPage() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function StoryViewerPage() {
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<any>(null);
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -76,6 +78,47 @@ export default function StoryViewerPage() {
     } catch (error) {
       console.error('Error fetching project:', error);
       router.push('/projects');
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!project || !project.scenes || project.scenes.length === 0) {
+      alert('No scenes to generate PDF');
+      return;
+    }
+
+    setGeneratingPDF(true);
+
+    try {
+      // Prepare scenes data
+      const scenesData = project.scenes
+        .filter((scene: any) => scene.images && scene.images.length > 0)
+        .map((scene: any) => ({
+          sceneNumber: scene.sceneNumber,
+          description: scene.description,
+          imageUrl: scene.images[0].imageUrl,
+        }));
+
+      if (scenesData.length === 0) {
+        alert('No scenes with images found');
+        setGeneratingPDF(false);
+        return;
+      }
+
+      // Generate and download PDF
+      await generateAndDownloadStoryPDF({
+        title: project.title,
+        description: project.description,
+        scenes: scenesData,
+        createdDate: new Date(project.createdAt).toLocaleDateString(),
+        author: user?.name || 'My Family',
+      });
+
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setGeneratingPDF(false);
     }
   };
 
@@ -216,17 +259,22 @@ export default function StoryViewerPage() {
             <div className="bg-white rounded-2xl shadow-xl p-6">
               <div className="flex gap-4 flex-wrap">
                 <button
-                  onClick={() => {
-                    // TODO: PDF download (Phase 3)
-                    alert('PDF download coming soon!');
-                  }}
-                  className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl hover:from-orange-700 hover:to-red-700 font-semibold shadow-lg transition-all"
+                  onClick={handleDownloadPDF}
+                  disabled={generatingPDF}
+                  className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl hover:from-orange-700 hover:to-red-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  📄 Download PDF
+                  {generatingPDF ? (
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Generating PDF...
+                    </span>
+                  ) : (
+                    '📄 Download PDF'
+                  )}
                 </button>
                 <Link
                   href="/projects"
-                  className="bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 font-semibold transition-all"
+                  className="bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 font-semibold transition-all inline-block"
                 >
                   Back to My Stories
                 </Link>
