@@ -1,0 +1,520 @@
+/**
+ * Landing page / Home page
+ * Modern, appealing design with emojis
+ */
+
+import Link from 'next/link';
+import { sampleStorybooks } from '@/data/sample-storybooks';
+import Image from 'next/image';
+
+export default function HomePage() {
+  // Show landing page (removed auth redirect - dashboard handles auth now)
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+      {/* Header with Sign In button */}
+      <header className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <div className="text-2xl font-bold">
+            📚 Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-600">Me</span> ✨
+          </div>
+          <span className="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded-full">BETA</span>
+        </div>
+        <Link
+          href="/login"
+          className="text-gray-700 hover:text-gray-900 font-medium px-6 py-2 rounded-lg hover:bg-white/50 transition-all"
+        >
+          Sign In
+        </Link>
+      </header>
+
+      <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12">
+        {/* Hero Section - Two Column Layout */}
+        <div className="grid lg:grid-cols-2 gap-12 items-center mb-16">
+          {/* Left Column - Content (50%) */}
+          <div className="space-y-6">
+            {/* Brand Logo/Title */}
+            <div className="mb-8">
+              <h1 className="text-5xl sm:text-6xl font-bold mb-2">
+                📚 Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-600">Me</span> ✨
+              </h1>
+              <div className="h-1 w-24 bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-600 rounded-full"></div>
+            </div>
+
+            {/* Tagline */}
+            <div className="space-y-3">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">
+                Where Your Child's Stories Come to Life
+              </h2>
+            </div>
+
+            {/* Mission Statement */}
+            <div className="bg-gradient-to-r from-yellow-50 to-pink-50 border-2 border-yellow-200 rounded-xl p-5 shadow-md">
+              <p className="text-sm font-semibold text-gray-500 mb-2">💫 Our Mission:</p>
+              <p className="text-base text-gray-800 leading-relaxed">
+                To turn your child's imagination into personalized storybooks that inspire a love for reading — and create memories you'll cherish forever.
+              </p>
+            </div>
+
+            {/* CTA Buttons - Side by Side */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link
+                href="/guest"
+                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3.5 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold text-base text-center shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-0.5"
+              >
+                🚀 Try It Free – No Sign-Up Needed
+              </Link>
+              <Link
+                href="/signup"
+                className="flex-1 bg-white text-gray-800 px-6 py-3.5 rounded-xl hover:bg-gray-50 font-semibold text-base text-center shadow-lg hover:shadow-xl transition-all border-2 border-gray-200 transform hover:-translate-y-0.5"
+              >
+                Create Account
+              </Link>
+            </div>
+          </div>
+
+          {/* Right Column - Hero Visual (50%) */}
+          <div className="lg:block hidden">
+            <div className="relative">
+              {/* Decorative background */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 rounded-3xl transform rotate-3"></div>
+
+              {/* Main visual container */}
+              <div className="relative bg-white rounded-3xl shadow-2xl p-8 transform -rotate-1 hover:rotate-0 transition-transform duration-300">
+                {/* Storybook mockup */}
+                <div className="space-y-4">
+                  {/* Book cover */}
+                  <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg">
+                    <div className="text-center space-y-3">
+                      <div className="text-5xl">📖</div>
+                      <h3 className="font-bold text-xl">My Adventure</h3>
+                      <p className="text-sm opacity-90">A story by Emma, age 5</p>
+                    </div>
+                  </div>
+
+                  {/* Book pages preview */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-gradient-to-br from-yellow-100 to-orange-100 rounded-lg p-4 aspect-square flex items-center justify-center text-4xl">
+                      🐉
+                    </div>
+                    <div className="bg-gradient-to-br from-green-100 to-blue-100 rounded-lg p-4 aspect-square flex items-center justify-center text-4xl">
+                      🦸‍♀️
+                    </div>
+                  </div>
+
+                  {/* Reading indicator */}
+                  <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+                    <span className="text-2xl">👦</span>
+                    <span className="text-2xl">👧</span>
+                    <span>+</span>
+                    <span className="text-2xl">👨‍👩‍👧</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Personal Story Section */}
+        <div className="bg-gradient-to-br from-white to-yellow-50 rounded-2xl shadow-xl p-5 sm:p-6 mb-8 sm:mb-10 border border-yellow-100">
+          <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+            <div className="flex-shrink-0 mx-auto sm:mx-0">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg transform rotate-3">
+                <span className="text-2xl sm:text-3xl">💡</span>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 flex items-center gap-2">
+                What Sparked StoryMe 🌟
+              </h2>
+              <div className="text-sm sm:text-base text-gray-700 space-y-2 leading-relaxed">
+                <p>
+                  One evening, my 4-year-old came running to me, eyes sparkling with excitement.
+                  He had just made up a wild story about how his friend got eaten by a dragon 🐉 — and how he and his superhero squad saved the day! 🦸‍♂️
+                </p>
+                <p>
+                  As he told me every detail with so much imagination and joy, I realized these moments are priceless — little sparks of creativity worth keeping forever.
+                </p>
+                <p>
+                  Around the same time, he was just beginning to learn how to read, and I noticed how much more excited he was to read his own stories. Seeing himself as the hero made reading fun, personal, and meaningful.
+                </p>
+                <p className="italic text-gray-600 bg-white/50 p-3 rounded-lg border-l-4 border-orange-400 text-sm">
+                  <span className="text-xl mr-1">✨</span>
+                  That moment, StoryMe was born — to help parents capture their child's imagination and turn it into personalized storybooks that inspire a love for reading and create memories to cherish forever.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Why Parents Love StoryMe */}
+        <div className="mb-12 sm:mb-16">
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 text-center mb-8 sm:mb-12">
+            🎯 Why Parents Love StoryMe
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+            {/* Benefit 1 */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-pink-100">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-rose-500 rounded-xl flex items-center justify-center shadow-md">
+                    <span className="text-2xl">📖</span>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 mb-2 text-lg">
+                    A Storybook About Your Child
+                  </h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    Every StoryMe book begins with your child's imagination — their adventures, dreams, and silly what-ifs. Each story becomes a reflection of who they are and what they love, turning fleeting moments into keepsakes you'll treasure forever.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Benefit 2 */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-blue-100">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-xl flex items-center justify-center shadow-md">
+                    <span className="text-2xl">🎓</span>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 mb-2 text-lg">
+                    Made to Make Reading Fun
+                  </h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    Kids are most motivated to read when the story feels like their own. StoryMe adapts every story to your child's age and reading level — blending playful language, familiar words, and their creativity to make reading engaging, personal, and joyful.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Benefit 3 */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-green-100">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center shadow-md">
+                    <span className="text-2xl">👦👧</span>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 mb-2 text-lg">
+                    Consistent Characters, Endless Adventures
+                  </h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    Upload a photo once, and StoryMe remembers your child and family characters — keeping them consistent across every page and every story. As your collection grows, your little hero grows right along with it.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Benefit 4 */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-purple-100">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl flex items-center justify-center shadow-md">
+                    <span className="text-2xl">🎨</span>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 mb-2 text-lg">
+                    Create in Any Way They Imagine
+                  </h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    Record their voice telling a story, upload a quick video, snap a photo of a crayon sketch, or type a few lines of a rough script — StoryMe brings it all to life. Our AI turns every idea, drawing, and doodle into a polished, illustrated storybook.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Benefit 5 */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-orange-100">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center shadow-md">
+                    <span className="text-2xl">⚡</span>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 mb-2 text-lg">
+                    Fast, Magical, and Print-Ready
+                  </h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    From imagination to illustrated book in minutes — with beautiful, high-resolution PDFs ready to print or turn into hardcover keepsakes for family and friends.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Benefit 6 */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-indigo-100">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-xl flex items-center justify-center shadow-md">
+                    <span className="text-2xl">✨</span>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 mb-2 text-lg">
+                    Coming Soon: Co-Author Mode
+                  </h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    Imagine your child as a sidekick in their favorite Dog Man or Frozen adventure — reading along as both fan and co-author. StoryMe is building new ways to blend your child into beloved story worlds while keeping the magic personal, safe, and educational.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p className="text-center text-lg text-gray-700 mt-8">
+            💫 <em>Because the best way to learn to love reading is to see yourself inside the story.</em>
+          </p>
+        </div>
+
+        {/* How It Works */}
+        <div className="bg-gradient-to-br from-white to-blue-50 rounded-3xl shadow-2xl p-6 sm:p-10 md:p-12 mb-12 sm:mb-16 border border-blue-100">
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4 text-center flex items-center justify-center gap-3">
+            <span>🔮 How It Works</span>
+          </h2>
+          <p className="text-center text-gray-600 mb-8 text-base sm:text-lg">
+            Creating a StoryMe book is simple, fun, and magical — for both you and your child.
+          </p>
+          <div className="space-y-6">
+            <div className="flex items-start gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full flex items-center justify-center font-bold text-xl shadow-lg">
+                1
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-900 mb-2 text-lg flex items-center gap-2">
+                  Create Your Characters <span className="text-xl">👦👧</span>
+                </h3>
+                <p className="text-gray-600 leading-relaxed">
+                  Upload a photo or describe your child and family members. StoryMe keeps their look consistent across every page and every book.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-full flex items-center justify-center font-bold text-xl shadow-lg">
+                2
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-900 mb-2 text-lg flex items-center gap-2">
+                  Tell the Story <span className="text-xl">🎤</span>
+                </h3>
+                <p className="text-gray-600 leading-relaxed">
+                  Record your child's voice, upload a short video, snap a picture of their drawing, or type a quick story idea. Our AI understands their imagination — even if it starts with just a few doodles or sentences.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-pink-500 to-pink-600 text-white rounded-full flex items-center justify-center font-bold text-xl shadow-lg">
+                3
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-900 mb-2 text-lg flex items-center gap-2">
+                  Watch the Magic Happen <span className="text-xl">🎨</span>
+                </h3>
+                <p className="text-gray-600 leading-relaxed">
+                  StoryMe brings each story to life with beautiful, age-appropriate illustrations that capture your child's world and emotions.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-full flex items-center justify-center font-bold text-xl shadow-lg">
+                4
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-900 mb-2 text-lg flex items-center gap-2">
+                  Read, Print & Treasure <span className="text-xl">📖</span>
+                </h3>
+                <p className="text-gray-600 leading-relaxed">
+                  Download your finished storybook as a high-quality PDF — perfect for bedtime reading, printing as a keepsake, or gifting to grandparents.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-full flex items-center justify-center font-bold text-xl shadow-lg">
+                5
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-900 mb-2 text-lg flex items-center gap-2">
+                  Share and Grow Together <span className="text-xl">💬</span>
+                </h3>
+                <p className="text-gray-600 leading-relaxed">
+                  Share your child's story with family and friends, or with the StoryMe community (coming soon). Tell us how we're doing — your feedback helps us make the experience even more magical for every family.
+                </p>
+              </div>
+            </div>
+          </div>
+          <p className="text-center text-gray-700 mt-8 text-base sm:text-lg">
+            💫 <em>From imagination to a beautifully illustrated storybook — in just minutes.</em>
+          </p>
+        </div>
+
+        {/* Social Proof / Stats */}
+        <div className="mb-12 sm:mb-16">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="bg-white rounded-2xl shadow-lg p-6 text-center transform hover:-translate-y-1 transition-all">
+              <div className="text-4xl mb-2">🎨</div>
+              <div className="text-3xl font-bold text-purple-600 mb-1">AI-Powered</div>
+              <div className="text-gray-600">Professional Illustrations</div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg p-6 text-center transform hover:-translate-y-1 transition-all">
+              <div className="text-4xl mb-2">⚡</div>
+              <div className="text-3xl font-bold text-blue-600 mb-1">5 Minutes</div>
+              <div className="text-gray-600">From Story to Book</div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg p-6 text-center transform hover:-translate-y-1 transition-all">
+              <div className="text-4xl mb-2">💝</div>
+              <div className="text-3xl font-bold text-pink-600 mb-1">Forever</div>
+              <div className="text-gray-600">Cherished Keepsakes</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sample Storybooks Gallery */}
+        {sampleStorybooks.length > 0 && (
+          <div className="mb-12 sm:mb-16">
+            <div className="text-center mb-8 sm:mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3 flex items-center justify-center gap-3">
+                <span className="text-4xl">📚</span>
+                <span>Sample Storybooks</span>
+              </h2>
+              <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+                See what other families have created with StoryMe
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            {sampleStorybooks.map((storybook) => (
+              <div
+                key={storybook.id}
+                className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-gray-100"
+              >
+                {/* Cover Image */}
+                <div className="relative h-64 sm:h-72 bg-gradient-to-br from-blue-50 to-purple-50">
+                  <Image
+                    src={storybook.coverImage}
+                    alt={storybook.title}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+
+                {/* Content */}
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-3">
+                    <h3 className="text-xl font-bold text-gray-900 flex-1">
+                      {storybook.title}
+                    </h3>
+                    <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium ml-2">
+                      {storybook.ageGroup}
+                    </span>
+                  </div>
+
+                  <p className="text-gray-600 text-sm mb-4 leading-relaxed">
+                    {storybook.description}
+                  </p>
+
+                  {/* Characters */}
+                  <div className="flex items-center gap-2 mb-4 flex-wrap">
+                    <span className="text-xs text-gray-500">Characters:</span>
+                    {storybook.characters.map((character, idx) => (
+                      <span
+                        key={idx}
+                        className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full"
+                      >
+                        {character}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Scene Preview */}
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    {storybook.scenes.slice(0, 3).map((scene, idx) => (
+                      <div
+                        key={idx}
+                        className="relative h-20 rounded-lg overflow-hidden bg-gray-100"
+                      >
+                        <Image
+                          src={scene.imageUrl}
+                          alt={`Scene ${idx + 1}`}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                    <span className="text-xs text-gray-500">
+                      {storybook.scenes.length} scenes
+                    </span>
+                    {storybook.isCustomerSubmission && storybook.customerName && (
+                      <span className="text-xs text-gray-500 italic">
+                        by {storybook.customerName}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+            {/* Add Your Story CTA */}
+            <div className="text-center mt-8 sm:mt-12">
+              <p className="text-gray-600 mb-4 text-base sm:text-lg">
+                Want to share your storybook here?
+              </p>
+              <Link
+                href="/guest"
+                className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
+              >
+                Create Your Storybook
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Final CTA */}
+        <div className="text-center bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl shadow-2xl p-8 sm:p-12 text-white">
+          <div className="mb-4">
+            <span className="text-5xl">✨📖✨</span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-bold mb-4 leading-tight">
+            Every child has a story worth telling — and reading.
+          </h2>
+          <p className="text-lg sm:text-xl mb-8 max-w-2xl mx-auto opacity-90">
+            Let StoryMe help you capture their imagination, nurture their love for reading, and create memories you'll cherish for a lifetime.
+          </p>
+          <div className="flex gap-4 justify-center flex-wrap">
+            <Link
+              href="/guest"
+              className="bg-white text-purple-600 px-8 py-4 rounded-xl hover:bg-gray-50 font-bold text-lg shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-0.5"
+            >
+              🚀 Try It Free – No Sign-Up Needed
+            </Link>
+            <Link
+              href="/signup"
+              className="bg-purple-800 text-white px-8 py-4 rounded-xl hover:bg-purple-900 font-bold text-lg shadow-xl hover:shadow-2xl transition-all border-2 border-white/20 transform hover:-translate-y-0.5"
+            >
+              Create Account
+            </Link>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-12 text-gray-500 text-sm">
+          <p className="flex items-center justify-center gap-2">
+            Made with <span className="text-red-500 animate-pulse">❤️</span> for parents and their little storytellers
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
