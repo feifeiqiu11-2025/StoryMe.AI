@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import CharacterManager from '@/components/story/CharacterManager';
 import ScriptInput from '@/components/story/ScriptInput';
 import GenerationProgress from '@/components/story/GenerationProgress';
@@ -10,6 +11,7 @@ import { StorySession } from '@/lib/types/story';
 import { validateScript, parseScriptIntoScenes, validateCharacterReferences } from '@/lib/scene-parser';
 
 export default function GuestStoryPage() {
+  const router = useRouter();
   const [session, setSession] = useState<StorySession>({
     characters: [],
     script: '',
@@ -19,6 +21,8 @@ export default function GuestStoryPage() {
   });
 
   const [error, setError] = useState<string | null>(null);
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  const [signupAction, setSignupAction] = useState<'save' | 'download'>('save');
 
   const handleCharactersChange = (characters: typeof session.characters) => {
     setSession(prev => ({
@@ -153,6 +157,16 @@ export default function GuestStoryPage() {
     setError(null);
   };
 
+  const handleSaveStory = () => {
+    setSignupAction('save');
+    setShowSignupPrompt(true);
+  };
+
+  const handleDownloadPDF = () => {
+    setSignupAction('download');
+    setShowSignupPrompt(true);
+  };
+
   const canGenerate =
     session.characters.length > 0 &&
     session.characters.every(c => c.referenceImage.url && c.name.trim()) &&
@@ -174,12 +188,6 @@ export default function GuestStoryPage() {
               </h1>
               <span className="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded-full">BETA</span>
               <span className="text-xs sm:text-sm text-gray-500 ml-2">Guest Mode</span>
-            </Link>
-            <Link
-              href="/signup"
-              className="text-xs sm:text-sm bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 font-medium transition-all"
-            >
-              Save Your Story
             </Link>
           </div>
         </div>
@@ -300,15 +308,23 @@ export default function GuestStoryPage() {
                   <div className="flex-shrink-0 text-2xl">🎉</div>
                   <div className="flex-1">
                     <h3 className="font-bold text-gray-900 mb-2">Your Story is Ready!</h3>
-                    <p className="text-sm text-gray-700 mb-3">
-                      Want to save this forever? Create a free account to download your storybook as a PDF.
+                    <p className="text-sm text-gray-700 mb-4">
+                      Love your story? Save it or download as PDF by creating a free account.
                     </p>
-                    <Link
-                      href="/signup"
-                      className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 font-semibold text-sm shadow-md hover:shadow-lg transition-all"
-                    >
-                      Create Free Account
-                    </Link>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={handleSaveStory}
+                        className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 font-semibold text-sm shadow-md hover:shadow-lg transition-all"
+                      >
+                        💾 Save Story
+                      </button>
+                      <button
+                        onClick={handleDownloadPDF}
+                        className="inline-flex items-center gap-2 bg-gradient-to-r from-green-600 to-teal-600 text-white px-6 py-2 rounded-lg hover:from-green-700 hover:to-teal-700 font-semibold text-sm shadow-md hover:shadow-lg transition-all"
+                      >
+                        📄 Download PDF
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -322,6 +338,44 @@ export default function GuestStoryPage() {
           )}
         </div>
       </main>
+
+      {/* Signup Prompt Modal */}
+      {showSignupPrompt && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 sm:p-8">
+            <div className="text-center">
+              <div className="text-5xl mb-4">
+                {signupAction === 'save' ? '💾' : '📄'}
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                {signupAction === 'save' ? 'Save Your Story' : 'Download as PDF'}
+              </h3>
+              <p className="text-gray-600 mb-6">
+                {signupAction === 'save'
+                  ? 'Create a free account to save your story and access it anytime from any device.'
+                  : 'Create a free account to download your storybook as a beautiful PDF.'}
+              </p>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => router.push('/signup')}
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 font-semibold shadow-md hover:shadow-lg transition-all"
+                >
+                  Create Free Account
+                </button>
+                <button
+                  onClick={() => setShowSignupPrompt(false)}
+                  className="w-full bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 font-medium transition-all"
+                >
+                  Maybe Later
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-4">
+                Already have an account? <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">Sign in</Link>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="bg-white border-t border-gray-200 mt-12 sm:mt-16">
