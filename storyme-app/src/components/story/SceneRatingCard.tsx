@@ -25,7 +25,6 @@ export default function SceneRatingCard({
   readonly = false,
 }: SceneRatingCardProps) {
   const [overallRating, setOverallRating] = useState(initialRatings?.overallRating || 0);
-  const [feedback, setFeedback] = useState(initialRatings?.ratingFeedback || '');
   const [isSaving, setIsSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -42,7 +41,6 @@ export default function SceneRatingCard({
     try {
       await onSave({
         overallRating,
-        ratingFeedback: feedback || undefined,
       });
       setSaveSuccess(true);
       setShowForm(false);
@@ -78,11 +76,6 @@ export default function SceneRatingCard({
             readonly
             size="md"
           />
-          {initialRatings?.ratingFeedback && (
-            <div className="mt-2 pt-2 border-t border-blue-200">
-              <p className="text-xs text-gray-600 italic">"{initialRatings.ratingFeedback}"</p>
-            </div>
-          )}
         </div>
       </div>
     );
@@ -117,24 +110,6 @@ export default function SceneRatingCard({
           />
           <p className="text-xs text-gray-500 mt-2">
             How would you rate this scene overall?
-          </p>
-        </div>
-
-        {/* Optional Feedback */}
-        <div>
-          <label className="text-xs font-medium text-gray-700 block mb-1">
-            Additional Feedback (Optional)
-          </label>
-          <textarea
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            placeholder="What could be improved?"
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            rows={2}
-            maxLength={500}
-          />
-          <p className="text-xs text-gray-400 mt-1">
-            {feedback.length}/500 characters
           </p>
         </div>
 
