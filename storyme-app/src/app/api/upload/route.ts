@@ -33,20 +33,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get authenticated user
+    // Get user (authenticated or guest)
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    // Use user ID if authenticated, otherwise use 'guest' folder
+    const userId = user?.id || 'guest';
 
     // Upload to Supabase Storage
     const storageService = new StorageService(supabase);
-    const result = await storageService.uploadCharacterImage(user.id, file);
+    const result = await storageService.uploadCharacterImage(userId, file);
 
     return NextResponse.json({
       success: true,
