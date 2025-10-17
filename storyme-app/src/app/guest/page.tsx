@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CharacterManager from '@/components/story/CharacterManager';
@@ -9,8 +9,11 @@ import StorySettingsPanel from '@/components/story/StorySettingsPanel';
 import EnhancementPreview from '@/components/story/EnhancementPreview';
 import GenerationProgress from '@/components/story/GenerationProgress';
 import ImageGallery from '@/components/story/ImageGallery';
+import GuestSignupModal from '@/components/auth/GuestSignupModal';
 import { StorySession, StoryTone, EnhancedScene } from '@/lib/types/story';
 import { validateScript, parseScriptIntoScenes, validateCharacterReferences } from '@/lib/scene-parser';
+import { saveGuestStory, getGuestStory, saveGuestStoryToAccount } from '@/lib/utils/guest-story-storage';
+import { createClient } from '@/lib/supabase/client';
 
 export default function GuestStoryPage() {
   const router = useRouter();
@@ -33,6 +36,34 @@ export default function GuestStoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [signupAction, setSignupAction] = useState<'save' | 'download'>('save');
+
+  // Check for authenticated user and restore guest story
+  useEffect(() => {
+    async function checkAuthAndRestoreStory() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (user) {
+        // User is authenticated - check for saved guest story
+        const guestStory = getGuestStory();
+
+        if (guestStory && guestStory.generatedImages.length > 0) {
+          console.log('Found guest story with images, redirecting to /create page...');
+
+          // Story will be preserved in sessionStorage, just redirect to authenticated create page
+          // The /create page should check for guest story and restore it
+          router.push('/create');
+        } else {
+          // User is authenticated but no completed guest story - redirect to dashboard
+          // This covers: no guest story, or guest story without generated images
+          console.log('No completed guest story found, redirecting to dashboard');
+          router.push('/dashboard');
+        }
+      }
+    }
+
+    checkAuthAndRestoreStory();
+  }, [router]);
 
   const handleCharactersChange = (characters: typeof session.characters) => {
     setSession(prev => ({
@@ -249,12 +280,78 @@ export default function GuestStoryPage() {
     setError(null);
   };
 
-  const handleSaveStory = () => {
-    setSignupAction('save');
-    setShowSignupPrompt(true);
+  const handleSaveStory = async () => {
+    // Check if user is authenticated
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      // User is authenticated - save directly to their account
+      console.log('Authenticated user, saving story to account...');
+
+      try {
+        const saved = await saveGuestStoryToAccount(user.id);
+
+        if (saved) {
+          alert('✅ Your story has been saved to your account!');
+          // Redirect to dashboard after saving
+          setTimeout(() => router.push('/dashboard'), 1000);
+        } else {
+          console.error('Failed to save story to account');
+          alert('❌ Failed to save story. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error saving story:', error);
+
+        // If unauthorized, the auth token might be stale - show signup modal
+        if (error instanceof Error && error.message === 'UNAUTHORIZED') {
+          console.log('Authentication expired, showing signup modal');
+          // Save to sessionStorage and show signup
+          if (session.generatedImages.length > 0) {
+            saveGuestStory({
+              characters: session.characters,
+              script: session.script,
+              readingLevel,
+              storyTone,
+              enhancedScenes,
+              generatedImages: session.generatedImages,
+            });
+          }
+          setSignupAction('save');
+          setShowSignupPrompt(true);
+        } else {
+          alert('❌ Failed to save story. Please try again.');
+        }
+      }
+    } else {
+      // User is not authenticated - save to sessionStorage and show signup modal
+      if (session.generatedImages.length > 0) {
+        saveGuestStory({
+          characters: session.characters,
+          script: session.script,
+          readingLevel,
+          storyTone,
+          enhancedScenes,
+          generatedImages: session.generatedImages,
+        });
+      }
+      setSignupAction('save');
+      setShowSignupPrompt(true);
+    }
   };
 
   const handleDownloadPDF = () => {
+    // Save guest story to sessionStorage before showing signup prompt
+    if (session.generatedImages.length > 0) {
+      saveGuestStory({
+        characters: session.characters,
+        script: session.script,
+        readingLevel,
+        storyTone,
+        enhancedScenes,
+        generatedImages: session.generatedImages,
+      });
+    }
     setSignupAction('download');
     setShowSignupPrompt(true);
   };
@@ -459,6 +556,7 @@ export default function GuestStoryPage() {
                 characters={session.characters}
                 generatedImages={session.generatedImages}
                 onStartOver={handleStartOver}
+                isGuestMode={true}
               />
             </>
           )}
@@ -467,40 +565,10 @@ export default function GuestStoryPage() {
 
       {/* Signup Prompt Modal */}
       {showSignupPrompt && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 sm:p-8">
-            <div className="text-center">
-              <div className="text-5xl mb-4">
-                {signupAction === 'save' ? '💾' : '📄'}
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                {signupAction === 'save' ? 'Save Your Story' : 'Download as PDF'}
-              </h3>
-              <p className="text-gray-600 mb-6">
-                {signupAction === 'save'
-                  ? 'Create a free account to save your story and access it anytime from any device.'
-                  : 'Create a free account to download your storybook as a beautiful PDF.'}
-              </p>
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={() => router.push('/signup')}
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 font-semibold shadow-md hover:shadow-lg transition-all"
-                >
-                  Create Free Account
-                </button>
-                <button
-                  onClick={() => setShowSignupPrompt(false)}
-                  className="w-full bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 font-medium transition-all"
-                >
-                  Maybe Later
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 mt-4">
-                Already have an account? <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">Sign in</Link>
-              </p>
-            </div>
-          </div>
-        </div>
+        <GuestSignupModal
+          action={signupAction}
+          onClose={() => setShowSignupPrompt(false)}
+        />
       )}
 
       {/* Footer */}

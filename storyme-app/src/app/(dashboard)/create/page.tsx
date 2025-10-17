@@ -18,6 +18,7 @@ import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScen
 import { parseScriptIntoScenes } from '@/lib/scene-parser';
 import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
+import { getGuestStory, clearGuestStory } from '@/lib/utils/guest-story-storage';
 
 const CHARACTERS_STORAGE_KEY = 'storyme_character_library';
 
@@ -94,6 +95,39 @@ export default function CreateStoryPage() {
 
     loadUser();
   }, [router]);
+
+  // Restore guest story if user just signed in from guest mode
+  useEffect(() => {
+    if (user) {
+      const guestStory = getGuestStory();
+
+      if (guestStory && guestStory.generatedImages.length > 0) {
+        console.log('Restoring guest story to authenticated create page...');
+
+        // Restore the story state
+        setCharacters(guestStory.characters);
+        setScriptInput(guestStory.script);
+        setReadingLevel(guestStory.readingLevel);
+        setStoryTone(guestStory.storyTone as StoryTone);
+        setEnhancedScenes(guestStory.enhancedScenes);
+        setImageGenerationStatus(guestStory.generatedImages);
+
+        // Set session to completed state
+        setSession({
+          characters: guestStory.characters,
+          script: guestStory.script,
+          scenes: [],
+          generatedImages: guestStory.generatedImages,
+          status: 'completed',
+        });
+
+        // Show save modal automatically
+        setShowSaveModal(true);
+
+        console.log('✓ Guest story restored, showing save modal');
+      }
+    }
+  }, [user]);
 
   const handleCharactersChange = (newCharacters: Character[]) => {
     setCharacters(newCharacters);
@@ -392,6 +426,57 @@ export default function CreateStoryPage() {
         // Continue anyway with fallback cover
       }
 
+      // Check if characters have temporary IDs (from guest mode)
+      const hasTemporaryIds = characters.some(c => c.id.startsWith('char-'));
+      let characterIds = characters.map(c => c.id);
+
+      if (hasTemporaryIds) {
+        console.log('Detected temporary character IDs, creating characters in library first...');
+
+        // Create characters in the library first
+        const characterIdMap: Record<string, string> = {};
+
+        for (const character of characters) {
+          if (character.id.startsWith('char-')) {
+            try {
+              const charResponse = await fetch('/api/characters', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  name: character.name,
+                  reference_image_url: character.referenceImage.url,
+                  reference_image_filename: character.referenceImage.fileName,
+                  hair_color: character.description.hairColor || '',
+                  skin_tone: character.description.skinTone || '',
+                  clothing: character.description.clothing || '',
+                  age: character.description.age || '',
+                  other_features: character.description.otherFeatures || '',
+                }),
+              });
+
+              if (!charResponse.ok) {
+                const errorData = await charResponse.json();
+                throw new Error(`Failed to create character ${character.name}: ${errorData.error}`);
+              }
+
+              const charData = await charResponse.json();
+              characterIdMap[character.id] = charData.character.id;
+              console.log(`✓ Created character: ${character.name} (${character.id} → ${charData.character.id})`);
+            } catch (error) {
+              console.error(`Failed to create character ${character.name}:`, error);
+              throw error;
+            }
+          } else {
+            // Already a real UUID, keep it
+            characterIdMap[character.id] = character.id;
+          }
+        }
+
+        // Use the real character IDs
+        characterIds = characters.map(c => characterIdMap[c.id]);
+        console.log('✓ All characters created, using real UUIDs:', characterIds);
+      }
+
       // Call save API
       const response = await fetch('/api/projects/save', {
         method: 'POST',
@@ -405,7 +490,7 @@ export default function CreateStoryPage() {
           originalScript: scriptInput,
           readingLevel: readingLevel, // NEW
           storyTone: storyTone,       // NEW
-          characterIds: characters.map(c => c.id),
+          characterIds: characterIds,
           scenes: scenesData,
         }),
       });
@@ -415,6 +500,10 @@ export default function CreateStoryPage() {
       if (!response.ok) {
         throw new Error(data.error || 'Failed to save story');
       }
+
+      // Clear guest story from sessionStorage after successful save
+      clearGuestStory();
+      console.log('✓ Cleared guest story from sessionStorage');
 
       // Success! Redirect to My Stories page
       router.push('/projects');
@@ -842,7 +931,7 @@ export default function CreateStoryPage() {
 
         {/* Save Story Modal */}
         {showSaveModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">Save Your Story</h2>

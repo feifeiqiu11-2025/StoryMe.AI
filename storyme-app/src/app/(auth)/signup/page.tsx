@@ -1,6 +1,6 @@
 /**
  * Signup page
- * Allows new users to create an account
+ * Allows new users to create an account with OAuth or email/password
  */
 
 'use client';
@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
+import SocialLoginButtons from '@/components/auth/SocialLoginButtons';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -121,7 +122,11 @@ export default function SignupPage() {
     <div className="bg-white rounded-lg shadow-xl p-8">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Create Account</h2>
 
-      <form onSubmit={handleSignup} className="space-y-4">
+      {/* OAuth Buttons (Primary) */}
+      <SocialLoginButtons mode="signup" redirectTo="/dashboard" />
+
+      {/* Email/Password Form (Secondary - Always Visible) */}
+      <form onSubmit={handleSignup} className="space-y-4 mt-6">
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
             Full Name

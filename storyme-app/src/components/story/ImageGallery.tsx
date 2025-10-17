@@ -10,6 +10,7 @@ interface ImageGalleryProps {
   onRating?: (imageId: string, characterId: string, rating: 'good' | 'bad') => void;
   onDownloadAll?: () => void;
   onStartOver?: () => void;
+  isGuestMode?: boolean; // Hide individual downloads in guest mode
 }
 
 export default function ImageGallery({
@@ -18,6 +19,7 @@ export default function ImageGallery({
   onRating,
   onDownloadAll,
   onStartOver,
+  isGuestMode = false,
 }: ImageGalleryProps) {
   // Track ratings per image per character
   const [ratings, setRatings] = useState<Record<string, Record<string, 'good' | 'bad'>>>({});
@@ -281,16 +283,18 @@ export default function ImageGallery({
                       <p>Generation time: {image.generationTime.toFixed(1)}s</p>
                     </div>
 
-                    {/* Download button */}
-                    <a
-                      href={image.imageUrl}
-                      download={`scene-${image.sceneNumber}.jpg`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
-                    >
-                      Download Image
-                    </a>
+                    {/* Download button - Only show in authenticated mode */}
+                    {!isGuestMode && (
+                      <a
+                        href={image.imageUrl}
+                        download={`scene-${image.sceneNumber}.jpg`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+                      >
+                        Download Image
+                      </a>
+                    )}
                   </>
                 )}
 

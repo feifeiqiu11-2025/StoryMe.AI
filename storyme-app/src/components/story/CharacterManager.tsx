@@ -23,6 +23,8 @@ export default function CharacterManager({
   onSaveToLibrary
 }: CharacterManagerProps) {
   const [uploadingCharacterId, setUploadingCharacterId] = useState<string | null>(null);
+  const [analyzingCharacterId, setAnalyzingCharacterId] = useState<string | null>(null);
+  const [analyzedCharacterId, setAnalyzedCharacterId] = useState<string | null>(null);
 
   const addCharacter = () => {
     if (characters.length >= MAX_CHARACTERS) return;
@@ -56,9 +58,24 @@ export default function CharacterManager({
   };
 
   const updateCharacter = (characterId: string, updates: Partial<Character>) => {
-    const updated = characters.map(c =>
-      c.id === characterId ? { ...c, ...updates } : c
-    );
+    const updated = characters.map(c => {
+      if (c.id === characterId) {
+        // Deep merge to preserve nested objects like referenceImage and description
+        return {
+          ...c,
+          ...updates,
+          // Explicitly preserve referenceImage if not being updated
+          referenceImage: updates.referenceImage !== undefined
+            ? updates.referenceImage
+            : c.referenceImage,
+          // Merge description instead of replacing
+          description: updates.description !== undefined
+            ? { ...c.description, ...updates.description }
+            : c.description
+        };
+      }
+      return c;
+    });
     onCharactersChange(updated);
   };
 
@@ -90,6 +107,7 @@ export default function CharacterManager({
     formData.append('characterId', characterId);
 
     try {
+      // Upload image first
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
@@ -102,16 +120,68 @@ export default function CharacterManager({
 
       const data = await response.json();
 
+      // Store the referenceImage data locally to preserve it during analysis
+      const referenceImage = {
+        url: data.url,
+        fileName: file.name,
+      };
+
+      // Update character with image URL
       updateCharacter(characterId, {
-        referenceImage: {
-          url: data.url,
-          fileName: file.name,
-        },
+        referenceImage,
       });
+
+      // Clear uploading state immediately after image is set
+      setUploadingCharacterId(null);
+
+      // Auto-analyze image immediately after upload
+      setAnalyzingCharacterId(characterId);
+
+      try {
+        const analysisResponse = await fetch('/api/analyze-character-image', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            imageUrl: data.url,
+          }),
+        });
+
+        if (analysisResponse.ok) {
+          const analysisData = await analysisResponse.json();
+          if (analysisData.success && analysisData.analysis) {
+            // Update character with BOTH description AND referenceImage to preserve it
+            const updates = {
+              referenceImage, // Explicitly include the referenceImage we uploaded
+              description: {
+                hairColor: analysisData.analysis.hairColor || '',
+                skinTone: analysisData.analysis.skinTone || '',
+                clothing: analysisData.analysis.clothing || '',
+                age: analysisData.analysis.age || '',
+                otherFeatures: analysisData.analysis.otherFeatures || '',
+              }
+            };
+
+            updateCharacter(characterId, updates);
+
+            // Show brief success message
+            setAnalyzedCharacterId(characterId);
+            setTimeout(() => setAnalyzedCharacterId(null), 3000);
+          }
+        } else {
+          console.warn('Image analysis failed, continuing without auto-fill');
+        }
+      } catch (analysisError) {
+        console.warn('Image analysis error:', analysisError);
+        // Continue silently - user can still fill in manually
+      } finally {
+        setAnalyzingCharacterId(null);
+      }
+
     } catch (error) {
       console.error('Upload error:', error);
       alert('Failed to upload image. Please try again.');
-    } finally {
       setUploadingCharacterId(null);
     }
   };
@@ -135,6 +205,8 @@ export default function CharacterManager({
             onSetPrimary={() => setPrimaryCharacter(character.id)}
             onImageUpload={(file) => handleImageUpload(character.id, file)}
             isUploading={uploadingCharacterId === character.id}
+            isAnalyzing={analyzingCharacterId === character.id}
+            showAnalyzedBadge={analyzedCharacterId === character.id}
             disabled={disabled}
             onSaveToLibrary={onSaveToLibrary}
           />
@@ -169,6 +241,8 @@ interface CharacterCardProps {
   onSetPrimary: () => void;
   onImageUpload: (file: File) => void;
   isUploading: boolean;
+  isAnalyzing: boolean;
+  showAnalyzedBadge: boolean;
   disabled: boolean;
   onSaveToLibrary?: (character: Character) => void;
 }
@@ -181,6 +255,8 @@ function CharacterCard({
   onSetPrimary,
   onImageUpload,
   isUploading,
+  isAnalyzing,
+  showAnalyzedBadge,
   disabled,
   onSaveToLibrary,
 }: CharacterCardProps) {
@@ -227,32 +303,73 @@ function CharacterCard({
       </div>
 
       {/* Image Upload */}
-      <div
-        {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
-          isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-        } ${disabled || isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-      >
-        <input {...getInputProps()} />
-        {isUploading ? (
-          <div className="space-y-2">
-            <div className="text-sm text-gray-600">Uploading...</div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+      <div className="relative">
+        <div
+          {...getRootProps()}
+          className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+            isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+          } ${disabled || isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          <input {...getInputProps()} />
+          {isUploading ? (
+            <div className="space-y-2">
+              <div className="text-sm text-gray-600">Uploading and analyzing...</div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+              </div>
+              <p className="text-sm text-gray-500">
+                AI is analyzing appearance details
+              </p>
+            </div>
+          ) : character.referenceImage?.url ? (
+            <div className="space-y-2">
+              <div className="relative group bg-gray-50 rounded overflow-hidden" style={{ height: '160px' }}>
+                <img
+                  src={character.referenceImage.url}
+                  alt={character.name || 'Character'}
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    console.error('Image failed to load:', character.referenceImage.url);
+                  }}
+                  onLoad={(e) => {
+                    console.log('Image loaded successfully:', character.referenceImage.url);
+                    console.log('Image dimensions:', e.currentTarget.naturalWidth, 'x', e.currentTarget.naturalHeight);
+                  }}
+                />
+                <div className="absolute inset-0 bg-transparent group-hover:bg-black group-hover:bg-opacity-20 transition-all rounded flex items-center justify-center pointer-events-none">
+                  <span className="text-white opacity-0 group-hover:opacity-100 text-sm font-medium drop-shadow-lg transition-opacity">
+                    Click to change
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 truncate">{character.referenceImage.fileName}</p>
+            </div>
+          ) : (
+            <div className="space-y-1 py-2">
+              <div className="text-sm text-gray-500">
+                {isDragActive ? 'Drop photo here' : 'Click or drag photo'}
+              </div>
+              <p className="text-sm text-gray-500">
+                AI will analyze appearance details
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* AI Analyzing Overlay Badge */}
+        {isAnalyzing && character.referenceImage.url && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-lg pointer-events-none">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin"></div>
+              <span className="text-sm text-purple-600 font-medium">AI analyzing...</span>
             </div>
           </div>
-        ) : character.referenceImage.url ? (
-          <div className="space-y-2">
-            <img
-              src={character.referenceImage.url}
-              alt={character.name}
-              className="w-full h-32 object-cover rounded"
-            />
-            <p className="text-xs text-gray-500 truncate">{character.referenceImage.fileName}</p>
-          </div>
-        ) : (
-          <div className="text-sm text-gray-500">
-            {isDragActive ? 'Drop photo here' : 'Click or drag photo'}
+        )}
+
+        {/* AI Analyzed Badge */}
+        {showAnalyzedBadge && (
+          <div className="absolute -top-2 -right-2 bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full shadow-sm animate-bounce">
+            ✨ AI analyzed
           </div>
         )}
       </div>
