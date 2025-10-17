@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { title, description, authorName, authorAge, coverImageUrl, originalScript, characterIds, scenes } = body;
+    const { title, description, authorName, authorAge, coverImageUrl, originalScript, readingLevel, storyTone, characterIds, scenes } = body;
 
     // Validate required fields
     if (!title || !title.trim()) {
@@ -72,6 +72,8 @@ export async function POST(request: NextRequest) {
       authorAge: authorAge,
       coverImageUrl: coverImageUrl,
       originalScript,
+      readingLevel: readingLevel,     // NEW
+      storyTone: storyTone,           // NEW
       characterIds,
       scenes,
     });

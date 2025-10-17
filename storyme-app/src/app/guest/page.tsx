@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CharacterManager from '@/components/story/CharacterManager';
 import ScriptInput from '@/components/story/ScriptInput';
+import StorySettingsPanel from '@/components/story/StorySettingsPanel';
+import EnhancementPreview from '@/components/story/EnhancementPreview';
 import GenerationProgress from '@/components/story/GenerationProgress';
 import ImageGallery from '@/components/story/ImageGallery';
-import { StorySession } from '@/lib/types/story';
+import { StorySession, StoryTone, EnhancedScene } from '@/lib/types/story';
 import { validateScript, parseScriptIntoScenes, validateCharacterReferences } from '@/lib/scene-parser';
 
 export default function GuestStoryPage() {
@@ -19,6 +21,14 @@ export default function GuestStoryPage() {
     generatedImages: [],
     status: 'idle',
   });
+
+  // Story settings (NEW)
+  const [readingLevel, setReadingLevel] = useState<number>(5);
+  const [storyTone, setStoryTone] = useState<StoryTone>('playful');
+
+  // Enhancement state (NEW)
+  const [enhancedScenes, setEnhancedScenes] = useState<EnhancedScene[]>([]);
+  const [isEnhancing, setIsEnhancing] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
@@ -38,6 +48,66 @@ export default function GuestStoryPage() {
       script: newScript,
     }));
     setError(null);
+  };
+
+  // NEW: Handle AI scene enhancement
+  const handleEnhanceScenes = async () => {
+    if (!session.script.trim() || session.characters.length === 0) {
+      setError('Please add characters and write scenes first');
+      return;
+    }
+
+    setIsEnhancing(true);
+    setError(null);
+
+    try {
+      // Parse raw script into scenes
+      const rawScenes = parseScriptIntoScenes(session.script, session.characters);
+
+      console.log(`Enhancing ${rawScenes.length} scenes with reading level ${readingLevel} and ${storyTone} tone`);
+
+      // Call AI enhancement API
+      const response = await fetch('/api/enhance-scenes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenes: rawScenes.map(s => ({
+            sceneNumber: s.sceneNumber,
+            rawDescription: s.description,
+            characterNames: s.characterNames || []
+          })),
+          readingLevel,
+          storyTone,
+          characters: session.characters,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Enhancement failed');
+      }
+
+      const { enhancedScenes: enhanced } = await response.json();
+      console.log(`✓ Enhanced ${enhanced.length} scenes successfully`);
+
+      setEnhancedScenes(enhanced);
+    } catch (error) {
+      console.error('Scene enhancement error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to enhance scenes');
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
+  // NEW: Handle caption edit
+  const handleCaptionEdit = (sceneNumber: number, newCaption: string) => {
+    setEnhancedScenes(prev =>
+      prev.map(scene =>
+        scene.sceneNumber === sceneNumber
+          ? { ...scene, caption: newCaption }
+          : scene
+      )
+    );
   };
 
   const handleGenerate = async () => {
@@ -82,32 +152,46 @@ export default function GuestStoryPage() {
       return;
     }
 
+    // Check if scenes have been enhanced
+    if (enhancedScenes.length === 0) {
+      setError('Please enhance scenes first');
+      return;
+    }
+
     setError(null);
+
+    // Build enhanced script for image generation using enhanced prompts
+    const enhancedScript = enhancedScenes.map(s => s.enhanced_prompt).join('\n');
+
+    // Parse scenes for character references
     const scenes = parseScriptIntoScenes(session.script, session.characters);
 
-    // Initialize generation
+    // Initialize generation with captions
     setSession(prev => ({
       ...prev,
       status: 'processing',
       scenes,
-      generatedImages: scenes.map(scene => ({
-        id: `img-${scene.id}`,
-        sceneId: scene.id,
-        sceneNumber: scene.sceneNumber,
-        sceneDescription: scene.description,
-        imageUrl: '',
-        prompt: '',
-        generationTime: 0,
-        status: 'pending',
-        characterRatings: scene.characterNames?.map(name => ({
-          characterId: session.characters.find(c => c.name === name)?.id || '',
-          characterName: name,
-        })),
-      })),
+      generatedImages: scenes.map(scene => {
+        const enhancedScene = enhancedScenes.find(es => es.sceneNumber === scene.sceneNumber);
+        return {
+          id: `img-${scene.id}`,
+          sceneId: scene.id,
+          sceneNumber: scene.sceneNumber,
+          sceneDescription: enhancedScene?.caption || scene.description, // Use caption for display
+          imageUrl: '',
+          prompt: '',
+          generationTime: 0,
+          status: 'pending',
+          characterRatings: scene.characterNames?.map(name => ({
+            characterId: session.characters.find(c => c.name === name)?.id || '',
+            characterName: name,
+          })),
+        };
+      }),
     }));
 
     try {
-      // Call the generation API
+      // Call the generation API with enhanced prompts
       const response = await fetch('/api/generate-images', {
         method: 'POST',
         headers: {
@@ -115,7 +199,7 @@ export default function GuestStoryPage() {
         },
         body: JSON.stringify({
           characters: session.characters,
-          script: session.script,
+          script: enhancedScript, // Use enhanced prompts for image generation
         }),
       });
 
@@ -126,11 +210,19 @@ export default function GuestStoryPage() {
 
       const data = await response.json();
 
-      // Update with results
+      // Update with results - preserve captions
+      const updatedImages = data.generatedImages.map((img: any) => {
+        const enhancedScene = enhancedScenes.find(es => es.sceneNumber === img.sceneNumber);
+        return {
+          ...img,
+          sceneDescription: enhancedScene?.caption || img.sceneDescription,
+        };
+      });
+
       setSession(prev => ({
         ...prev,
         status: 'completed',
-        generatedImages: data.generatedImages,
+        generatedImages: updatedImages,
       }));
 
       if (data.errors && data.errors.length > 0) {
@@ -249,6 +341,25 @@ export default function GuestStoryPage() {
                 />
               </section>
 
+              {/* Step 3: Story Settings (NEW) */}
+              <section className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-gray-200">
+                <div className="flex items-center mb-6">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold mr-3 text-sm">
+                    3
+                  </span>
+                  <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
+                    Story Settings
+                  </h2>
+                </div>
+                <StorySettingsPanel
+                  readingLevel={readingLevel}
+                  onReadingLevelChange={setReadingLevel}
+                  storyTone={storyTone}
+                  onStoryToneChange={setStoryTone}
+                  disabled={isEnhancing || isGenerating}
+                />
+              </section>
+
               {/* Error Display */}
               {error && (
                 <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
@@ -273,23 +384,38 @@ export default function GuestStoryPage() {
                 </div>
               )}
 
-              {/* Generate Button */}
-              <div className="flex justify-center">
-                <button
-                  onClick={handleGenerate}
-                  disabled={!canGenerate}
-                  className={`
-                    px-8 py-4 rounded-xl font-bold text-base sm:text-lg shadow-lg transition-all
-                    ${canGenerate
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 hover:shadow-xl transform hover:-translate-y-0.5'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    }
-                  `}
-                >
-                  ✨ Generate Story Images
-                </button>
-              </div>
+              {/* Enhance Button (NEW) */}
+              {enhancedScenes.length === 0 && (
+                <div className="flex justify-center">
+                  <button
+                    onClick={handleEnhanceScenes}
+                    disabled={!canGenerate || isEnhancing}
+                    className={`
+                      px-8 py-4 rounded-xl font-bold text-base sm:text-lg shadow-lg transition-all
+                      ${canGenerate && !isEnhancing
+                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 hover:shadow-xl transform hover:-translate-y-0.5'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }
+                    `}
+                  >
+                    {isEnhancing ? '⏳ Enhancing...' : '🎨 Enhance Scenes & Captions'}
+                  </button>
+                </div>
+              )}
             </>
+          )}
+
+          {/* Enhancement Preview (NEW) - Show after enhancement */}
+          {enhancedScenes.length > 0 && !isGenerating && !hasResults && (
+            <EnhancementPreview
+              enhancedScenes={enhancedScenes}
+              onCaptionEdit={handleCaptionEdit}
+              onRegenerateAll={() => {
+                setEnhancedScenes([]);
+                handleEnhanceScenes();
+              }}
+              onProceedToGenerate={handleGenerate}
+            />
           )}
 
           {/* Generation Progress */}

@@ -12,7 +12,8 @@ export interface StoryData {
   coverImageUrl?: string;
   scenes: Array<{
     sceneNumber: number;
-    description: string;
+    caption?: string;          // Age-appropriate caption for PDF (NEW)
+    description?: string;      // Fallback for backward compatibility
     imageUrl: string;
   }>;
   createdDate?: string;

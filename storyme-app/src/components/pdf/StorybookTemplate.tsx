@@ -156,7 +156,8 @@ interface StorybookTemplateProps {
   coverImageUrl?: string;
   scenes: Array<{
     sceneNumber: number;
-    description: string;
+    caption?: string;       // Age-appropriate caption (NEW)
+    description?: string;   // Fallback for backward compatibility
     imageUrl: string;
   }>;
   createdDate?: string;
@@ -257,7 +258,7 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
             {/* Text Section */}
             <View style={styles.sceneTextContainer}>
               <Text style={styles.sceneText}>
-                {scene.description}
+                {scene.caption || scene.description}
               </Text>
               <Text style={styles.sceneNumber}>
                 {scene.sceneNumber}

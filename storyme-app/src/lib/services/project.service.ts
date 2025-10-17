@@ -303,10 +303,15 @@ export class ProjectService {
       authorAge?: number;
       coverImageUrl?: string;
       originalScript: string;
+      readingLevel?: number;        // NEW
+      storyTone?: string;           // NEW
       characterIds: string[];
       scenes: Array<{
         sceneNumber: number;
         description: string;
+        raw_description?: string;   // NEW
+        enhanced_prompt?: string;   // NEW
+        caption?: string;            // NEW
         imageUrl: string;
         prompt: string;
         generationTime: number;
@@ -324,6 +329,8 @@ export class ProjectService {
       author_age: data.authorAge,
       cover_image_url: data.coverImageUrl,
       original_script: data.originalScript,
+      reading_level: data.readingLevel,     // NEW
+      story_tone: data.storyTone,           // NEW
       status: 'completed',
     });
 
@@ -344,6 +351,9 @@ export class ProjectService {
           project_id: project.id,
           scene_number: sceneData.sceneNumber,
           description: sceneData.description,
+          raw_description: sceneData.raw_description,        // NEW
+          enhanced_prompt: sceneData.enhanced_prompt,        // NEW
+          caption: sceneData.caption,                        // NEW
           character_ids: data.characterIds,
         })
         .select()

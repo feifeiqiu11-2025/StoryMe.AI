@@ -10,9 +10,11 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import CharacterManager from '@/components/story/CharacterManager';
 import ScriptInput from '@/components/story/ScriptInput';
+import StorySettingsPanel from '@/components/story/StorySettingsPanel';
+import EnhancementPreview from '@/components/story/EnhancementPreview';
 import GenerationProgress from '@/components/story/GenerationProgress';
 import ImageGallery from '@/components/story/ImageGallery';
-import { Character, Scene, StorySession, GeneratedImage } from '@/lib/types/story';
+import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScene } from '@/lib/types/story';
 import { parseScriptIntoScenes } from '@/lib/scene-parser';
 import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
@@ -28,9 +30,21 @@ export default function CreateStoryPage() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [scriptInput, setScriptInput] = useState('');
   const [parsedScenes, setParsedScenes] = useState<Scene[]>([]);
+
+  // Story settings (NEW)
+  const [readingLevel, setReadingLevel] = useState<number>(5);
+  const [storyTone, setStoryTone] = useState<StoryTone>('playful');
+
+  // Enhancement state (NEW)
+  const [enhancedScenes, setEnhancedScenes] = useState<EnhancedScene[]>([]);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+
+  // Image generation state
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [imageGenerationStatus, setImageGenerationStatus] = useState<GeneratedImage[]>([]);
+
+  // UI state
   const [session, setSession] = useState<StorySession | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [libraryCharacters, setLibraryCharacters] = useState<Character[]>([]);
@@ -131,12 +145,71 @@ export default function CreateStoryPage() {
     }
 
     // Add character to story
+    // Set first character as primary automatically
     const importedCharacter = {
       ...character,
+      isPrimary: characters.length === 0, // First character is primary
       order: characters.length + 1,
+      isFromLibrary: true, // Mark as imported from library
     };
     setCharacters([...characters, importedCharacter]);
     setShowImportModal(false);
+  };
+
+  const handleSaveToLibrary = async (character: Character) => {
+    if (!character.name || !character.referenceImage.url) {
+      alert('Please add a name and image before saving to library');
+      return;
+    }
+
+    if (!user?.id) {
+      alert('You must be logged in to save characters to library');
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+
+      // Check if character already exists in library
+      const { data: existing } = await supabase
+        .from('character_library')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('name', character.name)
+        .single();
+
+      if (existing) {
+        alert('A character with this name already exists in your library');
+        return;
+      }
+
+      // Save character to library
+      const { error } = await supabase
+        .from('character_library')
+        .insert({
+          user_id: user.id,
+          name: character.name,
+          reference_image_url: character.referenceImage.url,
+          reference_image_filename: character.referenceImage.fileName,
+          hair_color: character.description.hairColor,
+          skin_tone: character.description.skinTone,
+          clothing: character.description.clothing,
+          age: character.description.age,
+          other_features: character.description.otherFeatures,
+        });
+
+      if (error) throw error;
+
+      alert(`${character.name} saved to library!`);
+
+      // Reload library characters if modal is open
+      if (showImportModal) {
+        await loadLibraryCharacters(user.id);
+      }
+    } catch (error) {
+      console.error('Error saving character to library:', error);
+      alert('Failed to save character to library. Please try again.');
+    }
   };
 
   const handleScriptSubmit = () => {
@@ -156,6 +229,90 @@ export default function CreateStoryPage() {
     setSession(newSession);
   };
 
+  // NEW: Handle AI scene enhancement
+  const handleEnhanceScenes = async () => {
+    if (!scriptInput.trim() || characters.length === 0) {
+      alert('Please add characters and write scenes first');
+      return;
+    }
+
+    setIsEnhancing(true);
+
+    try {
+      // Parse raw script into scenes
+      const rawScenes = parseScriptIntoScenes(scriptInput, characters);
+      setParsedScenes(rawScenes);
+
+      console.log(`Enhancing ${rawScenes.length} scenes with reading level ${readingLevel} and ${storyTone} tone`);
+
+      // Call AI enhancement API
+      const response = await fetch('/api/enhance-scenes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenes: rawScenes.map(s => ({
+            sceneNumber: s.sceneNumber,
+            rawDescription: s.description,
+            characterNames: s.characterNames || []
+          })),
+          readingLevel,
+          storyTone,
+          characters: characters.map(c => ({
+            name: c.name,
+            description: Object.values(c.description).filter(Boolean).join(', ')
+          }))
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Enhancement failed');
+      }
+
+      const data = await response.json();
+
+      if (data.warning) {
+        alert('AI enhancement unavailable, using original descriptions');
+      }
+
+      // Store enhanced scenes
+      setEnhancedScenes(data.enhancedScenes);
+
+      console.log(`✓ Enhanced ${data.enhancedScenes.length} scenes successfully`);
+
+    } catch (error) {
+      console.error('Enhancement error:', error);
+      alert('Failed to enhance scenes. Please try again.');
+
+      // Fallback: use raw descriptions
+      const fallbackScenes = parsedScenes.map(s => ({
+        sceneNumber: s.sceneNumber,
+        raw_description: s.description,
+        enhanced_prompt: s.description,
+        caption: s.description,
+        characterNames: s.characterNames || []
+      }));
+      setEnhancedScenes(fallbackScenes);
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
+  // NEW: Handle caption editing in preview
+  const handleCaptionEdit = (sceneNumber: number, newCaption: string) => {
+    setEnhancedScenes(prev =>
+      prev.map(scene =>
+        scene.sceneNumber === sceneNumber
+          ? { ...scene, caption: newCaption }
+          : scene
+      )
+    );
+  };
+
+  // NEW: Handle regenerate all (go back to settings)
+  const handleRegenerateAll = () => {
+    setEnhancedScenes([]);
+  };
+
   const handleSaveStory = async () => {
     if (!saveTitle.trim()) {
       setSaveError('Please enter a title for your story');
@@ -166,16 +323,22 @@ export default function CreateStoryPage() {
     setSaveError('');
 
     try {
-      // Prepare scenes data
+      // Prepare scenes data with enhancement info
       const scenesData = imageGenerationStatus
         .filter(img => img.status === 'completed')
-        .map(img => ({
-          sceneNumber: img.sceneNumber,
-          description: img.sceneDescription,
-          imageUrl: img.imageUrl,
-          prompt: img.prompt,
-          generationTime: img.generationTime,
-        }));
+        .map(img => {
+          const enhancedScene = enhancedScenes.find(es => es.sceneNumber === img.sceneNumber);
+          return {
+            sceneNumber: img.sceneNumber,
+            description: img.sceneDescription,
+            raw_description: enhancedScene?.raw_description || img.sceneDescription,
+            enhanced_prompt: enhancedScene?.enhanced_prompt || img.sceneDescription,
+            caption: enhancedScene?.caption || img.sceneDescription,
+            imageUrl: img.imageUrl,
+            prompt: img.prompt,
+            generationTime: img.generationTime,
+          };
+        });
 
       if (scenesData.length === 0) {
         setSaveError('No completed scenes to save');
@@ -240,6 +403,8 @@ export default function CreateStoryPage() {
           authorAge: authorAge ? parseInt(authorAge) : undefined,
           coverImageUrl,
           originalScript: scriptInput,
+          readingLevel: readingLevel, // NEW
+          storyTone: storyTone,       // NEW
           characterIds: characters.map(c => c.id),
           scenes: scenesData,
         }),
@@ -275,11 +440,14 @@ export default function CreateStoryPage() {
       // Generate default title if not set
       const title = saveTitle || scriptInput.trim().split(' ').slice(0, 5).join(' ') || 'My Story';
 
-      const scenesData = completedScenes.map(img => ({
-        sceneNumber: img.sceneNumber,
-        description: img.sceneDescription,
-        imageUrl: img.imageUrl,
-      }));
+      const scenesData = completedScenes.map(img => {
+        const enhancedScene = enhancedScenes.find(es => es.sceneNumber === img.sceneNumber);
+        return {
+          sceneNumber: img.sceneNumber,
+          caption: enhancedScene?.caption || img.sceneDescription, // Use caption for PDF
+          imageUrl: img.imageUrl,
+        };
+      });
 
       // Format author string: "Name, age X" or just "Name" or fallback
       let authorString = authorName.trim();
@@ -304,17 +472,21 @@ export default function CreateStoryPage() {
     }
   };
 
+  // UPDATED: Use enhanced prompts for image generation
   const handleGenerateImages = async () => {
-    if (!session || parsedScenes.length === 0) return;
+    if (enhancedScenes.length === 0) {
+      alert('Please enhance scenes first');
+      return;
+    }
 
     setIsGenerating(true);
 
     // Initialize image generation status for all scenes
-    const initialStatus = parsedScenes.map((scene, index) => ({
+    const initialStatus = enhancedScenes.map((scene, index) => ({
       id: `temp-${index}`,
-      sceneId: scene.id || `scene-${index}`,
-      sceneNumber: scene.sceneNumber || index + 1,
-      sceneDescription: scene.description || '',
+      sceneId: `scene-${scene.sceneNumber}`,
+      sceneNumber: scene.sceneNumber,
+      sceneDescription: scene.caption, // Use caption for display
       imageUrl: '',
       prompt: '', // Will be filled by the API
       generationTime: 0,
@@ -323,12 +495,17 @@ export default function CreateStoryPage() {
     setImageGenerationStatus(initialStatus);
 
     try {
+      // Build script from enhanced prompts for image generation
+      const enhancedScript = enhancedScenes
+        .map(s => s.enhanced_prompt)
+        .join('\n');
+
       const response = await fetch('/api/generate-images', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           characters: characters,
-          script: scriptInput,
+          script: enhancedScript, // Use enhanced prompts, not raw script
           artStyle: "children's book illustration, colorful, whimsical",
         }),
       });
@@ -341,8 +518,16 @@ export default function CreateStoryPage() {
       const data = await response.json();
 
       // Update the image generation status with the actual results
+      // BUT preserve the captions from enhancedScenes
       if (data.generatedImages) {
-        setImageGenerationStatus(data.generatedImages);
+        const updatedImages = data.generatedImages.map((img: any) => {
+          const enhancedScene = enhancedScenes.find(es => es.sceneNumber === img.sceneNumber);
+          return {
+            ...img,
+            sceneDescription: enhancedScene?.caption || img.sceneDescription, // Use caption
+          };
+        });
+        setImageGenerationStatus(updatedImages);
       }
 
       // Extract image URLs for the gallery
@@ -419,21 +604,43 @@ export default function CreateStoryPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-900">Story Characters</h2>
-            <button
-              onClick={async () => {
-                if (user?.id) {
-                  await loadLibraryCharacters(user.id);
-                  setShowImportModal(true);
-                }
-              }}
-              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-medium text-sm shadow transition-all"
-            >
-              Import from Library
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  if (user?.id) {
+                    await loadLibraryCharacters(user.id);
+                    setShowImportModal(true);
+                  }
+                }}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-medium text-sm shadow transition-all flex items-center gap-2"
+              >
+                <span>📚</span> Import from Library
+              </button>
+              {characters.length < 5 && (
+                <button
+                  onClick={() => {
+                    const newCharacter = {
+                      id: `char-${Date.now()}`,
+                      name: '',
+                      referenceImage: { url: '', fileName: '' },
+                      description: {},
+                      isPrimary: characters.length === 0,
+                      order: characters.length + 1,
+                    };
+                    setCharacters([...characters, newCharacter]);
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium text-sm shadow transition-all"
+                >
+                  + Add Character
+                </button>
+              )}
+            </div>
           </div>
           <CharacterManager
             characters={characters}
             onCharactersChange={handleCharactersChange}
+            showAddButton={false}
+            onSaveToLibrary={handleSaveToLibrary}
           />
         </div>
 
@@ -505,84 +712,65 @@ export default function CreateStoryPage() {
         )}
 
         {/* Step 2: Script Input */}
-        {characters.length > 0 && (
+        {characters.length > 0 && enhancedScenes.length === 0 && (
           <div className="mb-8">
             <ScriptInput
               value={scriptInput}
               onChange={setScriptInput}
               characters={characters}
             />
-
-            {/* Generate Story Button */}
-            {scriptInput.trim() && parsedScenes.length === 0 && (
-              <div className="bg-white rounded-2xl shadow-xl p-8 mt-4">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">
-                  Ready to Generate Your Story?
-                </h3>
-                <p className="text-gray-600 mb-6">
-                  Review your characters and scenes, then click below to parse your story and prepare for illustration.
-                </p>
-                <button
-                  onClick={handleScriptSubmit}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-4 rounded-xl hover:from-purple-700 hover:to-pink-700 font-semibold text-lg shadow-lg hover:shadow-xl transition-all"
-                >
-                  Generate Story Scenes
-                </button>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Step 3: Preview Parsed Scenes */}
-        {parsedScenes.length > 0 && generatedImages.length === 0 && (
-          <div className="mb-8 bg-white rounded-2xl shadow-xl p-8">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
-              Story Scenes Preview
-            </h3>
-            <div className="space-y-4 mb-6">
-              {parsedScenes.map((scene, index) => (
-                <div key={index} className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-bold text-blue-700">Scene {index + 1}</span>
-                    {scene.characterNames && scene.characterNames.length > 0 && (
-                      <span className="text-sm text-gray-600">
-                        ({scene.characterNames.join(', ')})
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-gray-700">{scene.description}</p>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-4">
+        {/* Step 3: Story Settings (NEW) */}
+        {characters.length > 0 && scriptInput.trim() && enhancedScenes.length === 0 && (
+          <div className="mb-8">
+            <StorySettingsPanel
+              readingLevel={readingLevel}
+              onReadingLevelChange={setReadingLevel}
+              storyTone={storyTone}
+              onStoryToneChange={setStoryTone}
+              disabled={isEnhancing}
+            />
+
+            {/* Enhance Button */}
+            <div className="mt-6 bg-white rounded-2xl shadow-xl p-8">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">
+                Ready to Enhance Your Story?
+              </h3>
+              <p className="text-gray-600 mb-6">
+                AI will create detailed image prompts and age-appropriate captions for your {scriptInput.split('\n').filter(l => l.trim()).length} scenes.
+              </p>
               <button
-                onClick={() => {
-                  setParsedScenes([]);
-                  setSession(null);
-                }}
-                className="bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 font-semibold transition-all"
+                onClick={handleEnhanceScenes}
+                disabled={isEnhancing}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-4 rounded-xl hover:from-purple-700 hover:to-pink-700 font-semibold text-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                ← Edit Scenes
+                {isEnhancing ? (
+                  <>
+                    <span className="inline-block animate-spin mr-2">⏳</span>
+                    Enhancing Scenes...
+                  </>
+                ) : (
+                  '✨ Enhance Scenes & Captions'
+                )}
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 4: Generate Images */}
-        {parsedScenes.length > 0 && !isGenerating && generatedImages.length === 0 && (
-          <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
-              Ready to Generate Images?
-            </h3>
-            <p className="text-gray-600 mb-6">
-              You have {parsedScenes.length} scenes ready. Click below to generate AI illustrations!
-            </p>
-            <button
-              onClick={handleGenerateImages}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold text-lg shadow-lg hover:shadow-xl transition-all"
-            >
-              Generate {parsedScenes.length} Images
-            </button>
+        {/* Step 4: Enhancement Preview (NEW) */}
+        {enhancedScenes.length > 0 && generatedImages.length === 0 && (
+          <div className="mb-8">
+            <EnhancementPreview
+              enhancedScenes={enhancedScenes}
+              onCaptionEdit={handleCaptionEdit}
+              onRegenerateAll={handleRegenerateAll}
+              onProceedToGenerate={handleGenerateImages}
+              isGenerating={isGenerating}
+              readingLevel={readingLevel}
+              storyTone={storyTone}
+            />
           </div>
         )}
 

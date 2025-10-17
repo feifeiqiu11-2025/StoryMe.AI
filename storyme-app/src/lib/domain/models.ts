@@ -78,7 +78,17 @@ export interface Project {
   // Story Content
   original_script?: string;
   simplified_script?: string;
-  reading_level?: 'pre-k' | 'kindergarten' | 'grade-1';
+  reading_level?: number; // 3-8 years old (updated from enum to number)
+
+  // Story Enhancement Settings
+  story_tone?: 'playful' | 'educational' | 'adventure' | 'gentle' | 'silly' | 'mystery' | 'friendly' | 'brave';
+
+  // Author Info
+  author_name?: string;
+  author_age?: number;
+
+  // Cover Image
+  cover_image_url?: string;
 
   // Media
   video_url?: string;
@@ -117,6 +127,11 @@ export interface Scene {
   scene_number: number;
   description: string;
   simplified_text?: string;
+
+  // Scene Enhancement (AI-generated)
+  raw_description?: string;      // Original user input
+  enhanced_prompt?: string;       // AI-enhanced for image generation
+  caption?: string;               // Age-appropriate caption for PDF
 
   // Characters in this scene
   character_ids?: string[];

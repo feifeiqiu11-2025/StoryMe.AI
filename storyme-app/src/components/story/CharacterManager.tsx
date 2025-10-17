@@ -8,6 +8,8 @@ interface CharacterManagerProps {
   characters: Character[];
   onCharactersChange: (characters: Character[]) => void;
   disabled?: boolean;
+  showAddButton?: boolean;
+  onSaveToLibrary?: (character: Character) => void;
 }
 
 const MAX_CHARACTERS = 5;
@@ -16,7 +18,9 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 export default function CharacterManager({
   characters,
   onCharactersChange,
-  disabled = false
+  disabled = false,
+  showAddButton = true,
+  onSaveToLibrary
 }: CharacterManagerProps) {
   const [uploadingCharacterId, setUploadingCharacterId] = useState<string | null>(null);
 
@@ -132,12 +136,13 @@ export default function CharacterManager({
             onImageUpload={(file) => handleImageUpload(character.id, file)}
             isUploading={uploadingCharacterId === character.id}
             disabled={disabled}
+            onSaveToLibrary={onSaveToLibrary}
           />
         ))}
       </div>
 
       {/* Add Character Button */}
-      {characters.length < MAX_CHARACTERS && (
+      {showAddButton && characters.length < MAX_CHARACTERS && (
         <button
           onClick={addCharacter}
           disabled={disabled}
@@ -165,6 +170,7 @@ interface CharacterCardProps {
   onImageUpload: (file: File) => void;
   isUploading: boolean;
   disabled: boolean;
+  onSaveToLibrary?: (character: Character) => void;
 }
 
 function CharacterCard({
@@ -176,6 +182,7 @@ function CharacterCard({
   onImageUpload,
   isUploading,
   disabled,
+  onSaveToLibrary,
 }: CharacterCardProps) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: (acceptedFiles) => {
@@ -302,6 +309,18 @@ function CharacterCard({
           className="w-full text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 rounded transition-colors disabled:opacity-50"
         >
           Set as Primary Character
+        </button>
+      )}
+
+      {/* Save to Library - only show if character is not already from library */}
+      {onSaveToLibrary && !character.isFromLibrary && (
+        <button
+          onClick={() => onSaveToLibrary(character)}
+          disabled={disabled || !character.name || !character.referenceImage.url}
+          className="w-full text-sm bg-green-100 hover:bg-green-200 text-green-700 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title={!character.name || !character.referenceImage.url ? 'Add name and image to save' : 'Save character to library'}
+        >
+          💾 Save to Library
         </button>
       )}
     </div>

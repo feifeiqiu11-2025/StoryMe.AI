@@ -1,5 +1,16 @@
 // Core types for the POC
 
+// Story tone options for AI caption generation
+export type StoryTone =
+  | 'playful'       // Fun, energetic, joyful
+  | 'educational'   // Learning-focused, informative
+  | 'adventure'     // Exciting, brave, heroic
+  | 'gentle'        // Calm, soothing, peaceful
+  | 'silly'         // Absurd, humorous, wacky
+  | 'mystery'       // Curious, questioning, wondering
+  | 'friendly'      // Warm, social, cooperative
+  | 'brave';        // Courageous, overcoming fears
+
 export interface CharacterDescription {
   hairColor?: string;
   skinTone?: string;
@@ -18,6 +29,7 @@ export interface Character {
   description: CharacterDescription;
   isPrimary: boolean; // Primary character uses reference image in generation
   order: number; // Display order
+  isFromLibrary?: boolean; // Track if character was imported from library
 }
 
 export interface Scene {
@@ -25,6 +37,22 @@ export interface Scene {
   sceneNumber: number;
   description: string;
   characterNames?: string[]; // Extracted character names in this scene
+}
+
+// Enhanced scene after AI processing
+export interface EnhancedScene {
+  sceneNumber: number;
+  raw_description: string;      // Original user input
+  enhanced_prompt: string;       // AI-enhanced for image generation
+  caption: string;               // Age-appropriate caption for PDF
+  characterNames: string[];      // Characters in this scene
+}
+
+// Enhanced scene with generated image
+export interface EnhancedSceneWithImage extends EnhancedScene {
+  imageUrl?: string;
+  generationPrompt?: string;
+  generationTime?: number;
 }
 
 export interface CharacterRating {
