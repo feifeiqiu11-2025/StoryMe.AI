@@ -116,6 +116,7 @@ ${characters[0]?.name || 'Connor'} swinging on the swing, laughing happily`
   : 'Add characters first, then describe your story scenes here'}`}
         className={`
           w-full min-h-[200px] p-4 border rounded-lg font-mono text-sm
+          text-gray-900 placeholder:text-gray-400 bg-white
           focus:ring-2 focus:ring-blue-500 focus:border-blue-500
           disabled:bg-gray-100 disabled:cursor-not-allowed
           ${error ? 'border-red-300' : 'border-gray-300'}

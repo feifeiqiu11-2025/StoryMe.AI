@@ -105,13 +105,28 @@ export default function StoryViewerPage() {
         return;
       }
 
+      // Format author string from project data or fallback to user
+      let authorString = project.authorName || '';
+      if (authorString && project.authorAge) {
+        authorString += `, age ${project.authorAge}`;
+      } else if (!authorString) {
+        authorString = user?.name || 'My Family';
+      }
+
+      console.log('📄 PDF Download Data:');
+      console.log('  - Title:', project.title);
+      console.log('  - Author:', authorString);
+      console.log('  - Cover URL:', project.coverImageUrl || 'NULL - will use fallback');
+      console.log('  - Scenes:', scenesData.length);
+
       // Generate and download PDF
       await generateAndDownloadStoryPDF({
         title: project.title,
         description: project.description,
+        coverImageUrl: project.coverImageUrl,
         scenes: scenesData,
         createdDate: new Date(project.createdAt).toLocaleDateString(),
-        author: user?.name || 'My Family',
+        author: authorString,
       });
 
     } catch (error) {

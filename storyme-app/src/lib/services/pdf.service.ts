@@ -9,6 +9,7 @@ import { StorybookTemplate } from '@/components/pdf/StorybookTemplate';
 export interface StoryData {
   title: string;
   description?: string;
+  coverImageUrl?: string;
   scenes: Array<{
     sceneNumber: number;
     description: string;
@@ -29,6 +30,7 @@ export async function generateStoryPDF(storyData: StoryData): Promise<Blob> {
       title: storyData.title,
       description: storyData.description,
       author: storyData.author,
+      coverImageUrl: storyData.coverImageUrl,
       scenes: storyData.scenes,
       createdDate: storyData.createdDate,
     });

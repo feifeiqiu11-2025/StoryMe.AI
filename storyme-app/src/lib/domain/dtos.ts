@@ -82,6 +82,9 @@ export interface ProjectDTO {
   transcription?: string;
   createdAt: string;
   updatedAt: string;
+  authorName?: string;
+  authorAge?: number;
+  coverImageUrl?: string;
 }
 
 export interface CreateProjectDTO {

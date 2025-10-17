@@ -299,6 +299,9 @@ export class ProjectService {
     data: {
       title: string;
       description?: string;
+      authorName?: string;
+      authorAge?: number;
+      coverImageUrl?: string;
       originalScript: string;
       characterIds: string[];
       scenes: Array<{
@@ -317,6 +320,9 @@ export class ProjectService {
       user_id: userId,
       title: data.title,
       description: data.description,
+      author_name: data.authorName,
+      author_age: data.authorAge,
+      cover_image_url: data.coverImageUrl,
       original_script: data.originalScript,
       status: 'completed',
     });

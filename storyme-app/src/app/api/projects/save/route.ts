@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { title, description, originalScript, characterIds, scenes } = body;
+    const { title, description, authorName, authorAge, coverImageUrl, originalScript, characterIds, scenes } = body;
 
     // Validate required fields
     if (!title || !title.trim()) {
@@ -68,6 +68,9 @@ export async function POST(request: NextRequest) {
     const project = await projectService.saveCompletedStory(user.id, {
       title: title.trim(),
       description: description?.trim(),
+      authorName: authorName?.trim(),
+      authorAge: authorAge,
+      coverImageUrl: coverImageUrl,
       originalScript,
       characterIds,
       scenes,

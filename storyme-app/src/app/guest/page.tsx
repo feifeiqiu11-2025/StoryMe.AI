@@ -183,7 +183,7 @@ export default function GuestStoryPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2 group">
-              <h1 className="text-2xl sm:text-3xl font-bold hover:opacity-80 transition-opacity">
+              <h1 className="text-2xl sm:text-3xl font-bold hover:opacity-80 transition-opacity text-gray-900">
                 📚 Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-600">Me</span> ✨
               </h1>
               <span className="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded-full">BETA</span>

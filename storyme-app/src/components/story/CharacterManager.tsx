@@ -204,7 +204,7 @@ function CharacterCard({
             onChange={(e) => onUpdate({ name: e.target.value })}
             placeholder="Character name"
             disabled={disabled}
-            className="font-semibold text-lg border-b-2 border-transparent hover:border-gray-300 focus:border-blue-500 outline-none px-1 disabled:opacity-50"
+            className="font-semibold text-lg text-gray-900 placeholder:text-gray-400 border-b-2 border-transparent hover:border-gray-300 focus:border-blue-500 outline-none px-1 disabled:opacity-50"
           />
           {character.isPrimary && (
             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Primary</span>
@@ -258,7 +258,7 @@ function CharacterCard({
           onChange={(e) => onUpdateDescription('hairColor', e.target.value)}
           placeholder="Hair color (e.g., brown, blonde)"
           disabled={disabled}
-          className="w-full text-sm border rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
+          className="w-full text-sm text-gray-900 placeholder:text-gray-400 bg-white border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
         />
         <input
           type="text"
@@ -266,7 +266,7 @@ function CharacterCard({
           onChange={(e) => onUpdateDescription('skinTone', e.target.value)}
           placeholder="Skin tone"
           disabled={disabled}
-          className="w-full text-sm border rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
+          className="w-full text-sm text-gray-900 placeholder:text-gray-400 bg-white border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
         />
         <input
           type="text"
@@ -274,7 +274,7 @@ function CharacterCard({
           onChange={(e) => onUpdateDescription('clothing', e.target.value)}
           placeholder="Clothing (e.g., blue shirt, red jacket)"
           disabled={disabled}
-          className="w-full text-sm border rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
+          className="w-full text-sm text-gray-900 placeholder:text-gray-400 bg-white border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
         />
         <input
           type="text"
@@ -282,7 +282,7 @@ function CharacterCard({
           onChange={(e) => onUpdateDescription('age', e.target.value)}
           placeholder="Age (e.g., 8 years old)"
           disabled={disabled}
-          className="w-full text-sm border rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
+          className="w-full text-sm text-gray-900 placeholder:text-gray-400 bg-white border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
         />
         <input
           type="text"
@@ -290,7 +290,7 @@ function CharacterCard({
           onChange={(e) => onUpdateDescription('otherFeatures', e.target.value)}
           placeholder="Other features"
           disabled={disabled}
-          className="w-full text-sm border rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
+          className="w-full text-sm text-gray-900 placeholder:text-gray-400 bg-white border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
         />
       </div>
 

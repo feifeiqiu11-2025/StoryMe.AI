@@ -110,6 +110,9 @@ export function projectToDTO(project: Project): ProjectDTO {
     transcription: project.transcription,
     createdAt: project.created_at,
     updatedAt: project.updated_at,
+    authorName: (project as any).author_name,
+    authorAge: (project as any).author_age,
+    coverImageUrl: (project as any).cover_image_url,
   };
 }
 

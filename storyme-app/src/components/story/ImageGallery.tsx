@@ -236,13 +236,13 @@ export default function ImageGallery({
 
                     {/* Per-character rating buttons */}
                     {image.characterRatings && image.characterRatings.length > 0 && (
-                      <div className="space-y-3">
+                      <div className="space-y-2 mt-3">
                         <p className="text-sm font-medium text-gray-700">
                           Rate character consistency:
                         </p>
                         {image.characterRatings.map(charRating => (
-                          <div key={charRating.characterId} className="flex items-center gap-3">
-                            <span className="text-sm text-gray-700 w-24 font-medium">
+                          <div key={charRating.characterId} className="flex items-center gap-2">
+                            <span className="text-sm text-gray-700 min-w-[140px] font-medium">
                               {charRating.characterName}:
                             </span>
                             <div className="flex gap-2">

@@ -37,6 +37,8 @@ export default function CreateStoryPage() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveTitle, setSaveTitle] = useState('');
   const [saveDescription, setSaveDescription] = useState('');
+  const [authorName, setAuthorName] = useState('');
+  const [authorAge, setAuthorAge] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [generatingPDF, setGeneratingPDF] = useState(false);
@@ -181,6 +183,52 @@ export default function CreateStoryPage() {
         return;
       }
 
+      // Generate AI cover image
+      let coverImageUrl: string | undefined;
+      try {
+        console.log('🎨 Starting AI cover generation...');
+
+        const authorText = authorName.trim()
+          ? (authorAge ? `By ${authorName}, age ${authorAge}` : `By ${authorName}`)
+          : 'By My Family';
+
+        const coverPrompt = `Children's storybook cover illustration with title "${saveTitle.trim()}" prominently displayed at the top in large, clear, readable text. ${saveDescription || ''} ${authorText} displayed at the bottom. Professional children's book cover design, colorful, whimsical, appealing to 5-6 year olds, high quality illustration`;
+
+        console.log('Cover prompt:', coverPrompt);
+
+        // Call the cover generation API endpoint
+        const coverResponse = await fetch('/api/generate-cover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: saveTitle.trim(),
+            description: saveDescription || '',
+            author: authorText,
+            characters: characters,
+          }),
+        });
+
+        console.log('Cover API response status:', coverResponse.status);
+
+        if (coverResponse.ok) {
+          const coverData = await coverResponse.json();
+          console.log('Cover data received:', coverData);
+
+          if (coverData.imageUrl) {
+            coverImageUrl = coverData.imageUrl;
+            console.log('✅ Cover image generated:', coverImageUrl);
+          } else {
+            console.warn('No imageUrl in cover response');
+          }
+        } else {
+          const errorText = await coverResponse.text();
+          console.error('Cover generation failed:', errorText);
+        }
+      } catch (coverError) {
+        console.error('Failed to generate cover image, will use fallback:', coverError);
+        // Continue anyway with fallback cover
+      }
+
       // Call save API
       const response = await fetch('/api/projects/save', {
         method: 'POST',
@@ -188,6 +236,9 @@ export default function CreateStoryPage() {
         body: JSON.stringify({
           title: saveTitle.trim(),
           description: saveDescription.trim() || undefined,
+          authorName: authorName.trim() || undefined,
+          authorAge: authorAge ? parseInt(authorAge) : undefined,
+          coverImageUrl,
           originalScript: scriptInput,
           characterIds: characters.map(c => c.id),
           scenes: scenesData,
@@ -230,11 +281,19 @@ export default function CreateStoryPage() {
         imageUrl: img.imageUrl,
       }));
 
+      // Format author string: "Name, age X" or just "Name" or fallback
+      let authorString = authorName.trim();
+      if (authorString && authorAge) {
+        authorString += `, age ${authorAge}`;
+      } else if (!authorString) {
+        authorString = user?.name || 'My Family';
+      }
+
       await generateAndDownloadStoryPDF({
         title,
         description: saveDescription,
         scenes: scenesData,
-        author: user?.name || 'My Family',
+        author: authorString,
       });
 
     } catch (error) {
@@ -638,6 +697,37 @@ export default function CreateStoryPage() {
                     rows={3}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Author Name (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={authorName}
+                      onChange={(e) => setAuthorName(e.target.value)}
+                      disabled={isSaving}
+                      placeholder="e.g., Connor"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Age (Optional)
+                    </label>
+                    <input
+                      type="number"
+                      value={authorAge}
+                      onChange={(e) => setAuthorAge(e.target.value)}
+                      disabled={isSaving}
+                      placeholder="e.g., 5"
+                      min="1"
+                      max="12"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    />
+                  </div>
                 </div>
 
                 {saveError && (

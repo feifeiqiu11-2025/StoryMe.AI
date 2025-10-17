@@ -13,7 +13,7 @@ export default function HomePage() {
       {/* Header with Sign In button */}
       <header className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <Link href="/" className="text-2xl font-bold hover:opacity-80 transition-opacity cursor-pointer">
+          <Link href="/" className="text-2xl font-bold hover:opacity-80 transition-opacity cursor-pointer text-gray-900">
             📚 Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-600">Me</span> ✨
           </Link>
           <span className="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded-full">BETA</span>
@@ -28,12 +28,12 @@ export default function HomePage() {
 
       <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12">
         {/* Hero Section - Two Column Layout */}
-        <div className="grid lg:grid-cols-2 gap-12 items-center mb-16">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center mb-16">
           {/* Left Column - Content (50%) */}
           <div className="space-y-6">
             {/* Brand Logo/Title */}
             <div className="mb-8">
-              <h1 className="text-5xl sm:text-6xl font-bold mb-2">
+              <h1 className="text-5xl sm:text-6xl font-bold mb-2 text-gray-900">
                 📚 Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-600">Me</span> ✨
               </h1>
               <div className="h-1 w-24 bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-600 rounded-full"></div>
@@ -41,8 +41,8 @@ export default function HomePage() {
 
             {/* Tagline */}
             <div className="space-y-3">
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">
-                Where Your Child's Stories Come to Life
+              <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 leading-tight">
+                Where Your Child&apos;s Stories Come to Life
               </h2>
             </div>
 

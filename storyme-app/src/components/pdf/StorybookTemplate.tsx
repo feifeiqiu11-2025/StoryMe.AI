@@ -17,7 +17,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#4F46E5', // Gradient approximation with solid color
+    backgroundColor: '#4F46E5',
     padding: 60,
   },
   coverTitle: {
@@ -25,18 +25,47 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 30,
+    letterSpacing: 2,
   },
   coverSubtitle: {
-    fontSize: 20,
-    color: '#ffffff',
+    fontSize: 18,
+    color: '#E0E7FF',
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: 60,
+    maxWidth: '80%',
+  },
+  coverTagline: {
+    fontSize: 16,
+    color: '#C7D2FE',
+    textAlign: 'center',
+    marginBottom: 30,
+    fontStyle: 'italic',
   },
   coverAuthor: {
-    fontSize: 16,
+    fontSize: 24,
     color: '#ffffff',
     textAlign: 'center',
+    marginTop: 20,
+    fontWeight: 'bold',
+  },
+  coverDate: {
+    fontSize: 12,
+    color: '#C7D2FE',
+    textAlign: 'center',
+    marginTop: 40,
+  },
+  coverDecorationTop: {
+    width: '60%',
+    height: 3,
+    backgroundColor: '#FFD700',
+    marginBottom: 40,
+  },
+  coverDecorationBottom: {
+    width: '60%',
+    height: 3,
+    backgroundColor: '#FFD700',
+    marginTop: 40,
   },
   scenePage: {
     flex: 1,
@@ -44,7 +73,7 @@ const styles = StyleSheet.create({
   },
   sceneImageContainer: {
     width: '100%',
-    height: '70%',
+    height: '65%',
     backgroundColor: '#F3F4F6',
   },
   sceneImage: {
@@ -53,16 +82,17 @@ const styles = StyleSheet.create({
     objectFit: 'contain',
   },
   sceneTextContainer: {
-    height: '30%',
+    height: '35%',
     padding: 30,
     justifyContent: 'center',
     backgroundColor: '#ffffff',
   },
   sceneText: {
-    fontSize: 14,
-    lineHeight: 1.6,
+    fontSize: 22,
+    lineHeight: 2.0,
     color: '#374151',
     textAlign: 'center',
+    fontWeight: 'bold',
   },
   sceneNumber: {
     position: 'absolute',
@@ -78,16 +108,44 @@ const styles = StyleSheet.create({
     backgroundColor: '#7C3AED',
     padding: 60,
   },
+  backCoverDecoration: {
+    width: '70%',
+    height: 4,
+    backgroundColor: '#FFD700',
+    marginBottom: 50,
+  },
   backCoverText: {
-    fontSize: 24,
+    fontSize: 56,
     color: '#ffffff',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 50,
+    fontWeight: 'bold',
+    letterSpacing: 3,
+  },
+  backCoverMessage: {
+    fontSize: 16,
+    color: '#E9D5FF',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  backCoverAuthor: {
+    fontSize: 28,
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 50,
+    fontWeight: 'bold',
   },
   backCoverLogo: {
-    fontSize: 32,
-    color: '#ffffff',
-    marginTop: 40,
+    fontSize: 14,
+    color: '#E9D5FF',
+    textAlign: 'center',
+    marginTop: 50,
+  },
+  backCoverDecorationBottom: {
+    width: '70%',
+    height: 4,
+    backgroundColor: '#FFD700',
+    marginTop: 50,
   },
 });
 
@@ -95,6 +153,7 @@ interface StorybookTemplateProps {
   title: string;
   description?: string;
   author?: string;
+  coverImageUrl?: string;
   scenes: Array<{
     sceneNumber: number;
     description: string;
@@ -107,26 +166,81 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
   title,
   description,
   author = 'My Family',
+  coverImageUrl,
   scenes,
   createdDate,
 }) => {
+  // Debug logging
+  console.log('📖 PDF Template Received:');
+  console.log('  - coverImageUrl:', coverImageUrl);
+  console.log('  - Will use:', coverImageUrl ? 'AI Cover' : 'Fallback Cover');
+
   return (
     <Document>
-      {/* Cover Page */}
-      <Page size="A4" style={styles.page}>
-        <View style={styles.coverPage}>
-          <Text style={styles.coverTitle}>{title}</Text>
-          {description && (
-            <Text style={styles.coverSubtitle}>{description}</Text>
-          )}
-          <Text style={styles.coverAuthor}>By {author}</Text>
-          {createdDate && (
-            <Text style={[styles.coverAuthor, { marginTop: 20, fontSize: 12 }]}>
-              {createdDate}
-            </Text>
-          )}
-        </View>
-      </Page>
+      {/* Cover Page - AI Generated or Fallback */}
+      {coverImageUrl ? (
+        <Page size="A4" style={styles.page}>
+          {/* AI-generated background image */}
+          <View style={{ position: 'absolute', width: '100%', height: '100%' }}>
+            <Image
+              src={coverImageUrl}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                objectPosition: 'center'
+              }}
+            />
+          </View>
+          {/* Author overlay at bottom only */}
+          <View style={{
+            position: 'absolute',
+            bottom: 20,
+            width: '100%',
+            alignItems: 'center',
+          }}>
+            <View style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              padding: 15,
+              borderRadius: 10,
+            }}>
+              <Text style={{
+                fontSize: 24,
+                color: '#4B5563',
+                textAlign: 'center',
+              }}>
+                By {author}
+              </Text>
+              {createdDate && (
+                <Text style={{
+                  fontSize: 14,
+                  color: '#6B7280',
+                  textAlign: 'center',
+                  marginTop: 5,
+                }}>
+                  {createdDate}
+                </Text>
+              )}
+            </View>
+          </View>
+        </Page>
+      ) : (
+        <Page size="A4" style={styles.page}>
+          <View style={styles.coverPage}>
+            <View style={styles.coverDecorationTop} />
+            <Text style={styles.coverTitle}>{title}</Text>
+            {description && (
+              <Text style={styles.coverSubtitle}>{description}</Text>
+            )}
+            <Text style={styles.coverTagline}>A StoryMe Adventure</Text>
+            <View style={styles.coverDecorationBottom} />
+            <Text style={styles.coverAuthor}>By {author}</Text>
+            {createdDate && (
+              <Text style={styles.coverDate}>{createdDate}</Text>
+            )}
+          </View>
+        </Page>
+      )}
 
       {/* Scene Pages */}
       {scenes.map((scene, index) => (
@@ -153,20 +267,6 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
         </Page>
       ))}
 
-      {/* Back Cover */}
-      <Page size="A4" style={styles.page}>
-        <View style={styles.backCoverPage}>
-          <Text style={styles.backCoverText}>
-            The End
-          </Text>
-          <Text style={[styles.coverSubtitle, { fontSize: 16 }]}>
-            Created with love for our little storyteller
-          </Text>
-          <Text style={styles.backCoverLogo}>
-            ✨ StoryMe ✨
-          </Text>
-        </View>
-      </Page>
     </Document>
   );
 };

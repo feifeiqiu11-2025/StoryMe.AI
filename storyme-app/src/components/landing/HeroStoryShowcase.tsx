@@ -54,7 +54,7 @@ export default function HeroStoryShowcase() {
   if (loading) {
     return (
       <div className="lg:block hidden">
-        <div className="animate-pulse bg-gray-200 rounded-2xl w-[340px] h-[340px]"></div>
+        <div className="animate-pulse bg-gray-200 rounded-2xl w-full max-w-md lg:max-w-lg aspect-[4/3]"></div>
       </div>
     );
   }
@@ -64,10 +64,10 @@ export default function HeroStoryShowcase() {
     const currentMock = MOCK_STORIES[currentIndex];
 
     return (
-      <div className="lg:block hidden">
-        <div className="relative w-[340px]">
-          {/* Main story card - Square 340x340 */}
-          <div className="relative rounded-2xl overflow-hidden shadow-xl w-[340px] h-[340px]">
+      <div className="lg:flex lg:justify-center hidden">
+        <div className="relative w-full max-w-md lg:max-w-lg">
+          {/* Main story card - Rectangular 4:3 aspect ratio, responsive */}
+          <div className="relative rounded-2xl overflow-hidden shadow-xl w-full aspect-[4/3]">
             <div className={`bg-gradient-to-br ${currentMock.gradient} w-full h-full flex items-center justify-center transition-all duration-500`}>
               <span className="text-9xl">{currentMock.emoji}</span>
             </div>
@@ -107,11 +107,16 @@ export default function HeroStoryShowcase() {
   const coverImage = currentStory?.scenes?.[0]?.images?.[0]?.imageUrl;
   const sceneCount = currentStory?.scenes?.length || 0;
 
+  // Build author string from story data
+  const authorString = currentStory?.authorName
+    ? `${currentStory.authorName}${currentStory.authorAge ? `, ${currentStory.authorAge} years old` : ''}`
+    : 'A young storyteller';
+
   return (
-    <div className="lg:block hidden">
-      <div className="relative w-[340px]">
-        {/* Main story card - Square 340x340 */}
-        <div className="relative rounded-2xl overflow-hidden shadow-xl w-[340px] h-[340px]">
+    <div className="lg:flex lg:justify-center hidden">
+      <div className="relative w-full max-w-md lg:max-w-lg">
+        {/* Main story card - Rectangular 4:3 aspect ratio, responsive */}
+        <div className="relative rounded-2xl overflow-hidden shadow-xl w-full aspect-[4/3]">
           {coverImage ? (
             <div className="relative w-full h-full">
               <Image
@@ -120,7 +125,7 @@ export default function HeroStoryShowcase() {
                 fill
                 className="object-cover transition-opacity duration-500"
                 priority
-                sizes="340px"
+                sizes="(max-width: 1024px) 100vw, 512px"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
             </div>
@@ -138,7 +143,7 @@ export default function HeroStoryShowcase() {
             <div className="flex items-center justify-between mt-2">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">👦</span>
-                <p className="text-white/90 text-base">by Connor, 4 years old</p>
+                <p className="text-white/90 text-base">by {authorString}</p>
               </div>
               {sceneCount > 0 && (
                 <p className="text-white/80 text-sm">

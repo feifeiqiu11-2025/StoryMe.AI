@@ -32,27 +32,28 @@ export default function SceneRatingCard({
   // Check if already rated
   const hasRating = initialRatings?.overallRating !== undefined;
 
-  const handleSave = async () => {
-    if (!onSave || overallRating === 0) {
+  // Auto-save when rating changes
+  const handleRatingChange = async (newRating: number) => {
+    setOverallRating(newRating);
+
+    if (!onSave || newRating === 0) {
       return;
     }
 
     setIsSaving(true);
     try {
       await onSave({
-        overallRating,
+        overallRating: newRating,
       });
       setSaveSuccess(true);
       setShowForm(false);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setTimeout(() => setSaveSuccess(false), 2000);
     } catch (error) {
       console.error('Failed to save rating:', error);
     } finally {
       setIsSaving(false);
     }
   };
-
-  const canSubmit = overallRating > 0;
 
   // Display mode (readonly or already rated)
   if (readonly || (hasRating && !showForm)) {
@@ -83,8 +84,8 @@ export default function SceneRatingCard({
 
   // Edit mode
   return (
-    <div className="bg-white border-2 border-blue-300 rounded-lg p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-white rounded-lg p-3">
+      <div className="flex items-center justify-between mb-2">
         <h4 className="text-sm font-semibold text-gray-900">
           Rate This Scene {saveSuccess && <span className="text-green-600 ml-2">✓ Saved!</span>}
         </h4>
@@ -98,40 +99,17 @@ export default function SceneRatingCard({
         )}
       </div>
 
-      <div className="space-y-4">
+      <div>
         {/* Overall Rating */}
-        <div>
-          <StarRating
-            label="Overall Rating:"
-            value={overallRating}
-            onChange={setOverallRating}
-            size="lg"
-            showValue={false}
-          />
-          <p className="text-xs text-gray-500 mt-2">
-            How would you rate this scene overall?
-          </p>
-        </div>
-
-        {/* Submit Button */}
-        <button
-          onClick={handleSave}
-          disabled={!canSubmit || isSaving}
-          className={`
-            w-full py-2 px-4 rounded-lg font-medium text-sm transition-colors
-            ${canSubmit && !isSaving
-              ? 'bg-blue-600 hover:bg-blue-700 text-white'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }
-          `}
-        >
-          {isSaving ? 'Saving...' : hasRating ? 'Update Rating' : 'Submit Rating'}
-        </button>
-
-        {!canSubmit && (
-          <p className="text-xs text-red-500 text-center">
-            Please provide a rating before submitting
-          </p>
+        <StarRating
+          label="Overall Rating:"
+          value={overallRating}
+          onChange={handleRatingChange}
+          size="lg"
+          showValue={false}
+        />
+        {isSaving && (
+          <p className="text-xs text-gray-500 mt-1">Saving...</p>
         )}
       </div>
     </div>
