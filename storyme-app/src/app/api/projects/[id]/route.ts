@@ -72,22 +72,29 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    console.log('[DELETE /api/projects/[id]] Starting delete request...');
     const { id } = await params;
+    console.log(`[DELETE /api/projects/[id]] Project ID: ${id}`);
 
     // Get authenticated user
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      console.error('[DELETE /api/projects/[id]] Auth error:', authError);
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
+    console.log(`[DELETE /api/projects/[id]] User ID: ${user.id}`);
+
     // Delete project
     const projectService = new ProjectService(supabase);
+    console.log('[DELETE /api/projects/[id]] Calling projectService.deleteProject...');
     await projectService.deleteProject(id, user.id);
+    console.log('[DELETE /api/projects/[id]] Delete successful!');
 
     return NextResponse.json({
       success: true,
@@ -95,9 +102,12 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error('Error deleting project:', error);
+    console.error('[DELETE /api/projects/[id]] Error deleting project:', error);
 
     if (error instanceof Error) {
+      console.error('[DELETE /api/projects/[id]] Error message:', error.message);
+      console.error('[DELETE /api/projects/[id]] Error stack:', error.stack);
+
       // Handle authorization errors
       if (error.message.includes('Unauthorized')) {
         return NextResponse.json(

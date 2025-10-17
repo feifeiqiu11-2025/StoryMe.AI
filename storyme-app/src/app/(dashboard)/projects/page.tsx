@@ -81,24 +81,43 @@ export default function ProjectsPage() {
   };
 
   const handleDeleteProject = async (projectId: string) => {
+    console.log('[handleDeleteProject] Starting delete for project:', projectId);
     setDeleting(true);
     try {
-      const response = await fetch(`/api/projects/${projectId}`, {
+      const url = `/api/projects/${projectId}`;
+      console.log('[handleDeleteProject] DELETE URL:', url);
+
+      const response = await fetch(url, {
         method: 'DELETE',
       });
 
+      console.log('[handleDeleteProject] Response status:', response.status);
+      console.log('[handleDeleteProject] Response ok:', response.ok);
+
       if (response.ok) {
+        console.log('[handleDeleteProject] Delete successful, removing from list');
         // Remove from list
         setProjects(projects.filter(p => p.id !== projectId));
         setDeleteConfirm(null);
       } else {
-        const data = await response.json();
-        alert(`Failed to delete: ${data.error}`);
+        let errorMessage = 'Unknown error';
+        try {
+          const data = await response.json();
+          console.error('[handleDeleteProject] Server error data:', data);
+          errorMessage = data.error || JSON.stringify(data) || 'No error message';
+        } catch (jsonError) {
+          console.error('[handleDeleteProject] Failed to parse error JSON:', jsonError);
+          const text = await response.text();
+          console.error('[handleDeleteProject] Raw error response:', text);
+          errorMessage = text || `HTTP ${response.status}`;
+        }
+        alert(`Failed to delete: ${errorMessage}`);
       }
     } catch (error) {
-      console.error('Delete error:', error);
-      alert('Failed to delete project');
+      console.error('[handleDeleteProject] Fetch error:', error);
+      alert(`Failed to delete project: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
+      console.log('[handleDeleteProject] Finished delete attempt');
       setDeleting(false);
     }
   };
