@@ -224,6 +224,35 @@ export interface Storybook {
   created_at: string;
 }
 
+// ============================================
+// AUDIO MODELS (for Reading Mode)
+// ============================================
+
+export interface StoryAudioPage {
+  id: string;
+  project_id: string;
+  page_number: number;
+  page_type: 'cover' | 'scene';
+  scene_id?: string;
+
+  // Audio data
+  text_content: string;
+  audio_url?: string;
+  audio_filename?: string;
+  audio_duration_seconds?: number;
+
+  // Generation metadata
+  voice_id?: string;
+  tone?: string;
+  generation_status: 'pending' | 'generating' | 'completed' | 'failed';
+  error_message?: string;
+
+  created_at: string;
+  updated_at: string;
+}
+
+export type StoryAudioPageInput = Omit<StoryAudioPage, 'id' | 'created_at' | 'updated_at'>;
+
 export interface CharacterTag {
   id: string;
   user_id: string;

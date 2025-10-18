@@ -10,6 +10,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
+import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeViewer';
 
 export default function StoryViewerPage() {
   const router = useRouter();
@@ -21,6 +22,11 @@ export default function StoryViewerPage() {
   const [project, setProject] = useState<any>(null);
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [readingMode, setReadingMode] = useState(false);
+  const [readingPages, setReadingPages] = useState<ReadingPage[]>([]);
+  const [loadingAudio, setLoadingAudio] = useState(false);
+  const [generatingAudio, setGeneratingAudio] = useState(false);
+  const [hasAudio, setHasAudio] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -71,6 +77,8 @@ export default function StoryViewerPage() {
 
       if (response.ok) {
         setProject(data.project);
+        // Check if audio exists
+        await checkAudioExists();
       } else {
         console.error('Failed to fetch project:', data.error);
         router.push('/projects');
@@ -78,6 +86,115 @@ export default function StoryViewerPage() {
     } catch (error) {
       console.error('Error fetching project:', error);
       router.push('/projects');
+    }
+  };
+
+  const checkAudioExists = async () => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/audio-pages`);
+      const data = await response.json();
+      setHasAudio(data.hasAudio || false);
+    } catch (error) {
+      console.error('Error checking audio:', error);
+      setHasAudio(false);
+    }
+  };
+
+  const handleGenerateAudio = async () => {
+    if (!project) {
+      alert('Project not loaded');
+      return;
+    }
+
+    setGeneratingAudio(true);
+
+    try {
+      console.log('🎵 Starting audio generation...');
+
+      const response = await fetch('/api/generate-story-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert(`✅ Audio generated successfully!\n\n${data.successfulPages} of ${data.totalPages} pages have audio narration.`);
+        setHasAudio(true);
+        await checkAudioExists();
+      } else {
+        console.error('Audio generation failed:', data);
+        alert(`❌ Audio generation failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Audio generation error:', error);
+      alert(`❌ Error generating audio: ${error.message || 'Unknown error'}`);
+    } finally {
+      setGeneratingAudio(false);
+    }
+  };
+
+  const handleEnterReadingMode = async () => {
+    if (!project || !project.scenes || project.scenes.length === 0) {
+      alert('No scenes available for reading mode');
+      return;
+    }
+
+    setLoadingAudio(true);
+
+    try {
+      // Fetch audio pages
+      const audioResponse = await fetch(`/api/projects/${projectId}/audio-pages`);
+      const audioData = await audioResponse.json();
+
+      // Build pages array
+      const pages: ReadingPage[] = [];
+
+      // Page 1: Cover page
+      const coverText = project.authorName && project.authorAge
+        ? `${project.title}, by ${project.authorName}, age ${project.authorAge}`
+        : project.authorName
+        ? `${project.title}, by ${project.authorName}`
+        : project.title;
+
+      const coverAudioPage = audioData.audioPages?.find((ap: any) => ap.page_type === 'cover');
+
+      pages.push({
+        pageNumber: 1,
+        pageType: 'cover',
+        imageUrl: project.coverImageUrl || '/api/placeholder/1024/1024',
+        textContent: coverText,
+        audioUrl: coverAudioPage?.audio_url,
+        audioDuration: coverAudioPage?.audio_duration_seconds,
+      });
+
+      // Pages 2+: Scene pages
+      const scenes = (project.scenes || [])
+        .filter((scene: any) => scene.images && scene.images.length > 0)
+        .sort((a: any, b: any) => a.sceneNumber - b.sceneNumber);
+
+      scenes.forEach((scene: any, index: number) => {
+        const sceneAudioPage = audioData.audioPages?.find((ap: any) => ap.scene_id === scene.id);
+
+        pages.push({
+          pageNumber: index + 2,
+          pageType: 'scene',
+          imageUrl: scene.images[0].imageUrl,
+          textContent: scene.caption || scene.description,
+          audioUrl: sceneAudioPage?.audio_url,
+          audioDuration: sceneAudioPage?.audio_duration_seconds,
+        });
+      });
+
+      setReadingPages(pages);
+      setReadingMode(true);
+
+    } catch (error) {
+      console.error('Error loading reading mode:', error);
+      alert('Failed to load reading mode. Please try again.');
+    } finally {
+      setLoadingAudio(false);
     }
   };
 
@@ -274,6 +391,52 @@ export default function StoryViewerPage() {
             <div className="bg-white rounded-2xl shadow-xl p-6">
               <div className="flex gap-4 flex-wrap">
                 <button
+                  onClick={handleEnterReadingMode}
+                  disabled={loadingAudio}
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-purple-700 hover:to-blue-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loadingAudio ? (
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Loading...
+                    </span>
+                  ) : (
+                    '📖 Reading Mode'
+                  )}
+                </button>
+                {!hasAudio && (
+                  <button
+                    onClick={handleGenerateAudio}
+                    disabled={generatingAudio}
+                    className="bg-gradient-to-r from-green-600 to-teal-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-teal-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {generatingAudio ? (
+                      <span className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Generating Audio...
+                      </span>
+                    ) : (
+                      '🎵 Generate Audio'
+                    )}
+                  </button>
+                )}
+                {hasAudio && (
+                  <button
+                    onClick={handleGenerateAudio}
+                    disabled={generatingAudio}
+                    className="bg-gradient-to-r from-green-600 to-teal-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-teal-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {generatingAudio ? (
+                      <span className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Regenerating...
+                      </span>
+                    ) : (
+                      '🔄 Regenerate Audio'
+                    )}
+                  </button>
+                )}
+                <button
                   onClick={handleDownloadPDF}
                   disabled={generatingPDF}
                   className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl hover:from-orange-700 hover:to-red-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -308,6 +471,16 @@ export default function StoryViewerPage() {
           </div>
         )}
       </div>
+
+      {/* Reading Mode Viewer */}
+      {readingMode && readingPages.length > 0 && (
+        <ReadingModeViewer
+          projectId={projectId}
+          projectTitle={project?.title || 'Storybook'}
+          pages={readingPages}
+          onExit={() => setReadingMode(false)}
+        />
+      )}
     </div>
   );
 }
