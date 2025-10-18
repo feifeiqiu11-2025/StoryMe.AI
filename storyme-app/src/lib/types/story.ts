@@ -87,6 +87,9 @@ export interface StorySession {
   scenes: Scene[];
   generatedImages: GeneratedImage[];
   status: 'idle' | 'processing' | 'completed' | 'error';
+  artStyle?: string; // Art style for image generation
+  readingLevel?: number; // Reading level for scene enhancement
+  storyTone?: StoryTone; // Story tone for scene enhancement
 }
 
 export interface FalImageResponse {

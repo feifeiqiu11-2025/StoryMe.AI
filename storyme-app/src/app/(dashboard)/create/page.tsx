@@ -21,6 +21,7 @@ import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import { getGuestStory, clearGuestStory } from '@/lib/utils/guest-story-storage';
 
 const CHARACTERS_STORAGE_KEY = 'storyme_character_library';
+const ART_STYLE = "children's book illustration, colorful, whimsical";
 
 export default function CreateStoryPage() {
   const router = useRouter();
@@ -595,7 +596,7 @@ export default function CreateStoryPage() {
         body: JSON.stringify({
           characters: characters,
           script: enhancedScript, // Use enhanced prompts, not raw script
-          artStyle: "children's book illustration, colorful, whimsical",
+          artStyle: ART_STYLE,
         }),
       });
 
@@ -879,7 +880,7 @@ export default function CreateStoryPage() {
             <ImageGallery
               generatedImages={imageGenerationStatus}
               characters={characters}
-              artStyle={artStyle}
+              artStyle={ART_STYLE}
               onRegenerateScene={(imageId, newImageData) => {
                 // Replace the image in the status array
                 setImageGenerationStatus(prev =>

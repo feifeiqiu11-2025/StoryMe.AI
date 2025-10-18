@@ -15,6 +15,8 @@ import { validateScript, parseScriptIntoScenes, validateCharacterReferences } fr
 import { saveGuestStory, getGuestStory, saveGuestStoryToAccount } from '@/lib/utils/guest-story-storage';
 import { createClient } from '@/lib/supabase/client';
 
+const ART_STYLE = "children's book illustration, colorful, whimsical";
+
 export default function GuestStoryPage() {
   const router = useRouter();
   const [session, setSession] = useState<StorySession>({
@@ -23,6 +25,7 @@ export default function GuestStoryPage() {
     scenes: [],
     generatedImages: [],
     status: 'idle',
+    artStyle: ART_STYLE,
   });
 
   // Story settings (NEW)
@@ -276,6 +279,7 @@ export default function GuestStoryPage() {
       scenes: [],
       generatedImages: [],
       status: 'idle',
+      artStyle: ART_STYLE,
     });
     setError(null);
   };
