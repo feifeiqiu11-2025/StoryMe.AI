@@ -88,12 +88,17 @@ export async function POST(request: NextRequest) {
       success: true,
       generatedImage: {
         id: sceneId, // Keep the same ID to replace existing
+        sceneId: sceneId, // Add sceneId field
         sceneNumber,
         sceneDescription: originalSceneDescription, // Keep original description
         imageUrl: result.imageUrl,
         prompt: customPrompt, // Store the custom prompt that was used
         generationTime,
         status: 'completed',
+        characterRatings: characters.map((char: Character) => ({
+          characterId: char.id,
+          characterName: char.name,
+        })),
       },
     });
 

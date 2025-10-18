@@ -259,7 +259,7 @@ export default function ImageGallery({
                     />
 
                     {/* Per-character rating buttons */}
-                    {image.characterRatings && image.characterRatings.length > 0 && (
+                    {image.characterRatings && Array.isArray(image.characterRatings) && image.characterRatings.length > 0 && (
                       <div className="space-y-2 mt-3">
                         <p className="text-sm font-medium text-gray-700">
                           Rate character consistency:
