@@ -107,51 +107,39 @@ export default function RegenerateSceneControl({
   }
 
   return (
-    <div className="bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-300 rounded-lg p-5 space-y-4 shadow-sm">
+    <div className="bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-300 rounded-lg p-4 space-y-3 shadow-sm">
       <div className="flex items-center justify-between">
-        <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <span className="text-2xl">🎨</span>
+        <h4 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+          <span className="text-xl">🎨</span>
           Customize & Regenerate Scene {sceneNumber}
         </h4>
         <button
           onClick={handleCancel}
           disabled={isRegenerating}
-          className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+          className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 flex-shrink-0"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
-      {/* Original Prompt (Show full technical prompt) */}
-      <div className="space-y-2">
-        <label className="block text-sm font-semibold text-gray-700">
-          Current AI Prompt:
-        </label>
-        <div className="bg-gray-100 border border-gray-300 rounded-lg p-3">
-          <p className="text-sm text-gray-700 font-mono whitespace-pre-wrap">
-            {originalPrompt}
-          </p>
-        </div>
-      </div>
-
-      {/* Editable Prompt */}
+      {/* Editable Prompt - Single field */}
       <div className="space-y-2">
         <label htmlFor="edited-prompt" className="block text-sm font-semibold text-gray-700">
-          Edit Prompt:
+          AI Prompt:
         </label>
         <textarea
           id="edited-prompt"
           value={editedPrompt}
           onChange={(e) => setEditedPrompt(e.target.value)}
           disabled={isRegenerating}
-          rows={6}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-mono text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+          rows={4}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed resize-none"
           placeholder="Edit the AI prompt to improve this scene..."
         />
         <p className="text-xs text-gray-500">
-          💡 <strong>Tip:</strong> Be specific about character poses, expressions, actions, and background details.
+          💡 Be specific about character poses, expressions, actions, and background details.
         </p>
       </div>
 
@@ -163,21 +151,21 @@ export default function RegenerateSceneControl({
       )}
 
       {/* Action Buttons */}
-      <div className="flex gap-3 pt-2">
+      <div className="flex gap-2">
         <button
           onClick={handleRegenerate}
           disabled={isRegenerating || !editedPrompt.trim()}
-          className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all font-medium shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="flex-1 px-3 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
         >
           {isRegenerating ? (
             <>
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               <span>Generating...</span>
             </>
           ) : (
             <>
-              <span className="text-lg">🔄</span>
-              <span>Regenerate Image</span>
+              <span>🔄</span>
+              <span>Regenerate</span>
             </>
           )}
         </button>
@@ -185,7 +173,7 @@ export default function RegenerateSceneControl({
         <button
           onClick={handleCancel}
           disabled={isRegenerating}
-          className="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm"
         >
           Cancel
         </button>
@@ -193,9 +181,9 @@ export default function RegenerateSceneControl({
 
       {/* Generating Status */}
       {isRegenerating && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <p className="text-sm text-blue-700 font-medium flex items-center gap-2">
-            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+          <p className="text-xs text-blue-700 font-medium flex items-center gap-2">
+            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
             Generating new image... This may take 15-30 seconds.
           </p>
         </div>
