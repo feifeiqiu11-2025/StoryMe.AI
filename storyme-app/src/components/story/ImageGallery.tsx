@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { GeneratedImage, Character } from '@/lib/types/story';
 import SceneRatingCard from './SceneRatingCard';
+import RegenerateSceneControl from './RegenerateSceneControl';
 
 interface ImageGalleryProps {
   characters: Character[];
@@ -10,6 +11,8 @@ interface ImageGalleryProps {
   onRating?: (imageId: string, characterId: string, rating: 'good' | 'bad') => void;
   onDownloadAll?: () => void;
   onStartOver?: () => void;
+  onRegenerateScene?: (imageId: string, newImageData: any) => void;
+  artStyle?: string;
   isGuestMode?: boolean; // Hide individual downloads in guest mode
 }
 
@@ -19,6 +22,8 @@ export default function ImageGallery({
   onRating,
   onDownloadAll,
   onStartOver,
+  onRegenerateScene,
+  artStyle,
   isGuestMode = false,
 }: ImageGalleryProps) {
   // Track ratings per image per character
@@ -209,17 +214,34 @@ export default function ImageGallery({
 
               {/* Details */}
               <div className="flex-1 space-y-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Scene {image.sceneNumber}
-                  </h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {image.sceneDescription}
-                  </p>
-                  {image.characterRatings && image.characterRatings.length > 0 && (
-                    <p className="text-xs text-blue-600 mt-2">
-                      Characters: {image.characterRatings.map(r => r.characterName).join(', ')}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Scene {image.sceneNumber}
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {image.sceneDescription}
                     </p>
+                    {image.characterRatings && image.characterRatings.length > 0 && (
+                      <p className="text-xs text-blue-600 mt-2">
+                        Characters: {image.characterRatings.map(r => r.characterName).join(', ')}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Regenerate Button - Prominent position next to title */}
+                  {image.status === 'completed' && onRegenerateScene && (
+                    <div className="flex-shrink-0">
+                      <RegenerateSceneControl
+                        sceneId={image.id}
+                        sceneNumber={image.sceneNumber}
+                        originalPrompt={image.prompt}
+                        sceneDescription={image.sceneDescription}
+                        characters={characters}
+                        artStyle={artStyle}
+                        onRegenerate={(newImageData) => onRegenerateScene(image.id, newImageData)}
+                      />
+                    </div>
                   )}
                 </div>
 

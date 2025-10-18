@@ -556,6 +556,18 @@ export default function GuestStoryPage() {
                 characters={session.characters}
                 generatedImages={session.generatedImages}
                 onStartOver={handleStartOver}
+                artStyle={session.artStyle}
+                onRegenerateScene={(imageId, newImageData) => {
+                  // Replace the image in session
+                  setSession(prev => ({
+                    ...prev,
+                    generatedImages: prev.generatedImages.map(img =>
+                      img.id === imageId
+                        ? { ...img, ...newImageData }
+                        : img
+                    ),
+                  }));
+                }}
                 isGuestMode={true}
               />
             </>

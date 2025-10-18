@@ -879,6 +879,17 @@ export default function CreateStoryPage() {
             <ImageGallery
               generatedImages={imageGenerationStatus}
               characters={characters}
+              artStyle={artStyle}
+              onRegenerateScene={(imageId, newImageData) => {
+                // Replace the image in the status array
+                setImageGenerationStatus(prev =>
+                  prev.map(img =>
+                    img.id === imageId
+                      ? { ...img, ...newImageData }
+                      : img
+                  )
+                );
+              }}
             />
 
             {/* Save & Export Options */}
