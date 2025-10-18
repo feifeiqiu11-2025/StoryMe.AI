@@ -302,7 +302,7 @@ export default function ImageGallery({
 
                     {/* Meta info */}
                     <div className="text-xs text-gray-500 space-y-1">
-                      <p>Generation time: {image.generationTime.toFixed(1)}s</p>
+                      <p>Generation time: {(image.generationTime || 0).toFixed(1)}s</p>
                     </div>
 
                     {/* Download button - Only show in authenticated mode */}
