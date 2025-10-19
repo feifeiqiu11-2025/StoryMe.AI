@@ -46,7 +46,7 @@ export default function ScenePreviewApproval({
       <div className="max-w-4xl mx-auto px-4">
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
             📖 Enhanced Scene Preview
           </h1>
           <p className="text-gray-600">
@@ -119,7 +119,7 @@ export default function ScenePreviewApproval({
             >
               <div className="flex items-start gap-4">
                 {/* Scene Number */}
-                <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
                   {scene.sceneNumber}
                 </div>
 
@@ -140,10 +140,21 @@ export default function ScenePreviewApproval({
                     {onCaptionEdit ? (
                       <textarea
                         value={scene.caption}
-                        onChange={(e) => onCaptionEdit(scene.sceneNumber, e.target.value)}
+                        onChange={(e) => {
+                          onCaptionEdit(scene.sceneNumber, e.target.value);
+                          // Auto-resize textarea based on content
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                        onFocus={(e) => {
+                          // Set initial height on focus
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
                         disabled={isGenerating}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 leading-relaxed"
-                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 leading-relaxed overflow-hidden"
+                        rows={1}
+                        style={{ minHeight: '2.5rem' }}
                       />
                     ) : (
                       <p className="text-gray-900 leading-relaxed">
