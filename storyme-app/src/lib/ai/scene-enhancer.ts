@@ -2,9 +2,10 @@
  * AI Scene Enhancer
  * Uses Claude/OpenAI to enhance scene descriptions for better image generation
  * and create age-appropriate captions
+ * Also supports story expansion based on expansion level
  */
 
-import { StoryTone } from '../types/story';
+import { StoryTone, ExpansionLevel } from '../types/story';
 
 export interface SceneToEnhance {
   sceneNumber: number;
@@ -19,10 +20,12 @@ export interface Character {
 
 export interface EnhancedSceneResult {
   sceneNumber: number;
+  title?: string;                // Scene title for preview
   raw_description: string;
   enhanced_prompt: string;
   caption: string;
   characterNames: string[];
+  isNewCharacter?: boolean;      // Flag if AI added new character
 }
 
 /**
@@ -123,27 +126,116 @@ function getReadingLevelGuidelines(readingLevel: number): string {
 }
 
 /**
+ * Get target scene count based on expansion level and reading level
+ */
+function getTargetSceneCount(
+  originalSceneCount: number,
+  readingLevel: number,
+  expansionLevel: ExpansionLevel
+): number {
+  if (expansionLevel === 'minimal') {
+    return originalSceneCount; // Keep same count
+  }
+
+  if (expansionLevel === 'smart') {
+    // Age-based smart expansion
+    if (readingLevel <= 4) return Math.min(Math.ceil(originalSceneCount * 2), 8);
+    if (readingLevel <= 6) return Math.min(Math.ceil(originalSceneCount * 2.5), 10);
+    return Math.min(Math.ceil(originalSceneCount * 3), 12);
+  }
+
+  // Rich expansion
+  return Math.max(12, Math.min(Math.ceil(originalSceneCount * 3), 15));
+}
+
+/**
+ * Get expansion-specific instructions for AI
+ */
+function getExpansionInstructions(
+  expansionLevel: ExpansionLevel,
+  originalSceneCount: number,
+  targetSceneCount: number,
+  characterNames: string
+): string {
+  if (expansionLevel === 'minimal') {
+    return `
+EXPANSION LEVEL: MINIMAL (Keep Original Story)
+- You MUST create EXACTLY ${originalSceneCount} scenes (same as input)
+- DO NOT add new scenes or change the story structure
+- DO NOT add new characters beyond: ${characterNames}
+- ONLY enhance the captions to be age-appropriate and clear
+- Keep the user's original story spirit intact
+- Focus on improving language quality, not adding content
+    `;
+  }
+
+  if (expansionLevel === 'smart') {
+    return `
+EXPANSION LEVEL: SMART (Age-Based Expansion)
+- Original scenes: ${originalSceneCount}
+- Target scenes: ${targetSceneCount}
+- Expand the story with transitional scenes and details
+- You MAY add minor supporting characters if needed (parents, friends, pets)
+- Label any new characters with "(NEW)" in characterNames
+- Add sensory details (colors, sounds, feelings)
+- Add simple dialogue appropriate for the age
+- Add small plot elements (minor challenges, discoveries)
+- Maintain clear story arc: beginning → middle → end
+- MUST preserve user's main characters: ${characterNames}
+    `;
+  }
+
+  // Rich expansion
+  return `
+EXPANSION LEVEL: RICH (Full Creative Expansion)
+- Original scenes: ${originalSceneCount}
+- Target scenes: ${targetSceneCount} (12-15 scenes)
+- Create a fully developed narrative with rich storytelling
+- Add dialogue, character development, emotional moments
+- You MAY add supporting characters (label with "(NEW)")
+- Add mini story arcs, conflicts, and resolutions
+- Create detailed settings and atmospheres
+- Add character thoughts and emotions
+- MUST preserve user's main characters: ${characterNames}
+- Keep core theme from original script
+  `;
+}
+
+/**
  * Build system prompt for Claude API
  */
 export function buildEnhancementPrompt(
   scenes: SceneToEnhance[],
   characters: Character[],
   readingLevel: number,
-  storyTone: StoryTone
+  storyTone: StoryTone,
+  expansionLevel: ExpansionLevel = 'minimal'
 ): string {
   const characterNames = characters.map(c => c.name).join(', ');
   const characterDescriptions = characters
     .map(c => `- ${c.name}: ${c.description}`)
     .join('\n');
 
+  const targetSceneCount = getTargetSceneCount(scenes.length, readingLevel, expansionLevel);
+  const expansionInstructions = getExpansionInstructions(
+    expansionLevel,
+    scenes.length,
+    targetSceneCount,
+    characterNames
+  );
+
   return `You are a children's storybook expert specializing in creating engaging, age-appropriate stories.
 
 STORY SETTINGS:
 - Reading Level: ${readingLevel} years old
 - Story Tone: ${storyTone}
+- Input Scenes: ${scenes.length}
+- Target Output: ${targetSceneCount} scenes
 
 CHARACTER INFORMATION:
 ${characterDescriptions}
+
+${expansionInstructions}
 
 TONE GUIDELINES FOR "${storyTone.toUpperCase()}":
 ${getToneGuidelines(storyTone)}
@@ -181,21 +273,30 @@ INPUT SCENES:
 ${scenes.map((s, i) => `Scene ${s.sceneNumber}: "${s.rawDescription}" (Characters: ${s.characterNames.join(', ') || 'all'})`).join('\n')}
 
 OUTPUT FORMAT:
-Return a valid JSON array with this exact structure:
+Return a valid JSON array with ${targetSceneCount} scenes in this exact structure:
 [
   {
     "sceneNumber": 1,
+    "title": "Brief scene title (5-7 words)",
     "enhanced_prompt": "detailed visual description preserving character names",
-    "caption": "age-appropriate story text with ${storyTone} tone"
+    "caption": "age-appropriate story text with ${storyTone} tone",
+    "characterNames": ["Emma", "Mom"]
   },
   {
     "sceneNumber": 2,
+    "title": "...",
     "enhanced_prompt": "...",
-    "caption": "..."
+    "caption": "...",
+    "characterNames": ["Emma"]
   }
 ]
 
-Return ONLY the JSON array, no additional text.`;
+IMPORTANT:
+- Return EXACTLY ${targetSceneCount} scenes in the array
+- Include "title" for each scene (helps users preview)
+- List all character names appearing in each scene
+- Mark new characters with "(NEW)" suffix if you added them
+- Return ONLY the JSON array, no additional text.`;
 }
 
 /**
@@ -217,19 +318,18 @@ export function parseEnhancementResponse(
     }
 
     // Validate and merge with original scene data
+    // Note: With expansion, we might have MORE scenes than original
     return parsed.map((item: any, index: number) => {
-      const originalScene = originalScenes[index];
-
-      if (!originalScene) {
-        throw new Error(`Missing original scene for index ${index}`);
-      }
+      const originalScene = originalScenes[Math.min(index, originalScenes.length - 1)];
 
       return {
-        sceneNumber: originalScene.sceneNumber,
-        raw_description: originalScene.rawDescription,
-        enhanced_prompt: item.enhanced_prompt || originalScene.rawDescription,
-        caption: item.caption || originalScene.rawDescription,
-        characterNames: originalScene.characterNames
+        sceneNumber: item.sceneNumber || (index + 1),
+        title: item.title || `Scene ${index + 1}`,
+        raw_description: originalScene?.rawDescription || item.caption,
+        enhanced_prompt: item.enhanced_prompt || item.caption,
+        caption: item.caption || originalScene?.rawDescription || 'No description',
+        characterNames: item.characterNames || originalScene?.characterNames || [],
+        isNewCharacter: item.characterNames?.some((name: string) => name.includes('(NEW)')) || false
       };
     });
 

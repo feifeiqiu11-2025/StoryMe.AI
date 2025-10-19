@@ -1,12 +1,15 @@
 'use client';
 
-import { StoryTone } from '@/lib/types/story';
+import { StoryTone, ExpansionLevel } from '@/lib/types/story';
+import ExpansionLevelSelector from './ExpansionLevelSelector';
 
 interface StorySettingsPanelProps {
   readingLevel: number;
   onReadingLevelChange: (level: number) => void;
   storyTone: StoryTone;
   onStoryToneChange: (tone: StoryTone) => void;
+  expansionLevel: ExpansionLevel;
+  onExpansionLevelChange: (level: ExpansionLevel) => void;
   disabled?: boolean;
 }
 
@@ -64,6 +67,8 @@ export default function StorySettingsPanel({
   onReadingLevelChange,
   storyTone,
   onStoryToneChange,
+  expansionLevel,
+  onExpansionLevelChange,
   disabled = false,
 }: StorySettingsPanelProps) {
   return (
@@ -159,6 +164,13 @@ export default function StorySettingsPanel({
           ))}
         </div>
       </div>
+
+      {/* Expansion Level Selector */}
+      <ExpansionLevelSelector
+        value={expansionLevel}
+        readingLevel={readingLevel}
+        onChange={onExpansionLevelChange}
+      />
 
       {/* Summary */}
       <div className="pt-4 border-t border-gray-200">

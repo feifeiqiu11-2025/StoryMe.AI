@@ -17,14 +17,14 @@ import {
   type Character,
   type EnhancedSceneResult
 } from '@/lib/ai/scene-enhancer';
-import { StoryTone } from '@/lib/types/story';
+import { StoryTone, ExpansionLevel } from '@/lib/types/story';
 
 export const maxDuration = 60; // 1 minute timeout
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { scenes, readingLevel, storyTone, characters } = body;
+    const { scenes, readingLevel, storyTone, characters, expansionLevel = 'minimal' } = body;
 
     // Validate inputs
     if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
@@ -67,14 +67,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`Enhancing ${scenes.length} scenes with reading level ${readingLevel} and ${storyTone} tone`);
+    console.log(`Enhancing ${scenes.length} scenes with reading level ${readingLevel}, ${storyTone} tone, and ${expansionLevel} expansion`);
 
     // Build prompt for AI
     const prompt = buildEnhancementPrompt(
       scenes as SceneToEnhance[],
       characters as Character[],
       readingLevel,
-      storyTone as StoryTone
+      storyTone as StoryTone,
+      expansionLevel as ExpansionLevel
     );
 
     // Call OpenAI API

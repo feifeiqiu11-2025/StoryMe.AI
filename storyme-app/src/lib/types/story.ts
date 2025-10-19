@@ -11,6 +11,12 @@ export type StoryTone =
   | 'friendly'      // Warm, social, cooperative
   | 'brave';        // Courageous, overcoming fears
 
+// AI expansion level for story enhancement
+export type ExpansionLevel =
+  | 'minimal'       // Keep original structure, only enhance captions (default)
+  | 'smart'         // AI expands story based on age, adds scenes
+  | 'rich';         // Full creative expansion with detailed narrative
+
 export interface CharacterDescription {
   hairColor?: string;
   skinTone?: string;
@@ -42,10 +48,12 @@ export interface Scene {
 // Enhanced scene after AI processing
 export interface EnhancedScene {
   sceneNumber: number;
-  raw_description: string;      // Original user input
+  title?: string;                // Scene title for preview (NEW)
+  raw_description: string;       // Original user input
   enhanced_prompt: string;       // AI-enhanced for image generation
   caption: string;               // Age-appropriate caption for PDF
   characterNames: string[];      // Characters in this scene
+  isNewCharacter?: boolean;      // Flag if AI added new minor character (NEW)
 }
 
 // Enhanced scene with generated image
@@ -90,6 +98,9 @@ export interface StorySession {
   artStyle?: string; // Art style for image generation
   readingLevel?: number; // Reading level for scene enhancement
   storyTone?: StoryTone; // Story tone for scene enhancement
+  expansionLevel?: ExpansionLevel; // AI expansion level (NEW)
+  enhancedScenes?: EnhancedScene[]; // Preview before image generation (NEW)
+  approvedForGeneration?: boolean; // User approved enhanced scenes (NEW)
 }
 
 export interface FalImageResponse {

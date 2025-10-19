@@ -11,10 +11,10 @@ import { createClient } from '@/lib/supabase/client';
 import CharacterManager from '@/components/story/CharacterManager';
 import ScriptInput from '@/components/story/ScriptInput';
 import StorySettingsPanel from '@/components/story/StorySettingsPanel';
-import EnhancementPreview from '@/components/story/EnhancementPreview';
+import ScenePreviewApproval from '@/components/story/ScenePreviewApproval';
 import GenerationProgress from '@/components/story/GenerationProgress';
 import ImageGallery from '@/components/story/ImageGallery';
-import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScene } from '@/lib/types/story';
+import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScene, ExpansionLevel } from '@/lib/types/story';
 import { parseScriptIntoScenes } from '@/lib/scene-parser';
 import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
@@ -36,6 +36,7 @@ export default function CreateStoryPage() {
   // Story settings (NEW)
   const [readingLevel, setReadingLevel] = useState<number>(5);
   const [storyTone, setStoryTone] = useState<StoryTone>('playful');
+  const [expansionLevel, setExpansionLevel] = useState<ExpansionLevel>('minimal');
 
   // Enhancement state (NEW)
   const [enhancedScenes, setEnhancedScenes] = useState<EnhancedScene[]>([]);
@@ -58,6 +59,7 @@ export default function CreateStoryPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [isGeneratingMetadata, setIsGeneratingMetadata] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -292,6 +294,7 @@ export default function CreateStoryPage() {
           })),
           readingLevel,
           storyTone,
+          expansionLevel, // NEW: Pass expansion level to API
           characters: characters.map(c => ({
             name: c.name,
             description: Object.values(c.description).filter(Boolean).join(', ')
@@ -332,6 +335,11 @@ export default function CreateStoryPage() {
     }
   };
 
+  // NEW: Handle back button (go back to settings and clear enhanced scenes)
+  const handleRegenerateAll = () => {
+    setEnhancedScenes([]);
+  };
+
   // NEW: Handle caption editing in preview
   const handleCaptionEdit = (sceneNumber: number, newCaption: string) => {
     setEnhancedScenes(prev =>
@@ -343,9 +351,49 @@ export default function CreateStoryPage() {
     );
   };
 
-  // NEW: Handle regenerate all (go back to settings)
-  const handleRegenerateAll = () => {
-    setEnhancedScenes([]);
+  // NEW: Generate AI-powered title and description
+  const handleGenerateMetadata = async () => {
+    setIsGeneratingMetadata(true);
+    setSaveError('');
+
+    try {
+      console.log('🎨 Requesting AI-generated title and description...');
+
+      const response = await fetch('/api/generate-story-metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          script: scriptInput,
+          readingLevel,
+          storyTone,
+          characterNames: characters.map(c => c.name),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate metadata');
+      }
+
+      const data = await response.json();
+
+      console.log('✅ AI generated:', data);
+
+      // Set the title and description
+      setSaveTitle(data.title || 'My Amazing Story');
+      setSaveDescription(data.description || 'A wonderful adventure!');
+
+      if (data.warning) {
+        console.warn('Metadata generation warning:', data.warning);
+      }
+    } catch (error) {
+      console.error('Metadata generation error:', error);
+      // Fallback to simple defaults
+      const firstWords = scriptInput.trim().split(' ').slice(0, 5).join(' ');
+      setSaveTitle(firstWords || 'My Story');
+      setSaveDescription('An amazing adventure!');
+    } finally {
+      setIsGeneratingMetadata(false);
+    }
   };
 
   const handleSaveStory = async () => {
@@ -820,6 +868,8 @@ export default function CreateStoryPage() {
               onReadingLevelChange={setReadingLevel}
               storyTone={storyTone}
               onStoryToneChange={setStoryTone}
+              expansionLevel={expansionLevel}
+              onExpansionLevelChange={setExpansionLevel}
               disabled={isEnhancing}
             />
 
@@ -849,17 +899,17 @@ export default function CreateStoryPage() {
           </div>
         )}
 
-        {/* Step 4: Enhancement Preview (NEW) */}
+        {/* Step 4: Scene Preview & Approval (NEW) */}
         {enhancedScenes.length > 0 && generatedImages.length === 0 && (
           <div className="mb-8">
-            <EnhancementPreview
+            <ScenePreviewApproval
               enhancedScenes={enhancedScenes}
+              originalSceneCount={parsedScenes.length}
+              userCharacters={characters.map(c => c.name)}
+              onApprove={handleGenerateImages}
+              onBack={handleRegenerateAll}
               onCaptionEdit={handleCaptionEdit}
-              onRegenerateAll={handleRegenerateAll}
-              onProceedToGenerate={handleGenerateImages}
               isGenerating={isGenerating}
-              readingLevel={readingLevel}
-              storyTone={storyTone}
             />
           </div>
         )}
@@ -904,11 +954,10 @@ export default function CreateStoryPage() {
               <div className="flex gap-4 flex-wrap">
                 <button
                   className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-emerald-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={() => {
-                    // Generate default title if not set
-                    if (!saveTitle) {
-                      const firstWords = scriptInput.trim().split(' ').slice(0, 5).join(' ');
-                      setSaveTitle(firstWords || 'My Story');
+                  onClick={async () => {
+                    // Generate AI-powered title and description
+                    if (!saveTitle || !saveDescription) {
+                      await handleGenerateMetadata();
                     }
                     setShowSaveModal(true);
                   }}
@@ -960,16 +1009,33 @@ export default function CreateStoryPage() {
               </div>
 
               <div className="space-y-4 mb-6">
+                {/* AI Generation Info */}
+                {isGeneratingMetadata && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <p className="text-sm text-blue-700">AI is writing your title and description...</p>
+                  </div>
+                )}
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Story Title <span className="text-red-500">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Story Title <span className="text-red-500">*</span>
+                    </label>
+                    <button
+                      onClick={handleGenerateMetadata}
+                      disabled={isSaving || isGeneratingMetadata}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                    >
+                      ✨ Regenerate with AI
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={saveTitle}
                     onChange={(e) => setSaveTitle(e.target.value)}
-                    disabled={isSaving}
-                    placeholder="Enter a title for your story"
+                    disabled={isSaving || isGeneratingMetadata}
+                    placeholder={isGeneratingMetadata ? "Generating..." : "Enter a title for your story"}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
@@ -981,8 +1047,8 @@ export default function CreateStoryPage() {
                   <textarea
                     value={saveDescription}
                     onChange={(e) => setSaveDescription(e.target.value)}
-                    disabled={isSaving}
-                    placeholder="Add a brief description of your story"
+                    disabled={isSaving || isGeneratingMetadata}
+                    placeholder={isGeneratingMetadata ? "Generating..." : "Add a brief description of your story"}
                     rows={3}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />

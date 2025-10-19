@@ -182,10 +182,10 @@ export default function RegenerateSceneControl({
       {/* Generating Status */}
       {isRegenerating && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
-          <p className="text-xs text-blue-700 font-medium flex items-center gap-2">
+          <div className="text-xs text-blue-700 font-medium flex items-center gap-2">
             <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
             Generating new image... This may take 15-30 seconds.
-          </p>
+          </div>
         </div>
       )}
     </div>
