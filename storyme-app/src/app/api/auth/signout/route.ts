@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(request: NextRequest) {
+async function handleSignOut(request: NextRequest) {
   const supabase = await createClient();
 
   // Sign out from Supabase
@@ -15,4 +15,12 @@ export async function POST(request: NextRequest) {
 
   // Redirect to home page
   return NextResponse.redirect(new URL('/', origin));
+}
+
+export async function POST(request: NextRequest) {
+  return handleSignOut(request);
+}
+
+export async function GET(request: NextRequest) {
+  return handleSignOut(request);
 }
