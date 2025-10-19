@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { ReactNode } from 'react';
 import Link from 'next/link';
+import UsageBadge from '@/components/ui/UsageBadge';
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient();
@@ -18,44 +19,60 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     redirect('/login');
   }
 
+  // Get user's display name
+  const displayName = user.user_metadata?.name || user.email?.split('@')[0] || 'User';
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       {/* Top Navigation */}
-      <header className="bg-white border-b border-gray-200">
+      <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <Link href="/" className="text-2xl font-bold hover:opacity-80 transition-opacity text-gray-900">
-                📚 Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-600">Me</span> ✨
+            <div className="flex items-center gap-4">
+              <Link href="/" className="text-2xl font-bold hover:opacity-80 transition-opacity">
+                📚 Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Me</span> ✨
               </Link>
               <span className="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded-full">BETA</span>
             </div>
-            <nav className="hidden md:flex space-x-8">
+            <nav className="hidden md:flex space-x-6">
               <Link
                 href="/dashboard"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium"
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
               >
                 Dashboard
               </Link>
               <Link
                 href="/characters"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium"
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
               >
                 Characters
               </Link>
               <Link
                 href="/projects"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium"
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
               >
-                Projects
+                My Stories
+              </Link>
+              <Link
+                href="/create"
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+              >
+                Create Story
+              </Link>
+              <Link
+                href="/community-stories"
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+              >
+                Community Stories
               </Link>
             </nav>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{user.email}</span>
+              <UsageBadge />
+              <span className="text-sm font-medium text-gray-700">{displayName}</span>
               <form action="/api/auth/signout" method="post">
                 <button
                   type="submit"
-                  className="text-sm text-gray-700 hover:text-red-600 font-medium"
+                  className="text-sm text-gray-700 hover:text-red-600 font-medium transition-colors"
                 >
                   Sign Out
                 </button>
@@ -66,7 +83,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+      <main>{children}</main>
     </div>
   );
 }

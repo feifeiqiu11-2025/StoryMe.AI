@@ -325,37 +325,7 @@ export default function CharactersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      {/* Header Navigation */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="text-2xl font-bold">
-              Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Me</span>
-            </Link>
-            <nav className="flex gap-4">
-              <Link href="/dashboard" className="text-gray-600 hover:text-gray-900 font-medium">
-                Dashboard
-              </Link>
-              <Link href="/projects" className="text-gray-600 hover:text-gray-900 font-medium">
-                My Stories
-              </Link>
-              <Link href="/characters" className="text-blue-600 font-semibold border-b-2 border-blue-600">
-                Characters
-              </Link>
-              <Link href="/create" className="text-gray-600 hover:text-gray-900 font-medium">
-                Create Story
-              </Link>
-            </nav>
-          </div>
-          <div className="text-sm text-gray-600">
-            {user.name}
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Character Library</h1>
@@ -664,6 +634,5 @@ export default function CharactersPage() {
           </div>
         )}
       </div>
-    </div>
   );
 }

@@ -28,6 +28,11 @@ export async function GET(request: NextRequest) {
       success: true,
       projects,
       count: projects.length,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+      },
     });
 
   } catch (error) {

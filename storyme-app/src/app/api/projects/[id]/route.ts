@@ -67,6 +67,75 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const { visibility } = body;
+
+    // Validate visibility
+    if (!visibility || (visibility !== 'private' && visibility !== 'public')) {
+      return NextResponse.json(
+        { error: 'Invalid visibility value. Must be "private" or "public"' },
+        { status: 400 }
+      );
+    }
+
+    // Get authenticated user
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // Update project visibility
+    const projectService = new ProjectService(supabase);
+    await projectService.updateProject(id, user.id, { visibility });
+
+    return NextResponse.json({
+      success: true,
+      message: `Story is now ${visibility}`,
+      visibility,
+    });
+
+  } catch (error) {
+    console.error('Error updating project visibility:', error);
+
+    if (error instanceof Error) {
+      if (error.message.includes('Unauthorized')) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: 403 }
+        );
+      }
+
+      if (error.message.includes('not found')) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to update visibility' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

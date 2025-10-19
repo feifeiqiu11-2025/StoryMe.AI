@@ -63,13 +63,21 @@ export default function SignupPage() {
 
         // Create user record in users table
         if (data.user) {
+          const trialStartDate = new Date();
+          const trialEndDate = new Date(trialStartDate.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
           const { error: userError } = await supabase
             .from('users')
             .insert([{
               id: data.user.id,
               email: data.user.email,
               name: name,
-              subscription_tier: 'free'
+              subscription_tier: 'free',
+              trial_started_at: trialStartDate.toISOString(),
+              trial_ends_at: trialEndDate.toISOString(),
+              images_generated_count: 0,
+              images_limit: 50,
+              trial_status: 'active'
             }]);
 
           // Ignore duplicate key errors (user might already exist)
@@ -193,6 +201,30 @@ export default function SignupPage() {
             {error}
           </div>
         )}
+
+        {/* Trial Benefits Message */}
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <div className="text-2xl">🎁</div>
+            <div>
+              <p className="font-semibold text-gray-900 mb-2">Free 7-Day Trial Benefits:</p>
+              <ul className="text-sm text-gray-700 space-y-1">
+                <li className="flex items-center gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>No credit card required</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Create up to 50 story images (including regenerations)</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Full access to all features</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
 
         <button
           type="submit"

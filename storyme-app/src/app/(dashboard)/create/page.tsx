@@ -700,48 +700,27 @@ export default function CreateStoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      {/* Header Navigation */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="text-2xl font-bold">
-              Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Me</span>
-            </Link>
-            <nav className="flex gap-4">
-              <Link href="/dashboard" className="text-gray-600 hover:text-gray-900 font-medium">
-                Dashboard
-              </Link>
-              <Link href="/projects" className="text-gray-600 hover:text-gray-900 font-medium">
-                My Stories
-              </Link>
-              <Link href="/characters" className="text-gray-600 hover:text-gray-900 font-medium">
-                Characters
-              </Link>
-              <Link href="/create" className="text-blue-600 font-semibold border-b-2 border-blue-600">
-                Create Story
-              </Link>
-            </nav>
-          </div>
-          <div className="text-sm text-gray-600">
-            {user.name}
-          </div>
-        </div>
-      </header>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Your Story</h1>
+        <p className="text-gray-600">
+          Add your characters, write your story scenes, and generate beautiful illustrations!
+        </p>
+      </div>
 
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Your Story</h1>
-          <p className="text-gray-600">
-            Add your characters, write your story scenes, and generate beautiful illustrations!
-          </p>
+      {/* Step 1: Character Management */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-sm">
+            1
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900">Define Characters</h2>
         </div>
-
-        {/* Step 1: Character Management */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Story Characters</h2>
+        <p className="text-gray-600 mb-4 ml-11">
+          Add characters to your story. You can import from your character library or create new ones.
+        </p>
+        <div className="mb-4">
+          <div className="flex justify-end gap-2">
             <div className="flex gap-2">
               <button
                 onClick={async () => {
@@ -852,6 +831,15 @@ export default function CreateStoryPage() {
         {/* Step 2: Script Input */}
         {characters.length > 0 && enhancedScenes.length === 0 && (
           <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-sm">
+                2
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900">Write Story Scenes</h2>
+            </div>
+            <p className="text-gray-600 mb-4 ml-11">
+              Describe each scene of your story. Write simple descriptions for each part of your story.
+            </p>
             <ScriptInput
               value={scriptInput}
               onChange={setScriptInput}
@@ -860,9 +848,18 @@ export default function CreateStoryPage() {
           </div>
         )}
 
-        {/* Step 3: Story Settings (NEW) */}
+        {/* Step 3: Story Settings */}
         {characters.length > 0 && scriptInput.trim() && enhancedScenes.length === 0 && (
           <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-sm">
+                3
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900">Configure Story Settings</h2>
+            </div>
+            <p className="text-gray-600 mb-4 ml-11">
+              Customize the reading level, tone, and how much detail you want in your story.
+            </p>
             <StorySettingsPanel
               readingLevel={readingLevel}
               onReadingLevelChange={setReadingLevel}
@@ -899,9 +896,18 @@ export default function CreateStoryPage() {
           </div>
         )}
 
-        {/* Step 4: Scene Preview & Approval (NEW) */}
+        {/* Step 4: Scene Preview & Approval */}
         {enhancedScenes.length > 0 && generatedImages.length === 0 && (
           <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-sm">
+                4
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900">Review & Approve Scenes</h2>
+            </div>
+            <p className="text-gray-600 mb-4 ml-11">
+              Review the enhanced scene descriptions and captions. You can edit them before generating images.
+            </p>
             <ScenePreviewApproval
               enhancedScenes={enhancedScenes}
               originalSceneCount={parsedScenes.length}
@@ -924,9 +930,18 @@ export default function CreateStoryPage() {
           </div>
         )}
 
-        {/* Generated Images */}
+        {/* Step 5: Generated Images */}
         {imageGenerationStatus.length > 0 && imageGenerationStatus.some(img => img.status === 'completed') && (
           <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-600 text-white font-bold text-sm">
+                ✓
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900">Your Story is Complete!</h2>
+            </div>
+            <p className="text-gray-600 mb-4 ml-11">
+              Review your generated images. You can regenerate individual scenes if needed.
+            </p>
             <ImageGallery
               generatedImages={imageGenerationStatus}
               characters={characters}

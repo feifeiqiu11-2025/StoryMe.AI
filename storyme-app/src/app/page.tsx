@@ -3,12 +3,18 @@
  * Modern, appealing design with emojis
  */
 
+'use client';
+
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import HeroStoryShowcase from '@/components/landing/HeroStoryShowcase';
 
 export default function HomePage() {
+  const router = useRouter();
+
   // Show landing page (removed auth redirect - dashboard handles auth now)
   return (
+    <>
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       {/* Header with Sign In button */}
       <header className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
@@ -56,17 +62,24 @@ export default function HomePage() {
 
             {/* CTA Buttons - Side by Side */}
             <div className="flex flex-col sm:flex-row gap-3">
-              <Link
+              {/* Guest mode - commented out for future use */}
+              {/* <Link
                 href="/guest"
                 className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3.5 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold text-base text-center shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-0.5"
               >
                 🚀 Try It Free – No Sign-Up Needed
-              </Link>
+              </Link> */}
               <Link
                 href="/signup"
+                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3.5 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold text-base text-center shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-0.5"
+              >
+                🎁 Sign up for free 7 days trial
+              </Link>
+              <Link
+                href="/login"
                 className="flex-1 bg-white text-gray-800 px-6 py-3.5 rounded-xl hover:bg-gray-50 font-semibold text-base text-center shadow-lg hover:shadow-xl transition-all border-2 border-gray-200 transform hover:-translate-y-0.5"
               >
-                Create Account
+                Sign In
               </Link>
             </div>
           </div>
@@ -350,17 +363,24 @@ export default function HomePage() {
             Let StoryMe help you capture their imagination, nurture their love for reading, and create memories you'll cherish for a lifetime.
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
-            <Link
+            {/* Guest mode - commented out for future use */}
+            {/* <Link
               href="/guest"
               className="bg-white text-purple-600 px-8 py-4 rounded-xl hover:bg-gray-50 font-bold text-lg shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-0.5"
             >
               🚀 Try It Free – No Sign-Up Needed
-            </Link>
+            </Link> */}
             <Link
               href="/signup"
+              className="bg-white text-purple-600 px-8 py-4 rounded-xl hover:bg-gray-50 font-bold text-lg shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-0.5"
+            >
+              🎁 Sign up for free 7 days trial
+            </Link>
+            <Link
+              href="/login"
               className="bg-purple-800 text-white px-8 py-4 rounded-xl hover:bg-purple-900 font-bold text-lg shadow-xl hover:shadow-2xl transition-all border-2 border-white/20 transform hover:-translate-y-0.5"
             >
-              Create Account
+              Sign In
             </Link>
           </div>
         </div>
@@ -373,5 +393,6 @@ export default function HomePage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -274,36 +274,7 @@ export default function StoryViewerPage() {
   const currentImage = currentScene?.images?.[0];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      {/* Header Navigation */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="text-2xl font-bold">
-              Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Me</span>
-            </Link>
-            <nav className="flex gap-4">
-              <Link href="/dashboard" className="text-gray-600 hover:text-gray-900 font-medium">
-                Dashboard
-              </Link>
-              <Link href="/projects" className="text-blue-600 font-semibold">
-                My Stories
-              </Link>
-              <Link href="/characters" className="text-gray-600 hover:text-gray-900 font-medium">
-                Characters
-              </Link>
-              <Link href="/create" className="text-gray-600 hover:text-gray-900 font-medium">
-                Create Story
-              </Link>
-            </nav>
-          </div>
-          <div className="text-sm text-gray-600">
-            {user?.name}
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
+    <>
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Story Header */}
         <div className="mb-8">
@@ -324,9 +295,9 @@ export default function StoryViewerPage() {
         {/* Story Viewer */}
         {scenes.length > 0 ? (
           <div className="space-y-6">
-            {/* Scene Display */}
+            {/* Scene Display with Overlay Controls */}
             <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-              {/* Image */}
+              {/* Image with Overlaid Navigation */}
               {currentImage?.imageUrl ? (
                 <div className="relative aspect-video bg-gradient-to-br from-blue-100 to-purple-100">
                   <img
@@ -334,8 +305,48 @@ export default function StoryViewerPage() {
                     alt={`Scene ${currentSceneIndex + 1}`}
                     className="w-full h-full object-contain"
                   />
-                  <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-4 py-2 rounded-full text-sm font-semibold">
-                    Scene {currentSceneIndex + 1} of {scenes.length}
+
+                  {/* Overlay Navigation */}
+                  <div className="absolute inset-0 flex items-center justify-between px-4">
+                    <button
+                      onClick={() => setCurrentSceneIndex(Math.max(0, currentSceneIndex - 1))}
+                      disabled={currentSceneIndex === 0}
+                      className="bg-black bg-opacity-60 hover:bg-opacity-80 text-white p-4 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+
+                    <button
+                      onClick={() => setCurrentSceneIndex(Math.min(scenes.length - 1, currentSceneIndex + 1))}
+                      disabled={currentSceneIndex === scenes.length - 1}
+                      className="bg-black bg-opacity-60 hover:bg-opacity-80 text-white p-4 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Page Indicator */}
+                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-black bg-opacity-60 px-4 py-2 rounded-full">
+                    {scenes.map((_: any, index: number) => (
+                      <button
+                        key={index}
+                        onClick={() => setCurrentSceneIndex(index)}
+                        className={`w-2 h-2 rounded-full transition-all ${
+                          index === currentSceneIndex
+                            ? 'bg-white w-6'
+                            : 'bg-white bg-opacity-50 hover:bg-opacity-75'
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Scene Counter */}
+                  <div className="absolute top-4 right-4 bg-black bg-opacity-60 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                    {currentSceneIndex + 1} / {scenes.length}
                   </div>
                 </div>
               ) : (
@@ -349,41 +360,6 @@ export default function StoryViewerPage() {
                 <p className="text-gray-800 text-lg leading-relaxed">
                   {currentScene?.description || 'No description available'}
                 </p>
-              </div>
-            </div>
-
-            {/* Navigation Controls */}
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              <div className="flex items-center justify-between gap-4">
-                <button
-                  onClick={() => setCurrentSceneIndex(Math.max(0, currentSceneIndex - 1))}
-                  disabled={currentSceneIndex === 0}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  ← Previous
-                </button>
-
-                <div className="flex gap-2">
-                  {scenes.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setCurrentSceneIndex(index)}
-                      className={`w-3 h-3 rounded-full transition-all ${
-                        index === currentSceneIndex
-                          ? 'bg-blue-600 w-8'
-                          : 'bg-gray-300 hover:bg-gray-400'
-                      }`}
-                    />
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => setCurrentSceneIndex(Math.min(scenes.length - 1, currentSceneIndex + 1))}
-                  disabled={currentSceneIndex === scenes.length - 1}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next →
-                </button>
               </div>
             </div>
 
@@ -481,6 +457,6 @@ export default function StoryViewerPage() {
           onExit={() => setReadingMode(false)}
         />
       )}
-    </div>
+    </>
   );
 }

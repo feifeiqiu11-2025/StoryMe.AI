@@ -85,6 +85,10 @@ export interface ProjectDTO {
   authorName?: string;
   authorAge?: number;
   coverImageUrl?: string;
+  visibility?: 'private' | 'public';
+  featured?: boolean;
+  viewCount?: number;
+  shareCount?: number;
 }
 
 export interface CreateProjectDTO {

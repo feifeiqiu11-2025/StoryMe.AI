@@ -303,15 +303,16 @@ export class ProjectService {
       authorAge?: number;
       coverImageUrl?: string;
       originalScript: string;
-      readingLevel?: number;        // NEW
-      storyTone?: string;           // NEW
+      readingLevel?: number;
+      storyTone?: string;
+      visibility?: 'private' | 'public'; // NEW: Privacy control
       characterIds: string[];
       scenes: Array<{
         sceneNumber: number;
         description: string;
-        raw_description?: string;   // NEW
-        enhanced_prompt?: string;   // NEW
-        caption?: string;            // NEW
+        raw_description?: string;
+        enhanced_prompt?: string;
+        caption?: string;
         imageUrl: string;
         prompt: string;
         generationTime: number;
@@ -329,8 +330,9 @@ export class ProjectService {
       author_age: data.authorAge,
       cover_image_url: data.coverImageUrl,
       original_script: data.originalScript,
-      reading_level: data.readingLevel,     // NEW
-      story_tone: data.storyTone,           // NEW
+      reading_level: data.readingLevel,
+      story_tone: data.storyTone,
+      visibility: data.visibility || 'private', // DEFAULT to private for safety
       status: 'completed',
     });
 

@@ -17,6 +17,11 @@ export type ExpansionLevel =
   | 'smart'         // AI expands story based on age, adds scenes
   | 'rich';         // Full creative expansion with detailed narrative
 
+// Story visibility/privacy level
+export type StoryVisibility =
+  | 'private'       // Only creator can see (default for safety)
+  | 'public';       // Visible on landing page and public gallery
+
 export interface CharacterDescription {
   hairColor?: string;
   skinTone?: string;
@@ -101,6 +106,48 @@ export interface StorySession {
   expansionLevel?: ExpansionLevel; // AI expansion level (NEW)
   enhancedScenes?: EnhancedScene[]; // Preview before image generation (NEW)
   approvedForGeneration?: boolean; // User approved enhanced scenes (NEW)
+}
+
+// Project/Story metadata for saved stories
+export interface Project {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  status: 'draft' | 'processing' | 'completed' | 'error';
+
+  // Privacy & Sharing (NEW)
+  visibility: StoryVisibility; // 'private' (default) or 'public'
+  featured: boolean; // Admin-curated featured stories
+  viewCount: number; // Number of views
+  likeCount: number; // Number of likes (future)
+  shareCount: number; // Social shares count
+  publishedAt?: string; // ISO timestamp when made public
+
+  // Story content
+  originalScript?: string;
+  readingLevel?: number;
+  storyTone?: StoryTone;
+  expansionLevel?: ExpansionLevel;
+
+  // Metadata
+  createdAt: string;
+  updatedAt: string;
+
+  // Relations (optional)
+  scenes?: ProjectScene[];
+}
+
+// Scene within a saved project
+export interface ProjectScene {
+  id: string;
+  projectId: string;
+  sceneNumber: number;
+  description: string;
+  caption?: string;
+  imageUrl?: string;
+  prompt?: string;
+  createdAt: string;
 }
 
 export interface FalImageResponse {

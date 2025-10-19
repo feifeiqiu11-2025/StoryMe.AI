@@ -94,6 +94,12 @@ export interface Project {
   video_url?: string;
   transcription?: string;
 
+  // Privacy & Sharing
+  visibility?: 'private' | 'public';
+  featured?: boolean;
+  view_count?: number;
+  share_count?: number;
+
   created_at: string;
   updated_at: string;
 }

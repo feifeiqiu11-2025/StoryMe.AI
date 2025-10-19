@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import type { ProjectWithScenesDTO } from '@/lib/domain/dtos';
 
 // Mock stories for when no real stories exist
@@ -64,39 +65,49 @@ export default function HeroStoryShowcase() {
     const currentMock = MOCK_STORIES[currentIndex];
 
     return (
-      <div className="lg:flex lg:justify-center hidden">
+      <div className="lg:flex lg:flex-col lg:items-center hidden">
         <div className="relative w-full max-w-md lg:max-w-lg">
-          {/* Main story card - Rectangular 4:3 aspect ratio, responsive */}
-          <div className="relative rounded-2xl overflow-hidden shadow-xl w-full aspect-[4/3]">
-            <div className={`bg-gradient-to-br ${currentMock.gradient} w-full h-full flex items-center justify-center transition-all duration-500`}>
-              <span className="text-9xl">{currentMock.emoji}</span>
-            </div>
+          {/* Main story card - Reduced height for better proportion */}
+          <Link href="/community-stories" className="block">
+            <div className="relative rounded-2xl overflow-hidden shadow-xl w-full aspect-[5/3] cursor-pointer hover:shadow-2xl transition-shadow">
+              <div className={`bg-gradient-to-br ${currentMock.gradient} w-full h-full flex items-center justify-center transition-all duration-500`}>
+                <span className="text-8xl">{currentMock.emoji}</span>
+              </div>
 
-            {/* Story info overlay */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-5">
-              <h3 className="text-white font-bold text-xl">{currentMock.title}</h3>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="text-2xl">👦</span>
-                <p className="text-white/90 text-base">by {currentMock.author}</p>
+              {/* Story info overlay */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-5">
+                <h3 className="text-white font-bold text-xl">{currentMock.title}</h3>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-2xl">👦</span>
+                  <p className="text-white/90 text-base">by {currentMock.author}</p>
+                </div>
+              </div>
+
+              {/* Navigation dots overlay on image */}
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
+                {MOCK_STORIES.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentIndex(idx);
+                    }}
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      idx === currentIndex
+                        ? 'w-8 bg-white'
+                        : 'w-2 bg-white/50 hover:bg-white/75'
+                    }`}
+                    aria-label={`Go to slide ${idx + 1}`}
+                  />
+                ))}
               </div>
             </div>
-          </div>
+          </Link>
 
-          {/* Navigation dots */}
-          <div className="flex justify-center gap-2 mt-4">
-            {MOCK_STORIES.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentIndex(idx)}
-                className={`h-2.5 rounded-full transition-all duration-300 ${
-                  idx === currentIndex
-                    ? 'w-10 bg-gradient-to-r from-blue-500 to-purple-500'
-                    : 'w-2.5 bg-gray-300 hover:bg-gray-400'
-                }`}
-                aria-label={`Go to slide ${idx + 1}`}
-              />
-            ))}
-          </div>
+          {/* Title below slideshow - matching Create Account button font */}
+          <p className="text-gray-800 font-semibold text-base text-center mt-3">
+            ✨ Stories shared from communities
+          </p>
         </div>
       </div>
     );
@@ -113,62 +124,72 @@ export default function HeroStoryShowcase() {
     : 'A young storyteller';
 
   return (
-    <div className="lg:flex lg:justify-center hidden">
+    <div className="lg:flex lg:flex-col lg:items-center hidden">
       <div className="relative w-full max-w-md lg:max-w-lg">
-        {/* Main story card - Rectangular 4:3 aspect ratio, responsive */}
-        <div className="relative rounded-2xl overflow-hidden shadow-xl w-full aspect-[4/3]">
-          {coverImage ? (
-            <div className="relative w-full h-full">
-              <Image
-                src={coverImage}
-                alt={currentStory.title || 'Story'}
-                fill
-                className="object-cover transition-opacity duration-500"
-                priority
-                sizes="(max-width: 1024px) 100vw, 512px"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-            </div>
-          ) : (
-            <div className="bg-gradient-to-br from-blue-500 to-purple-600 w-full h-full flex items-center justify-center">
-              <span className="text-9xl">📖</span>
-            </div>
-          )}
-
-          {/* Story info overlay */}
-          <div className="absolute bottom-0 left-0 right-0 p-5">
-            <h3 className="text-white font-bold text-xl line-clamp-1">
-              {currentStory.title || 'Untitled Story'}
-            </h3>
-            <div className="flex items-center justify-between mt-2">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">👦</span>
-                <p className="text-white/90 text-base">by {authorString}</p>
+        {/* Main story card - Reduced height for better proportion */}
+        <Link href="/community-stories" className="block">
+          <div className="relative rounded-2xl overflow-hidden shadow-xl w-full aspect-[5/3] cursor-pointer hover:shadow-2xl transition-shadow">
+            {coverImage ? (
+              <div className="relative w-full h-full">
+                <Image
+                  src={coverImage}
+                  alt={currentStory.title || 'Story'}
+                  fill
+                  className="object-cover transition-opacity duration-500"
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 512px"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
               </div>
-              {sceneCount > 0 && (
-                <p className="text-white/80 text-sm">
-                  {sceneCount} scene{sceneCount !== 1 ? 's' : ''}
-                </p>
-              )}
+            ) : (
+              <div className="bg-gradient-to-br from-blue-500 to-purple-600 w-full h-full flex items-center justify-center">
+                <span className="text-8xl">📖</span>
+              </div>
+            )}
+
+            {/* Story info overlay */}
+            <div className="absolute bottom-0 left-0 right-0 p-5">
+              <h3 className="text-white font-bold text-xl line-clamp-1">
+                {currentStory.title || 'Untitled Story'}
+              </h3>
+              <div className="flex items-center justify-between mt-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">👦</span>
+                  <p className="text-white/90 text-base">by {authorString}</p>
+                </div>
+                {sceneCount > 0 && (
+                  <p className="text-white/80 text-sm">
+                    {sceneCount} scene{sceneCount !== 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Navigation dots overlay on image */}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
+              {stories.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentIndex(idx);
+                  }}
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    idx === currentIndex
+                      ? 'w-8 bg-white'
+                      : 'w-2 bg-white/50 hover:bg-white/75'
+                  }`}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
+              ))}
             </div>
           </div>
-        </div>
+        </Link>
 
-        {/* Navigation dots */}
-        <div className="flex justify-center gap-2 mt-4">
-          {stories.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => setCurrentIndex(idx)}
-              className={`h-2.5 rounded-full transition-all duration-300 ${
-                idx === currentIndex
-                  ? 'w-10 bg-gradient-to-r from-blue-500 to-purple-500'
-                  : 'w-2.5 bg-gray-300 hover:bg-gray-400'
-              }`}
-              aria-label={`Go to slide ${idx + 1}`}
-            />
-          ))}
-        </div>
+        {/* Title below slideshow - matching Create Account button font */}
+        <p className="text-gray-800 font-semibold text-base text-center mt-3">
+          ✨ Stories shared from communities
+        </p>
       </div>
     </div>
   );

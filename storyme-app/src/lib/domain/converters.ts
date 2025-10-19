@@ -113,6 +113,10 @@ export function projectToDTO(project: Project): ProjectDTO {
     authorName: (project as any).author_name,
     authorAge: (project as any).author_age,
     coverImageUrl: (project as any).cover_image_url,
+    visibility: project.visibility,
+    featured: project.featured,
+    viewCount: project.view_count,
+    shareCount: project.share_count,
   };
 }
 

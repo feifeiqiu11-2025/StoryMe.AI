@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ProjectService } from '@/lib/services/project.service';
+import { checkImageLimit } from '@/lib/middleware/checkImageLimit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,7 +23,19 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { title, description, authorName, authorAge, coverImageUrl, originalScript, readingLevel, storyTone, characterIds, scenes } = body;
+    const {
+      title,
+      description,
+      authorName,
+      authorAge,
+      coverImageUrl,
+      originalScript,
+      readingLevel,
+      storyTone,
+      characterIds,
+      scenes,
+      visibility = 'private' // DEFAULT to private for safety
+    } = body;
 
     // Validate required fields
     if (!title || !title.trim()) {
@@ -63,6 +76,52 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validate visibility value
+    if (visibility && visibility !== 'private' && visibility !== 'public') {
+      return NextResponse.json(
+        { error: 'Invalid visibility value. Must be "private" or "public"' },
+        { status: 400 }
+      );
+    }
+
+    // CHECK IMAGE LIMIT - verify user has enough quota for all scenes
+    const imageCount = scenes.length;
+    const limitCheck = await checkImageLimit(user.id);
+
+    if (!limitCheck.allowed) {
+      if (limitCheck.trialExpired) {
+        return NextResponse.json({
+          error: 'Trial expired',
+          message: 'Your 7-day trial has expired. Please upgrade to continue creating stories.',
+          trialExpired: true
+        }, { status: 403 });
+      }
+
+      return NextResponse.json({
+        error: 'Image limit reached',
+        message: `You've used all ${limitCheck.limit} trial images. Please upgrade to continue.`,
+        usage: {
+          count: limitCheck.count,
+          limit: limitCheck.limit,
+          remaining: limitCheck.remaining
+        }
+      }, { status: 403 });
+    }
+
+    // Check if user has enough remaining quota for this story
+    if (limitCheck.remaining < imageCount && !limitCheck.isPremium) {
+      return NextResponse.json({
+        error: 'Insufficient image quota',
+        message: `This story requires ${imageCount} images, but you only have ${limitCheck.remaining} remaining. Please upgrade or reduce the number of scenes.`,
+        usage: {
+          count: limitCheck.count,
+          limit: limitCheck.limit,
+          remaining: limitCheck.remaining,
+          required: imageCount
+        }
+      }, { status: 403 });
+    }
+
     // Save story
     const projectService = new ProjectService(supabase);
     const project = await projectService.saveCompletedStory(user.id, {
@@ -72,8 +131,9 @@ export async function POST(request: NextRequest) {
       authorAge: authorAge,
       coverImageUrl: coverImageUrl,
       originalScript,
-      readingLevel: readingLevel,     // NEW
-      storyTone: storyTone,           // NEW
+      readingLevel: readingLevel,
+      storyTone: storyTone,
+      visibility: visibility as 'private' | 'public', // NEW: Privacy control (defaults to private)
       characterIds,
       scenes,
     });
