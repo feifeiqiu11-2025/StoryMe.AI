@@ -5,6 +5,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
@@ -26,8 +27,9 @@ export async function GET(request: Request) {
                    email?.split('@')[0] ||
                    'User';
 
-      // Check if user record exists
-      const { data: existingUser } = await supabase
+      // Check if user record exists (use service role to bypass RLS)
+      const supabaseAdmin = createServiceRoleClient();
+      const { data: existingUser } = await supabaseAdmin
         .from('users')
         .select('id')
         .eq('id', userId)
@@ -36,13 +38,14 @@ export async function GET(request: Request) {
       // Create user record if it doesn't exist (without consent initially)
       let isNewUser = false;
       if (!existingUser) {
-        console.log('Creating user record for OAuth user:', userId, email);
+        console.log('[AUTH CALLBACK] Creating user record for OAuth user:', userId, email);
         isNewUser = true;
 
         const trialStartDate = new Date();
         const trialEndDate = new Date(trialStartDate.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-        const { error: userError } = await supabase
+        // Use service role client to bypass RLS for user creation
+        const { error: userError } = await supabaseAdmin
           .from('users')
           .insert([{
             id: userId,
@@ -58,11 +61,11 @@ export async function GET(request: Request) {
           }]);
 
         if (userError) {
-          console.error('Error creating user record:', userError);
+          console.error('[AUTH CALLBACK] Error creating user record:', userError);
           // Don't fail the login if user creation fails
           // The user is still authenticated, just missing the extended profile
         } else {
-          console.log('Successfully created user record for OAuth user');
+          console.log('[AUTH CALLBACK] Successfully created user record for OAuth user');
         }
       }
 
