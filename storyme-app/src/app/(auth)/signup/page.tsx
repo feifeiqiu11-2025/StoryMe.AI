@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import SocialLoginButtons from '@/components/auth/SocialLoginButtons';
+import PrivacyConsentModal from '@/components/auth/PrivacyConsentModal';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -19,6 +20,12 @@ export default function SignupPage() {
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [pendingSignupData, setPendingSignupData] = useState<{
+    email: string;
+    password: string;
+    name: string;
+  } | null>(null);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +42,14 @@ export default function SignupPage() {
       return;
     }
 
+    // Store signup data and show consent modal
+    setPendingSignupData({ email, password, name });
+    setShowConsentModal(true);
+  };
+
+  const handleConsentGiven = async () => {
+    if (!pendingSignupData) return;
+
     setLoading(true);
 
     try {
@@ -46,11 +61,11 @@ export default function SignupPage() {
         // Use real Supabase authentication
         const supabase = createClient();
         const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
+          email: pendingSignupData.email,
+          password: pendingSignupData.password,
           options: {
             data: {
-              name,
+              name: pendingSignupData.name,
             },
           },
         });
@@ -58,10 +73,11 @@ export default function SignupPage() {
         if (error) {
           setError(error.message);
           setLoading(false);
+          setShowConsentModal(false);
           return;
         }
 
-        // Create user record in users table
+        // Create user record in users table with consent
         if (data.user) {
           const trialStartDate = new Date();
           const trialEndDate = new Date(trialStartDate.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -71,13 +87,18 @@ export default function SignupPage() {
             .insert([{
               id: data.user.id,
               email: data.user.email,
-              name: name,
+              name: pendingSignupData.name,
               subscription_tier: 'free',
               trial_started_at: trialStartDate.toISOString(),
               trial_ends_at: trialEndDate.toISOString(),
               images_generated_count: 0,
               images_limit: 50,
-              trial_status: 'active'
+              trial_status: 'active',
+              privacy_consent_given: true,
+              privacy_consent_date: new Date().toISOString(),
+              privacy_consent_version: '1.0',
+              terms_accepted: true,
+              terms_accepted_date: new Date().toISOString(),
             }]);
 
           // Ignore duplicate key errors (user might already exist)
@@ -123,11 +144,26 @@ export default function SignupPage() {
       console.error('Signup error:', err);
       setError('An unexpected error occurred. Please try again.');
       setLoading(false);
+      setShowConsentModal(false);
     }
   };
 
+  const handleConsentDeclined = () => {
+    setShowConsentModal(false);
+    setPendingSignupData(null);
+    setLoading(false);
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow-xl p-8">
+    <>
+      <PrivacyConsentModal
+        isOpen={showConsentModal}
+        onConsent={handleConsentGiven}
+        onDecline={handleConsentDeclined}
+        loading={loading}
+      />
+
+      <div className="bg-white rounded-lg shadow-xl p-8">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Create Account</h2>
 
       {/* OAuth Buttons (Primary) */}
@@ -243,6 +279,7 @@ export default function SignupPage() {
           </Link>
         </p>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

@@ -14,6 +14,7 @@ import StorySettingsPanel from '@/components/story/StorySettingsPanel';
 import ScenePreviewApproval from '@/components/story/ScenePreviewApproval';
 import GenerationProgress from '@/components/story/GenerationProgress';
 import ImageGallery from '@/components/story/ImageGallery';
+import FeedbackModal from '@/components/feedback/FeedbackModal';
 import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScene, ExpansionLevel } from '@/lib/types/story';
 import { parseScriptIntoScenes } from '@/lib/scene-parser';
 import Link from 'next/link';
@@ -60,6 +61,9 @@ export default function CreateStoryPage() {
   const [saveError, setSaveError] = useState('');
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [isGeneratingMetadata, setIsGeneratingMetadata] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [savedProjectId, setSavedProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -554,14 +558,65 @@ export default function CreateStoryPage() {
       clearGuestStory();
       console.log('✓ Cleared guest story from sessionStorage');
 
-      // Success! Redirect to My Stories page
-      router.push('/projects');
+      // Close save modal
+      setShowSaveModal(false);
+
+      // Check if we should show feedback modal (first story)
+      if (data.showFeedbackModal) {
+        setSavedProjectId(data.project.id);
+        setShowFeedbackModal(true);
+      } else {
+        // No feedback needed, redirect immediately
+        router.push('/projects');
+      }
 
     } catch (error) {
       console.error('Save error:', error);
       setSaveError(error instanceof Error ? error.message : 'Failed to save story');
       setIsSaving(false);
     }
+  };
+
+  const handleFeedbackSubmit = async (feedbackData: {
+    rating: number;
+    feedbackText: string;
+    isPublic: boolean;
+    displayName: string;
+  }) => {
+    setFeedbackLoading(true);
+
+    try {
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...feedbackData,
+          projectId: savedProjectId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit feedback');
+      }
+
+      // Success! Show thank you message and redirect
+      alert(`Thank you for your feedback! You've earned +${data.bonusAwarded} bonus images! 🎁`);
+      setShowFeedbackModal(false);
+      router.push('/projects');
+
+    } catch (error) {
+      console.error('Feedback submission error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to submit feedback');
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  const handleFeedbackSkip = () => {
+    setShowFeedbackModal(false);
+    router.push('/projects');
   };
 
   const handleDownloadPDF = async () => {
@@ -700,13 +755,22 @@ export default function CreateStoryPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Your Story</h1>
-        <p className="text-gray-600">
-          Add your characters, write your story scenes, and generate beautiful illustrations!
-        </p>
-      </div>
+    <>
+      {/* Feedback Modal */}
+      <FeedbackModal
+        isOpen={showFeedbackModal}
+        onSubmit={handleFeedbackSubmit}
+        onSkip={handleFeedbackSkip}
+        loading={feedbackLoading}
+      />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Your Story</h1>
+          <p className="text-gray-600">
+            Add your characters, write your story scenes, and generate beautiful illustrations!
+          </p>
+        </div>
 
       {/* Step 1: Character Management */}
       <div className="mb-8">
@@ -1143,6 +1207,7 @@ export default function CreateStoryPage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

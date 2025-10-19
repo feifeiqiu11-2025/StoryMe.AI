@@ -8,6 +8,7 @@
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import HeroStoryShowcase from '@/components/landing/HeroStoryShowcase';
+import Testimonials from '@/components/landing/Testimonials';
 
 export default function HomePage() {
   const router = useRouter();
@@ -384,9 +385,14 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
+      </div>
 
-        {/* Footer */}
-        <div className="text-center mt-12 text-gray-500 text-sm">
+      {/* Testimonials Section - Above Footer */}
+      <Testimonials />
+
+      {/* Footer */}
+      <div className="bg-gradient-to-b from-blue-50 to-white">
+        <div className="max-w-6xl mx-auto px-4 text-center py-8 text-gray-500 text-sm">
           <p className="flex items-center justify-center gap-2">
             Made with <span className="text-red-500 animate-pulse">❤️</span> for parents and their little storytellers
           </p>

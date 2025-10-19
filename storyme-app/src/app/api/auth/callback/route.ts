@@ -33,9 +33,11 @@ export async function GET(request: Request) {
         .eq('id', userId)
         .single();
 
-      // Create user record if it doesn't exist
+      // Create user record if it doesn't exist (without consent initially)
+      let isNewUser = false;
       if (!existingUser) {
         console.log('Creating user record for OAuth user:', userId, email);
+        isNewUser = true;
 
         const trialStartDate = new Date();
         const trialEndDate = new Date(trialStartDate.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -51,7 +53,8 @@ export async function GET(request: Request) {
             trial_ends_at: trialEndDate.toISOString(),
             images_generated_count: 0,
             images_limit: 50,
-            trial_status: 'active'
+            trial_status: 'active',
+            privacy_consent_given: false, // New users must consent
           }]);
 
         if (userError) {
@@ -63,15 +66,25 @@ export async function GET(request: Request) {
         }
       }
 
-      // Redirect to next page
+      // Redirect logic: new users go to consent page, existing users go to destination
       const forwardedHost = request.headers.get('x-forwarded-host');
       const isLocalEnv = process.env.NODE_ENV === 'development';
-      if (isLocalEnv) {
-        return NextResponse.redirect(`${origin}${next}`);
-      } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`);
+
+      let redirectUrl: string;
+      if (isNewUser) {
+        // New OAuth users must accept privacy consent first
+        redirectUrl = `/consent?next=${encodeURIComponent(next)}`;
       } else {
-        return NextResponse.redirect(`${origin}${next}`);
+        // Existing users go directly to destination
+        redirectUrl = next;
+      }
+
+      if (isLocalEnv) {
+        return NextResponse.redirect(`${origin}${redirectUrl}`);
+      } else if (forwardedHost) {
+        return NextResponse.redirect(`https://${forwardedHost}${redirectUrl}`);
+      } else {
+        return NextResponse.redirect(`${origin}${redirectUrl}`);
       }
     }
   }

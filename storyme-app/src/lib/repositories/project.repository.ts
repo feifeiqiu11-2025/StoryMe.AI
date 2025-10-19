@@ -213,4 +213,36 @@ export class ProjectRepository extends BaseRepository<Project> {
 
     return mapped as ProjectWithScenes[];
   }
+
+  /**
+   * Find public projects with scenes (for landing page)
+   * Only returns projects with visibility = 'public'
+   */
+  async findPublicWithScenes(): Promise<ProjectWithScenes[]> {
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select(`
+        *,
+        scenes (
+          *,
+          images:generated_images (*)
+        )
+      `)
+      .eq('status', 'completed')
+      .eq('visibility', 'public')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Map images back to generated_images for proper typing
+    const mapped = (data || []).map(project => ({
+      ...project,
+      scenes: project.scenes?.map((scene: any) => ({
+        ...scene,
+        generated_images: scene.images || [],
+      })),
+    }));
+
+    return mapped as ProjectWithScenes[];
+  }
 }

@@ -12,15 +12,14 @@ import { projectWithScenesToDTO } from '@/lib/domain/converters';
 export async function GET(request: NextRequest) {
   try {
     // Use service role client to bypass RLS for public display
-    // In production, would filter by is_public flag
     const supabase = createServiceRoleClient();
     const projectRepo = new ProjectRepository(supabase);
 
-    // Get all projects (POC mode - in production would filter by is_public flag)
-    const allProjects = await projectRepo.findAllWithScenes();
+    // Get only public projects for landing page
+    const publicProjects = await projectRepo.findPublicWithScenes();
 
     // Limit to most recent 6 projects for landing page
-    const recentProjects = allProjects
+    const recentProjects = publicProjects
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 6)
       .map(projectWithScenesToDTO);

@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +22,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    // Use service role client to bypass RLS for public display
+    const supabase = createServiceRoleClient();
 
     // Build query for public stories with scenes and images
     let query = supabase
@@ -38,6 +39,8 @@ export async function GET(request: NextRequest) {
         share_count,
         published_at,
         created_at,
+        author_name,
+        author_age,
         scenes (
           id,
           scene_number,
@@ -85,6 +88,8 @@ export async function GET(request: NextRequest) {
       shareCount: project.share_count,
       publishedAt: project.published_at,
       createdAt: project.created_at,
+      authorName: project.author_name,
+      authorAge: project.author_age,
       scenes: project.scenes?.map((scene: any) => ({
         id: scene.id,
         sceneNumber: scene.scene_number,

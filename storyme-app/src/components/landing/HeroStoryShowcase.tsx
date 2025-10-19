@@ -22,7 +22,7 @@ export default function HeroStoryShowcase() {
   useEffect(() => {
     async function fetchFeaturedStories() {
       try {
-        const response = await fetch('/api/projects/public');
+        const response = await fetch('/api/stories/public?limit=5&featured=true');
         if (!response.ok) {
           throw new Error('Failed to fetch stories');
         }
@@ -30,7 +30,7 @@ export default function HeroStoryShowcase() {
 
         // Get up to 5 stories for the slideshow
         if (data.projects && data.projects.length > 0) {
-          setStories(data.projects.slice(0, 5));
+          setStories(data.projects);
         }
       } catch (err) {
         console.error('Error fetching featured stories:', err);
@@ -115,7 +115,7 @@ export default function HeroStoryShowcase() {
 
   // Show real saved stories slideshow
   const currentStory = stories[currentIndex];
-  const coverImage = currentStory?.scenes?.[0]?.images?.[0]?.imageUrl;
+  const coverImage = currentStory?.scenes?.[0]?.imageUrl;
   const sceneCount = currentStory?.scenes?.length || 0;
 
   // Build author string from story data

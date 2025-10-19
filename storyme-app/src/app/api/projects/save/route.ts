@@ -122,6 +122,24 @@ export async function POST(request: NextRequest) {
       }, { status: 403 });
     }
 
+    // Check if this is user's first completed story (for feedback prompt)
+    const { count: completedCount } = await supabase
+      .from('projects')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('status', 'completed');
+
+    const isFirstStory = (completedCount || 0) === 0;
+
+    // Check if user has already given feedback
+    const { data: feedbackData } = await supabase
+      .from('user_feedback')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
+
+    const shouldShowFeedbackModal = isFirstStory && !feedbackData;
+
     // Save story
     const projectService = new ProjectService(supabase);
     const project = await projectService.saveCompletedStory(user.id, {
@@ -142,6 +160,7 @@ export async function POST(request: NextRequest) {
       success: true,
       project,
       message: 'Story saved successfully!',
+      showFeedbackModal: shouldShowFeedbackModal, // NEW: Prompt for feedback after first story
     });
 
   } catch (error) {
