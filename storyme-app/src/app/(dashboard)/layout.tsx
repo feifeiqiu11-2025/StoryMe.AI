@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { ReactNode } from 'react';
 import Link from 'next/link';
-import UsageBadge from '@/components/ui/UsageBadge';
+import ProfileMenu from '@/components/ui/ProfileMenu';
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient();
@@ -66,17 +66,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
                 Community Stories
               </Link>
             </nav>
-            <div className="flex items-center space-x-4">
-              <UsageBadge />
-              <span className="text-sm font-medium text-gray-700">{displayName}</span>
-              <form action="/api/auth/signout" method="post">
-                <button
-                  type="submit"
-                  className="text-sm text-gray-700 hover:text-red-600 font-medium transition-colors"
-                >
-                  Sign Out
-                </button>
-              </form>
+            <div className="flex items-center">
+              <ProfileMenu displayName={displayName} />
             </div>
           </div>
         </div>

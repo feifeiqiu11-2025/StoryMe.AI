@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
 import { parseScriptIntoScenes, buildConsistentSceneSettings, extractSceneLocation } from '@/lib/scene-parser';
 import { GeneratedImage, Character, CharacterRating } from '@/lib/types/story';
+import { createClient } from '@/lib/supabase/server';
+import { checkImageGenerationLimit, logApiUsage } from '@/lib/utils/rate-limit';
 
 export const maxDuration = 300; // 5 minutes timeout for Vercel
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  const requestId = `gen-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
   try {
     const body = await request.json();
     const { characters, script, artStyle } = body;
@@ -32,6 +37,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'No valid scenes found in script' },
         { status: 400 }
+      );
+    }
+
+    // Get authenticated user
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    // Check rate limits BEFORE generating images
+    const rateLimitCheck = await checkImageGenerationLimit(user.id, scenes.length);
+
+    if (!rateLimitCheck.allowed) {
+      // Log the rate limit hit
+      await logApiUsage({
+        userId: user.id,
+        endpoint: '/api/generate-images',
+        method: 'POST',
+        statusCode: 429,
+        responseTimeMs: Date.now() - startTime,
+        errorMessage: rateLimitCheck.reason,
+        requestId,
+      });
+
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded',
+          message: rateLimitCheck.reason,
+          limits: rateLimitCheck.limits,
+        },
+        { status: 429 }
       );
     }
 
@@ -128,15 +169,47 @@ export async function POST(request: NextRequest) {
     }
 
     // Return results even if some images failed
+    const successfulCount = generatedImages.filter(img => img.status === 'completed').length;
+
+    // Log API usage
+    await logApiUsage({
+      userId: user.id,
+      endpoint: '/api/generate-images',
+      method: 'POST',
+      statusCode: 200,
+      responseTimeMs: Date.now() - startTime,
+      imagesGenerated: successfulCount,
+      errorMessage: errors.length > 0 ? errors.join('; ') : undefined,
+      requestId,
+    });
+
     return NextResponse.json({
       success: errors.length === 0,
       generatedImages,
       errors: errors.length > 0 ? errors : undefined,
       totalScenes: scenes.length,
-      successfulScenes: generatedImages.filter(img => img.status === 'completed').length,
+      successfulScenes: successfulCount,
+      limits: rateLimitCheck.limits, // Include current limits in response
     });
   } catch (error) {
     console.error('Generate images error:', error);
+
+    // Log error
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      await logApiUsage({
+        userId: user.id,
+        endpoint: '/api/generate-images',
+        method: 'POST',
+        statusCode: 500,
+        responseTimeMs: Date.now() - startTime,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        requestId,
+      });
+    }
+
     return NextResponse.json(
       {
         error: 'Failed to generate images',
