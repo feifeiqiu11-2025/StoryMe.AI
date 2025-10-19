@@ -68,7 +68,7 @@ export default function HeroStoryShowcase() {
       <div className="lg:flex lg:flex-col lg:items-center hidden">
         <div className="relative w-full max-w-md lg:max-w-lg">
           {/* Main story card - Reduced height for better proportion */}
-          <Link href="/community-stories" className="block">
+          <Link href="/signup" className="block">
             <div className="relative rounded-2xl overflow-hidden shadow-xl w-full aspect-[5/3] cursor-pointer hover:shadow-2xl transition-shadow">
               <div className={`bg-gradient-to-br ${currentMock.gradient} w-full h-full flex items-center justify-center transition-all duration-500`}>
                 <span className="text-8xl">{currentMock.emoji}</span>
@@ -127,7 +127,7 @@ export default function HeroStoryShowcase() {
     <div className="lg:flex lg:flex-col lg:items-center hidden">
       <div className="relative w-full max-w-md lg:max-w-lg">
         {/* Main story card - Reduced height for better proportion */}
-        <Link href="/community-stories" className="block">
+        <Link href="/signup" className="block">
           <div className="relative rounded-2xl overflow-hidden shadow-xl w-full aspect-[5/3] cursor-pointer hover:shadow-2xl transition-shadow">
             {coverImage ? (
               <div className="relative w-full h-full">

@@ -201,12 +201,6 @@ export default function PublicStoryViewerPage() {
             </div>
             <div className="flex items-center space-x-4">
               <Link
-                href="/community-stories"
-                className="text-sm text-gray-700 hover:text-blue-600 font-medium transition-colors"
-              >
-                Community Stories
-              </Link>
-              <Link
                 href="/login"
                 className="text-sm text-gray-700 hover:text-blue-600 font-medium transition-colors"
               >
@@ -226,8 +220,8 @@ export default function PublicStoryViewerPage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Story Header */}
         <div className="mb-6">
-          <Link href="/community-stories" className="text-blue-600 hover:text-blue-700 font-medium mb-2 inline-block">
-            ← Back to Gallery
+          <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium mb-2 inline-block">
+            ← Sign up to create your story
           </Link>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">{story.title}</h1>
           {story.description && (
