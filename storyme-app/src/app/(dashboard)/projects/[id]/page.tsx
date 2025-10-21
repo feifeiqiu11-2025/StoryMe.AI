@@ -396,22 +396,6 @@ export default function StoryViewerPage() {
                     )}
                   </button>
                 )}
-                {hasAudio && (
-                  <button
-                    onClick={handleGenerateAudio}
-                    disabled={generatingAudio}
-                    className="bg-gradient-to-r from-green-600 to-teal-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-teal-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {generatingAudio ? (
-                      <span className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Regenerating...
-                      </span>
-                    ) : (
-                      '🔄 Regenerate Audio'
-                    )}
-                  </button>
-                )}
                 <button
                   onClick={handleDownloadPDF}
                   disabled={generatingPDF}

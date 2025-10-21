@@ -113,9 +113,8 @@ export default function PublicStoriesPage() {
         <div className="max-w-7xl mx-auto px-4 py-8">
           {/* Page Header */}
           <div className="mb-8">
-            <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4 flex items-center gap-3">
-              <span>🌍</span>
-              <span>Community Stories</span>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Community Stories
             </h1>
             <p className="text-gray-600 text-lg">
               Discover amazing stories created by kids and families around the world!

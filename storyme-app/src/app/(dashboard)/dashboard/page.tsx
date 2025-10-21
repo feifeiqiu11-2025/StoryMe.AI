@@ -152,12 +152,12 @@ export default function DashboardPage() {
             <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform shadow-md">
               🌟
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Story Gallery</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Community Stories</h3>
             <p className="text-gray-700 text-sm mb-4">
               Explore stories from our community
             </p>
             <div className="flex items-center gap-2 text-pink-600 font-semibold group-hover:gap-3 transition-all text-sm">
-              Browse Gallery →
+              Browse Stories →
             </div>
           </Link>
         </div>

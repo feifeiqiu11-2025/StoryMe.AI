@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import type { ProjectWithScenesDTO } from '@/lib/domain/dtos';
 
 // Mock stories for when no real stories exist
@@ -15,9 +17,21 @@ const MOCK_STORIES = [
 ];
 
 export default function HeroStoryShowcase() {
+  const router = useRouter();
   const [stories, setStories] = useState<ProjectWithScenesDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [user, setUser] = useState<any>(null);
+
+  // Check if user is logged in
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    checkAuth();
+  }, []);
 
   useEffect(() => {
     async function fetchFeaturedStories() {
@@ -68,7 +82,7 @@ export default function HeroStoryShowcase() {
       <div className="lg:flex lg:flex-col lg:items-center hidden">
         <div className="relative w-full max-w-md lg:max-w-lg">
           {/* Main story card - Reduced height for better proportion */}
-          <Link href="/signup" className="block">
+          <Link href={user ? "/community-stories" : "/stories"} className="block">
             <div className="relative rounded-2xl overflow-hidden shadow-xl w-full aspect-[5/3] cursor-pointer hover:shadow-2xl transition-shadow">
               <div className={`bg-gradient-to-br ${currentMock.gradient} w-full h-full flex items-center justify-center transition-all duration-500`}>
                 <span className="text-8xl">{currentMock.emoji}</span>
@@ -127,7 +141,7 @@ export default function HeroStoryShowcase() {
     <div className="lg:flex lg:flex-col lg:items-center hidden">
       <div className="relative w-full max-w-md lg:max-w-lg">
         {/* Main story card - Reduced height for better proportion */}
-        <Link href="/signup" className="block">
+        <Link href={user ? "/community-stories" : "/stories"} className="block">
           <div className="relative rounded-2xl overflow-hidden shadow-xl w-full aspect-[5/3] cursor-pointer hover:shadow-2xl transition-shadow">
             {coverImage ? (
               <div className="relative w-full h-full">

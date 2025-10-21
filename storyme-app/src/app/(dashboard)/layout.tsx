@@ -29,7 +29,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
-              <Link href="/" className="text-2xl font-bold hover:opacity-80 transition-opacity">
+              <Link href="/dashboard" className="text-2xl font-bold hover:opacity-80 transition-opacity">
                 📚 Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Me</span> ✨
               </Link>
               <span className="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded-full">BETA</span>
