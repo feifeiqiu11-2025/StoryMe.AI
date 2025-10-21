@@ -492,19 +492,34 @@ export default function CreateStoryPage() {
         for (const character of characters) {
           if (character.id.startsWith('char-')) {
             try {
+              // Build character payload with only non-empty fields
+              const characterPayload: Record<string, any> = {
+                name: character.name,
+                reference_image_url: character.referenceImage.url,
+                reference_image_filename: character.referenceImage.fileName,
+              };
+
+              // Only include description fields if they have values
+              if (character.description.hairColor) {
+                characterPayload.hair_color = character.description.hairColor;
+              }
+              if (character.description.skinTone) {
+                characterPayload.skin_tone = character.description.skinTone;
+              }
+              if (character.description.clothing) {
+                characterPayload.clothing = character.description.clothing;
+              }
+              if (character.description.age) {
+                characterPayload.age = character.description.age;
+              }
+              if (character.description.otherFeatures) {
+                characterPayload.other_features = character.description.otherFeatures;
+              }
+
               const charResponse = await fetch('/api/characters', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  name: character.name,
-                  reference_image_url: character.referenceImage.url,
-                  reference_image_filename: character.referenceImage.fileName,
-                  hair_color: character.description.hairColor || '',
-                  skin_tone: character.description.skinTone || '',
-                  clothing: character.description.clothing || '',
-                  age: character.description.age || '',
-                  other_features: character.description.otherFeatures || '',
-                }),
+                body: JSON.stringify(characterPayload),
               });
 
               if (!charResponse.ok) {

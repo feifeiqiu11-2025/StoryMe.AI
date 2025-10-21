@@ -78,7 +78,7 @@ export default function DashboardCommunityStoriesPage() {
   const regularStories = filteredStories.filter(s => !s.featured);
 
   const handleStoryClick = (storyId: string) => {
-    router.push(`/story/${storyId}`);
+    router.push(`/stories/${storyId}?from=community`);
   };
 
   return (

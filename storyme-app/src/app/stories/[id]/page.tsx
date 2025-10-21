@@ -7,8 +7,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeViewer';
 import SocialShareButtons from '@/components/story/SocialShareButtons';
@@ -16,8 +17,11 @@ import SocialShareButtons from '@/components/story/SocialShareButtons';
 export default function PublicStoryViewerPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const storyId = params.id as string;
+  const fromCommunity = searchParams.get('from') === 'community';
 
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [story, setStory] = useState<any>(null);
@@ -26,6 +30,16 @@ export default function PublicStoryViewerPage() {
   const [readingMode, setReadingMode] = useState(false);
   const [readingPages, setReadingPages] = useState<ReadingPage[]>([]);
   const [loadingReadingMode, setLoadingReadingMode] = useState(false);
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    checkAuth();
+  }, []);
 
   useEffect(() => {
     fetchStory();
@@ -175,19 +189,28 @@ export default function PublicStoryViewerPage() {
       {/* Header Navigation */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <Link href="/" className="text-2xl font-bold">
+          <Link href={user ? "/dashboard" : "/"} className="text-2xl font-bold">
             Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Me</span>
           </Link>
           <div className="flex items-center gap-4">
-            <Link href="/stories" className="text-gray-600 hover:text-gray-900 font-medium">
+            <Link href={fromCommunity ? "/community-stories" : "/stories"} className="text-gray-600 hover:text-gray-900 font-medium">
               Browse Stories
             </Link>
-            <Link
-              href="/signup"
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold transition-all shadow-lg"
-            >
-              Create Your Story
-            </Link>
+            {user ? (
+              <Link
+                href="/dashboard"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold transition-all shadow-lg"
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <Link
+                href="/signup"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold transition-all shadow-lg"
+              >
+                Create Your Story
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -196,8 +219,8 @@ export default function PublicStoryViewerPage() {
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Story Header */}
         <div className="mb-8">
-          <Link href="/stories" className="text-blue-600 hover:text-blue-700 font-medium mb-4 inline-block">
-            ← Back to Gallery
+          <Link href={fromCommunity ? "/community-stories" : "/stories"} className="text-blue-600 hover:text-blue-700 font-medium mb-4 inline-block">
+            ← Back to Community Stories
           </Link>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">{story.title}</h1>
           {story.description && (

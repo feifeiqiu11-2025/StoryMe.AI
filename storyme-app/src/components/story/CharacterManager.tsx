@@ -285,7 +285,7 @@ function CharacterCard({
             type="text"
             value={character.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
-            placeholder="Character name"
+            placeholder="Character name *"
             disabled={disabled}
             className="font-semibold text-lg text-gray-900 placeholder:text-gray-400 border-b-2 border-transparent hover:border-gray-300 focus:border-blue-500 outline-none px-1 disabled:opacity-50"
           />

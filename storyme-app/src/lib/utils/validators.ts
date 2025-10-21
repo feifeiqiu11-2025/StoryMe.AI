@@ -25,18 +25,21 @@ export const characterLibrarySchema = z.object({
   art_style_preference: z.enum(['cartoon', 'watercolor', 'realistic']).optional(),
 }).refine(
   (data) => {
-    // At least one description field should be provided
-    return !!(
+    // Either have a reference image OR at least one description field
+    const hasReferenceImage = !!data.reference_image_url;
+    const hasDescription = !!(
       data.hair_color ||
       data.skin_tone ||
       data.clothing ||
       data.age ||
       data.other_features
     );
+
+    return hasReferenceImage || hasDescription;
   },
   {
-    message: 'Please provide at least one character description (hair color, clothing, or age)',
-    path: ['hair_color'],
+    message: 'Please provide either a reference image or at least one character description',
+    path: ['reference_image_url'],
   }
 );
 
