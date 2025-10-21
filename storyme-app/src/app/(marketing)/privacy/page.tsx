@@ -12,7 +12,7 @@ export default function PrivacyPolicyPage() {
         {/* Header */}
         <div className="text-center mb-12">
           <Link href="/" className="inline-block text-3xl font-bold mb-4 hover:opacity-80 transition-opacity">
-            📚 Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Me</span> ✨
+            📚 Kindle<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Wood</span> Studio ✨
           </Link>
           <h1 className="text-4xl font-bold text-gray-900 mt-4">Privacy Policy</h1>
           <p className="text-gray-600 mt-2">Last updated: October 2024</p>
@@ -23,7 +23,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Overview</h2>
             <p className="text-gray-700 leading-relaxed">
-              At StoryMe, we take your privacy seriously. This policy explains how we collect, use,
+              At KindleWood Studio, we take your privacy seriously. This policy explains how we collect, use,
               protect, and share your personal information when you use our personalized children's
               storybook generation service.
             </p>
@@ -83,7 +83,7 @@ export default function PrivacyPolicyPage() {
                 When you create a story, your photos are temporarily sent to fal.ai (our AI image
                 generation partner) to create illustrations. fal.ai processes your photos in real-time
                 and does not permanently store them after generation. Generated images are saved
-                securely to your StoryMe account.
+                securely to your KindleWood Studio account.
               </p>
             </div>
           </section>
@@ -114,7 +114,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Children's Privacy</h2>
             <p className="text-gray-700">
-              StoryMe is designed for parents and guardians to create stories featuring children.
+              KindleWood Studio is designed for parents and guardians to create stories featuring children.
               We do not knowingly collect personal information directly from children under 13.
               All accounts must be created and managed by adults.
             </p>

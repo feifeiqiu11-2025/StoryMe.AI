@@ -591,7 +591,7 @@ export default function GuestStoryPage() {
       <footer className="bg-white border-t border-gray-200 mt-12 sm:mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <p className="text-center text-xs sm:text-sm text-gray-600">
-            Made with ❤️ for parents and their little storytellers • <Link href="/" className="text-blue-600 hover:text-blue-700 font-medium">StoryMe</Link>
+            Made with ❤️ for parents and their little storytellers • <Link href="/" className="text-blue-600 hover:text-blue-700 font-medium">KindleWood Studio</Link>
           </p>
         </div>
       </footer>

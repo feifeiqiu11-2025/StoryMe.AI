@@ -167,13 +167,13 @@ export default function PrivacyToggle({
                 Make this story public?
               </h3>
               <p className="text-gray-600 text-sm">
-                Your story will be visible to everyone and appear on the StoryMe landing page.
+                Your story will be visible to everyone and appear on the KindleWood landing page.
               </p>
             </div>
 
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
               <ul className="text-sm text-gray-700 space-y-1">
-                <li>✓ Your story will appear on the StoryMe landing page</li>
+                <li>✓ Your story will appear on the KindleWood landing page</li>
                 <li>✓ Anyone can view your story</li>
                 <li>✓ You can change this back to private anytime</li>
               </ul>

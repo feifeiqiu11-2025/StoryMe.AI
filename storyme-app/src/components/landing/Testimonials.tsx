@@ -46,11 +46,11 @@ export default function Testimonials() {
   }
 
   return (
-    <section className="py-16 bg-gradient-to-b from-white to-blue-50">
+    <section className="py-6 bg-gradient-to-b from-white to-blue-50">
       <div className="max-w-6xl mx-auto px-4">
         {/* Section Header */}
-        <div className="text-center mb-12">
-          <div className="inline-block mb-4">
+        <div className="text-center mb-6">
+          <div className="inline-block mb-3">
             <div className="flex items-center gap-2 bg-gradient-to-r from-blue-100 to-purple-100 px-4 py-2 rounded-full">
               <span className="text-2xl">💬</span>
               <span className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
@@ -58,11 +58,11 @@ export default function Testimonials() {
               </span>
             </div>
           </div>
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
             Voice from Our Little Authors
           </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            See what parents are saying about their StoryMe experience
+          <p className="text-base text-gray-600 max-w-2xl mx-auto">
+            See what parents are saying about KindleWood
           </p>
         </div>
 
@@ -119,7 +119,7 @@ export default function Testimonials() {
                       {testimonial.display_name || 'Anonymous'}
                     </p>
                     <p className="text-xs text-gray-500">
-                      StoryMe Parent
+                      KindleWood Parent
                     </p>
                   </div>
                 </div>
@@ -130,7 +130,7 @@ export default function Testimonials() {
 
         {/* Call to Action */}
         {testimonials.length > 0 && (
-          <div className="text-center mt-12">
+          <div className="text-center mt-8">
             <div className="inline-block bg-blue-50 rounded-2xl px-6 py-4 border-2 border-blue-200">
               <p className="text-gray-700 mb-3">
                 Join thousands of parents creating magical stories!

@@ -29,7 +29,7 @@ export default function SettingsPage() {
           <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4">
             <p className="text-sm text-gray-700">
               We're building a comprehensive settings page where you can customize your
-              StoryMe experience, manage your account, and configure preferences.
+              KindleWood experience, manage your account, and configure preferences.
             </p>
           </div>
 

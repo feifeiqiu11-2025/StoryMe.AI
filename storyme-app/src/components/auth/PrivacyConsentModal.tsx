@@ -131,7 +131,7 @@ export default function PrivacyConsentModal({
                   disabled={loading}
                 />
                 <span className="text-sm text-gray-700 flex-1">
-                  I understand and consent to StoryMe's data practices. I have read the{' '}
+                  I understand and consent to KindleWood Studio's data practices. I have read the{' '}
                   <Link
                     href="/privacy"
                     target="_blank"

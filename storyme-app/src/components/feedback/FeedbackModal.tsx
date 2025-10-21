@@ -55,7 +55,7 @@ export default function FeedbackModal({
             <h2 className="text-2xl font-bold">You Created Your First Story!</h2>
           </div>
           <p className="text-blue-100 text-sm">
-            Help us improve StoryMe and earn +5 bonus images!
+            Help us improve KindleWood and earn +5 bonus images!
           </p>
         </div>
 
@@ -147,7 +147,7 @@ export default function FeedbackModal({
                       Share as a testimonial on our website
                     </p>
                     <p className="text-sm text-gray-700">
-                      Help other parents discover StoryMe! Your feedback may be featured on our landing page.
+                      Help other parents discover KindleWood! Your feedback may be featured on our landing page.
                     </p>
                   </div>
                 </label>
