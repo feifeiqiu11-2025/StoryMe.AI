@@ -180,6 +180,11 @@ export default function StoryViewerPage() {
       const audioResponse = await fetch(`/api/projects/${projectId}/audio-pages`);
       const audioData = await audioResponse.json();
 
+      // Fetch quiz questions
+      const quizResponse = await fetch(`/api/projects/${projectId}/quiz`);
+      const quizData = await quizResponse.json();
+      const quizQuestions = quizData.questions || [];
+
       // Build pages array
       const pages: ReadingPage[] = [];
 
@@ -218,6 +223,48 @@ export default function StoryViewerPage() {
           audioDuration: sceneAudioPage?.audio_duration_seconds,
         });
       });
+
+      // Quiz pages (if quiz exists)
+      if (quizQuestions.length > 0) {
+        console.log(`📚 Adding ${quizQuestions.length} quiz questions to reading mode`);
+
+        // Add transition page
+        const transitionAudioPage = audioData.audioPages?.find((ap: any) => ap.page_type === 'quiz_transition');
+        pages.push({
+          pageNumber: pages.length + 1,
+          pageType: 'quiz_transition',
+          imageUrl: project.coverImageUrl || '/api/placeholder/1024/1024', // Use cover image
+          textContent: "Let's see if our little readers and listeners are paying attention!",
+          audioUrl: transitionAudioPage?.audio_url,
+          audioDuration: transitionAudioPage?.audio_duration_seconds,
+        });
+
+        // Add quiz question pages
+        quizQuestions.forEach((question: any, index: number) => {
+          const questionAudioPage = audioData.audioPages?.find((ap: any) => ap.quiz_question_id === question.id);
+
+          pages.push({
+            pageNumber: pages.length + 1,
+            pageType: 'quiz_question',
+            imageUrl: project.coverImageUrl || '/api/placeholder/1024/1024', // Use cover image
+            textContent: question.question,
+            audioUrl: questionAudioPage?.audio_url,
+            audioDuration: questionAudioPage?.audio_duration_seconds,
+            quizQuestion: {
+              id: question.id,
+              question: question.question,
+              optionA: question.option_a,
+              optionB: question.option_b,
+              optionC: question.option_c,
+              optionD: question.option_d,
+              correctAnswer: question.correct_answer,
+              explanation: question.explanation,
+            },
+          });
+        });
+      }
+
+      console.log(`📖 Loading reading mode with ${pages.length} total pages (${scenes.length} scenes, ${quizQuestions.length} quiz questions)`);
 
       setReadingPages(pages);
       setReadingMode(true);

@@ -10,11 +10,21 @@ import { useSwipeable } from 'react-swipeable';
 
 export interface ReadingPage {
   pageNumber: number;
-  pageType: 'cover' | 'scene';
+  pageType: 'cover' | 'scene' | 'quiz_transition' | 'quiz_question';
   imageUrl: string;
   textContent: string;
   audioUrl?: string;
   audioDuration?: number;
+  quizQuestion?: {
+    id: string;
+    question: string;
+    optionA: string;
+    optionB: string;
+    optionC: string;
+    optionD: string;
+    correctAnswer: string;
+    explanation?: string;
+  };
 }
 
 interface ReadingModeViewerProps {
@@ -240,9 +250,59 @@ export default function ReadingModeViewer({
 
           {/* Text Content */}
           <div className="bg-white p-6 md:p-8">
-            <p className="text-gray-800 text-xl md:text-2xl lg:text-3xl leading-relaxed text-center font-medium">
-              {currentPage.textContent}
-            </p>
+            {currentPage.pageType === 'quiz_question' && currentPage.quizQuestion ? (
+              <div className="max-w-3xl mx-auto">
+                <h2 className="text-gray-900 text-2xl md:text-3xl font-bold mb-6 text-center">
+                  {currentPage.quizQuestion.question}
+                </h2>
+                <div className="space-y-4">
+                  {[
+                    { letter: 'A', text: currentPage.quizQuestion.optionA },
+                    { letter: 'B', text: currentPage.quizQuestion.optionB },
+                    { letter: 'C', text: currentPage.quizQuestion.optionC },
+                    { letter: 'D', text: currentPage.quizQuestion.optionD },
+                  ].map((option) => (
+                    <div
+                      key={option.letter}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        option.letter === currentPage.quizQuestion?.correctAnswer
+                          ? 'border-green-500 bg-green-50'
+                          : 'border-gray-300 bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className={`font-bold text-lg ${
+                          option.letter === currentPage.quizQuestion?.correctAnswer
+                            ? 'text-green-700'
+                            : 'text-gray-700'
+                        }`}>
+                          {option.letter}.
+                        </span>
+                        <span className={`text-lg ${
+                          option.letter === currentPage.quizQuestion?.correctAnswer
+                            ? 'text-green-900 font-medium'
+                            : 'text-gray-800'
+                        }`}>
+                          {option.text}
+                          {option.letter === currentPage.quizQuestion?.correctAnswer && ' ✓'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {currentPage.quizQuestion.explanation && (
+                  <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-blue-900 text-base">
+                      <strong>Explanation:</strong> {currentPage.quizQuestion.explanation}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-gray-800 text-xl md:text-2xl lg:text-3xl leading-relaxed text-center font-medium">
+                {currentPage.textContent}
+              </p>
+            )}
           </div>
         </div>
 
