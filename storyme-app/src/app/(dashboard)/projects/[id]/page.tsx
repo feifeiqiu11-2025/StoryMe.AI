@@ -689,6 +689,74 @@ export default function StoryViewerPage() {
               </div>
             </div>
 
+            {/* Quiz Questions */}
+            {quizQuestions.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+                <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6">
+                  <h2 className="text-2xl font-bold text-white text-center">
+                    📚 Quiz Time!
+                  </h2>
+                  <p className="text-white text-center mt-2 opacity-90">
+                    Let's see if our little readers and listeners are paying attention!
+                  </p>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {quizQuestions.map((question: any, index: number) => (
+                    <div key={question.id} className="border-2 border-gray-200 rounded-xl p-6 bg-gray-50">
+                      <h3 className="text-xl font-bold text-gray-900 mb-4">
+                        Question {index + 1}: {question.question}
+                      </h3>
+
+                      <div className="space-y-3">
+                        {[
+                          { letter: 'A', text: question.option_a },
+                          { letter: 'B', text: question.option_b },
+                          { letter: 'C', text: question.option_c },
+                          { letter: 'D', text: question.option_d },
+                        ].map((option) => (
+                          <div
+                            key={option.letter}
+                            className={`p-4 rounded-lg border-2 transition-all ${
+                              option.letter === question.correct_answer
+                                ? 'border-green-500 bg-green-50'
+                                : 'border-gray-300 bg-white'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <span className={`font-bold text-lg ${
+                                option.letter === question.correct_answer
+                                  ? 'text-green-700'
+                                  : 'text-gray-700'
+                              }`}>
+                                {option.letter}.
+                              </span>
+                              <span className={`text-lg ${
+                                option.letter === question.correct_answer
+                                  ? 'text-green-900 font-medium'
+                                  : 'text-gray-800'
+                              }`}>
+                                {option.text}
+                                {option.letter === question.correct_answer && ' ✓'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {question.explanation && (
+                        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-blue-900 text-base">
+                            <strong>Explanation:</strong> {question.explanation}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
               {/* Section 1: Story Actions */}

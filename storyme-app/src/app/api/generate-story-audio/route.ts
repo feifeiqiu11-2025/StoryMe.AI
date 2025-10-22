@@ -124,7 +124,10 @@ export async function POST(request: NextRequest) {
     });
 
     // Quiz pages (if quiz exists)
+    console.log('📊 Project quiz_questions data:', project.quiz_questions);
     const quizQuestions = (project.quiz_questions || []).sort((a: any, b: any) => a.question_order - b.question_order);
+    console.log(`🧠 Quiz questions count: ${quizQuestions.length}`);
+
     if (quizQuestions.length > 0) {
       console.log(`🧠 Found ${quizQuestions.length} quiz questions, adding quiz audio pages`);
 
