@@ -65,7 +65,7 @@ function generatePodcastRSS(publications: any[]): string {
   const podcastTitle = 'KindleWood Stories';
   const podcastDescription = 'AI-powered audiobook stories created by kids, for kids. Every child is an author at KindleWood! Listen to magical tales narrated by AI and illustrated with stunning artwork - all imagined by young creators.';
   const podcastAuthor = 'KindleWood Studio';
-  const podcastEmail = 'podcast@kindlewood.com';
+  const podcastEmail = 'feifei_qiu@hotmail.com';
   const podcastLink = process.env.NEXT_PUBLIC_APP_URL || 'https://kindlewood.com';
   const podcastImageUrl = `${podcastLink}/podcast-cover-art.jpg`;
   const podcastLanguage = 'en-us';
