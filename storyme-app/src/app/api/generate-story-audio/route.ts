@@ -30,9 +30,10 @@ const VOICE_CONFIG: Record<string, { voice: 'alloy' | 'echo' | 'fable' | 'onyx' 
 
 interface AudioPage {
   pageNumber: number;
-  pageType: 'cover' | 'scene';
+  pageType: 'cover' | 'scene' | 'quiz_transition' | 'quiz_question';
   textContent: string;
   sceneId?: string;
+  quizQuestionId?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch project with scenes
+    // Fetch project with scenes and quiz questions
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select(`
@@ -70,6 +71,17 @@ export async function POST(request: NextRequest) {
           scene_number,
           description,
           caption
+        ),
+        quiz_questions (
+          id,
+          question_order,
+          question,
+          option_a,
+          option_b,
+          option_c,
+          option_d,
+          correct_answer,
+          explanation
         )
       `)
       .eq('id', projectId)
@@ -111,7 +123,37 @@ export async function POST(request: NextRequest) {
       });
     });
 
-    console.log(`📖 Generating audio for ${pages.length} pages`);
+    // Quiz pages (if quiz exists)
+    const quizQuestions = (project.quiz_questions || []).sort((a: any, b: any) => a.question_order - b.question_order);
+    if (quizQuestions.length > 0) {
+      console.log(`🧠 Found ${quizQuestions.length} quiz questions, adding quiz audio pages`);
+
+      // Add transition page
+      const transitionPageNumber = pages.length + 1;
+      pages.push({
+        pageNumber: transitionPageNumber,
+        pageType: 'quiz_transition',
+        textContent: "Let's see if our little readers and listeners are paying attention!",
+      });
+
+      // Add quiz question pages
+      quizQuestions.forEach((question: any, index: number) => {
+        const questionText = `Question ${index + 1}: ${question.question}. ` +
+          `A: ${question.option_a}. ` +
+          `B: ${question.option_b}. ` +
+          `C: ${question.option_c}. ` +
+          `D: ${question.option_d}.`;
+
+        pages.push({
+          pageNumber: transitionPageNumber + 1 + index,
+          pageType: 'quiz_question',
+          textContent: questionText,
+          quizQuestionId: question.id,
+        });
+      });
+    }
+
+    console.log(`📖 Generating audio for ${pages.length} pages (${scenes.length} scenes${quizQuestions.length > 0 ? ` + ${quizQuestions.length} quiz questions` : ''})`);
 
     // Get voice configuration based on story tone
     const tone = project.story_tone || 'default';
@@ -144,6 +186,7 @@ export async function POST(request: NextRequest) {
             page_number: page.pageNumber,
             page_type: page.pageType,
             scene_id: page.sceneId,
+            quiz_question_id: page.quizQuestionId, // NEW: Link to quiz question if applicable
             text_content: page.textContent,
             voice_id: voiceConfig.voice,
             tone: tone,
@@ -212,6 +255,19 @@ export async function POST(request: NextRequest) {
         if (updatedPage) {
           generatedPages.push(updatedPage);
           console.log(`✅ Page ${page.pageNumber} audio generated successfully`);
+
+          // If this is a quiz question page, also update the quiz_questions table
+          if (page.pageType === 'quiz_question' && page.quizQuestionId) {
+            await supabase
+              .from('quiz_questions')
+              .update({
+                question_audio_url: publicUrl,
+                audio_generated: true,
+              })
+              .eq('id', page.quizQuestionId);
+
+            console.log(`✅ Updated quiz question ${page.quizQuestionId} with audio URL`);
+          }
         }
 
       } catch (pageError: any) {
