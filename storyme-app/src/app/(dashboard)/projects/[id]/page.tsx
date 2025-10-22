@@ -32,6 +32,12 @@ export default function StoryViewerPage() {
   const [showPublicConfirm, setShowPublicConfirm] = useState(false);
   const [spotifyStatus, setSpotifyStatus] = useState<string | null>(null);
   const [publishingToSpotify, setPublishingToSpotify] = useState(false);
+  const [kidsAppStatus, setKidsAppStatus] = useState<string | null>(null);
+  const [publishingToKidsApp, setPublishingToKidsApp] = useState(false);
+  const [kidsAppPublishedTo, setKidsAppPublishedTo] = useState<any[]>([]);
+  const [showKidsAppModal, setShowKidsAppModal] = useState(false);
+  const [childProfiles, setChildProfiles] = useState<any[]>([]);
+  const [selectedChildren, setSelectedChildren] = useState<string[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -86,6 +92,8 @@ export default function StoryViewerPage() {
         await checkAudioExists();
         // Check Spotify status
         await checkSpotifyStatus();
+        // Check Kids App status
+        await checkKidsAppStatus();
       } else {
         console.error('Failed to fetch project:', data.error);
         router.push('/projects');
@@ -347,6 +355,126 @@ export default function StoryViewerPage() {
       alert(`❌ Failed to publish to Spotify: ${error.message}`);
     } finally {
       setPublishingToSpotify(false);
+    }
+  };
+
+  const checkKidsAppStatus = async () => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/publish-kids-app`);
+      const data = await response.json();
+      if (data.isPublished) {
+        setKidsAppStatus(data.status);
+        setKidsAppPublishedTo(data.publishedTo || []);
+      }
+    } catch (error) {
+      console.error('Error checking Kids App status:', error);
+    }
+  };
+
+  const fetchChildProfiles = async () => {
+    try {
+      const supabase = createClient();
+      const { data: profiles, error } = await supabase
+        .from('child_profiles')
+        .select('id, name')
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching child profiles:', error);
+        return [];
+      }
+
+      return profiles || [];
+    } catch (error) {
+      console.error('Error fetching child profiles:', error);
+      return [];
+    }
+  };
+
+  const handleKidsAppButtonClick = async () => {
+    if (kidsAppStatus === 'live') {
+      // Already published, show who it's published to
+      const childNames = kidsAppPublishedTo.map(c => c.childName).join(', ');
+      const confirmed = confirm(
+        `This story is published to: ${childNames}\n\n` +
+        'Would you like to unpublish it from the Kids App?'
+      );
+      if (confirmed) {
+        await handleUnpublishFromKidsApp();
+      }
+      return;
+    }
+
+    // Not published yet, show selection modal
+    const profiles = await fetchChildProfiles();
+    if (profiles.length === 0) {
+      alert('No child profiles found. Please create child profiles in the KindleWood Kids App first.');
+      return;
+    }
+
+    setChildProfiles(profiles);
+    setSelectedChildren(profiles.map(p => p.id)); // Select all by default
+    setShowKidsAppModal(true);
+  };
+
+  const handlePublishToKidsApp = async () => {
+    if (!project || selectedChildren.length === 0) {
+      alert('Please select at least one child profile');
+      return;
+    }
+
+    setPublishingToKidsApp(true);
+    setShowKidsAppModal(false);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/publish-kids-app`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          childProfileIds: selectedChildren,
+          category: 'bedtime',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(`✅ ${data.message}`);
+        setKidsAppStatus('live');
+        await checkKidsAppStatus();
+      } else {
+        alert(`❌ ${data.error}${data.message ? '\n\n' + data.message : ''}`);
+      }
+    } catch (error: any) {
+      console.error('Kids App publishing error:', error);
+      alert(`❌ Failed to publish to Kids App: ${error.message}`);
+    } finally {
+      setPublishingToKidsApp(false);
+    }
+  };
+
+  const handleUnpublishFromKidsApp = async () => {
+    setPublishingToKidsApp(true);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/publish-kids-app`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert('✅ Story unpublished from Kids App');
+        setKidsAppStatus(null);
+        setKidsAppPublishedTo([]);
+      } else {
+        alert(`❌ ${data.error}`);
+      }
+    } catch (error: any) {
+      console.error('Kids App unpublish error:', error);
+      alert(`❌ Failed to unpublish: ${error.message}`);
+    } finally {
+      setPublishingToKidsApp(false);
     }
   };
 
@@ -613,14 +741,30 @@ export default function StoryViewerPage() {
                     </button>
                   </Tooltip>
 
-                  {/* Kids App Placeholder */}
-                  <Tooltip text="Publish this story to KindleWood Kids App (coming soon)">
+                  {/* Kids App Publishing */}
+                  <Tooltip text={kidsAppStatus === 'live' ? `Published to ${kidsAppPublishedTo.length} child(ren)` : "Publish this story to KindleWood Kids App"}>
                     <button
-                      onClick={() => alert('Kids App publishing coming soon!')}
-                      className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium shadow-md transition-all"
+                      onClick={handleKidsAppButtonClick}
+                      disabled={publishingToKidsApp}
+                      className={`flex items-center gap-2 px-4 py-2 text-sm rounded-lg font-medium shadow-md transition-all ${
+                        kidsAppStatus === 'live'
+                          ? 'bg-green-500 text-white hover:bg-green-600'
+                          : 'bg-blue-500 text-white hover:bg-blue-600'
+                      } ${publishingToKidsApp ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      <span>📱</span>
-                      <span>Kids App</span>
+                      {publishingToKidsApp ? (
+                        <>
+                          <span className="animate-spin">⏳</span>
+                          <span>Publishing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>📱</span>
+                          <span>
+                            {kidsAppStatus === 'live' ? 'Kids App ✓' : 'Kids App'}
+                          </span>
+                        </>
+                      )}
                     </button>
                   </Tooltip>
 
@@ -686,6 +830,65 @@ export default function StoryViewerPage() {
               </button>
               <button
                 onClick={() => setShowPublicConfirm(false)}
+                className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 font-semibold transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Kids App Child Selection Modal */}
+      {showKidsAppModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              Publish to Kids App
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Select which children can read "{project?.title}" in the KindleWood Kids App:
+            </p>
+
+            <div className="space-y-3 mb-6 max-h-60 overflow-y-auto">
+              {childProfiles.map((child) => (
+                <label
+                  key={child.id}
+                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedChildren.includes(child.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedChildren([...selectedChildren, child.id]);
+                      } else {
+                        setSelectedChildren(selectedChildren.filter(id => id !== child.id));
+                      }
+                    }}
+                    className="w-5 h-5 text-blue-500 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-lg font-medium text-gray-900">
+                    {child.name}
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handlePublishToKidsApp}
+                disabled={selectedChildren.length === 0}
+                className={`flex-1 px-6 py-3 rounded-xl font-semibold transition-all ${
+                  selectedChildren.length === 0
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                Publish to {selectedChildren.length} {selectedChildren.length === 1 ? 'Child' : 'Children'}
+              </button>
+              <button
+                onClick={() => setShowKidsAppModal(false)}
                 className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 font-semibold transition-all"
               >
                 Cancel
