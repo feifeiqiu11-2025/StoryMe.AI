@@ -40,7 +40,7 @@ export async function POST(
     // 3. Verify project ownership
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, user_id, title, coverImageUrl, description')
+      .select('*')
       .eq('id', projectId)
       .eq('user_id', user.id)
       .single();
@@ -141,7 +141,7 @@ export async function POST(
         title: project.title,
         author: user.email || 'Unknown',
         description: project.description,
-        cover_image_url: project.coverImageUrl,
+        cover_image_url: project.coverImageUrl || project.cover_image_url,
         guid: `kindlewood-app-${projectId}`,
         status: 'live',
         published_at: new Date().toISOString(),
