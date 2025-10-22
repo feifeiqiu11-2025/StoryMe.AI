@@ -131,6 +131,63 @@ export async function POST(
       );
     }
 
+    // 7a. Fetch quiz questions (optional - story might not have quiz)
+    const { data: quizQuestions, error: quizError } = await supabase
+      .from('quiz_questions')
+      .select('id, question_order, question, option_a, option_b, option_c, option_d, correct_answer, explanation')
+      .eq('project_id', projectId)
+      .order('question_order', { ascending: true });
+
+    if (quizError) {
+      console.error('Error fetching quiz questions:', quizError);
+      // Don't fail publish if quiz fetch fails - quiz is optional
+    }
+
+    const hasQuiz = quizQuestions && quizQuestions.length > 0;
+
+    // 7b. If story has quiz, verify quiz audio exists
+    if (hasQuiz) {
+      const quizQuestionIds = quizQuestions.map(q => q.id);
+
+      // Check for quiz transition audio
+      const { data: quizTransitionAudio } = await supabase
+        .from('story_audio_pages')
+        .select('id, audio_url')
+        .eq('project_id', projectId)
+        .eq('page_type', 'quiz_transition')
+        .not('audio_url', 'is', null)
+        .maybeSingle();
+
+      // Check for quiz question audio
+      const { data: quizQuestionAudio } = await supabase
+        .from('story_audio_pages')
+        .select('quiz_question_id, audio_url')
+        .in('quiz_question_id', quizQuestionIds)
+        .eq('page_type', 'quiz_question')
+        .not('audio_url', 'is', null);
+
+      const questionsWithAudio = new Set(quizQuestionAudio?.map(a => a.quiz_question_id) || []);
+      const missingQuizAudio = quizQuestions.filter(q => !questionsWithAudio.has(q.id));
+
+      if (!quizTransitionAudio || missingQuizAudio.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'Quiz is missing audio',
+            details: {
+              hasTransitionAudio: !!quizTransitionAudio,
+              totalQuizQuestions: quizQuestions.length,
+              questionsWithAudio: questionsWithAudio.size,
+              missingAudioForQuestions: missingQuizAudio.map(q => q.question_order),
+            },
+            message: 'Please generate audio for the story. The quiz needs audio narration for all questions and the transition.'
+          },
+          { status: 400 }
+        );
+      }
+
+      console.log(`✅ Quiz audio verified: transition + ${quizQuestions.length} questions`);
+    }
+
     // 8. Create or update publication record
     const { data: publication, error: pubError } = await supabase
       .from('publications')
@@ -151,6 +208,10 @@ export async function POST(
           language: 'en',
           child_count: childProfileIds.length,
           scene_count: scenes.length,
+          has_quiz: hasQuiz,
+          quiz_question_count: hasQuiz ? quizQuestions.length : 0,
+          reading_level: project.reading_level,
+          story_tone: project.story_tone,
         },
       }, {
         onConflict: 'project_id,platform',
@@ -187,12 +248,15 @@ export async function POST(
     }
 
     // 10. Return success response
+    const quizMessage = hasQuiz ? ` (includes ${quizQuestions.length} quiz questions)` : '';
     return NextResponse.json({
       success: true,
       publication,
       targets: insertedTargets,
       publishedTo: profiles.map(p => p.name),
-      message: `"${project.title}" published to ${insertedTargets?.length || 0} child profile(s): ${profiles.map(p => p.name).join(', ')}`,
+      hasQuiz,
+      quizQuestionCount: hasQuiz ? quizQuestions.length : 0,
+      message: `"${project.title}"${quizMessage} published to ${insertedTargets?.length || 0} child profile(s): ${profiles.map(p => p.name).join(', ')}`,
     });
 
   } catch (error: any) {
@@ -262,6 +326,11 @@ export async function GET(
 
     const activeTargets = publication.publication_targets.filter((t: any) => t.is_active);
 
+    // Extract quiz info from platform_metadata
+    const metadata = publication.platform_metadata || {};
+    const hasQuiz = metadata.has_quiz || false;
+    const quizQuestionCount = metadata.quiz_question_count || 0;
+
     return NextResponse.json({
       isPublished: publication.status === 'live' && activeTargets.length > 0,
       status: publication.status,
@@ -274,6 +343,8 @@ export async function GET(
           publishedAt: t.added_at,
         };
       }),
+      hasQuiz,
+      quizQuestionCount,
       publication,
     });
 
