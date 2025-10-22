@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     console.log(`Author: ${author || 'Unknown'}`);
 
     // Build the cover prompt - include title in AI image, author will be overlaid
-    const coverDescription = `Children's storybook cover illustration with the title "${title}" displayed prominently in large, clear, readable text at the top. ${description ? description + '. ' : ''}Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Leave the bottom 15% with less busy details for author credit placement. Book cover composition with clear title text`;
+    const coverDescription = `Children's storybook cover illustration with the title "${title}" displayed prominently in large, clear, readable text at the top. ${description ? description + '. ' : ''}Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Include small text "KindleWood Studio" in bottom corner as copyright. Leave the bottom 15% with less busy details for author credit placement. Book cover composition with clear title text`;
 
     // Convert relative URLs to absolute URLs for Fal.ai
     const baseUrl = process.env.VERCEL_URL

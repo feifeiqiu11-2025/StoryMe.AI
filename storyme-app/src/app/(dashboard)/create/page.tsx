@@ -1188,28 +1188,19 @@ export default function CreateStoryPage() {
                     <div className="space-y-2 ml-4">
                       {['A', 'B', 'C', 'D'].map((letter, optIndex) => {
                         const option = question[`option_${letter.toLowerCase()}`];
-                        const isCorrect = question.correct_answer === letter;
                         return (
                           <div
                             key={letter}
-                            className={`flex items-start gap-2 p-2 rounded ${
-                              isCorrect ? 'bg-green-100 border border-green-300' : 'bg-white'
-                            }`}
+                            className="flex items-start gap-2 p-2 rounded bg-white"
                           >
                             <span className="font-medium text-gray-700">{letter}.</span>
-                            <span className={isCorrect ? 'text-green-700 font-medium' : 'text-gray-700'}>
+                            <span className="text-gray-700">
                               {option}
-                              {isCorrect && ' ✓'}
                             </span>
                           </div>
                         );
                       })}
                     </div>
-                    {question.explanation && (
-                      <div className="mt-3 ml-4 text-sm text-gray-600 bg-blue-50 p-2 rounded">
-                        <strong>Explanation:</strong> {question.explanation}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -1238,7 +1229,7 @@ export default function CreateStoryPage() {
         {/* Save Story Modal */}
         {showSaveModal && (
           <div className="fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-8">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">Save Your Story</h2>
                 <button
