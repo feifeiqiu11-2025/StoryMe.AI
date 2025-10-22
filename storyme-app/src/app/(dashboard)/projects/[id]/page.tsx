@@ -38,6 +38,9 @@ export default function StoryViewerPage() {
   const [showKidsAppModal, setShowKidsAppModal] = useState(false);
   const [childProfiles, setChildProfiles] = useState<any[]>([]);
   const [selectedChildren, setSelectedChildren] = useState<string[]>([]);
+  const [hasQuiz, setHasQuiz] = useState(false);
+  const [generatingQuiz, setGeneratingQuiz] = useState(false);
+  const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -94,6 +97,8 @@ export default function StoryViewerPage() {
         await checkSpotifyStatus();
         // Check Kids App status
         await checkKidsAppStatus();
+        // Check Quiz status
+        await checkQuizStatus();
       } else {
         console.error('Failed to fetch project:', data.error);
         router.push('/projects');
@@ -478,6 +483,56 @@ export default function StoryViewerPage() {
     }
   };
 
+  const checkQuizStatus = async () => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/quiz`);
+      const data = await response.json();
+      if (data.exists) {
+        setHasQuiz(true);
+        setQuizQuestions(data.questions || []);
+      }
+    } catch (error) {
+      console.error('Error checking quiz status:', error);
+    }
+  };
+
+  const handleGenerateQuiz = async () => {
+    if (!project) return;
+
+    const confirmed = confirm(
+      'Generate Quiz?\n\n' +
+      'AI will create 3 comprehension questions for this story.\n' +
+      (hasAudio ? 'Audio will be generated automatically for the questions.\n\n' : 'Note: Story has no audio, quiz will be text-only.\n\n') +
+      'This may take 1-2 minutes. Continue?'
+    );
+
+    if (!confirmed) return;
+
+    setGeneratingQuiz(true);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/quiz`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(`✅ ${data.message}\n\n${data.questions.length} questions created!`);
+        setHasQuiz(true);
+        setQuizQuestions(data.questions);
+        await checkQuizStatus();
+      } else {
+        alert(`❌ ${data.error}${data.details ? '\n\n' + data.details : ''}`);
+      }
+    } catch (error: any) {
+      console.error('Quiz generation error:', error);
+      alert(`❌ Failed to generate quiz: ${error.message}`);
+    } finally {
+      setGeneratingQuiz(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
@@ -636,6 +691,31 @@ export default function StoryViewerPage() {
                         <>
                           <span>🎵</span>
                           <span>{hasAudio ? 'Audio Ready ✓' : 'Generate Audio'}</span>
+                        </>
+                      )}
+                    </button>
+                  </Tooltip>
+
+                  {/* Generate Quiz */}
+                  <Tooltip text={hasQuiz ? `Quiz ready (${quizQuestions.length} questions). Click to regenerate.` : "Generate quiz questions with AI"}>
+                    <button
+                      onClick={handleGenerateQuiz}
+                      disabled={generatingQuiz}
+                      className={`flex items-center gap-2 px-4 py-2 text-sm rounded-lg font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                        hasQuiz
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : 'bg-purple-500 text-white hover:bg-purple-600'
+                      }`}
+                    >
+                      {generatingQuiz ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Generating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🧠</span>
+                          <span>{hasQuiz ? 'Quiz Ready ✓' : 'Generate Quiz'}</span>
                         </>
                       )}
                     </button>
