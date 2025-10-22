@@ -264,39 +264,19 @@ export default function ReadingModeViewer({
                   ].map((option) => (
                     <div
                       key={option.letter}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        option.letter === currentPage.quizQuestion?.correctAnswer
-                          ? 'border-green-500 bg-green-50'
-                          : 'border-gray-300 bg-gray-50'
-                      }`}
+                      className="p-4 rounded-lg border-2 border-gray-300 bg-gray-50 transition-all hover:border-purple-400 hover:bg-purple-50"
                     >
                       <div className="flex items-start gap-3">
-                        <span className={`font-bold text-lg ${
-                          option.letter === currentPage.quizQuestion?.correctAnswer
-                            ? 'text-green-700'
-                            : 'text-gray-700'
-                        }`}>
+                        <span className="font-bold text-lg text-gray-700">
                           {option.letter}.
                         </span>
-                        <span className={`text-lg ${
-                          option.letter === currentPage.quizQuestion?.correctAnswer
-                            ? 'text-green-900 font-medium'
-                            : 'text-gray-800'
-                        }`}>
+                        <span className="text-lg text-gray-800">
                           {option.text}
-                          {option.letter === currentPage.quizQuestion?.correctAnswer && ' ✓'}
                         </span>
                       </div>
                     </div>
                   ))}
                 </div>
-                {currentPage.quizQuestion.explanation && (
-                  <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-blue-900 text-base">
-                      <strong>Explanation:</strong> {currentPage.quizQuestion.explanation}
-                    </p>
-                  </div>
-                )}
               </div>
             ) : (
               <p className="text-gray-800 text-xl md:text-2xl lg:text-3xl leading-relaxed text-center font-medium">
