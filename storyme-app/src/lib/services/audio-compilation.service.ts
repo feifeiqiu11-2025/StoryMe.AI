@@ -10,8 +10,11 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 
-// Configure FFmpeg binary path
+// Configure FFmpeg and FFprobe binary paths
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+// FFprobe is in the same directory as ffmpeg
+const ffprobePath = ffmpegInstaller.path.replace('ffmpeg', 'ffprobe');
+ffmpeg.setFfprobePath(ffprobePath);
 
 export interface AudioCompilationResult {
   compiledAudioUrl: string;
@@ -43,7 +46,7 @@ export class AudioCompilationService {
     }
 
     const { data: audioPages, error: audioPagesError } = await this.supabase
-      .from('audio_pages')
+      .from('story_audio_pages')
       .select('*')
       .eq('project_id', projectId)
       .order('page_number', { ascending: true });
@@ -126,10 +129,11 @@ export class AudioCompilationService {
 
       console.log(`✓ Uploaded to: ${urlData.publicUrl}`);
 
-      // 9. Calculate duration using ffprobe
-      const duration = await this.getAudioDuration(outputPath);
+      // 9. Calculate duration - estimate from file size (ffprobe not available)
+      // MP3 @ 128kbps = ~16KB per second
+      const duration = Math.round(stats.size / 16000);
 
-      console.log(`✓ Duration: ${Math.floor(duration / 60)}m ${Math.floor(duration % 60)}s`);
+      console.log(`✓ Duration (estimated): ${Math.floor(duration / 60)}m ${Math.floor(duration % 60)}s`);
 
       // 10. Cleanup temp files
       await fs.rm(tempDir, { recursive: true, force: true });
@@ -185,14 +189,22 @@ export class AudioCompilationService {
    */
   private async getAudioDuration(filePath: string): Promise<number> {
     return new Promise((resolve, reject) => {
-      ffmpeg.ffprobe(filePath, (err, metadata) => {
-        if (err) {
-          reject(new Error(`FFprobe error: ${err.message}`));
-        } else {
-          const duration = metadata.format.duration || 0;
-          resolve(duration);
-        }
-      });
+      // Try to get duration from ffmpeg itself
+      ffmpeg(filePath)
+        .ffprobe((err, metadata) => {
+          if (err) {
+            console.warn('FFprobe not available, estimating duration from file size');
+            // Fallback: estimate duration based on file size
+            // MP3 @ 128kbps = ~16KB per second
+            const fs = require('fs');
+            const stats = fs.statSync(filePath);
+            const estimatedDuration = (stats.size / 16000); // rough estimate
+            resolve(estimatedDuration);
+          } else {
+            const duration = metadata.format.duration || 0;
+            resolve(duration);
+          }
+        });
     });
   }
 }

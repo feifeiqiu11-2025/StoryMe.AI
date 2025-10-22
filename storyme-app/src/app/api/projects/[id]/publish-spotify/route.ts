@@ -66,14 +66,14 @@ export async function POST(
 
     // 4. Verify audio exists for all scenes
     const { data: audioPages } = await supabase
-      .from('audio_pages')
+      .from('story_audio_pages')
       .select('*')
       .eq('project_id', projectId)
       .not('audio_url', 'is', null);
 
     // Count total scenes (including cover page which is page_number = 0)
     const { count: totalScenesCount } = await supabase
-      .from('audio_pages')
+      .from('story_audio_pages')
       .select('*', { count: 'exact', head: true })
       .eq('project_id', projectId);
 
