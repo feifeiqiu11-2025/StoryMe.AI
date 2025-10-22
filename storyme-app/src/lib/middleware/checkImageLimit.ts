@@ -18,6 +18,24 @@ export async function checkImageLimit(userId: string): Promise<ImageLimitResult>
   const supabase = await createClient();
 
   try {
+    // First check if user has unlimited images (images_limit = -1)
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('images_limit')
+      .eq('id', userId)
+      .single();
+
+    if (!userError && user && user.images_limit === -1) {
+      // Unlimited images - bypass all checks
+      return {
+        allowed: true,
+        count: 0,
+        limit: -1,
+        remaining: -1,
+        isPremium: true,
+      };
+    }
+
     // Call the database function to check limit
     const { data, error } = await supabase.rpc('check_image_limit', {
       user_uuid: userId
