@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
         console.log(`🎵 Generating audio for page ${page.pageNumber}: "${page.textContent.substring(0, 50)}..."`);
 
         // Update status to generating
-        const { data: audioPage } = await supabase
+        const { data: audioPage, error: insertError } = await supabase
           .from('story_audio_pages')
           .insert({
             project_id: projectId,
@@ -201,8 +201,16 @@ export async function POST(request: NextRequest) {
           .select()
           .single();
 
-        if (!audioPage) {
+        if (insertError || !audioPage) {
           console.error(`Failed to create audio page record for page ${page.pageNumber}`);
+          console.error('Insert error details:', insertError);
+          console.error('Page data being inserted:', {
+            project_id: projectId,
+            page_number: page.pageNumber,
+            page_type: page.pageType,
+            scene_id: page.sceneId,
+            quiz_question_id: page.quizQuestionId,
+          });
           continue;
         }
 
