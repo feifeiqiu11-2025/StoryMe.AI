@@ -65,6 +65,12 @@ export default function CreateStoryPage() {
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [savedProjectId, setSavedProjectId] = useState<string | null>(null);
 
+  // Cover preview state
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  const [coverImagePrompt, setCoverImagePrompt] = useState<string>('');
+  const [generatingCover, setGeneratingCover] = useState(false);
+  const [coverApproved, setCoverApproved] = useState(false);
+
   useEffect(() => {
     const loadUser = async () => {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -400,6 +406,63 @@ export default function CreateStoryPage() {
     }
   };
 
+  const generateCoverPreview = async () => {
+    if (!saveTitle.trim()) {
+      setSaveError('Please enter a title for your story');
+      return;
+    }
+
+    setGeneratingCover(true);
+    setSaveError('');
+
+    try {
+      const authorText = authorName.trim()
+        ? (authorAge ? `By ${authorName}, age ${authorAge}` : `By ${authorName}`)
+        : '';
+
+      const response = await fetch('/api/generate-cover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: saveTitle.trim(),
+          description: saveDescription || '',
+          author: authorText,
+          characters: characters,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate cover');
+      }
+
+      const data = await response.json();
+
+      if (data.imageUrl) {
+        setCoverImageUrl(data.imageUrl);
+        setCoverImagePrompt(data.prompt || '');
+        console.log('✓ Cover preview generated:', data.imageUrl);
+      } else {
+        throw new Error('No image URL in response');
+      }
+    } catch (error) {
+      console.error('Cover generation error:', error);
+      setSaveError(error instanceof Error ? error.message : 'Failed to generate cover image');
+    } finally {
+      setGeneratingCover(false);
+    }
+  };
+
+  const regenerateCover = async () => {
+    setCoverApproved(false);
+    await generateCoverPreview();
+  };
+
+  const approveCover = () => {
+    setCoverApproved(true);
+    setSaveError('');
+  };
+
   const handleSaveStory = async () => {
     if (!saveTitle.trim()) {
       setSaveError('Please enter a title for your story');
@@ -433,50 +496,13 @@ export default function CreateStoryPage() {
         return;
       }
 
-      // Generate AI cover image
-      let coverImageUrl: string | undefined;
-      try {
-        console.log('🎨 Starting AI cover generation...');
+      // Use the pre-approved cover image URL
+      const coverImageUrlToSave = coverImageUrl || undefined;
 
-        const authorText = authorName.trim()
-          ? (authorAge ? `By ${authorName}, age ${authorAge}` : `By ${authorName}`)
-          : 'By My Family';
-
-        const coverPrompt = `Children's storybook cover illustration with title "${saveTitle.trim()}" prominently displayed at the top in large, clear, readable text. ${saveDescription || ''} ${authorText} displayed at the bottom. Professional children's book cover design, colorful, whimsical, appealing to 5-6 year olds, high quality illustration`;
-
-        console.log('Cover prompt:', coverPrompt);
-
-        // Call the cover generation API endpoint
-        const coverResponse = await fetch('/api/generate-cover', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: saveTitle.trim(),
-            description: saveDescription || '',
-            author: authorText,
-            characters: characters,
-          }),
-        });
-
-        console.log('Cover API response status:', coverResponse.status);
-
-        if (coverResponse.ok) {
-          const coverData = await coverResponse.json();
-          console.log('Cover data received:', coverData);
-
-          if (coverData.imageUrl) {
-            coverImageUrl = coverData.imageUrl;
-            console.log('✅ Cover image generated:', coverImageUrl);
-          } else {
-            console.warn('No imageUrl in cover response');
-          }
-        } else {
-          const errorText = await coverResponse.text();
-          console.error('Cover generation failed:', errorText);
-        }
-      } catch (coverError) {
-        console.error('Failed to generate cover image, will use fallback:', coverError);
-        // Continue anyway with fallback cover
+      if (coverImageUrlToSave) {
+        console.log('✅ Using pre-approved cover:', coverImageUrlToSave);
+      } else {
+        console.log('⚠️ No cover image approved, saving without cover');
       }
 
       // Check if characters have temporary IDs (from guest mode)
@@ -554,7 +580,7 @@ export default function CreateStoryPage() {
           description: saveDescription.trim() || undefined,
           authorName: authorName.trim() || undefined,
           authorAge: authorAge ? parseInt(authorAge) : undefined,
-          coverImageUrl,
+          coverImageUrl: coverImageUrlToSave,
           originalScript: scriptInput,
           readingLevel: readingLevel, // NEW
           storyTone: storyTone,       // NEW
@@ -1185,6 +1211,61 @@ export default function CreateStoryPage() {
                   </div>
                 )}
 
+                {/* Cover Preview Section */}
+                {!coverImageUrl && !coverApproved && (
+                  <button
+                    onClick={generateCoverPreview}
+                    disabled={!saveTitle.trim() || generatingCover}
+                    className="w-full bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {generatingCover ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                        Generating Cover Preview...
+                      </span>
+                    ) : (
+                      '🎨 Generate Cover Preview'
+                    )}
+                  </button>
+                )}
+
+                {coverImageUrl && !coverApproved && (
+                  <div className="border-2 border-purple-200 rounded-xl p-4 bg-purple-50">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Cover Preview:</p>
+                    <img
+                      src={coverImageUrl}
+                      alt="Generated cover"
+                      className="w-full rounded-lg shadow-lg mb-3"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={regenerateCover}
+                        disabled={generatingCover}
+                        className="flex-1 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-all disabled:opacity-50"
+                      >
+                        ↻ Try Again
+                      </button>
+                      <button
+                        onClick={approveCover}
+                        className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-all"
+                      >
+                        ✓ Use This Cover
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {coverApproved && (
+                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <img
+                      src={coverImageUrl || ''}
+                      alt="Approved cover"
+                      className="w-16 h-16 rounded object-cover"
+                    />
+                    <span className="text-green-700 font-medium">✓ Cover Approved!</span>
+                  </div>
+                )}
+
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-sm text-blue-700">
                     This will save your story with {imageGenerationStatus.filter(img => img.status === 'completed').length} scenes to your library.
@@ -1195,7 +1276,7 @@ export default function CreateStoryPage() {
               <div className="flex gap-3">
                 <button
                   onClick={handleSaveStory}
-                  disabled={isSaving || !saveTitle.trim()}
+                  disabled={isSaving || !saveTitle.trim() || !coverApproved}
                   className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-emerald-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? (
@@ -1211,6 +1292,10 @@ export default function CreateStoryPage() {
                   onClick={() => {
                     setShowSaveModal(false);
                     setSaveError('');
+                    setCoverImageUrl(null);
+                    setCoverImagePrompt('');
+                    setCoverApproved(false);
+                    setGeneratingCover(false);
                   }}
                   disabled={isSaving}
                   className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"

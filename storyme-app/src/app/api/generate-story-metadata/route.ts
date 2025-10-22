@@ -1,13 +1,13 @@
 /**
  * Generate Story Metadata API
- * Uses Claude AI to generate a compelling title and description for a story
+ * Uses OpenAI to generate a compelling title and description for a story
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 export async function POST(request: NextRequest) {
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     console.log('🎨 Generating story metadata with AI...');
 
-    // Build the prompt for Claude
+    // Build the prompt for OpenAI
     const prompt = `You are a creative children's book editor. Based on the following story, generate a catchy, age-appropriate title and a brief description.
 
 Story Details:
@@ -38,47 +38,39 @@ Please generate:
 1. A catchy, memorable title (3-8 words) that captures the essence of the story
 2. A brief, engaging description (1-2 sentences, 20-40 words) that would entice a parent or child to read the story
 
-Format your response as JSON:
-{
-  "title": "The proposed title",
-  "description": "The brief description"
-}
-
 Important:
 - Make the title exciting and age-appropriate for ${readingLevel}-year-olds
 - The description should highlight the main adventure or theme
 - Keep it simple and fun
-- Do NOT use quotation marks in the title or description`;
+- Do NOT use quotation marks in the title or description
 
-    const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 500,
-      temperature: 0.8,
+Respond with ONLY a JSON object in this exact format:
+{"title": "The proposed title", "description": "The brief description"}`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
       messages: [
+        {
+          role: 'system',
+          content: 'You are a creative children\'s book editor who generates catchy titles and descriptions. Always respond with valid JSON only.',
+        },
         {
           role: 'user',
           content: prompt,
         },
       ],
+      response_format: { type: 'json_object' },
+      max_tokens: 500,
+      temperature: 0.8,
     });
 
-    // Extract the response
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
-      : '';
-
+    const responseText = completion.choices[0].message.content || '';
     console.log('Raw AI response:', responseText);
 
     // Parse the JSON response
     let metadata;
     try {
-      // Try to extract JSON from the response
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        metadata = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('No JSON found in response');
-      }
+      metadata = JSON.parse(responseText);
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
       // Fallback: extract title and description manually
