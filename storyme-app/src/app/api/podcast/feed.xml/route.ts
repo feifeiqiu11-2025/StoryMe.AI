@@ -27,8 +27,10 @@ export async function GET(request: NextRequest) {
 
     if (publicationsError) {
       console.error('Error fetching publications:', publicationsError);
-      return new NextResponse('Error fetching episodes', { status: 500 });
+      return new NextResponse(`Error fetching episodes: ${JSON.stringify(publicationsError)}`, { status: 500 });
     }
+
+    console.log(`📊 RSS Feed: Found ${publications?.length || 0} published episodes`);
 
     if (!publications) {
       // No episodes yet - return empty but valid RSS feed
