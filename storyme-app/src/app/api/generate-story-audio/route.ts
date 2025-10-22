@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch project with scenes and quiz questions
+    // Fetch project with scenes
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select(`
@@ -71,17 +71,6 @@ export async function POST(request: NextRequest) {
           scene_number,
           description,
           caption
-        ),
-        quiz_questions (
-          id,
-          question_order,
-          question,
-          option_a,
-          option_b,
-          option_c,
-          option_d,
-          correct_answer,
-          explanation
         )
       `)
       .eq('id', projectId)
@@ -95,6 +84,20 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    // Fetch quiz questions separately
+    const { data: quizQuestionsData, error: quizError } = await supabase
+      .from('quiz_questions')
+      .select('id, question_order, question, option_a, option_b, option_c, option_d, correct_answer, explanation')
+      .eq('project_id', projectId)
+      .order('question_order', { ascending: true });
+
+    if (quizError) {
+      console.error('Quiz fetch error:', quizError);
+    }
+
+    // Attach quiz questions to project object
+    project.quiz_questions = quizQuestionsData || [];
 
     // Prepare pages for audio generation
     const pages: AudioPage[] = [];
