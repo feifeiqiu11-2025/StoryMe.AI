@@ -596,8 +596,29 @@ export default function StoryViewerPage() {
   }
 
   const scenes = project.scenes || [];
-  const currentScene = scenes[currentSceneIndex];
-  const currentImage = currentScene?.images?.[0];
+
+  // Build combined pages array: scenes + quiz
+  const allPages = [
+    ...scenes.map((scene: any, index: number) => ({
+      type: 'scene',
+      sceneIndex: index,
+      scene: scene,
+      image: scene.images?.[0],
+    })),
+    ...(quizQuestions.length > 0 ? [
+      {
+        type: 'quiz_transition',
+        title: "Let's see if our little readers and listeners are paying attention!",
+      },
+      ...quizQuestions.map((question: any, index: number) => ({
+        type: 'quiz_question',
+        questionIndex: index,
+        question: question,
+      }))
+    ] : [])
+  ];
+
+  const currentPage = allPages[currentSceneIndex];
 
   return (
     <>
@@ -613,6 +634,12 @@ export default function StoryViewerPage() {
           )}
           <div className="flex items-center gap-4 mt-4 text-sm text-gray-500">
             <span>{scenes.length} scenes</span>
+            {quizQuestions.length > 0 && (
+              <>
+                <span>•</span>
+                <span>{quizQuestions.length} quiz questions</span>
+              </>
+            )}
             <span>•</span>
             <span>{new Date(project.createdAt).toLocaleDateString()}</span>
           </div>
@@ -621,141 +648,150 @@ export default function StoryViewerPage() {
         {/* Story Viewer */}
         {scenes.length > 0 ? (
           <div className="space-y-6">
-            {/* Scene Display with Overlay Controls */}
+            {/* Page Display with Overlay Controls */}
             <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-              {/* Image with Overlaid Navigation */}
-              {currentImage?.imageUrl ? (
+              {/* Content Area */}
+              {currentPage?.type === 'scene' && currentPage.image?.imageUrl ? (
                 <div className="relative aspect-video bg-gradient-to-br from-blue-100 to-purple-100">
                   <img
-                    src={currentImage.imageUrl}
-                    alt={`Scene ${currentSceneIndex + 1}`}
+                    src={currentPage.image.imageUrl}
+                    alt={`Scene ${currentPage.sceneIndex + 1}`}
                     className="w-full h-full object-contain"
                   />
-
-                  {/* Overlay Navigation */}
-                  <div className="absolute inset-0 flex items-center justify-between px-4">
-                    <button
-                      onClick={() => setCurrentSceneIndex(Math.max(0, currentSceneIndex - 1))}
-                      disabled={currentSceneIndex === 0}
-                      className="bg-black bg-opacity-60 hover:bg-opacity-80 text-white p-4 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
-                    >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
-
-                    <button
-                      onClick={() => setCurrentSceneIndex(Math.min(scenes.length - 1, currentSceneIndex + 1))}
-                      disabled={currentSceneIndex === scenes.length - 1}
-                      className="bg-black bg-opacity-60 hover:bg-opacity-80 text-white p-4 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
-                    >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
+                </div>
+              ) : currentPage?.type === 'quiz_transition' ? (
+                <div className="relative aspect-video bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center p-8">
+                  <div className="text-center">
+                    <div className="text-6xl mb-4">📚</div>
+                    <h2 className="text-3xl font-bold text-gray-900">Quiz Time!</h2>
                   </div>
-
-                  {/* Page Indicator */}
-                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-black bg-opacity-60 px-4 py-2 rounded-full">
-                    {scenes.map((_: any, index: number) => (
-                      <button
-                        key={index}
-                        onClick={() => setCurrentSceneIndex(index)}
-                        className={`w-2 h-2 rounded-full transition-all ${
-                          index === currentSceneIndex
-                            ? 'bg-white w-6'
-                            : 'bg-white bg-opacity-50 hover:bg-opacity-75'
-                        }`}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Scene Counter */}
-                  <div className="absolute top-4 right-4 bg-black bg-opacity-60 text-white px-4 py-2 rounded-full text-sm font-semibold">
-                    {currentSceneIndex + 1} / {scenes.length}
+                </div>
+              ) : currentPage?.type === 'quiz_question' ? (
+                <div className="relative bg-gradient-to-br from-purple-50 to-blue-50 p-8 min-h-[400px]">
+                  <div className="max-w-3xl mx-auto">
+                    <div className="text-center mb-4">
+                      <span className="bg-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium">
+                        Question {currentPage.questionIndex + 1} of {quizQuestions.length}
+                      </span>
+                    </div>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+                      {currentPage.question.question}
+                    </h3>
+                    <div className="space-y-3">
+                      {[
+                        { letter: 'A', text: currentPage.question.option_a },
+                        { letter: 'B', text: currentPage.question.option_b },
+                        { letter: 'C', text: currentPage.question.option_c },
+                        { letter: 'D', text: currentPage.question.option_d },
+                      ].map((option) => (
+                        <div
+                          key={option.letter}
+                          className={`p-4 rounded-lg border-2 transition-all ${
+                            option.letter === currentPage.question.correct_answer
+                              ? 'border-green-500 bg-green-50'
+                              : 'border-gray-300 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className={`font-bold text-lg ${
+                              option.letter === currentPage.question.correct_answer
+                                ? 'text-green-700'
+                                : 'text-gray-700'
+                            }`}>
+                              {option.letter}.
+                            </span>
+                            <span className={`text-lg ${
+                              option.letter === currentPage.question.correct_answer
+                                ? 'text-green-900 font-medium'
+                                : 'text-gray-800'
+                            }`}>
+                              {option.text}
+                              {option.letter === currentPage.question.correct_answer && ' ✓'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div className="aspect-video bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-                  <div className="text-6xl">📖</div>
+                <div className="relative aspect-video bg-gradient-to-br from-blue-100 to-purple-100">
+                  <img
+                    src={project.coverImageUrl || '/api/placeholder/1024/1024'}
+                    alt="Story cover"
+                    className="w-full h-full object-contain"
+                  />
+
+              {/* Navigation Controls */}
+              <div className="absolute inset-0 flex items-center justify-between px-4 pointer-events-none">
+                <button
+                  onClick={() => setCurrentSceneIndex(Math.max(0, currentSceneIndex - 1))}
+                  disabled={currentSceneIndex === 0}
+                  className="pointer-events-auto bg-black bg-opacity-60 hover:bg-opacity-80 text-white p-4 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+
+                <button
+                  onClick={() => setCurrentSceneIndex(Math.min(allPages.length - 1, currentSceneIndex + 1))}
+                  disabled={currentSceneIndex === allPages.length - 1}
+                  className="pointer-events-auto bg-black bg-opacity-60 hover:bg-opacity-80 text-white p-4 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Page Indicator */}
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-black bg-opacity-60 px-4 py-2 rounded-full max-w-[90%] overflow-x-auto">
+                {allPages.map((_: any, index: number) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentSceneIndex(index)}
+                    className={`w-2 h-2 rounded-full transition-all flex-shrink-0 ${
+                      index === currentSceneIndex
+                        ? 'bg-white w-6'
+                        : 'bg-white bg-opacity-50 hover:bg-opacity-75'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {/* Page Counter */}
+              <div className="absolute top-4 right-4 bg-black bg-opacity-60 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                {currentSceneIndex + 1} / {allPages.length}
+              </div>
+
+              {/* Text Content */}
+              {currentPage?.type === 'scene' && (
+                <div className="p-8">
+                  <p className="text-gray-800 text-lg leading-relaxed">
+                    {currentPage.scene?.description || 'No description available'}
+                  </p>
                 </div>
               )}
 
-              {/* Scene Text */}
-              <div className="p-8">
-                <p className="text-gray-800 text-lg leading-relaxed">
-                  {currentScene?.description || 'No description available'}
-                </p>
-              </div>
-            </div>
-
-            {/* Quiz Questions */}
-            {quizQuestions.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-                <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6">
-                  <h2 className="text-2xl font-bold text-white text-center">
-                    📚 Quiz Time!
-                  </h2>
-                  <p className="text-white text-center mt-2 opacity-90">
-                    Let's see if our little readers and listeners are paying attention!
+              {currentPage?.type === 'quiz_transition' && (
+                <div className="p-8 text-center">
+                  <p className="text-gray-600 text-xl font-medium">
+                    {currentPage.title}
                   </p>
                 </div>
+              )}
 
-                <div className="p-6 space-y-6">
-                  {quizQuestions.map((question: any, index: number) => (
-                    <div key={question.id} className="border-2 border-gray-200 rounded-xl p-6 bg-gray-50">
-                      <h3 className="text-xl font-bold text-gray-900 mb-4">
-                        Question {index + 1}: {question.question}
-                      </h3>
-
-                      <div className="space-y-3">
-                        {[
-                          { letter: 'A', text: question.option_a },
-                          { letter: 'B', text: question.option_b },
-                          { letter: 'C', text: question.option_c },
-                          { letter: 'D', text: question.option_d },
-                        ].map((option) => (
-                          <div
-                            key={option.letter}
-                            className={`p-4 rounded-lg border-2 transition-all ${
-                              option.letter === question.correct_answer
-                                ? 'border-green-500 bg-green-50'
-                                : 'border-gray-300 bg-white'
-                            }`}
-                          >
-                            <div className="flex items-start gap-3">
-                              <span className={`font-bold text-lg ${
-                                option.letter === question.correct_answer
-                                  ? 'text-green-700'
-                                  : 'text-gray-700'
-                              }`}>
-                                {option.letter}.
-                              </span>
-                              <span className={`text-lg ${
-                                option.letter === question.correct_answer
-                                  ? 'text-green-900 font-medium'
-                                  : 'text-gray-800'
-                              }`}>
-                                {option.text}
-                                {option.letter === question.correct_answer && ' ✓'}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {question.explanation && (
-                        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                          <p className="text-blue-900 text-base">
-                            <strong>Explanation:</strong> {question.explanation}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+              {currentPage?.type === 'quiz_question' && currentPage.question?.explanation && (
+                <div className="p-6">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-blue-900 text-base">
+                      <strong>Explanation:</strong> {currentPage.question.explanation}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Actions */}
             <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
