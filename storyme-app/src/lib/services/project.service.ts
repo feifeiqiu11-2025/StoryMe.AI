@@ -317,6 +317,15 @@ export class ProjectService {
         prompt: string;
         generationTime: number;
       }>;
+      quizData?: Array<{ // NEW: Optional quiz questions
+        question: string;
+        option_a: string;
+        option_b: string;
+        option_c: string;
+        option_d: string;
+        correct_answer: string;
+        explanation?: string;
+      }>;
     }
   ): Promise<ProjectDTO> {
     const supabase = this.projectRepo['supabase'];
@@ -380,6 +389,35 @@ export class ProjectService {
       if (imageError) {
         throw new Error(`Failed to save image for scene ${sceneData.sceneNumber}: ${imageError.message}`);
       }
+    }
+
+    // 5. Save quiz questions if provided
+    if (data.quizData && data.quizData.length > 0) {
+      console.log(`💾 Saving ${data.quizData.length} quiz questions for project ${project.id}...`);
+
+      for (let i = 0; i < data.quizData.length; i++) {
+        const question = data.quizData[i];
+        const { error: quizError } = await supabase
+          .from('quiz_questions')
+          .insert({
+            project_id: project.id,
+            question_order: i + 1,
+            question: question.question,
+            option_a: question.option_a,
+            option_b: question.option_b,
+            option_c: question.option_c,
+            option_d: question.option_d,
+            correct_answer: question.correct_answer,
+            explanation: question.explanation,
+          });
+
+        if (quizError) {
+          console.error(`Failed to save quiz question ${i + 1}:`, quizError);
+          throw new Error(`Failed to save quiz question ${i + 1}: ${quizError.message}`);
+        }
+      }
+
+      console.log(`✅ Successfully saved ${data.quizData.length} quiz questions`);
     }
 
     return projectToDTO(project);

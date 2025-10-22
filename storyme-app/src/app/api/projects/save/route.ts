@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       storyTone,
       characterIds,
       scenes,
+      quizData, // NEW: Optional quiz questions
       visibility = 'private' // DEFAULT to private for safety
     } = body;
 
@@ -154,6 +155,7 @@ export async function POST(request: NextRequest) {
       visibility: visibility as 'private' | 'public', // NEW: Privacy control (defaults to private)
       characterIds,
       scenes,
+      quizData, // NEW: Pass quiz questions if provided
     });
 
     return NextResponse.json({

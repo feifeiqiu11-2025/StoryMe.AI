@@ -71,6 +71,13 @@ export default function CreateStoryPage() {
   const [generatingCover, setGeneratingCover] = useState(false);
   const [coverApproved, setCoverApproved] = useState(false);
 
+  // Quiz generation state
+  const [quizData, setQuizData] = useState<any>(null);
+  const [generatingQuiz, setGeneratingQuiz] = useState(false);
+  const [showQuizModal, setShowQuizModal] = useState(false);
+  const [quizDifficulty, setQuizDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
+  const [quizQuestionCount, setQuizQuestionCount] = useState<number>(3);
+
   useEffect(() => {
     const loadUser = async () => {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -463,6 +470,53 @@ export default function CreateStoryPage() {
     setSaveError('');
   };
 
+  const handleGenerateQuiz = async () => {
+    if (!scriptInput.trim()) {
+      setSaveError('Story script is required to generate quiz');
+      return;
+    }
+
+    setGeneratingQuiz(true);
+    setSaveError('');
+
+    try {
+      console.log(`Generating ${quizQuestionCount} ${quizDifficulty} quiz questions...`);
+
+      const response = await fetch('/api/generate-quiz-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          script: scriptInput,
+          readingLevel,
+          storyTone,
+          difficulty: quizDifficulty,
+          questionCount: quizQuestionCount,
+          characterNames: characters.map(c => c.name),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate quiz');
+      }
+
+      const data = await response.json();
+      setQuizData(data.questions);
+      setShowQuizModal(true);
+      console.log('✓ Quiz generated:', data.questions.length, 'questions');
+    } catch (error) {
+      console.error('Quiz generation error:', error);
+      setSaveError(error instanceof Error ? error.message : 'Failed to generate quiz');
+    } finally {
+      setGeneratingQuiz(false);
+    }
+  };
+
+  const approveQuiz = () => {
+    setShowQuizModal(false);
+    setSaveError('');
+  };
+
   const handleSaveStory = async () => {
     if (!saveTitle.trim()) {
       setSaveError('Please enter a title for your story');
@@ -586,6 +640,7 @@ export default function CreateStoryPage() {
           storyTone: storyTone,       // NEW
           characterIds: characterIds,
           scenes: scenesData,
+          quizData: quizData || undefined, // Include quiz if generated
         }),
       });
 
@@ -1110,6 +1165,76 @@ export default function CreateStoryPage() {
           </div>
         )}
 
+        {/* Quiz Preview Modal */}
+        {showQuizModal && quizData && (
+          <div className="fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Quiz Preview</h2>
+                <button
+                  onClick={() => setShowQuizModal(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-6 mb-6">
+                {quizData.map((question: any, index: number) => (
+                  <div key={index} className="bg-gray-50 rounded-lg p-4">
+                    <p className="font-semibold text-gray-900 mb-3">
+                      {index + 1}. {question.question}
+                    </p>
+                    <div className="space-y-2 ml-4">
+                      {['A', 'B', 'C', 'D'].map((letter, optIndex) => {
+                        const option = question[`option_${letter.toLowerCase()}`];
+                        const isCorrect = question.correct_answer === letter;
+                        return (
+                          <div
+                            key={letter}
+                            className={`flex items-start gap-2 p-2 rounded ${
+                              isCorrect ? 'bg-green-100 border border-green-300' : 'bg-white'
+                            }`}
+                          >
+                            <span className="font-medium text-gray-700">{letter}.</span>
+                            <span className={isCorrect ? 'text-green-700 font-medium' : 'text-gray-700'}>
+                              {option}
+                              {isCorrect && ' ✓'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {question.explanation && (
+                      <div className="mt-3 ml-4 text-sm text-gray-600 bg-blue-50 p-2 rounded">
+                        <strong>Explanation:</strong> {question.explanation}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setQuizData(null);
+                    setShowQuizModal(false);
+                  }}
+                  className="flex-1 bg-gray-500 text-white px-6 py-3 rounded-xl hover:bg-gray-600 font-semibold transition-all"
+                >
+                  ↻ Regenerate
+                </button>
+                <button
+                  onClick={approveQuiz}
+                  className="flex-1 bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 font-semibold transition-all"
+                >
+                  ✓ Use This Quiz
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Save Story Modal */}
         {showSaveModal && (
           <div className="fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1266,9 +1391,83 @@ export default function CreateStoryPage() {
                   </div>
                 )}
 
+                {/* Quiz Generation Section */}
+                {coverApproved && !quizData && (
+                  <div className="border-2 border-purple-200 rounded-xl p-4 bg-purple-50">
+                    <p className="text-sm font-medium text-gray-700 mb-3">Generate Quiz (Optional)</p>
+                    <p className="text-xs text-gray-600 mb-3">
+                      AI will create comprehension questions to include with your story.
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Difficulty
+                        </label>
+                        <select
+                          value={quizDifficulty}
+                          onChange={(e) => setQuizDifficulty(e.target.value as 'easy' | 'medium' | 'hard')}
+                          disabled={generatingQuiz}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100"
+                        >
+                          <option value="easy">Easy</option>
+                          <option value="medium">Medium</option>
+                          <option value="hard">Hard</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Questions
+                        </label>
+                        <select
+                          value={quizQuestionCount}
+                          onChange={(e) => setQuizQuestionCount(parseInt(e.target.value))}
+                          disabled={generatingQuiz}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100"
+                        >
+                          <option value="3">3 Questions</option>
+                          <option value="5">5 Questions</option>
+                          <option value="10">10 Questions</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleGenerateQuiz}
+                      disabled={generatingQuiz}
+                      className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      {generatingQuiz ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                          Generating Quiz...
+                        </span>
+                      ) : (
+                        '🧠 Generate Quiz'
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {quizData && (
+                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <span className="text-2xl">🧠</span>
+                    <div className="flex-1">
+                      <span className="text-green-700 font-medium">✓ Quiz Generated!</span>
+                      <p className="text-xs text-green-600">{quizData.length} questions ready</p>
+                    </div>
+                    <button
+                      onClick={() => setShowQuizModal(true)}
+                      className="text-xs text-purple-600 hover:text-purple-700 font-medium"
+                    >
+                      Preview
+                    </button>
+                  </div>
+                )}
+
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-sm text-blue-700">
-                    This will save your story with {imageGenerationStatus.filter(img => img.status === 'completed').length} scenes to your library.
+                    This will save your story with {imageGenerationStatus.filter(img => img.status === 'completed').length} scenes{quizData ? ` and ${quizData.length} quiz questions` : ''} to your library.
                   </p>
                 </div>
               </div>
