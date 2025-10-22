@@ -649,10 +649,10 @@ export default function StoryViewerPage() {
         {scenes.length > 0 ? (
           <div className="space-y-6">
             {/* Page Display with Overlay Controls */}
-            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden relative">
               {/* Content Area */}
               {currentPage?.type === 'scene' && currentPage.image?.imageUrl ? (
-                <div className="relative aspect-video bg-gradient-to-br from-blue-100 to-purple-100">
+                <div className="aspect-video bg-gradient-to-br from-blue-100 to-purple-100">
                   <img
                     src={currentPage.image.imageUrl}
                     alt={`Scene ${currentPage.sceneIndex + 1}`}
@@ -660,14 +660,14 @@ export default function StoryViewerPage() {
                   />
                 </div>
               ) : currentPage?.type === 'quiz_transition' ? (
-                <div className="relative aspect-video bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center p-8">
+                <div className="aspect-video bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center p-8">
                   <div className="text-center">
                     <div className="text-6xl mb-4">📚</div>
                     <h2 className="text-3xl font-bold text-gray-900">Quiz Time!</h2>
                   </div>
                 </div>
               ) : currentPage?.type === 'quiz_question' ? (
-                <div className="relative bg-gradient-to-br from-purple-50 to-blue-50 p-8 min-h-[400px]">
+                <div className="bg-gradient-to-br from-purple-50 to-blue-50 p-8 min-h-[400px]">
                   <div className="max-w-3xl mx-auto">
                     <div className="text-center mb-4">
                       <span className="bg-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium">
@@ -686,27 +686,14 @@ export default function StoryViewerPage() {
                       ].map((option) => (
                         <div
                           key={option.letter}
-                          className={`p-4 rounded-lg border-2 transition-all ${
-                            option.letter === currentPage.question.correct_answer
-                              ? 'border-green-500 bg-green-50'
-                              : 'border-gray-300 bg-white'
-                          }`}
+                          className="p-4 rounded-lg border-2 border-gray-300 bg-white transition-all hover:border-purple-400 hover:bg-purple-50"
                         >
                           <div className="flex items-start gap-3">
-                            <span className={`font-bold text-lg ${
-                              option.letter === currentPage.question.correct_answer
-                                ? 'text-green-700'
-                                : 'text-gray-700'
-                            }`}>
+                            <span className="font-bold text-lg text-gray-700">
                               {option.letter}.
                             </span>
-                            <span className={`text-lg ${
-                              option.letter === currentPage.question.correct_answer
-                                ? 'text-green-900 font-medium'
-                                : 'text-gray-800'
-                            }`}>
+                            <span className="text-lg text-gray-800">
                               {option.text}
-                              {option.letter === currentPage.question.correct_answer && ' ✓'}
                             </span>
                           </div>
                         </div>
@@ -715,7 +702,7 @@ export default function StoryViewerPage() {
                   </div>
                 </div>
               ) : (
-                <div className="relative aspect-video bg-gradient-to-br from-blue-100 to-purple-100">
+                <div className="aspect-video bg-gradient-to-br from-blue-100 to-purple-100">
                   <img
                     src={project.coverImageUrl || '/api/placeholder/1024/1024'}
                     alt="Story cover"
@@ -784,15 +771,7 @@ export default function StoryViewerPage() {
                 </div>
               )}
 
-              {currentPage?.type === 'quiz_question' && currentPage.question?.explanation && (
-                <div className="p-6">
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-blue-900 text-base">
-                      <strong>Explanation:</strong> {currentPage.question.explanation}
-                    </p>
-                  </div>
-                </div>
-              )}
+              {/* Explanation hidden - kids should figure out on their own */}
             </div>
 
             {/* Actions */}
