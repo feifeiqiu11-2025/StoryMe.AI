@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeViewer';
+import Tooltip from '@/components/ui/Tooltip';
 
 export default function StoryViewerPage() {
   const router = useRouter();
@@ -27,6 +28,10 @@ export default function StoryViewerPage() {
   const [loadingAudio, setLoadingAudio] = useState(false);
   const [generatingAudio, setGeneratingAudio] = useState(false);
   const [hasAudio, setHasAudio] = useState(false);
+  const [updatingVisibility, setUpdatingVisibility] = useState(false);
+  const [showPublicConfirm, setShowPublicConfirm] = useState(false);
+  const [spotifyStatus, setSpotifyStatus] = useState<string | null>(null);
+  const [publishingToSpotify, setPublishingToSpotify] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -79,6 +84,8 @@ export default function StoryViewerPage() {
         setProject(data.project);
         // Check if audio exists
         await checkAudioExists();
+        // Check Spotify status
+        await checkSpotifyStatus();
       } else {
         console.error('Failed to fetch project:', data.error);
         router.push('/projects');
@@ -97,6 +104,18 @@ export default function StoryViewerPage() {
     } catch (error) {
       console.error('Error checking audio:', error);
       setHasAudio(false);
+    }
+  };
+
+  const checkSpotifyStatus = async () => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/spotify-status`);
+      const data = await response.json();
+      if (data.hasPublication) {
+        setSpotifyStatus(data.status);
+      }
+    } catch (error) {
+      console.error('Error checking Spotify status:', error);
     }
   };
 
@@ -254,6 +273,83 @@ export default function StoryViewerPage() {
     }
   };
 
+  const handleTogglePublic = () => {
+    const currentVisibility = project?.visibility || 'private';
+    const newVisibility = currentVisibility === 'public' ? 'private' : 'public';
+
+    // If going public, show confirmation
+    if (newVisibility === 'public') {
+      setShowPublicConfirm(true);
+    } else {
+      // Going private, no confirmation needed
+      updateVisibility(newVisibility);
+    }
+  };
+
+  const updateVisibility = async (newVisibility: 'public' | 'private') => {
+    setUpdatingVisibility(true);
+    setShowPublicConfirm(false);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibility: newVisibility }),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setProject({ ...project, visibility: newVisibility });
+        alert(newVisibility === 'public' ? '✅ Story is now public!' : '✅ Story is now private.');
+      } else {
+        const data = await response.json();
+        alert(`Failed to update visibility: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error updating visibility:', error);
+      alert('Failed to update visibility. Please try again.');
+    } finally {
+      setUpdatingVisibility(false);
+    }
+  };
+
+  const handlePublishToSpotify = async () => {
+    if (!project) return;
+
+    const confirmed = confirm(
+      'Publish to Spotify?\n\n' +
+      'Your story will be published as an episode on the KindleWood Stories podcast. ' +
+      'It will appear on Spotify within 1-6 hours.\n\n' +
+      'Make sure you have generated audio for all scenes first.\n\n' +
+      'Continue?'
+    );
+
+    if (!confirmed) return;
+
+    setPublishingToSpotify(true);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/publish-spotify`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(`✅ ${data.message}`);
+        setSpotifyStatus('published');
+        await checkSpotifyStatus(); // Refresh status
+      } else {
+        alert(`❌ ${data.error}${data.details ? '\n\n' + data.details : ''}`);
+      }
+    } catch (error: any) {
+      console.error('Spotify publishing error:', error);
+      alert(`❌ Failed to publish to Spotify: ${error.message}`);
+    } finally {
+      setPublishingToSpotify(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
@@ -364,58 +460,184 @@ export default function StoryViewerPage() {
             </div>
 
             {/* Actions */}
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              <div className="flex gap-4 flex-wrap">
-                <button
-                  onClick={handleEnterReadingMode}
-                  disabled={loadingAudio}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-purple-700 hover:to-blue-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loadingAudio ? (
-                    <span className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Loading...
-                    </span>
-                  ) : (
-                    '📖 Reading Mode'
-                  )}
-                </button>
-                {!hasAudio && (
-                  <button
-                    onClick={handleGenerateAudio}
-                    disabled={generatingAudio}
-                    className="bg-gradient-to-r from-green-600 to-teal-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-teal-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {generatingAudio ? (
-                      <span className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Generating Audio...
-                      </span>
-                    ) : (
-                      '🎵 Generate Audio'
-                    )}
-                  </button>
-                )}
-                <button
-                  onClick={handleDownloadPDF}
-                  disabled={generatingPDF}
-                  className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl hover:from-orange-700 hover:to-red-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {generatingPDF ? (
-                    <span className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Generating PDF...
-                    </span>
-                  ) : (
-                    '📄 Download PDF'
-                  )}
-                </button>
-                <Link
-                  href="/projects"
-                  className="bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 font-semibold transition-all inline-block"
-                >
-                  Back to My Stories
-                </Link>
+            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+              {/* Section 1: Story Actions */}
+              <div className="mb-5">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  Story Actions
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {/* Read Mode */}
+                  <Tooltip text="Read this story in fullscreen mode with narration">
+                    <button
+                      onClick={handleEnterReadingMode}
+                      disabled={loadingAudio}
+                      className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loadingAudio ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Loading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>📖</span>
+                          <span>Read Mode</span>
+                        </>
+                      )}
+                    </button>
+                  </Tooltip>
+
+                  {/* Generate Audio / Audio Ready */}
+                  <Tooltip text={hasAudio ? "Audio ready. Click to regenerate." : "Generate AI narration for this story"}>
+                    <button
+                      onClick={handleGenerateAudio}
+                      disabled={generatingAudio}
+                      className={`flex items-center gap-2 px-4 py-2 text-sm rounded-lg font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                        hasAudio
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : 'bg-gray-500 text-white hover:bg-gray-600'
+                      }`}
+                    >
+                      {generatingAudio ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Generating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🎵</span>
+                          <span>{hasAudio ? 'Audio Ready ✓' : 'Generate Audio'}</span>
+                        </>
+                      )}
+                    </button>
+                  </Tooltip>
+
+                  {/* Export PDF */}
+                  <Tooltip text="Download this story as a PDF file">
+                    <button
+                      onClick={handleDownloadPDF}
+                      disabled={generatingPDF}
+                      className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:from-orange-700 hover:to-red-700 font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {generatingPDF ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Exporting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>📄</span>
+                          <span>Export PDF</span>
+                        </>
+                      )}
+                    </button>
+                  </Tooltip>
+                </div>
+              </div>
+
+              {/* Section 2: Publishing */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  Publishing
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {/* Make Public / Private */}
+                  <Tooltip text={project?.visibility === 'public' ? "Make this story private" : "Make this story visible to everyone"}>
+                    <button
+                      onClick={handleTogglePublic}
+                      disabled={updatingVisibility}
+                      className={`flex items-center gap-2 px-4 py-2 text-sm rounded-lg font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                        project?.visibility === 'public'
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : 'bg-gray-600 text-white hover:bg-gray-700'
+                      }`}
+                    >
+                      {updatingVisibility ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Updating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{project?.visibility === 'public' ? '🌍' : '🔒'}</span>
+                          <span>{project?.visibility === 'public' ? 'Public' : 'Make Public'}</span>
+                        </>
+                      )}
+                    </button>
+                  </Tooltip>
+
+                  {/* Publish to Spotify */}
+                  <Tooltip text={
+                    spotifyStatus === 'live'
+                      ? "Live on Spotify! Click to view"
+                      : spotifyStatus === 'published'
+                      ? "Published! Will appear on Spotify within 1-6 hours"
+                      : spotifyStatus === 'compiling'
+                      ? "Compiling audio for Spotify..."
+                      : "Publish this story to Spotify as a podcast episode"
+                  }>
+                    <button
+                      onClick={handlePublishToSpotify}
+                      disabled={publishingToSpotify || ['compiling', 'published', 'live'].includes(spotifyStatus || '')}
+                      className={`flex items-center gap-2 px-4 py-2 text-sm rounded-lg font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                        spotifyStatus === 'live'
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : spotifyStatus === 'published'
+                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          : spotifyStatus === 'compiling'
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-gray-500 text-white hover:bg-gray-600'
+                      }`}
+                    >
+                      {publishingToSpotify ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Publishing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🎵</span>
+                          <span>
+                            {spotifyStatus === 'live'
+                              ? 'On Spotify ✓'
+                              : spotifyStatus === 'published'
+                              ? 'Published'
+                              : spotifyStatus === 'compiling'
+                              ? 'Compiling...'
+                              : 'Spotify'
+                            }
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  </Tooltip>
+
+                  {/* Kids App Placeholder */}
+                  <Tooltip text="Publish this story to KindleWood Kids App (coming soon)">
+                    <button
+                      onClick={() => alert('Kids App publishing coming soon!')}
+                      className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium shadow-md transition-all"
+                    >
+                      <span>📱</span>
+                      <span>Kids App</span>
+                    </button>
+                  </Tooltip>
+
+                  {/* Spacer to push delete to the right on desktop */}
+                  <div className="flex-1 hidden sm:block"></div>
+
+                  {/* Delete Story */}
+                  <Tooltip text="Delete this story permanently">
+                    <Link
+                      href="/projects"
+                      className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium shadow-md transition-all"
+                    >
+                      <span>←</span>
+                      <span className="hidden sm:inline">Back</span>
+                    </Link>
+                  </Tooltip>
+                </div>
               </div>
             </div>
           </div>
@@ -440,6 +662,37 @@ export default function StoryViewerPage() {
           pages={readingPages}
           onExit={() => setReadingMode(false)}
         />
+      )}
+
+      {/* Public Confirmation Modal */}
+      {showPublicConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">Make Story Public?</h3>
+            <p className="text-gray-600 mb-4">
+              Your story will be visible to everyone on the landing page and public gallery.
+            </p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-yellow-800 font-medium">
+                💡 Important: Make sure your story doesn't contain personal information like addresses, phone numbers, or school names.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => updateVisibility('public')}
+                className="flex-1 bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 font-semibold transition-all"
+              >
+                Make Public
+              </button>
+              <button
+                onClick={() => setShowPublicConfirm(false)}
+                className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 font-semibold transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

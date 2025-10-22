@@ -7,6 +7,17 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '10mb',
     },
   },
+  // Exclude FFmpeg binaries from Webpack bundling (fixes Turbopack compatibility)
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        '@ffmpeg-installer/ffmpeg': 'commonjs @ffmpeg-installer/ffmpeg',
+        'fluent-ffmpeg': 'commonjs fluent-ffmpeg',
+      });
+    }
+    return config;
+  },
   // Temporarily ignore ESLint errors during build for MVP deployment
   eslint: {
     ignoreDuringBuilds: true,

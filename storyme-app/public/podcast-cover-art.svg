@@ -1,0 +1,38 @@
+<svg width="3000" height="3000" viewBox="0 0 3000 3000" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6B46C1;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#9333EA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#EC4899;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <rect width="3000" height="3000" fill="url(#grad1)"/>
+
+  <!-- Decorative elements -->
+  <circle cx="300" cy="300" r="150" fill="#FFFFFF" opacity="0.1"/>
+  <circle cx="2700" cy="2700" r="200" fill="#FFFFFF" opacity="0.1"/>
+  <circle cx="2600" cy="400" r="180" fill="#FFFFFF" opacity="0.1"/>
+
+  <!-- Main Logo Circle -->
+  <circle cx="1500" cy="1200" r="600" fill="#FFFFFF" opacity="0.95"/>
+
+  <!-- Book Icon -->
+  <path d="M 1150 1000 L 1150 1400 L 1850 1400 L 1850 1000 Z" fill="#6B46C1" opacity="0.2"/>
+  <path d="M 1150 1000 L 1500 900 L 1850 1000 L 1850 1400 L 1500 1300 L 1150 1400 Z" fill="#9333EA"/>
+  <line x1="1500" y1="900" x2="1500" y2="1300" stroke="#FFFFFF" stroke-width="8"/>
+
+  <!-- KindleWood Text -->
+  <text x="1500" y="2050" font-family="Arial, sans-serif" font-size="200" font-weight="bold" fill="#FFFFFF" text-anchor="middle">
+    KindleWood
+  </text>
+  <text x="1500" y="2250" font-family="Arial, sans-serif" font-size="120" fill="#FFFFFF" text-anchor="middle" opacity="0.9">
+    Stories
+  </text>
+
+  <!-- Tagline -->
+  <text x="1500" y="2500" font-family="Arial, sans-serif" font-size="80" fill="#FFFFFF" text-anchor="middle" opacity="0.8">
+    Created by Kids, for Kids
+  </text>
+</svg>

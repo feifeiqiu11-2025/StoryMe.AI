@@ -60,6 +60,19 @@ export async function checkImageGenerationLimit(
     };
   }
 
+  // Check if user has unlimited images (images_limit = -1)
+  const isUnlimited = user.images_limit === -1;
+
+  if (isUnlimited) {
+    return {
+      allowed: true,
+      limits: {
+        daily: { used: 0, limit: -1, remaining: -1 },
+        hourly: { used: 0, limit: -1, remaining: -1 },
+      },
+    };
+  }
+
   // Determine rate limits based on subscription tier
   const isTrial = user.subscription_tier === 'free' && user.trial_status === 'active';
   const config = RATE_LIMITS[user.subscription_tier] || RATE_LIMITS.free;
