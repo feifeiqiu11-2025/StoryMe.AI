@@ -721,6 +721,8 @@ export default function StoryViewerPage() {
                     alt="Story cover"
                     className="w-full h-full object-contain"
                   />
+                </div>
+              )}
 
               {/* Navigation Controls */}
               <div className="absolute inset-0 flex items-center justify-between px-4 pointer-events-none">
