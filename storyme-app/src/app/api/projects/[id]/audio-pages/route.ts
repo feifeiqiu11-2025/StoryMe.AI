@@ -1,6 +1,7 @@
 /**
  * Get Audio Pages for a Project
  * Returns all audio pages for Reading Mode
+ * PUBLIC endpoint - Kids app needs to access audio for published stories
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,40 +15,24 @@ export async function GET(
     const { id: projectId } = await params;
 
     if (!projectId) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: 'Project ID is required' },
         { status: 400 }
       );
+      // Add CORS headers
+      response.headers.set('Access-Control-Allow-Origin', '*');
+      response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      return response;
     }
 
     // Initialize Supabase client
     const supabase = await createClient();
 
-    // Get user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    // PUBLIC endpoint - no auth check required
+    // Kids app needs to fetch audio for published stories
 
-    // Verify project belongs to user
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('id', projectId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (projectError || !project) {
-      return NextResponse.json(
-        { error: 'Project not found' },
-        { status: 404 }
-      );
-    }
-
-    // Fetch audio pages
+    // Fetch audio pages (includes quiz transition and quiz question audio)
     const { data: audioPages, error: audioPagesError } = await supabase
       .from('story_audio_pages')
       .select('*')
@@ -56,22 +41,53 @@ export async function GET(
 
     if (audioPagesError) {
       console.error('Error fetching audio pages:', audioPagesError);
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: 'Failed to fetch audio pages' },
         { status: 500 }
       );
+      // Add CORS headers
+      response.headers.set('Access-Control-Allow-Origin', '*');
+      response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      return response;
     }
 
-    return NextResponse.json({
-      audioPages: audioPages || [],
+    // Format response for kids app
+    // Includes: story pages, quiz_transition, and quiz_question pages
+    const response = NextResponse.json({
+      pages: audioPages || [],
       hasAudio: (audioPages || []).length > 0,
     });
 
+    // Add CORS headers for kids app
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    return response;
+
   } catch (error: any) {
     console.error('Get audio pages error:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: error.message || 'Failed to get audio pages' },
       { status: 500 }
     );
+    // Add CORS headers even for errors
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    return response;
   }
+}
+
+/**
+ * OPTIONS - Handle preflight requests for CORS
+ */
+export async function OPTIONS() {
+  const response = new NextResponse(null, { status: 204 });
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  response.headers.set('Access-Control-Max-Age', '86400');
+  return response;
 }
