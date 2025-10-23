@@ -318,7 +318,7 @@ Format your response as JSON:
 }
 
 /**
- * GET - Fetch existing quiz questions
+ * GET - Fetch existing quiz questions (PUBLIC - no auth required for kids app)
  */
 export async function GET(
   request: NextRequest,
@@ -328,6 +328,9 @@ export async function GET(
     const { id: projectId } = await params;
     const supabase = await createClient();
 
+    // Public endpoint - no auth check required
+    // Kids app needs to fetch quiz for published stories
+
     const { data: questions, error } = await supabase
       .from('quiz_questions')
       .select('*')
@@ -335,19 +338,48 @@ export async function GET(
       .order('question_order', { ascending: true });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      const response = NextResponse.json({ error: error.message }, { status: 500 });
+      // Add CORS headers for kids app
+      response.headers.set('Access-Control-Allow-Origin', '*');
+      response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      return response;
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       exists: questions && questions.length > 0,
       questions: questions || [],
       hasAudio: questions?.some(q => q.audio_generated) || false,
     });
 
+    // Add CORS headers for kids app
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    return response;
+
   } catch (error: any) {
     console.error('Fetch quiz error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const response = NextResponse.json({ error: error.message }, { status: 500 });
+    // Add CORS headers even for errors
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    return response;
   }
+}
+
+/**
+ * OPTIONS - Handle preflight requests for CORS
+ */
+export async function OPTIONS() {
+  const response = new NextResponse(null, { status: 204 });
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  response.headers.set('Access-Control-Max-Age', '86400');
+  return response;
 }
 
 /**
