@@ -326,7 +326,9 @@ export async function GET(
 ) {
   try {
     const { id: projectId } = await params;
-    const supabase = await createClient();
+    // Use service role client to bypass RLS (public endpoint for kids app)
+    const { createServiceRoleClient } = await import('@/lib/supabase/service-role');
+    const supabase = createServiceRoleClient();
 
     // Public endpoint - no auth check required
     // Kids app needs to fetch quiz for published stories
