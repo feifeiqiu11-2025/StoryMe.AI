@@ -195,7 +195,7 @@ export default function StoryViewerPage() {
         ? `${project.title}, by ${project.authorName}`
         : project.title;
 
-      const coverAudioPage = audioData.audioPages?.find((ap: any) => ap.page_type === 'cover');
+      const coverAudioPage = audioData.pages?.find((ap: any) => ap.page_type === 'cover');
 
       pages.push({
         pageNumber: 1,
@@ -212,7 +212,7 @@ export default function StoryViewerPage() {
         .sort((a: any, b: any) => a.sceneNumber - b.sceneNumber);
 
       scenes.forEach((scene: any, index: number) => {
-        const sceneAudioPage = audioData.audioPages?.find((ap: any) => ap.scene_id === scene.id);
+        const sceneAudioPage = audioData.pages?.find((ap: any) => ap.scene_id === scene.id);
 
         pages.push({
           pageNumber: index + 2,
@@ -229,19 +229,19 @@ export default function StoryViewerPage() {
         console.log(`📚 Adding ${quizQuestions.length} quiz questions to reading mode`);
 
         // Add transition page
-        const transitionAudioPage = audioData.audioPages?.find((ap: any) => ap.page_type === 'quiz_transition');
+        const transitionAudioPage = audioData.pages?.find((ap: any) => ap.page_type === 'quiz_transition');
         pages.push({
           pageNumber: pages.length + 1,
           pageType: 'quiz_transition',
           imageUrl: project.coverImageUrl || '/api/placeholder/1024/1024', // Use cover image
-          textContent: "Let's see if our little readers and listeners are paying attention!",
+          textContent: "Let's see if our little readers and listeners paid attention, answer some fun questions about the story!",
           audioUrl: transitionAudioPage?.audio_url,
           audioDuration: transitionAudioPage?.audio_duration_seconds,
         });
 
         // Add quiz question pages
         quizQuestions.forEach((question: any, index: number) => {
-          const questionAudioPage = audioData.audioPages?.find((ap: any) => ap.quiz_question_id === question.id);
+          const questionAudioPage = audioData.pages?.find((ap: any) => ap.quiz_question_id === question.id);
 
           pages.push({
             pageNumber: pages.length + 1,

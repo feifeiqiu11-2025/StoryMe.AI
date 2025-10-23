@@ -75,7 +75,7 @@ export default function PublicStoryViewerPage() {
       // Page 1: Cover page (use first scene image as cover if no cover exists)
       const coverImageUrl = story.scenes[0]?.imageUrl || '/api/placeholder/1024/1024';
       const coverText = story.title;
-      const coverAudioPage = audioData.audioPages?.find((ap: any) => ap.page_type === 'cover');
+      const coverAudioPage = audioData.pages?.find((ap: any) => ap.page_type === 'cover');
 
       pages.push({
         pageNumber: 1,
@@ -88,7 +88,7 @@ export default function PublicStoryViewerPage() {
 
       // Pages 2+: Scene pages
       story.scenes.forEach((scene: any, index: number) => {
-        const sceneAudioPage = audioData.audioPages?.find((ap: any) => ap.scene_id === scene.id);
+        const sceneAudioPage = audioData.pages?.find((ap: any) => ap.scene_id === scene.id);
 
         pages.push({
           pageNumber: index + 2,

@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
       pages.push({
         pageNumber: transitionPageNumber,
         pageType: 'quiz_transition',
-        textContent: "Let's see if our little readers and listeners are paying attention!",
+        textContent: "Let's see if our little readers and listeners paid attention, answer some fun questions about the story!",
       });
 
       // Add quiz question pages
