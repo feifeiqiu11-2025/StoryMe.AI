@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation';
 import { ReactNode } from 'react';
 import Link from 'next/link';
 import ProfileMenu from '@/components/ui/ProfileMenu';
+import EmailVerificationBanner from '@/components/auth/EmailVerificationBanner';
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient();
@@ -72,6 +73,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           </div>
         </div>
       </header>
+
+      {/* Email Verification Banner */}
+      <EmailVerificationBanner />
 
       {/* Main Content */}
       <main>{children}</main>

@@ -15,7 +15,7 @@ export default function PrivacyPolicyPage() {
             📚 Kindle<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Wood</span> Studio ✨
           </Link>
           <h1 className="text-4xl font-bold text-gray-900 mt-4">Privacy Policy</h1>
-          <p className="text-gray-600 mt-2">Last updated: October 2024</p>
+          <p className="text-gray-600 mt-2">Last updated: October 23, 2025</p>
         </div>
 
         {/* Content */}
@@ -112,12 +112,85 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Children's Privacy</h2>
-            <p className="text-gray-700">
-              KindleWood Studio is designed for parents and guardians to create stories featuring children.
-              We do not knowingly collect personal information directly from children under 13.
-              All accounts must be created and managed by adults.
-            </p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Children's Privacy (COPPA Compliance)</h2>
+            <div className="space-y-4">
+              <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4">
+                <h3 className="font-bold text-gray-900 mb-2">Our Commitment to Children's Privacy</h3>
+                <p className="text-gray-700">
+                  KindleWood complies with the Children's Online Privacy Protection Act (COPPA). We take the privacy of children under 13 very seriously.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Parent-Controlled Platform</h3>
+                <p className="text-gray-700 mb-2">
+                  KindleWood Studio is designed for parents and guardians to create and manage content for their children:
+                </p>
+                <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
+                  <li>All accounts must be created and managed by adults (18+)</li>
+                  <li>Parents control all child profiles, photos, and data</li>
+                  <li>We do not knowingly collect information directly from children under 13</li>
+                  <li>Children can only access content through the KindleWood Kids app with parental setup</li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Information About Children We Collect (With Parental Consent)</h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
+                  <li><strong>Child's name and age:</strong> Provided by parent for profile creation</li>
+                  <li><strong>Photos:</strong> Uploaded by parent for story personalization</li>
+                  <li><strong>Reading progress:</strong> Stories read, quiz performance, time spent</li>
+                  <li><strong>Preferences:</strong> Favorite stories, reading goals set by parents</li>
+                </ul>
+                <p className="text-gray-700 mt-2">
+                  All of this information is collected through the parent account and controlled by the parent.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">How We Use Children's Information</h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
+                  <li>To personalize stories with the child's name and likeness</li>
+                  <li>To track reading progress and educational achievements</li>
+                  <li>To provide age-appropriate content recommendations</li>
+                  <li>To enable parents to monitor their child's learning journey</li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Parental Rights Under COPPA</h3>
+                <p className="text-gray-700 mb-2">
+                  As a parent or guardian, you have the right to:
+                </p>
+                <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
+                  <li><strong>Review:</strong> View all data we have about your child</li>
+                  <li><strong>Delete:</strong> Delete your child's profile and all associated data at any time</li>
+                  <li><strong>Refuse:</strong> Refuse further collection of your child's information (by deleting their profile)</li>
+                  <li><strong>Control:</strong> Manage what data is collected and how it's used</li>
+                </ul>
+                <p className="text-gray-700 mt-2">
+                  To exercise these rights, sign in to your account and manage child profiles in Settings, or contact us at kindlewood@gmail.com.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Data Sharing for Children</h3>
+                <p className="text-gray-700">
+                  We do NOT sell or share children's personal information with third parties for marketing purposes.
+                  Children's photos are only shared with our AI service provider (fal.ai) for the sole purpose of
+                  generating personalized story illustrations, and are not stored by the service provider.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">KindleWood Kids App</h3>
+                <p className="text-gray-700">
+                  The KindleWood Kids mobile app is designed for children to consume content created by their parents.
+                  The app does not collect any additional information beyond reading progress and quiz answers, which
+                  are visible to parents in their account dashboard.
+                </p>
+              </div>
+            </div>
           </section>
 
           <section>
@@ -143,8 +216,11 @@ export default function PrivacyPolicyPage() {
               If you have questions about this Privacy Policy or your data:
             </p>
             <div className="bg-gray-50 rounded-lg p-4 mt-4">
-              <p className="text-gray-700">
-                <strong>Email:</strong> privacy@storyme.app (placeholder)
+              <p className="text-gray-700 mb-2">
+                <strong>Email:</strong> <a href="mailto:kindlewood@gmail.com" className="text-blue-600 hover:text-blue-700 underline">kindlewood@gmail.com</a>
+              </p>
+              <p className="text-gray-700 text-sm">
+                We will respond to your privacy inquiries within 30 days.
               </p>
             </div>
           </section>

@@ -15,7 +15,7 @@ export default function TermsOfServicePage() {
             📚 Kindle<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Wood</span> Studio ✨
           </Link>
           <h1 className="text-4xl font-bold text-gray-900 mt-4">Terms of Service</h1>
-          <p className="text-gray-600 mt-2">Last updated: October 2024</p>
+          <p className="text-gray-600 mt-2">Last updated: October 23, 2025</p>
         </div>
 
         {/* Content */}
@@ -119,6 +119,44 @@ export default function TermsOfServicePage() {
           </section>
 
           <section>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">KindleWood Kids App & COPPA Compliance</h2>
+            <div className="space-y-4">
+              <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4">
+                <h3 className="font-bold text-gray-900 mb-2">Children's Privacy Protection</h3>
+                <p className="text-gray-700">
+                  KindleWood complies with the Children's Online Privacy Protection Act (COPPA).
+                  By using our services, you acknowledge and agree to the following:
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Age Requirement</h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
+                  <li>You must be at least 18 years old to create a KindleWood account</li>
+                  <li>Parents/guardians are responsible for all child profiles created under their account</li>
+                  <li>Children under 13 may only use the KindleWood Kids app with parental setup and supervision</li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Parental Consent</h3>
+                <p className="text-gray-700">
+                  By creating a child profile, you represent that you are the parent or legal guardian of the child
+                  and consent to the collection and use of the child's information as described in our Privacy Policy.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">KindleWood Kids App Usage</h3>
+                <p className="text-gray-700">
+                  The KindleWood Kids mobile app is designed for children to read stories created by their parents.
+                  All content must be set up by a parent through KindleWood Studio before being accessible in the Kids app.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Service Availability</h2>
             <p className="text-gray-700 mb-4">
               We strive for high availability but cannot guarantee uninterrupted service. We may:
@@ -173,8 +211,8 @@ export default function TermsOfServicePage() {
           <section>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Governing Law</h2>
             <p className="text-gray-700">
-              These terms are governed by the laws of [Your Jurisdiction - to be specified].
-              Disputes will be resolved through binding arbitration.
+              These terms are governed by the laws of the State of California, United States.
+              Any disputes will be resolved in the state or federal courts located in California.
             </p>
           </section>
 
@@ -185,7 +223,7 @@ export default function TermsOfServicePage() {
             </p>
             <div className="bg-gray-50 rounded-lg p-4 mt-4">
               <p className="text-gray-700">
-                <strong>Email:</strong> legal@storyme.app (placeholder)
+                <strong>Email:</strong> <a href="mailto:kindlewood@gmail.com" className="text-blue-600 hover:text-blue-700 underline">kindlewood@gmail.com</a>
               </p>
             </div>
           </section>
