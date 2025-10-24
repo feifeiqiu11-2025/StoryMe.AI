@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ProjectService } from '@/lib/services/project.service';
 import { checkImageLimit } from '@/lib/middleware/checkImageLimit';
+import { checkStoryCreationLimit, incrementStoryCount } from '@/lib/subscription/middleware';
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,6 +20,24 @@ export async function POST(request: NextRequest) {
         { error: 'Unauthorized' },
         { status: 401 }
       );
+    }
+
+    // CHECK STORY CREATION LIMIT - Phase 2A subscription system
+    const subscriptionStatus = await checkStoryCreationLimit(user.id);
+
+    if (!subscriptionStatus.canCreate) {
+      return NextResponse.json({
+        error: 'Story limit reached',
+        message: subscriptionStatus.reason,
+        subscription: {
+          tier: subscriptionStatus.tier,
+          status: subscriptionStatus.status,
+          storiesUsed: subscriptionStatus.storiesUsed,
+          storiesLimit: subscriptionStatus.storiesLimit,
+          trialEndsAt: subscriptionStatus.trialEndsAt,
+        },
+        upgradeRequired: true,
+      }, { status: 403 });
     }
 
     // Parse request body
@@ -157,6 +176,15 @@ export async function POST(request: NextRequest) {
       scenes,
       quizData, // NEW: Pass quiz questions if provided
     });
+
+    // INCREMENT STORY COUNT - Phase 2A subscription system
+    // This updates the user's monthly story counter and usage tracking
+    try {
+      await incrementStoryCount(user.id);
+    } catch (countError) {
+      // Log error but don't fail the request - story was already saved
+      console.error('Failed to increment story count:', countError);
+    }
 
     return NextResponse.json({
       success: true,
