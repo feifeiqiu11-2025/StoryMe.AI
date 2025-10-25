@@ -15,6 +15,8 @@ export default function NewCharacterPage() {
   const [error, setError] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   // Form fields
   const [name, setName] = useState('');
@@ -48,6 +50,68 @@ export default function NewCharacterPage() {
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+
+      // Auto-analyze image immediately after selection
+      autoAnalyzeImage(file);
+    }
+  };
+
+  const autoAnalyzeImage = async (file: File) => {
+    setIsAnalyzing(true);
+    setError(null);
+
+    try {
+      // Upload image first
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload image');
+      }
+
+      const uploadData = await uploadResponse.json();
+      setUploadedImageUrl(uploadData.url);
+
+      console.log('🔍 Analyzing character image:', uploadData.url);
+
+      // Analyze the uploaded image
+      const analysisResponse = await fetch('/api/analyze-character-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageUrl: uploadData.url,
+        }),
+      });
+
+      if (analysisResponse.ok) {
+        const analysisData = await analysisResponse.json();
+        console.log('✅ Character analysis successful:', analysisData);
+
+        if (analysisData.success && analysisData.analysis) {
+          // Auto-fill description fields
+          setHairColor(analysisData.analysis.hairColor || '');
+          setSkinTone(analysisData.analysis.skinTone || '');
+          setClothing(analysisData.analysis.clothing || '');
+          setAge(analysisData.analysis.age || '');
+          setOtherFeatures(analysisData.analysis.otherFeatures || '');
+        }
+      } else {
+        const errorData = await analysisResponse.json();
+        console.error('❌ Image analysis failed:', errorData);
+        console.warn('User can fill in manually. Error:', errorData.error);
+      }
+    } catch (analysisError: any) {
+      console.error('❌ Auto-analysis error:', analysisError);
+      // Fail silently - user can fill in manually
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -77,11 +141,11 @@ export default function NewCharacterPage() {
         return;
       }
 
-      let imageUrl = null;
-      let imageFilename = null;
+      let imageUrl = uploadedImageUrl; // Use already uploaded image URL
+      let imageFilename = imageFile?.name || null;
 
-      // Upload image if provided
-      if (imageFile) {
+      // If image wasn't auto-analyzed (edge case), upload it now
+      if (imageFile && !uploadedImageUrl) {
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
@@ -169,6 +233,11 @@ export default function NewCharacterPage() {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Reference Photo (Optional)
+            {isAnalyzing && (
+              <span className="ml-2 text-sm text-purple-600 font-normal">
+                🤖 AI analyzing...
+              </span>
+            )}
           </label>
 
           {imagePreview ? (
@@ -178,13 +247,23 @@ export default function NewCharacterPage() {
                 alt="Preview"
                 className="w-full h-64 object-cover rounded-lg"
               />
+              {isAnalyzing && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin"></div>
+                    <span className="text-sm text-purple-600 font-medium">AI analyzing photo...</span>
+                  </div>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => {
                   setImageFile(null);
                   setImagePreview(null);
+                  setUploadedImageUrl(null);
                 }}
                 className="absolute top-2 right-2 bg-red-600 text-white p-2 rounded-full hover:bg-red-700"
+                disabled={isAnalyzing}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path

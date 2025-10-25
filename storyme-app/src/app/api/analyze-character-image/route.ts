@@ -23,10 +23,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Analyzing character image...');
+    console.log('🔍 Analyzing character image:', imageUrl);
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4o', // gpt-4o supports vision natively
       max_tokens: 500,
       temperature: 0.3, // Lower temperature for more consistent analysis
       messages: [
@@ -66,7 +66,9 @@ Do not include any explanatory text, only the JSON object.`
     });
 
     const content = response.choices[0]?.message?.content || '';
-    console.log('AI Analysis Response:', content);
+    console.log('✅ AI Analysis Response:', content);
+    console.log('📊 Model used:', response.model);
+    console.log('🔢 Tokens used:', response.usage);
 
     // Parse the JSON response
     try {
@@ -115,10 +117,18 @@ Do not include any explanatory text, only the JSON object.`
     }
 
   } catch (error: any) {
-    console.error('Character image analysis error:', error);
+    console.error('❌ Character image analysis error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      type: error.type,
+      stack: error.stack?.split('\n').slice(0, 3)
+    });
 
     // Handle specific OpenAI errors
     if (error.status === 401) {
+      console.error('🔑 OpenAI API key issue - check OPENAI_API_KEY environment variable');
       return NextResponse.json(
         { error: 'OpenAI API key is invalid or missing' },
         { status: 500 }
@@ -126,16 +136,27 @@ Do not include any explanatory text, only the JSON object.`
     }
 
     if (error.status === 429) {
+      console.error('⏱️ Rate limit exceeded');
       return NextResponse.json(
         { error: 'Rate limit exceeded. Please try again in a moment.' },
         { status: 429 }
       );
     }
 
-    if (error.code === 'invalid_image_url') {
+    if (error.code === 'invalid_image_url' || error.message?.includes('image_url')) {
+      console.error('🖼️ Invalid image URL:', imageUrl);
       return NextResponse.json(
         { error: 'Invalid image URL. Please upload a valid image.' },
         { status: 400 }
+      );
+    }
+
+    // Check if it's a model-related error
+    if (error.message?.includes('model') || error.code === 'model_not_found') {
+      console.error('🤖 Model error - gpt-4o might not be available or vision not enabled');
+      return NextResponse.json(
+        { error: 'Vision AI model is currently unavailable. Please try again later or contact support.' },
+        { status: 503 }
       );
     }
 

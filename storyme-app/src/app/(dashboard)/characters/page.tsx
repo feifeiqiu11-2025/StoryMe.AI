@@ -212,6 +212,47 @@ export default function CharactersPage() {
         imageUrl: data.url,
         imageFileName: file.name,
       });
+
+      // Auto-analyze image with AI (NEW!)
+      console.log('🔍 Analyzing character image:', data.url);
+
+      try {
+        const analysisResponse = await fetch('/api/analyze-character-image', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            imageUrl: data.url,
+          }),
+        });
+
+        if (analysisResponse.ok) {
+          const analysisData = await analysisResponse.json();
+          console.log('✅ Character analysis successful:', analysisData);
+
+          if (analysisData.success && analysisData.analysis) {
+            // Auto-fill description fields
+            setFormData((prev) => ({
+              ...prev,
+              imageUrl: data.url,
+              imageFileName: file.name,
+              hairColor: analysisData.analysis.hairColor || prev.hairColor,
+              skinTone: analysisData.analysis.skinTone || prev.skinTone,
+              clothing: analysisData.analysis.clothing || prev.clothing,
+              age: analysisData.analysis.age || prev.age,
+              otherFeatures: analysisData.analysis.otherFeatures || prev.otherFeatures,
+            }));
+          }
+        } else {
+          const errorData = await analysisResponse.json();
+          console.error('❌ Image analysis failed:', errorData);
+          console.warn('User can fill in manually. Error:', errorData.error);
+        }
+      } catch (analysisError) {
+        console.error('❌ Auto-analysis error:', analysisError);
+        // Fail silently - user can still fill in manually
+      }
     } catch (error) {
       console.error('Upload error:', error);
       alert('Failed to upload image. Please try again.');

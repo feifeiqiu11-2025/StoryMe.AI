@@ -150,6 +150,8 @@ export default function CharacterManager({
 
         if (analysisResponse.ok) {
           const analysisData = await analysisResponse.json();
+          console.log('✅ Character analysis successful:', analysisData);
+
           if (analysisData.success && analysisData.analysis) {
             // Update character with BOTH description AND referenceImage to preserve it
             const updates = {
@@ -170,10 +172,21 @@ export default function CharacterManager({
             setTimeout(() => setAnalyzedCharacterId(null), 3000);
           }
         } else {
-          console.warn('Image analysis failed, continuing without auto-fill');
+          const errorData = await analysisResponse.json();
+          console.error('❌ Image analysis failed:', errorData);
+          console.warn('Image analysis failed, user can fill in manually. Error:', errorData.error);
+
+          // Optionally show user-friendly message (don't block workflow)
+          if (errorData.error?.includes('unavailable')) {
+            console.info('💡 Tip: User can still fill in character details manually');
+          }
         }
-      } catch (analysisError) {
-        console.warn('Image analysis error:', analysisError);
+      } catch (analysisError: any) {
+        console.error('❌ Image analysis error:', analysisError);
+        console.error('Error details:', {
+          message: analysisError.message,
+          name: analysisError.name
+        });
         // Continue silently - user can still fill in manually
       } finally {
         setAnalyzingCharacterId(null);
