@@ -15,7 +15,7 @@ export default function TermsOfServicePage() {
             📚 Kindle<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Wood</span> Studio ✨
           </Link>
           <h1 className="text-4xl font-bold text-gray-900 mt-4">Terms of Service</h1>
-          <p className="text-gray-600 mt-2">Last updated: October 23, 2025</p>
+          <p className="text-gray-600 mt-2">Last updated: October 25, 2025</p>
         </div>
 
         {/* Content */}
@@ -108,14 +108,37 @@ export default function TermsOfServicePage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Trial & Subscription</h2>
-            <ul className="list-disc list-inside text-gray-700 space-y-2 ml-4">
-              <li>Free trial: 7 days, 50 images total</li>
-              <li>Trial usage limits may change without notice (BETA)</li>
-              <li>Premium plans (coming soon) will have different limits and pricing</li>
-              <li>No credit card required for trial</li>
-              <li>We reserve the right to modify pricing and plans</li>
-            </ul>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Trial & Subscription Plans</h2>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Free Trial</h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
+                  <li>Duration: 7 days from signup</li>
+                  <li>Limit: Up to 5 stories total</li>
+                  <li>No credit card required</li>
+                  <li>Full access to all features during trial</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Paid Subscription Plans</h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
+                  <li><strong>Basic:</strong> $8.99/month or $89/year - 20 new stories per month</li>
+                  <li><strong>Premium:</strong> $14.99/month or $149/year - Unlimited stories</li>
+                  <li><strong>Team:</strong> $59.99/month or $599/year - 5 separate accounts, unlimited stories each</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Billing & Payments</h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
+                  <li>All payments processed securely through Stripe</li>
+                  <li>Subscriptions automatically renew unless cancelled</li>
+                  <li>You may cancel at any time - access continues until end of billing period</li>
+                  <li>Refunds handled on a case-by-case basis within 7 days of charge</li>
+                  <li>Plan changes (upgrades/downgrades) are prorated immediately</li>
+                  <li>We reserve the right to modify pricing with 30 days notice to existing subscribers</li>
+                </ul>
+              </div>
+            </div>
           </section>
 
           <section>

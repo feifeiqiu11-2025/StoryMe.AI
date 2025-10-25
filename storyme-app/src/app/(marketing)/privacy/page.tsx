@@ -15,7 +15,7 @@ export default function PrivacyPolicyPage() {
             📚 Kindle<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Wood</span> Studio ✨
           </Link>
           <h1 className="text-4xl font-bold text-gray-900 mt-4">Privacy Policy</h1>
-          <p className="text-gray-600 mt-2">Last updated: October 23, 2025</p>
+          <p className="text-gray-600 mt-2">Last updated: October 25, 2025</p>
         </div>
 
         {/* Content */}
@@ -96,8 +96,17 @@ export default function PrivacyPolicyPage() {
             <ul className="list-disc list-inside text-gray-700 space-y-2 ml-4">
               <li><strong>fal.ai:</strong> For AI image generation (photos sent temporarily, not stored)</li>
               <li><strong>Supabase:</strong> Our secure database and authentication provider</li>
+              <li><strong>Stripe:</strong> Our payment processor for subscription billing (they handle all payment card data - we never see or store your card information)</li>
               <li><strong>Legal authorities:</strong> If required by law or to protect rights and safety</li>
             </ul>
+            <div className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200 mt-4">
+              <h3 className="font-bold text-gray-900 mb-2">Payment Information</h3>
+              <p className="text-gray-700">
+                All payment card information is processed directly by Stripe, a PCI-DSS compliant payment
+                processor. We never see, handle, or store your credit card details. We only receive
+                confirmation of successful or failed payments and subscription status updates from Stripe.
+              </p>
+            </div>
           </section>
 
           <section>
