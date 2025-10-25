@@ -20,6 +20,8 @@ interface SubscriptionInfo {
   storiesRemaining: string;
   trialDaysRemaining: number | null;
   canCreateStory: boolean;
+  cancelAtPeriodEnd?: boolean;
+  stripe_subscription_id?: string;
 }
 
 export default function UpgradePage() {
@@ -381,13 +383,20 @@ export default function UpgradePage() {
                   >
                     Current Plan
                   </button>
-                  <button
-                    onClick={handleCancelSubscription}
-                    disabled={cancelling}
-                    className="w-full bg-white border-2 border-red-300 text-red-600 py-2 rounded-lg font-medium hover:bg-red-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {cancelling ? 'Cancelling...' : 'Cancel Subscription'}
-                  </button>
+                  {!subscription?.cancelAtPeriodEnd && (
+                    <button
+                      onClick={handleCancelSubscription}
+                      disabled={cancelling}
+                      className="w-full bg-white border-2 border-red-300 text-red-600 py-2 rounded-lg font-medium hover:bg-red-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {cancelling ? 'Cancelling...' : 'Cancel Subscription'}
+                    </button>
+                  )}
+                  {subscription?.cancelAtPeriodEnd && (
+                    <div className="w-full bg-orange-50 border-2 border-orange-300 text-orange-700 py-2 rounded-lg text-center text-sm">
+                      Cancels at period end
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -449,13 +458,20 @@ export default function UpgradePage() {
                   >
                     Current Plan
                   </button>
-                  <button
-                    onClick={handleCancelSubscription}
-                    disabled={cancelling}
-                    className="w-full bg-white border-2 border-red-300 text-red-600 py-2 rounded-lg font-medium hover:bg-red-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {cancelling ? 'Cancelling...' : 'Cancel Subscription'}
-                  </button>
+                  {!subscription?.cancelAtPeriodEnd && (
+                    <button
+                      onClick={handleCancelSubscription}
+                      disabled={cancelling}
+                      className="w-full bg-white border-2 border-red-300 text-red-600 py-2 rounded-lg font-medium hover:bg-red-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {cancelling ? 'Cancelling...' : 'Cancel Subscription'}
+                    </button>
+                  )}
+                  {subscription?.cancelAtPeriodEnd && (
+                    <div className="w-full bg-orange-50 border-2 border-orange-300 text-orange-700 py-2 rounded-lg text-center text-sm">
+                      Cancels at period end
+                    </div>
+                  )}
                 </div>
               )}
             </div>

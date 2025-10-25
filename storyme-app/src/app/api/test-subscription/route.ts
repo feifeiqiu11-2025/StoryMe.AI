@@ -40,6 +40,7 @@ export async function GET(request: Request) {
         stories_limit,
         billing_cycle_start,
         stripe_customer_id,
+        stripe_subscription_id,
         team_id,
         is_team_primary
       `)
@@ -70,6 +71,20 @@ export async function GET(request: Request) {
       const now = new Date();
       const diffTime = trialEnd.getTime() - now.getTime();
       trialDaysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    // Check if subscription is marked for cancellation
+    let cancelAtPeriodEnd = false;
+    if (userData.stripe_subscription_id) {
+      const { data: subscriptionData } = await supabase
+        .from('subscriptions')
+        .select('cancel_at_period_end')
+        .eq('stripe_subscription_id', userData.stripe_subscription_id)
+        .single();
+
+      if (subscriptionData) {
+        cancelAtPeriodEnd = subscriptionData.cancel_at_period_end || false;
+      }
     }
 
     // Return comprehensive test results
@@ -109,6 +124,8 @@ export async function GET(request: Request) {
         canCreateStory: storyCreationStatus.canCreate,
         hasStripeCustomer: !!userData.stripe_customer_id,
         isTeamMember: !!userData.team_id,
+        cancelAtPeriodEnd,
+        stripe_subscription_id: userData.stripe_subscription_id,
       },
       message: storyCreationStatus.canCreate
         ? '✓ Everything looks good! You can create stories.'
