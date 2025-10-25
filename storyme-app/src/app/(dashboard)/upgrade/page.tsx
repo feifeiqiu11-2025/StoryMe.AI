@@ -29,6 +29,7 @@ export default function UpgradePage() {
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [cancelling, setCancelling] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
   // Get plan from URL params (when user hits limit)
   const suggestedPlan = searchParams?.get('plan') || null;
@@ -60,9 +61,36 @@ export default function UpgradePage() {
     loadSubscription();
   }, [router]);
 
-  const handleSelectPlan = (planId: string, cycle: 'monthly' | 'annual') => {
-    // Will integrate with Stripe checkout
-    router.push(`/pricing?plan=${planId}&cycle=${cycle}`);
+  const handleSelectPlan = async (planId: string, cycle: 'monthly' | 'annual') => {
+    setCheckoutLoading(planId);
+
+    try {
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tier: planId,
+          cycle: cycle,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = data.url;
+      } else {
+        console.error('Failed to create checkout session:', data.error);
+        alert(data.error || 'Failed to start checkout. Please try again.');
+        setCheckoutLoading(null);
+      }
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      alert('Failed to start checkout. Please try again.');
+      setCheckoutLoading(null);
+    }
   };
 
   const handleCancelSubscription = async () => {
@@ -178,41 +206,39 @@ export default function UpgradePage() {
             {isPremium || isTeam ? 'Manage Your Plan' : 'Upgrade for More Stories'}
           </h2>
 
-          {/* Billing Toggle */}
-          {!isPremium && !isTeam && (
-            <div className="flex justify-center mb-8">
-              <div className="inline-flex items-center bg-white rounded-full p-1.5 shadow-md">
-                <button
-                  onClick={() => setBillingCycle('monthly')}
-                  className={`px-6 py-2 rounded-full font-medium transition-all ${
-                    billingCycle === 'monthly'
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Monthly
-                </button>
-                <button
-                  onClick={() => setBillingCycle('annual')}
-                  className={`px-6 py-2 rounded-full font-medium transition-all relative ${
-                    billingCycle === 'annual'
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Annual
-                  <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
-                    Save 17%
-                  </span>
-                </button>
-              </div>
+          {/* Billing Toggle - Show for all users */}
+          <div className="flex justify-center mb-8">
+            <div className="inline-flex items-center bg-white rounded-full p-1.5 shadow-md">
+              <button
+                onClick={() => setBillingCycle('monthly')}
+                className={`px-6 py-2 rounded-full font-medium transition-all ${
+                  billingCycle === 'monthly'
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingCycle('annual')}
+                className={`px-6 py-2 rounded-full font-medium transition-all relative ${
+                  billingCycle === 'annual'
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Annual
+                <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
+                  Save 17%
+                </span>
+              </button>
             </div>
-          )}
+          </div>
 
           {/* Upgrade Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Basic Plan */}
-            {isTrial && (
+            {/* Basic Plan - Show for trial, premium, and team users (downgrade option) */}
+            {!currentTier.includes('basic') && (
               <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-blue-200 hover:border-blue-300 transition-all">
                 <div className="mb-4">
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">📖 Basic</h3>
@@ -242,9 +268,10 @@ export default function UpgradePage() {
 
                 <button
                   onClick={() => handleSelectPlan('basic', billingCycle)}
-                  className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-600 transition-all shadow-md"
+                  disabled={checkoutLoading === 'basic'}
+                  className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-600 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Choose Basic
+                  {checkoutLoading === 'basic' ? 'Loading...' : (isPremium || isTeam) ? 'Downgrade to Basic' : 'Choose Basic'}
                 </button>
               </div>
             )}
@@ -297,9 +324,10 @@ export default function UpgradePage() {
               {!isPremium && (
                 <button
                   onClick={() => handleSelectPlan('premium', billingCycle)}
-                  className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600 transition-all shadow-md"
+                  disabled={checkoutLoading === 'premium'}
+                  className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Go Premium
+                  {checkoutLoading === 'premium' ? 'Loading...' : isTeam ? 'Switch to Premium' : 'Go Premium'}
                 </button>
               )}
               {isPremium && (
@@ -364,9 +392,10 @@ export default function UpgradePage() {
               {!isTeam && (
                 <button
                   onClick={() => handleSelectPlan('team', billingCycle)}
-                  className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white py-3 rounded-lg font-semibold hover:from-green-600 hover:to-teal-600 transition-all shadow-md"
+                  disabled={checkoutLoading === 'team'}
+                  className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white py-3 rounded-lg font-semibold hover:from-green-600 hover:to-teal-600 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Choose Team
+                  {checkoutLoading === 'team' ? 'Loading...' : isPremium ? 'Upgrade to Team' : 'Choose Team'}
                 </button>
               )}
               {isTeam && (
