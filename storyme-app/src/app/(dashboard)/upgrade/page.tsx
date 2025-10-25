@@ -28,6 +28,7 @@ export default function UpgradePage() {
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const [cancelling, setCancelling] = useState(false);
 
   // Get plan from URL params (when user hits limit)
   const suggestedPlan = searchParams?.get('plan') || null;
@@ -62,6 +63,34 @@ export default function UpgradePage() {
   const handleSelectPlan = (planId: string, cycle: 'monthly' | 'annual') => {
     // Will integrate with Stripe checkout
     router.push(`/pricing?plan=${planId}&cycle=${cycle}`);
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!confirm('Are you sure you want to cancel your subscription? You will retain access until the end of your billing period.')) {
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      const response = await fetch('/api/cancel-subscription', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert('Your subscription will be cancelled at the end of the billing period. You can continue to use all features until then.');
+        // Reload subscription data
+        window.location.reload();
+      } else {
+        alert(data.error || 'Failed to cancel subscription. Please try again.');
+      }
+    } catch (error) {
+      console.error('Cancel subscription error:', error);
+      alert('Failed to cancel subscription. Please try again.');
+    } finally {
+      setCancelling(false);
+    }
   };
 
   if (loading) {
@@ -274,12 +303,21 @@ export default function UpgradePage() {
                 </button>
               )}
               {isPremium && (
-                <button
-                  disabled
-                  className="w-full bg-gray-100 text-gray-400 py-3 rounded-lg font-semibold cursor-not-allowed"
-                >
-                  Current Plan
-                </button>
+                <div className="space-y-2">
+                  <button
+                    disabled
+                    className="w-full bg-gray-100 text-gray-400 py-3 rounded-lg font-semibold cursor-not-allowed"
+                  >
+                    Current Plan
+                  </button>
+                  <button
+                    onClick={handleCancelSubscription}
+                    disabled={cancelling}
+                    className="w-full bg-white border-2 border-red-300 text-red-600 py-2 rounded-lg font-medium hover:bg-red-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {cancelling ? 'Cancelling...' : 'Cancel Subscription'}
+                  </button>
+                </div>
               )}
             </div>
 
@@ -332,12 +370,21 @@ export default function UpgradePage() {
                 </button>
               )}
               {isTeam && (
-                <button
-                  disabled
-                  className="w-full bg-gray-100 text-gray-400 py-3 rounded-lg font-semibold cursor-not-allowed"
-                >
-                  Current Plan
-                </button>
+                <div className="space-y-2">
+                  <button
+                    disabled
+                    className="w-full bg-gray-100 text-gray-400 py-3 rounded-lg font-semibold cursor-not-allowed"
+                  >
+                    Current Plan
+                  </button>
+                  <button
+                    onClick={handleCancelSubscription}
+                    disabled={cancelling}
+                    className="w-full bg-white border-2 border-red-300 text-red-600 py-2 rounded-lg font-medium hover:bg-red-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {cancelling ? 'Cancelling...' : 'Cancel Subscription'}
+                  </button>
+                </div>
               )}
             </div>
           </div>
