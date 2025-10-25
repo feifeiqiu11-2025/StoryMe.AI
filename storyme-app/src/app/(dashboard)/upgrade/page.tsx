@@ -62,6 +62,42 @@ export default function UpgradePage() {
   }, [router]);
 
   const handleSelectPlan = async (planId: string, cycle: 'monthly' | 'annual') => {
+    // Get plan details for confirmation message
+    const planNames: Record<string, string> = {
+      basic: 'Basic',
+      premium: 'Premium',
+      team: 'Team'
+    };
+
+    const planPrices: Record<string, { monthly: number, annual: number }> = {
+      basic: { monthly: 8.99, annual: 89 },
+      premium: { monthly: 14.99, annual: 149 },
+      team: { monthly: 59.99, annual: 599 }
+    };
+
+    const newPlan = planNames[planId];
+    const newPrice = cycle === 'monthly'
+      ? `$${planPrices[planId].monthly}/month`
+      : `$${planPrices[planId].annual}/year`;
+
+    // Determine action type
+    let actionType = 'upgrade to';
+    if (currentTier === 'premium' && planId === 'basic') actionType = 'downgrade to';
+    if (currentTier === 'team' && (planId === 'basic' || planId === 'premium')) actionType = 'downgrade to';
+    if (currentTier === 'team' && planId === 'premium') actionType = 'switch to';
+    if (currentTier === 'premium' && planId === 'team') actionType = 'upgrade to';
+
+    // Show confirmation dialog
+    const confirmMessage = `Are you sure you want to ${actionType} the ${newPlan} plan (${newPrice})?\n\n${
+      subscription?.stripe_subscription_id
+        ? 'Your billing will be prorated immediately.'
+        : 'You will be redirected to Stripe to complete payment.'
+    }`;
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
     setCheckoutLoading(planId);
 
     try {
