@@ -65,7 +65,8 @@ export default function UpgradePage() {
     setCheckoutLoading(planId);
 
     try {
-      const response = await fetch('/api/create-checkout-session', {
+      // Use change-subscription API which handles both upgrades/downgrades and new subscriptions
+      const response = await fetch('/api/change-subscription', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -78,17 +79,23 @@ export default function UpgradePage() {
 
       const data = await response.json();
 
-      if (response.ok && data.url) {
-        // Redirect to Stripe Checkout
-        window.location.href = data.url;
+      if (response.ok) {
+        if (data.checkoutUrl) {
+          // New subscription - redirect to Stripe Checkout
+          window.location.href = data.checkoutUrl;
+        } else {
+          // Subscription updated successfully
+          alert('Your subscription has been updated! The change will take effect immediately.');
+          window.location.reload();
+        }
       } else {
-        console.error('Failed to create checkout session:', data.error);
-        alert(data.error || 'Failed to start checkout. Please try again.');
+        console.error('Failed to change subscription:', data.error);
+        alert(data.error || 'Failed to change subscription. Please try again.');
         setCheckoutLoading(null);
       }
     } catch (error) {
-      console.error('Error creating checkout session:', error);
-      alert('Failed to start checkout. Please try again.');
+      console.error('Error changing subscription:', error);
+      alert('Failed to change subscription. Please try again.');
       setCheckoutLoading(null);
     }
   };
