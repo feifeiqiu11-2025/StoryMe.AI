@@ -142,6 +142,11 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     stripe_customer_id: subscription.customer as string,
   };
 
+  // If subscription is active, end the trial
+  if (subscription.status === 'active') {
+    userUpdateData.trial_status = 'completed';
+  }
+
   // Add billing_cycle_start only if current_period_start exists
   if (subscription.current_period_start) {
     userUpdateData.billing_cycle_start = new Date(subscription.current_period_start * 1000).toISOString();
