@@ -425,16 +425,6 @@ export default function UpgradePage() {
             </div>
           </div>
         </div>
-
-        {/* View Full Pricing */}
-        <div className="text-center">
-          <Link
-            href="/pricing"
-            className="inline-block text-gray-600 hover:text-gray-900 font-medium underline"
-          >
-            View detailed pricing comparison →
-          </Link>
-        </div>
       </div>
     </div>
   );
