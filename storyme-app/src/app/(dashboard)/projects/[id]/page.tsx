@@ -46,6 +46,7 @@ export default function StoryViewerPage() {
   const [recordingMode, setRecordingMode] = useState(false);
   const [uploadingAudio, setUploadingAudio] = useState(false);
   const [pageRecordings, setPageRecordings] = useState<Map<number, { blob: Blob; url: string; duration: number }>>(new Map());
+  const [savedPages, setSavedPages] = useState<Set<number>>(new Set()); // Track which pages are uploaded to server
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -429,6 +430,89 @@ export default function StoryViewerPage() {
     }
   }, [isDragging, dragOffset]);
 
+  // Save current page only and auto-advance to next
+  const handleSaveCurrentPage = async () => {
+    const recording = pageRecordings.get(currentSceneIndex);
+
+    if (!recording) {
+      alert('No recording for this page. Please record first.');
+      return;
+    }
+
+    setUploadingAudio(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('projectId', projectId);
+      formData.append('language', 'en');
+      formData.append('voiceProfileName', `${user?.name || 'User'}'s Voice`);
+
+      const page = allPages[currentSceneIndex];
+      const metadata = [{
+        pageNumber: currentSceneIndex + 1,
+        pageType: page.type,
+        sceneId: page.type === 'scene' ? page.scene?.id : undefined,
+        quizQuestionId: page.type === 'quiz_question' ? page.question?.id : undefined,
+        textContent: page.type === 'cover' ? `${page.title}` :
+                    page.type === 'scene' ? page.scene?.description :
+                    page.type === 'quiz_question' ? page.question?.question : '',
+        duration: recording.duration,
+      }];
+
+      formData.append(`audio_${currentSceneIndex + 1}`, recording.blob, `page-${currentSceneIndex + 1}.webm`);
+      formData.append('audioMetadata', JSON.stringify(metadata));
+
+      const response = await fetch('/api/upload-user-audio', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        console.log(`✅ Page ${currentSceneIndex + 1} saved successfully`);
+
+        // Mark this page as saved
+        const newSavedPages = new Set(savedPages);
+        newSavedPages.add(currentSceneIndex);
+        setSavedPages(newSavedPages);
+
+        // Remove from unsaved recordings (keep blob for preview until exit)
+        // URL.revokeObjectURL(recording.url);
+        // const newRecordings = new Map(pageRecordings);
+        // newRecordings.delete(currentSceneIndex);
+        // setPageRecordings(newRecordings);
+
+        setHasAudio(true);
+
+        // Auto-advance to next page or exit if last page
+        if (currentSceneIndex < allPages.length - 1) {
+          // Go to next page
+          setCurrentSceneIndex(currentSceneIndex + 1);
+
+          // Stop any playing preview
+          if (isPlaying) {
+            stopPreview();
+          }
+        } else {
+          // Last page - show success and exit
+          alert(`✅ All pages recorded and saved!\n\nYour audio narration is ready.`);
+          await checkAudioExists();
+          handleExitRecordingMode();
+        }
+      } else {
+        console.error('Audio upload failed:', data);
+        alert(`❌ Failed to save page ${currentSceneIndex + 1}: ${data.error || 'Unknown error'}\n\nPlease try again.`);
+      }
+    } catch (error: any) {
+      console.error('Audio upload error:', error);
+      alert(`❌ Error saving audio: ${error.message || 'Unknown error'}\n\nPlease try again.`);
+    } finally {
+      setUploadingAudio(false);
+    }
+  };
+
+  // Legacy: Save all recordings at once (keep for backward compatibility)
   const handleSaveAllRecordings = async () => {
     if (pageRecordings.size === 0) {
       alert('No recordings to save. Please record at least one page.');
@@ -481,6 +565,7 @@ export default function StoryViewerPage() {
         // Clear recordings
         pageRecordings.forEach(rec => URL.revokeObjectURL(rec.url));
         setPageRecordings(new Map());
+        setSavedPages(new Set());
       } else {
         console.error('Audio upload failed:', data);
         alert(`❌ Audio upload failed: ${data.error || 'Unknown error'}`);
@@ -1576,13 +1661,17 @@ export default function StoryViewerPage() {
                     <h3 className="text-base font-bold text-gray-900">🎙️ Recording Mode</h3>
                   </div>
                   <p className="text-xs text-gray-600 ml-5">
-                    {pageRecordings.size} of {allPages.length} pages recorded
+                    <span className="text-green-600 font-semibold">{savedPages.size} saved</span>
+                    {pageRecordings.size > savedPages.size && (
+                      <span className="text-yellow-600 font-semibold">, {pageRecordings.size - savedPages.size} recorded</span>
+                    )}
+                    <span className="text-gray-500">, {allPages.length - pageRecordings.size} remaining</span>
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={handleSaveAllRecordings}
-                    disabled={uploadingAudio || pageRecordings.size === 0}
+                    onClick={handleSaveCurrentPage}
+                    disabled={uploadingAudio || !pageRecordings.has(currentSceneIndex)}
                     className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-4 py-1.5 rounded-lg hover:from-green-700 hover:to-blue-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                   >
                     {uploadingAudio ? (
@@ -1590,6 +1679,8 @@ export default function StoryViewerPage() {
                         <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                         Saving...
                       </span>
+                    ) : currentSceneIndex === allPages.length - 1 ? (
+                      'Save & Finish'
                     ) : (
                       'Save & Continue'
                     )}
@@ -1615,8 +1706,17 @@ export default function StoryViewerPage() {
                   // Has recording - show preview controls
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-2 mb-3">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-green-700 font-semibold text-sm">Recorded ({formatTime(pageRecordings.get(currentSceneIndex)!.duration)})</span>
+                      {savedPages.has(currentSceneIndex) ? (
+                        <>
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-green-700 font-semibold text-sm">✅ Saved ({formatTime(pageRecordings.get(currentSceneIndex)!.duration)})</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                          <span className="text-yellow-700 font-semibold text-sm">🟡 Recorded ({formatTime(pageRecordings.get(currentSceneIndex)!.duration)}) - Not saved yet</span>
+                        </>
+                      )}
                     </div>
                     <div className="flex flex-col gap-2">
                       <button
