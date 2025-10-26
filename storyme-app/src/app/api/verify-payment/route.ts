@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
 
     // If payment is complete but database not updated, update it now (webhook may be delayed)
     if (isPaymentComplete && userData && userData.subscription_tier !== subscriptionTier) {
-      console.log(`Payment verified but database not updated. Updating user ${user.id} to tier: ${subscriptionTier}`);
+      console.log(`[VERIFY-PAYMENT] Payment verified but database not updated. Updating user ${user.id} to tier: ${subscriptionTier}`);
 
       // Determine stories limit
       let storiesLimit = 5;
@@ -80,13 +80,13 @@ export async function GET(request: NextRequest) {
       if (subscriptionTier === 'premium' || subscriptionTier === 'team') storiesLimit = -1;
 
       // Update database immediately
-      await supabase
+      const { error: updateError } = await supabase
         .from('users')
         .update({
           subscription_tier: subscriptionTier,
           subscription_status: subscriptionStatus,
           stories_limit: storiesLimit,
-          stripe_subscription_id: session.subscription.id,
+          stripe_subscription_id: typeof session.subscription === 'object' ? session.subscription.id : session.subscription,
           stripe_customer_id: session.customer as string,
           billing_cycle_start: new Date().toISOString(),
           stories_created_this_month: 0, // Reset count on new subscription
@@ -94,7 +94,12 @@ export async function GET(request: NextRequest) {
         })
         .eq('id', user.id);
 
-      console.log(`Database updated successfully for user ${user.id}`);
+      if (updateError) {
+        console.error(`[VERIFY-PAYMENT] Failed to update user ${user.id}:`, updateError);
+        // Don't throw - still return status even if update failed
+      } else {
+        console.log(`[VERIFY-PAYMENT] Database updated successfully for user ${user.id}`);
+      }
     }
 
     // Return comprehensive status
