@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
@@ -41,12 +41,21 @@ export default function StoryViewerPage() {
   const [hasQuiz, setHasQuiz] = useState(false);
   const [generatingQuiz, setGeneratingQuiz] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
+
+  // Recording mode state
   const [recordingMode, setRecordingMode] = useState(false);
-  const [recordingPages, setRecordingPages] = useState<RecordingPage[]>([]);
   const [uploadingAudio, setUploadingAudio] = useState(false);
-  const [currentRecording, setCurrentRecording] = useState<Blob | null>(null);
+  const [pageRecordings, setPageRecordings] = useState<Map<number, { blob: Blob; url: string; duration: number }>>(new Map());
   const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
+  const [recordingChunks, setRecordingChunks] = useState<Blob[]>([]);
+  const audioPreviewRef = useRef<HTMLAudioElement>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number>(0);
 
   useEffect(() => {
     const loadData = async () => {
@@ -185,10 +194,257 @@ export default function StoryViewerPage() {
 
   const handleExitRecordingMode = () => {
     console.log('🎙️ Exiting recording mode...');
+
+    // Stop recording if active
+    if (isRecording && mediaRecorder) {
+      mediaRecorder.stop();
+    }
+
+    // Stop preview if playing
+    if (audioPreviewRef.current) {
+      audioPreviewRef.current.pause();
+    }
+
+    // Clear timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    // Stop audio stream
+    if (audioStream) {
+      audioStream.getTracks().forEach(track => track.stop());
+    }
+
     setRecordingMode(false);
     setIsRecording(false);
-    setCurrentRecording(null);
+    setIsPaused(false);
     setRecordingTime(0);
+    setIsPlaying(false);
+  };
+
+  // Request microphone access
+  const requestMicrophoneAccess = async () => {
+    try {
+      if (!window.isSecureContext) {
+        alert('❌ Audio recording requires HTTPS or localhost.\n\nPlease access via:\n• https://story-me-ai.vercel.app (production)\n• http://localhost:3001 (dev)');
+        return null;
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('❌ Audio recording is not supported in your browser.\n\nPlease update to the latest version of Chrome, Firefox, Safari, or Edge.');
+        return null;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setAudioStream(stream);
+      return stream;
+    } catch (error: any) {
+      console.error('Microphone access error:', error);
+      if (error.name === 'NotAllowedError') {
+        alert('❌ Microphone access denied.\n\nPlease allow microphone access in your browser settings.');
+      } else if (error.name === 'NotFoundError') {
+        alert('❌ No microphone found.\n\nPlease connect a microphone and try again.');
+      } else {
+        alert(`❌ Failed to access microphone: ${error.message}`);
+      }
+      return null;
+    }
+  };
+
+  // Start recording for current page
+  const startRecording = async () => {
+    let stream = audioStream;
+    if (!stream) {
+      stream = await requestMicrophoneAccess();
+      if (!stream) return;
+    }
+
+    try {
+      const recorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus',
+        audioBitsPerSecond: 128000,
+      });
+
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        const duration = recordingTime;
+
+        // Save recording for current page
+        const newRecordings = new Map(pageRecordings);
+        newRecordings.set(currentSceneIndex, { blob, url, duration });
+        setPageRecordings(newRecordings);
+
+        console.log(`✅ Recorded page ${currentSceneIndex + 1} - ${duration}s`);
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setRecordingChunks(chunks);
+      setIsRecording(true);
+      setIsPaused(false);
+      setRecordingTime(0);
+      startTimeRef.current = Date.now();
+
+      // Start timer
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => {
+          const newTime = prev + 1;
+          // Auto-stop at 60 seconds
+          if (newTime >= 60) {
+            stopRecording();
+          }
+          return newTime;
+        });
+      }, 1000);
+    } catch (error) {
+      console.error('Recording start error:', error);
+      alert('Failed to start recording. Please try again.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    setIsRecording(false);
+    setIsPaused(false);
+  };
+
+  const pauseRecording = () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.pause();
+      setIsPaused(true);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    }
+  };
+
+  const resumeRecording = () => {
+    if (mediaRecorder && mediaRecorder.state === 'paused') {
+      mediaRecorder.resume();
+      setIsPaused(false);
+
+      // Resume timer
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => {
+          const newTime = prev + 1;
+          if (newTime >= 60) {
+            stopRecording();
+          }
+          return newTime;
+        });
+      }, 1000);
+    }
+  };
+
+  const deleteRecording = () => {
+    const newRecordings = new Map(pageRecordings);
+    const recording = newRecordings.get(currentSceneIndex);
+    if (recording) {
+      URL.revokeObjectURL(recording.url);
+      newRecordings.delete(currentSceneIndex);
+      setPageRecordings(newRecordings);
+    }
+  };
+
+  const playRecording = () => {
+    const recording = pageRecordings.get(currentSceneIndex);
+    if (recording && audioPreviewRef.current) {
+      audioPreviewRef.current.src = recording.url;
+      audioPreviewRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
+  const stopPreview = () => {
+    if (audioPreviewRef.current) {
+      audioPreviewRef.current.pause();
+      audioPreviewRef.current.currentTime = 0;
+    }
+    setIsPlaying(false);
+  };
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleSaveAllRecordings = async () => {
+    if (pageRecordings.size === 0) {
+      alert('No recordings to save. Please record at least one page.');
+      return;
+    }
+
+    setUploadingAudio(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('projectId', projectId);
+      formData.append('language', 'en');
+      formData.append('voiceProfileName', `${user?.name || 'User'}'s Voice`);
+
+      const metadata: any[] = [];
+      const recordings = Array.from(pageRecordings.entries());
+
+      recordings.forEach(([pageIndex, recording]) => {
+        const page = allPages[pageIndex];
+
+        metadata.push({
+          pageNumber: pageIndex + 1,
+          pageType: page.type,
+          sceneId: page.type === 'scene' ? page.scene?.id : undefined,
+          quizQuestionId: page.type === 'quiz_question' ? page.question?.id : undefined,
+          textContent: page.type === 'cover' ? `${page.title}` :
+                      page.type === 'scene' ? page.scene?.description :
+                      page.type === 'quiz_question' ? page.question?.question : '',
+          duration: recording.duration,
+        });
+
+        formData.append(`audio_${pageIndex + 1}`, recording.blob, `page-${pageIndex + 1}.webm`);
+      });
+
+      formData.append('audioMetadata', JSON.stringify(metadata));
+
+      const response = await fetch('/api/upload-user-audio', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert(`✅ Audio uploaded successfully!\n\n${data.successfulPages} of ${recordings.length} pages uploaded.`);
+        setHasAudio(true);
+        await checkAudioExists();
+        handleExitRecordingMode();
+
+        // Clear recordings
+        pageRecordings.forEach(rec => URL.revokeObjectURL(rec.url));
+        setPageRecordings(new Map());
+      } else {
+        console.error('Audio upload failed:', data);
+        alert(`❌ Audio upload failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Audio upload error:', error);
+      alert(`❌ Error uploading audio: ${error.message || 'Unknown error'}`);
+    } finally {
+      setUploadingAudio(false);
+    }
   };
 
   const handleUploadRecordings = async (recordings: any[]) => {
@@ -1238,39 +1494,149 @@ export default function StoryViewerPage() {
 
       {/* Recording Mode Overlay - Shows recording controls over the story viewer */}
       {recordingMode && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center p-4">
-          <div className="bg-white rounded-t-2xl shadow-2xl w-full max-w-4xl p-6 animate-slide-up">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">🎙️ Recording Mode</h3>
-                <p className="text-sm text-gray-600">Navigate pages and record audio for each</p>
-              </div>
-              <button
-                onClick={handleExitRecordingMode}
-                className="text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+        <>
+          {/* Hidden audio element for preview */}
+          <audio
+            ref={audioPreviewRef}
+            onEnded={() => setIsPlaying(false)}
+            onPause={() => setIsPlaying(false)}
+          />
 
-            <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6">
-              <div className="text-center">
-                <button
-                  onClick={() => {/* TODO: Implement recording */}}
-                  className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-8 py-4 rounded-full hover:from-red-600 hover:to-pink-600 font-semibold shadow-lg transition-all transform hover:scale-105 flex items-center gap-3 mx-auto"
-                >
-                  <div className="w-4 h-4 bg-white rounded-full"></div>
-                  <span className="text-lg">Start Recording for Page {currentSceneIndex + 1}</span>
-                </button>
-                <p className="text-sm text-gray-600 mt-4">
-                  Use the navigation arrows or dots to move between pages
-                </p>
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center p-4">
+            <div className="bg-white rounded-t-2xl shadow-2xl w-full max-w-4xl p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">🎙️ Recording Mode</h3>
+                  <p className="text-sm text-gray-600">
+                    {pageRecordings.size} of {allPages.length} pages recorded
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSaveAllRecordings}
+                    disabled={uploadingAudio || pageRecordings.size === 0}
+                    className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-6 py-2 rounded-xl hover:from-green-700 hover:to-blue-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    {uploadingAudio ? (
+                      <span className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Saving...
+                      </span>
+                    ) : (
+                      'Save & Continue'
+                    )}
+                  </button>
+                  <button
+                    onClick={handleExitRecordingMode}
+                    className="text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Recording Controls */}
+              <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6">
+                <div className="mb-4 text-center">
+                  <span className="text-sm font-semibold text-gray-700">Page {currentSceneIndex + 1} of {allPages.length}</span>
+                </div>
+
+                {pageRecordings.has(currentSceneIndex) ? (
+                  // Has recording - show preview controls
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-4">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span className="text-green-700 font-semibold">Recorded ({formatTime(pageRecordings.get(currentSceneIndex)!.duration)})</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-4">
+                      <button
+                        onClick={isPlaying ? stopPreview : playRecording}
+                        className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-semibold shadow-lg transition-all"
+                      >
+                        {isPlaying ? '⏹️ Stop' : '▶️ Play'}
+                      </button>
+                      <button
+                        onClick={deleteRecording}
+                        className="bg-red-600 text-white px-6 py-3 rounded-xl hover:bg-red-700 font-semibold shadow-lg transition-all"
+                      >
+                        🗑️ Delete & Re-record
+                      </button>
+                    </div>
+                  </div>
+                ) : !isRecording ? (
+                  // No recording - show start button
+                  <div className="text-center">
+                    <button
+                      onClick={startRecording}
+                      className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-8 py-4 rounded-full hover:from-red-600 hover:to-pink-600 font-semibold shadow-lg transition-all transform hover:scale-105 flex items-center gap-3 mx-auto"
+                    >
+                      <div className="w-4 h-4 bg-white rounded-full"></div>
+                      <span className="text-lg">Start Recording</span>
+                    </button>
+                    <p className="text-sm text-gray-600 mt-4">
+                      Use navigation arrows to switch pages • Max 60s per page
+                    </p>
+                  </div>
+                ) : (
+                  // Recording in progress
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-4 mb-4">
+                      <div className="flex gap-1">
+                        {[...Array(3)].map((_, i) => (
+                          <div
+                            key={i}
+                            className="w-2 h-8 bg-red-500 rounded-full animate-pulse"
+                            style={{ animationDelay: `${i * 0.15}s` }}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-2xl font-bold text-gray-900">
+                        {formatTime(recordingTime)}
+                      </span>
+                      <span className="text-sm text-gray-600">/ 60s</span>
+                    </div>
+
+                    <div className="w-full max-w-md mx-auto mb-6">
+                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-red-500 to-pink-500 transition-all"
+                          style={{ width: `${(recordingTime / 60) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-4">
+                      {!isPaused ? (
+                        <button
+                          onClick={pauseRecording}
+                          className="bg-yellow-500 text-white px-6 py-3 rounded-xl hover:bg-yellow-600 font-semibold shadow-lg transition-all"
+                        >
+                          ⏸️ Pause
+                        </button>
+                      ) : (
+                        <button
+                          onClick={resumeRecording}
+                          className="bg-green-500 text-white px-6 py-3 rounded-xl hover:bg-green-600 font-semibold shadow-lg transition-all"
+                        >
+                          ▶️ Resume
+                        </button>
+                      )}
+                      <button
+                        onClick={stopRecording}
+                        className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-semibold shadow-lg transition-all"
+                      >
+                        ⏹️ Stop & Save
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </>
   );
