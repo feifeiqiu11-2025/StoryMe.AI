@@ -180,13 +180,21 @@ export default function StoryViewerPage() {
     // Build recording pages
     const pages: RecordingPage[] = [];
 
+    // Debug: Log project data to see what we have
+    console.log('📚 Project data for recording:', project);
+    console.log('📚 Project scenes:', project.scenes);
+
     // Page 1: Cover page
-    const coverImageUrl = project.scenes[0]?.imageUrl || '/api/placeholder/1024/1024';
+    // Use the actual cover image URL from the project, or first scene's first image
+    const firstSceneImage = project.scenes[0]?.images?.[0]?.imageUrl;
+    const coverImageUrl = project.cover_image_url || firstSceneImage || '';
     const coverText = project.author_name && project.author_age
       ? `${project.title}, by ${project.author_name}, age ${project.author_age}`
       : project.author_name
       ? `${project.title}, by ${project.author_name}`
       : project.title;
+
+    console.log('🖼️ Cover image URL:', coverImageUrl);
 
     pages.push({
       pageNumber: 1,
@@ -197,11 +205,15 @@ export default function StoryViewerPage() {
 
     // Pages 2+: Scene pages
     project.scenes.forEach((scene: any, index: number) => {
+      // Get the first image from the scene's images array
+      const sceneImageUrl = scene.images?.[0]?.imageUrl || '';
+      console.log(`🖼️ Scene ${index + 1} image:`, sceneImageUrl);
+
       pages.push({
         pageNumber: index + 2,
         pageType: 'scene',
-        imageUrl: scene.imageUrl || '/api/placeholder/1024/1024',
-        textContent: scene.caption || scene.description,
+        imageUrl: sceneImageUrl,
+        textContent: scene.caption || scene.description || '',
         sceneId: scene.id,
       });
     });
