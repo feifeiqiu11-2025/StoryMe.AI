@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
       // English: Include title in AI prompt (AI generates the title text artistically)
       coverDescription = `Children's storybook cover illustration with title "${title}" prominently displayed at the top. ${description ? description + '. ' : ''}Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Beautiful typography for the title, clean composition with space at bottom for author credits. Book cover style illustration`;
     } else {
-      // Chinese: NO TEXT (prevents random Chinese characters, we'll overlay programmatically)
-      coverDescription = `Children's storybook cover illustration. ${description ? description + '. ' : ''}Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Clean composition with clear space at top for title and bottom for credits. Book cover style illustration. NO TEXT, NO LETTERS, NO WORDS, NO CHINESE CHARACTERS on the image - clean visual only`;
+      // Chinese: NO TEXT AT ALL (prevents random Chinese characters, we'll overlay programmatically)
+      coverDescription = `Children's storybook cover illustration WITHOUT ANY TEXT WHATSOEVER. ${description ? description + '. ' : ''}Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Clean composition with clear space at top for title and bottom for credits. Book cover style illustration. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO CHINESE CHARACTERS, NO NUMBERS, NO SYMBOLS on the image - ONLY pure visual illustration with NO text elements at all`;
     }
 
     // Convert relative URLs to absolute URLs for Fal.ai

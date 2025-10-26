@@ -60,10 +60,10 @@ async function overlayEnglishCover(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
-    // Calculate font sizes
-    const baseFontSize = Math.floor(image.width / 15);
-    const authorFontSize = Math.floor(baseFontSize * 0.4);
-    const copyrightFontSize = Math.floor(baseFontSize * 0.3);
+    // Calculate font sizes - LARGER for better visibility
+    const baseFontSize = Math.floor(image.width / 8); // Increased from /15 to /8 to match Chinese
+    const authorFontSize = Math.floor(baseFontSize * 0.6); // Increased from 0.4 to 0.6
+    const copyrightFontSize = Math.floor(baseFontSize * 0.45); // Increased from 0.3 to 0.45
     const fontFamily = 'Georgia, serif';
 
     // Draw author at bottom (if provided)
@@ -124,12 +124,15 @@ async function overlayChineseCover(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
-    // Calculate font sizes
-    const baseFontSize = Math.floor(image.width / 15);
-    const titleFontSize = baseFontSize;
-    const authorFontSize = Math.floor(baseFontSize * 0.4);
-    const copyrightFontSize = Math.floor(baseFontSize * 0.3);
-    const fontFamily = 'Noto Sans SC, WenQuanYi Micro Hei, Microsoft YaHei, sans-serif';
+    // Calculate font sizes - MUCH LARGER for better visibility
+    const baseFontSize = Math.floor(image.width / 8); // Increased from /15 to /8
+    const titleFontSize = Math.floor(baseFontSize * 1.2); // Title even bigger
+    const authorFontSize = Math.floor(baseFontSize * 0.6); // Increased from 0.4 to 0.6
+    const copyrightFontSize = Math.floor(baseFontSize * 0.45); // Increased from 0.3 to 0.45
+
+    // Use system fonts that work on server-side canvas
+    // Note: We use 'sans-serif' as fallback which will use system default fonts
+    const fontFamily = 'sans-serif';
 
     // Draw title at top (centered, 15% from top)
     const titleY = image.height * 0.15;
