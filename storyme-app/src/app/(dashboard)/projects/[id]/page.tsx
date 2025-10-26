@@ -1569,13 +1569,13 @@ export default function StoryViewerPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <div className="flex flex-col gap-0.5">
-                      <div className="w-4 h-0.5 bg-gray-400 rounded"></div>
-                      <div className="w-4 h-0.5 bg-gray-400 rounded"></div>
-                      <div className="w-4 h-0.5 bg-gray-400 rounded"></div>
+                      <div className="w-3 h-0.5 bg-gray-400 rounded"></div>
+                      <div className="w-3 h-0.5 bg-gray-400 rounded"></div>
+                      <div className="w-3 h-0.5 bg-gray-400 rounded"></div>
                     </div>
-                    <h3 className="text-xl font-bold text-gray-900">🎙️ Recording Mode</h3>
+                    <h3 className="text-base font-bold text-gray-900">🎙️ Recording Mode</h3>
                   </div>
-                  <p className="text-sm text-gray-600 ml-6">
+                  <p className="text-xs text-gray-600 ml-5">
                     {pageRecordings.size} of {allPages.length} pages recorded
                   </p>
                 </div>
@@ -1583,11 +1583,11 @@ export default function StoryViewerPage() {
                   <button
                     onClick={handleSaveAllRecordings}
                     disabled={uploadingAudio || pageRecordings.size === 0}
-                    className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-6 py-2 rounded-xl hover:from-green-700 hover:to-blue-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-4 py-1.5 rounded-lg hover:from-green-700 hover:to-blue-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                   >
                     {uploadingAudio ? (
-                      <span className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span className="flex items-center gap-1.5">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                         Saving...
                       </span>
                     ) : (
