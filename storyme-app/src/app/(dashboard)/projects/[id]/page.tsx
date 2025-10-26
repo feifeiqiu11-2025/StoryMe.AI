@@ -597,14 +597,24 @@ export default function StoryViewerPage() {
 
   const scenes = project.scenes || [];
 
-  // Build combined pages array: scenes + quiz
+  // Build combined pages array: cover + scenes + quiz
   const allPages = [
+    // Cover page (first page)
+    {
+      type: 'cover',
+      title: project.title,
+      author: project.authorName,
+      age: project.authorAge,
+      coverImageUrl: project.coverImageUrl,
+    },
+    // Scene pages
     ...scenes.map((scene: any, index: number) => ({
       type: 'scene',
       sceneIndex: index,
       scene: scene,
       image: scene.images?.[0],
     })),
+    // Quiz pages (if any)
     ...(quizQuestions.length > 0 ? [
       {
         type: 'quiz_transition',
@@ -651,7 +661,21 @@ export default function StoryViewerPage() {
             {/* Page Display with Overlay Controls */}
             <div className="bg-white rounded-2xl shadow-2xl overflow-hidden relative">
               {/* Content Area */}
-              {currentPage?.type === 'scene' && currentPage.image?.imageUrl ? (
+              {currentPage?.type === 'cover' ? (
+                <div className="aspect-video bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
+                  {currentPage.coverImageUrl ? (
+                    <img
+                      src={currentPage.coverImageUrl}
+                      alt="Story cover"
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-8xl">📖</span>
+                    </div>
+                  )}
+                </div>
+              ) : currentPage?.type === 'scene' && currentPage.image?.imageUrl ? (
                 <div className="aspect-video bg-gradient-to-br from-blue-100 to-purple-100">
                   <img
                     src={currentPage.image.imageUrl}
