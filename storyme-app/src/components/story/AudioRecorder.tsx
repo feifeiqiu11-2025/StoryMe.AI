@@ -81,34 +81,42 @@ export default function AudioRecorder({
 
   const requestMicPermission = async () => {
     try {
-      // Check if MediaDevices API is supported
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        console.error('MediaDevices API not supported in this browser');
-        alert('❌ Audio recording is not supported in your browser. Please use Chrome, Firefox, Safari, or Edge.');
-        setMicPermissionDenied(true);
-        return;
-      }
-
-      // Check if running in secure context (HTTPS or localhost)
+      // Check if running in secure context FIRST (HTTPS or localhost)
+      // This is the most common issue - browsers hide navigator.mediaDevices in insecure contexts
       if (!window.isSecureContext) {
         console.error('Not a secure context - HTTPS required for microphone access');
-        alert('❌ Audio recording requires a secure connection (HTTPS). Please access the site via HTTPS.');
+        console.log('Current URL:', window.location.href);
+        alert('❌ Audio recording requires HTTPS or localhost.\n\nYou are currently on: ' + window.location.hostname + '\n\nPlease access via:\n• https://story-me-ai.vercel.app (production)\n• http://localhost:3001 (dev)');
         setMicPermissionDenied(true);
         return;
       }
 
+      // Check if MediaDevices API is supported (after secure context check)
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('MediaDevices API not supported');
+        console.log('navigator.mediaDevices:', navigator.mediaDevices);
+        console.log('User Agent:', navigator.userAgent);
+        alert('❌ Audio recording is not supported in your browser.\n\nPlease update to the latest version of Chrome, Firefox, Safari, or Edge.');
+        setMicPermissionDenied(true);
+        return;
+      }
+
+      console.log('✅ Requesting microphone permission...');
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       setMicPermissionDenied(false);
+      console.log('✅ Microphone access granted');
     } catch (error: any) {
       console.error('Microphone permission error:', error);
+      console.log('Error name:', error.name);
+      console.log('Error message:', error.message);
 
       if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-        alert('❌ Microphone access denied. Please allow microphone access in your browser settings.');
+        alert('❌ Microphone access denied.\n\nPlease click the microphone icon in your browser\'s address bar and allow access, then try again.');
       } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-        alert('❌ No microphone found. Please connect a microphone and try again.');
+        alert('❌ No microphone found.\n\nPlease connect a microphone device and try again.');
       } else {
-        alert(`❌ Failed to access microphone: ${error.message || 'Unknown error'}`);
+        alert(`❌ Failed to access microphone.\n\nError: ${error.message || 'Unknown error'}\n\nPlease check your browser settings.`);
       }
 
       setMicPermissionDenied(true);
