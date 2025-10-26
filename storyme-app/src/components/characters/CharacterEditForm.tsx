@@ -175,7 +175,7 @@ export default function CharacterEditForm({ character }: CharacterEditFormProps)
             <img
               src={imagePreview}
               alt="Preview"
-              className="w-full h-64 object-cover rounded-lg"
+              className="w-full h-64 object-contain rounded-lg bg-gray-50"
             />
             <button
               type="button"

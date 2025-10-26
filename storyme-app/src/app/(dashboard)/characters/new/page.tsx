@@ -245,7 +245,7 @@ export default function NewCharacterPage() {
               <img
                 src={imagePreview}
                 alt="Preview"
-                className="w-full h-64 object-cover rounded-lg"
+                className="w-full h-64 object-contain rounded-lg bg-gray-50"
               />
               {isAnalyzing && (
                 <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-lg">
