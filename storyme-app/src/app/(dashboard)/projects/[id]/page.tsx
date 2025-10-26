@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeViewer';
+import AudioRecorder, { RecordingPage } from '@/components/story/AudioRecorder';
 import Tooltip from '@/components/ui/Tooltip';
 
 export default function StoryViewerPage() {
@@ -41,6 +42,9 @@ export default function StoryViewerPage() {
   const [hasQuiz, setHasQuiz] = useState(false);
   const [generatingQuiz, setGeneratingQuiz] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
+  const [showRecorder, setShowRecorder] = useState(false);
+  const [recordingPages, setRecordingPages] = useState<RecordingPage[]>([]);
+  const [uploadingAudio, setUploadingAudio] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -164,6 +168,102 @@ export default function StoryViewerPage() {
       alert(`❌ Error generating audio: ${error.message || 'Unknown error'}`);
     } finally {
       setGeneratingAudio(false);
+    }
+  };
+
+  const handleRecordAudio = async () => {
+    if (!project || !project.scenes || project.scenes.length === 0) {
+      alert('No scenes available to record audio');
+      return;
+    }
+
+    // Build recording pages
+    const pages: RecordingPage[] = [];
+
+    // Page 1: Cover page
+    const coverImageUrl = project.scenes[0]?.imageUrl || '/api/placeholder/1024/1024';
+    const coverText = project.author_name && project.author_age
+      ? `${project.title}, by ${project.author_name}, age ${project.author_age}`
+      : project.author_name
+      ? `${project.title}, by ${project.author_name}`
+      : project.title;
+
+    pages.push({
+      pageNumber: 1,
+      pageType: 'cover',
+      imageUrl: coverImageUrl,
+      textContent: coverText,
+    });
+
+    // Pages 2+: Scene pages
+    project.scenes.forEach((scene: any, index: number) => {
+      pages.push({
+        pageNumber: index + 2,
+        pageType: 'scene',
+        imageUrl: scene.imageUrl || '/api/placeholder/1024/1024',
+        textContent: scene.caption || scene.description,
+        sceneId: scene.id,
+      });
+    });
+
+    setRecordingPages(pages);
+    setShowRecorder(true);
+  };
+
+  const handleUploadRecordings = async (recordings: any[]) => {
+    setUploadingAudio(true);
+
+    try {
+      console.log(`🎙️ Uploading ${recordings.length} audio recordings...`);
+
+      // Prepare form data
+      const formData = new FormData();
+      formData.append('projectId', projectId);
+      formData.append('language', 'en'); // TODO: Support multi-language
+      formData.append('voiceProfileName', `${user?.name || 'User'}'s Voice`);
+
+      // Build metadata array
+      const metadata = recordings.map((rec, index) => {
+        const page = recordingPages.find(p => p.pageNumber === rec.pageNumber);
+        return {
+          pageNumber: rec.pageNumber,
+          pageType: page?.pageType || 'scene',
+          sceneId: page?.sceneId,
+          quizQuestionId: page?.quizQuestionId,
+          textContent: page?.textContent || '',
+          duration: rec.duration,
+        };
+      });
+
+      formData.append('audioMetadata', JSON.stringify(metadata));
+
+      // Append audio files
+      recordings.forEach((rec) => {
+        formData.append(`audio_${rec.pageNumber}`, rec.audioBlob, `page-${rec.pageNumber}.webm`);
+      });
+
+      // Upload to API
+      const response = await fetch('/api/upload-user-audio', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert(`✅ Audio uploaded successfully!\n\n${data.successfulPages} of ${recordings.length} pages uploaded.`);
+        setHasAudio(true);
+        await checkAudioExists();
+        setShowRecorder(false);
+      } else {
+        console.error('Audio upload failed:', data);
+        alert(`❌ Audio upload failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Audio upload error:', error);
+      alert(`❌ Error uploading audio: ${error.message || 'Unknown error'}`);
+    } finally {
+      setUploadingAudio(false);
     }
   };
 
@@ -852,6 +952,27 @@ export default function StoryViewerPage() {
                     </button>
                   </Tooltip>
 
+                  {/* Record Your Voice */}
+                  <Tooltip text="Record your own voice narration for this story">
+                    <button
+                      onClick={handleRecordAudio}
+                      disabled={uploadingAudio}
+                      className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg hover:from-red-600 hover:to-pink-600 font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {uploadingAudio ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🎙️</span>
+                          <span>Record Audio</span>
+                        </>
+                      )}
+                    </button>
+                  </Tooltip>
+
                   {/* Generate Quiz */}
                   <Tooltip text={hasQuiz ? `Quiz ready (${quizQuestions.length} questions). Click to regenerate.` : "Generate quiz questions with AI"}>
                     <button
@@ -1132,6 +1253,17 @@ export default function StoryViewerPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Audio Recorder Modal */}
+      {showRecorder && (
+        <AudioRecorder
+          projectId={projectId}
+          projectTitle={project?.title || 'Story'}
+          pages={recordingPages}
+          onComplete={handleUploadRecordings}
+          onExit={() => setShowRecorder(false)}
+        />
       )}
     </>
   );
