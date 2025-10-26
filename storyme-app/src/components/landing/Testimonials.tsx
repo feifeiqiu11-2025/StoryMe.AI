@@ -127,23 +127,6 @@ export default function Testimonials() {
             ))}
           </div>
         )}
-
-        {/* Call to Action */}
-        {testimonials.length > 0 && (
-          <div className="text-center mt-8">
-            <div className="inline-block bg-blue-50 rounded-2xl px-6 py-4 border-2 border-blue-200">
-              <p className="text-gray-700 mb-3">
-                Join thousands of parents creating magical stories!
-              </p>
-              <a
-                href="/signup"
-                className="inline-block px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
-              >
-                Start Your Free Trial
-              </a>
-            </div>
-          </div>
-        )}
       </div>
     </section>
   );

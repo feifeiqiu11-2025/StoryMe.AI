@@ -43,6 +43,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
                 Dashboard
               </Link>
               <Link
+                href="/create"
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+              >
+                Create Story
+              </Link>
+              <Link
                 href="/characters"
                 className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
               >
@@ -53,12 +59,6 @@ export default async function DashboardLayout({ children }: { children: ReactNod
                 className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
               >
                 My Stories
-              </Link>
-              <Link
-                href="/create"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
-              >
-                Create Story
               </Link>
               <Link
                 href="/community-stories"

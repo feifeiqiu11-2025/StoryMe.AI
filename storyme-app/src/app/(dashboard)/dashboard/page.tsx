@@ -110,23 +110,6 @@ export default function DashboardPage() {
             </div>
           </Link>
 
-          {/* My Stories */}
-          <Link
-            href="/projects"
-            className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-8 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-indigo-200 hover:border-indigo-300"
-          >
-            <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform shadow-md">
-              📚
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">My Stories</h3>
-            <p className="text-gray-700 text-sm mb-4">
-              Browse and manage all your storybooks
-            </p>
-            <div className="flex items-center gap-2 text-indigo-600 font-semibold group-hover:gap-3 transition-all text-sm">
-              View Stories →
-            </div>
-          </Link>
-
           {/* Character Library */}
           <Link
             href="/characters"
@@ -141,6 +124,23 @@ export default function DashboardPage() {
             </p>
             <div className="flex items-center gap-2 text-purple-600 font-semibold group-hover:gap-3 transition-all text-sm">
               Manage Characters →
+            </div>
+          </Link>
+
+          {/* My Stories */}
+          <Link
+            href="/projects"
+            className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-8 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-indigo-200 hover:border-indigo-300"
+          >
+            <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform shadow-md">
+              📚
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">My Stories</h3>
+            <p className="text-gray-700 text-sm mb-4">
+              Browse and manage all your storybooks
+            </p>
+            <div className="flex items-center gap-2 text-indigo-600 font-semibold group-hover:gap-3 transition-all text-sm">
+              View Stories →
             </div>
           </Link>
 

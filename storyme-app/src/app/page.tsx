@@ -112,6 +112,15 @@ export default function HomePage() {
                 <p className="font-medium text-gray-800">
                   Our mission is to nurture curiosity, imagination, and bilingual learning through stories that grow with them — wherever they read, listen, and learn. 🌱
                 </p>
+                <div className="mt-6 text-center sm:text-left">
+                  <a
+                    href="#founder-letter"
+                    className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold transition-colors group"
+                  >
+                    Read the Founder's Letter
+                    <span className="transform group-hover:translate-x-1 transition-transform">→</span>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -391,7 +400,7 @@ export default function HomePage() {
       </div>
 
       {/* A Letter from the Founder Section */}
-      <div className="max-w-6xl mx-auto px-4 pt-0 pb-12 sm:pb-16">
+      <div id="founder-letter" className="max-w-6xl mx-auto px-4 pt-0 pb-12 sm:pb-16">
 
         {/* Section Title - Outside the card */}
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-6 sm:mb-8">
@@ -562,13 +571,32 @@ export default function HomePage() {
       <Testimonials />
 
       {/* Footer */}
-      <div className="bg-gradient-to-b from-blue-50 to-white">
-        <div className="max-w-6xl mx-auto px-4 text-center py-6 text-gray-500 text-sm">
-          <p className="flex items-center justify-center gap-2">
-            Made with <span className="text-red-500 animate-pulse">❤️</span> for parents and their little storytellers
-          </p>
-          <p className="mt-2 text-xs">
-            KindleWood Studio • Beta
+      <div className="bg-gradient-to-b from-blue-50 to-white border-t border-blue-100">
+        <div className="max-w-6xl mx-auto px-4 text-center py-8 sm:py-12">
+          {/* Main CTA */}
+          <div className="mb-8">
+            <p className="text-lg sm:text-xl text-gray-700 mb-6">
+              Every great story starts with a child's imagination.
+            </p>
+            <Link
+              href="/signup"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-3 rounded-full font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"
+            >
+              Start Creating →
+            </Link>
+          </div>
+
+          {/* Footer Links */}
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm text-gray-600 mb-4">
+            <Link href="/about" className="hover:text-indigo-600 transition-colors">About</Link>
+            <Link href="/contact" className="hover:text-indigo-600 transition-colors">Contact</Link>
+            <Link href="/privacy" className="hover:text-indigo-600 transition-colors">Privacy</Link>
+            <Link href="/terms" className="hover:text-indigo-600 transition-colors">Terms</Link>
+          </div>
+
+          {/* Copyright */}
+          <p className="text-xs text-gray-500">
+            © {new Date().getFullYear()} KindleWood Studio. All rights reserved.
           </p>
         </div>
       </div>
