@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
 import { Character } from '@/lib/types/story';
+import { overlayCoverText } from '@/lib/services/cover-overlay.service';
+import { createClient } from '@/lib/supabase/server';
 
 export const maxDuration = 300; // 5 minutes timeout for Vercel
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, description, author, characters } = body;
+    const { title, description, author, age, language = 'en', characters } = body;
 
     // Validate inputs
     if (!title) {
@@ -19,9 +21,19 @@ export async function POST(request: NextRequest) {
 
     console.log(`📚 Generating cover for: "${title}"`);
     console.log(`Author: ${author || 'Unknown'}`);
+    console.log(`Age: ${age || 'N/A'}`);
+    console.log(`Language: ${language}`);
 
-    // Build the cover prompt - include title in AI image, author will be overlaid
-    const coverDescription = `Children's storybook cover illustration with the title "${title}" displayed prominently in large, clear, readable text at the top. ${description ? description + '. ' : ''}Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Include small text "KindleWood Studio" in bottom corner as copyright. Leave the bottom 15% with less busy details for author credit placement. Book cover composition with clear title text`;
+    // Build the cover prompt based on language
+    let coverDescription: string;
+
+    if (language === 'en') {
+      // English: Include title in AI prompt (AI generates the title text artistically)
+      coverDescription = `Children's storybook cover illustration with title "${title}" prominently displayed at the top. ${description ? description + '. ' : ''}Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Beautiful typography for the title, clean composition with space at bottom for author credits. Book cover style illustration`;
+    } else {
+      // Chinese: NO TEXT (prevents random Chinese characters, we'll overlay programmatically)
+      coverDescription = `Children's storybook cover illustration. ${description ? description + '. ' : ''}Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Clean composition with clear space at top for title and bottom for credits. Book cover style illustration. NO TEXT, NO LETTERS, NO WORDS, NO CHINESE CHARACTERS on the image - clean visual only`;
+    }
 
     // Convert relative URLs to absolute URLs for Fal.ai
     const baseUrl = process.env.VERCEL_URL
@@ -49,12 +61,52 @@ export async function POST(request: NextRequest) {
       emphasizeGenericCharacters: true,
     });
 
-    console.log(`✅ Cover generated successfully in ${result.generationTime}s`);
-    console.log(`Cover URL: ${result.imageUrl}`);
+    console.log(`✅ Base cover generated successfully in ${result.generationTime}s`);
+    console.log(`Base cover URL: ${result.imageUrl}`);
+
+    // Step 2: Overlay text on the cover image
+    console.log('📝 Overlaying text on cover...');
+    const coverWithText = await overlayCoverText(result.imageUrl, {
+      title,
+      author,
+      age,
+      language: language as 'en' | 'zh',
+    });
+
+    // Step 3: Upload the final cover with text to Supabase storage
+    console.log('☁️ Uploading final cover to storage...');
+    const supabase = await createClient();
+
+    // Get user (authenticated or guest)
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Use user ID if authenticated, otherwise use 'guest' folder
+    const userId = user?.id || 'guest';
+
+    const fileName = `${userId}/covers/${Date.now()}.png`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('generated-images')
+      .upload(fileName, coverWithText, {
+        contentType: 'image/png',
+        cacheControl: '3600',
+      });
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      throw new Error(`Failed to upload final cover: ${uploadError.message}`);
+    }
+
+    // Get public URL of the uploaded cover
+    const { data: urlData } = supabase.storage
+      .from('generated-images')
+      .getPublicUrl(fileName);
+
+    const finalCoverUrl = urlData.publicUrl;
+    console.log(`✅ Final cover with text uploaded: ${finalCoverUrl}`);
 
     return NextResponse.json({
       success: true,
-      imageUrl: result.imageUrl,
+      imageUrl: finalCoverUrl,
       prompt: result.prompt,
       generationTime: result.generationTime,
     });

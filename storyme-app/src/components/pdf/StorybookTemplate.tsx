@@ -6,6 +6,21 @@
 import React from 'react';
 import { Document, Page, View, Text, Image, StyleSheet, Font } from '@react-pdf/renderer';
 
+// Register Chinese fonts for PDF rendering
+Font.register({
+  family: 'Noto Sans SC',
+  fonts: [
+    {
+      src: 'https://fonts.gstatic.com/s/notosanssc/v36/k3kXo84MPvpLmixcA63oeALhL4iJ-Q7m8w.ttf',
+      fontWeight: 400,
+    },
+    {
+      src: 'https://fonts.gstatic.com/s/notosanssc/v36/k3kQo84MPvpLmixcA63oeALZJamO9yP66K4bLAxhZWI.ttf',
+      fontWeight: 700,
+    },
+  ],
+});
+
 // Define styles for PDF
 const styles = StyleSheet.create({
   page: {
@@ -23,6 +38,7 @@ const styles = StyleSheet.create({
   coverTitle: {
     fontSize: 48,
     fontWeight: 'bold',
+    fontFamily: 'Noto Sans SC',
     color: '#ffffff',
     textAlign: 'center',
     marginBottom: 30,
@@ -30,6 +46,7 @@ const styles = StyleSheet.create({
   },
   coverSubtitle: {
     fontSize: 18,
+    fontFamily: 'Noto Sans SC',
     color: '#E0E7FF',
     textAlign: 'center',
     marginBottom: 60,
@@ -37,6 +54,7 @@ const styles = StyleSheet.create({
   },
   coverTagline: {
     fontSize: 16,
+    fontFamily: 'Noto Sans SC',
     color: '#C7D2FE',
     textAlign: 'center',
     marginBottom: 30,
@@ -44,6 +62,7 @@ const styles = StyleSheet.create({
   },
   coverAuthor: {
     fontSize: 24,
+    fontFamily: 'Noto Sans SC',
     color: '#ffffff',
     textAlign: 'center',
     marginTop: 20,
@@ -51,6 +70,7 @@ const styles = StyleSheet.create({
   },
   coverDate: {
     fontSize: 12,
+    fontFamily: 'Noto Sans SC',
     color: '#C7D2FE',
     textAlign: 'center',
     marginTop: 40,
@@ -89,6 +109,7 @@ const styles = StyleSheet.create({
   },
   sceneText: {
     fontSize: 22,
+    fontFamily: 'Noto Sans SC',
     lineHeight: 2.0,
     color: '#374151',
     textAlign: 'center',
@@ -99,6 +120,7 @@ const styles = StyleSheet.create({
     bottom: 10,
     right: 10,
     fontSize: 10,
+    fontFamily: 'Noto Sans SC',
     color: '#9CA3AF',
   },
   backCoverPage: {
@@ -116,6 +138,7 @@ const styles = StyleSheet.create({
   },
   backCoverText: {
     fontSize: 56,
+    fontFamily: 'Noto Sans SC',
     color: '#ffffff',
     textAlign: 'center',
     marginBottom: 50,
@@ -124,12 +147,14 @@ const styles = StyleSheet.create({
   },
   backCoverMessage: {
     fontSize: 16,
+    fontFamily: 'Noto Sans SC',
     color: '#E9D5FF',
     textAlign: 'center',
     marginBottom: 10,
   },
   backCoverAuthor: {
     fontSize: 28,
+    fontFamily: 'Noto Sans SC',
     color: '#ffffff',
     textAlign: 'center',
     marginBottom: 50,
@@ -137,6 +162,7 @@ const styles = StyleSheet.create({
   },
   backCoverLogo: {
     fontSize: 14,
+    fontFamily: 'Noto Sans SC',
     color: '#E9D5FF',
     textAlign: 'center',
     marginTop: 50,
@@ -207,6 +233,7 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
             }}>
               <Text style={{
                 fontSize: 24,
+                fontFamily: 'Noto Sans SC',
                 color: '#4B5563',
                 textAlign: 'center',
               }}>
@@ -215,6 +242,7 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
               {createdDate && (
                 <Text style={{
                   fontSize: 14,
+                  fontFamily: 'Noto Sans SC',
                   color: '#6B7280',
                   textAlign: 'center',
                   marginTop: 5,

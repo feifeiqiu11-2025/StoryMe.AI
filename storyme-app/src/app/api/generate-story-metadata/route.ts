@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { getModelForLanguage, logModelUsage } from '@/lib/ai/deepseek-client';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -12,7 +13,7 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
-    const { script, readingLevel, storyTone, characterNames } = await request.json();
+    const { script, readingLevel, storyTone, characterNames, language = 'en' } = await request.json();
 
     if (!script) {
       return NextResponse.json(
@@ -21,10 +22,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🎨 Generating story metadata with AI...');
+    console.log(`🎨 Generating story metadata with AI (language: ${language})...`);
 
-    // Build the prompt for OpenAI
-    const prompt = `You are a creative children's book editor. Based on the following story, generate a catchy, age-appropriate title and a brief description.
+    // Get appropriate AI model for language
+    const { client, model } = getModelForLanguage(language as 'en' | 'zh');
+
+    // Build the prompt based on language
+    const prompt = language === 'zh'
+      ? `你是一位富有创意的儿童图书编辑。根据以下故事，生成一个吸引人的、适合年龄的标题和简短描述。
+
+故事详情：
+- 阅读年龄：${readingLevel || 5} 岁
+- 故事基调：${storyTone || 'playful'}
+- 角色：${characterNames?.join('、') || '未知'}
+
+故事脚本：
+${script}
+
+请生成：
+1. 一个吸引人、令人难忘的标题（3-8个字）来捕捉故事的精髓
+2. 一个简短、引人入胜的描述（1-2句话，20-40个字）来吸引家长或孩子阅读这个故事
+
+重要事项：
+- 标题要令人兴奋，适合${readingLevel}岁的孩子
+- 描述应突出主要冒险或主题
+- 保持简单有趣
+- 标题和描述中不要使用引号
+
+仅以这种确切格式的JSON对象响应：
+{"title": "建议的标题", "description": "简短的描述"}`
+      : `You are a creative children's book editor. Based on the following story, generate a catchy, age-appropriate title and a brief description.
 
 Story Details:
 - Reading Age: ${readingLevel || 5} years old
@@ -47,12 +74,16 @@ Important:
 Respond with ONLY a JSON object in this exact format:
 {"title": "The proposed title", "description": "The brief description"}`;
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const systemMessage = language === 'zh'
+      ? '你是一位富有创意的儿童图书编辑，生成吸引人的标题和描述。始终只返回有效的JSON。'
+      : 'You are a creative children\'s book editor who generates catchy titles and descriptions. Always respond with valid JSON only.';
+
+    const completion = await client.chat.completions.create({
+      model,
       messages: [
         {
           role: 'system',
-          content: 'You are a creative children\'s book editor who generates catchy titles and descriptions. Always respond with valid JSON only.',
+          content: systemMessage,
         },
         {
           role: 'user',
@@ -66,6 +97,9 @@ Respond with ONLY a JSON object in this exact format:
 
     const responseText = completion.choices[0].message.content || '';
     console.log('Raw AI response:', responseText);
+
+    // Log model usage
+    logModelUsage(language as 'en' | 'zh', model, completion.usage);
 
     // Parse the JSON response
     let metadata;

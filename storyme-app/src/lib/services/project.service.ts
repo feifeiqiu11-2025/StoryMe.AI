@@ -306,6 +306,7 @@ export class ProjectService {
       readingLevel?: number;
       storyTone?: string;
       visibility?: 'private' | 'public'; // NEW: Privacy control
+      language?: 'en' | 'zh'; // NEW: Language for the story
       characterIds: string[];
       scenes: Array<{
         sceneNumber: number;
@@ -342,6 +343,7 @@ export class ProjectService {
       reading_level: data.readingLevel,
       story_tone: data.storyTone,
       visibility: data.visibility || 'private', // DEFAULT to private for safety
+      content_language: data.language || 'en', // NEW: Language for the story
       status: 'completed',
     });
 

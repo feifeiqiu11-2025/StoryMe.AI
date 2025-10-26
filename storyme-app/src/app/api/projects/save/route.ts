@@ -54,7 +54,8 @@ export async function POST(request: NextRequest) {
       characterIds,
       scenes,
       quizData, // NEW: Optional quiz questions
-      visibility = 'private' // DEFAULT to private for safety
+      visibility = 'private', // DEFAULT to private for safety
+      language = 'en' // NEW: Language for the story (en or zh)
     } = body;
 
     // Validate required fields
@@ -172,6 +173,7 @@ export async function POST(request: NextRequest) {
       readingLevel: readingLevel,
       storyTone: storyTone,
       visibility: visibility as 'private' | 'public', // NEW: Privacy control (defaults to private)
+      language: language as 'en' | 'zh', // NEW: Language for the story
       characterIds,
       scenes,
       quizData, // NEW: Pass quiz questions if provided

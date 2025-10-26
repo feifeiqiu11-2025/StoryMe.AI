@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { getModelForLanguage, logModelUsage } from '@/lib/ai/deepseek-client';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -20,6 +21,7 @@ export async function POST(request: NextRequest) {
       difficulty = 'easy',
       questionCount = 3,
       characterNames = [],
+      language = 'en',
     } = body;
 
     if (!script || script.trim().length === 0) {
@@ -29,16 +31,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`🧠 Generating ${questionCount} ${difficulty} quiz questions...`);
+    console.log(`🧠 Generating ${questionCount} ${difficulty} quiz questions (language: ${language})...`);
 
-    // Build AI prompt
+    // Get appropriate AI model for language
+    const { client, model } = getModelForLanguage(language as 'en' | 'zh');
+
+    // Build AI prompt based on language
     const difficultyDescriptions = {
-      easy: 'very simple, suitable for ages 4-6. Focus on basic story events and main characters.',
-      medium: 'moderately challenging, suitable for ages 7-9. Include some inference and sequence questions.',
-      hard: 'more complex, suitable for ages 10-12. Include vocabulary, theme, and cause-effect questions.',
+      easy: language === 'zh'
+        ? '非常简单，适合4-6岁。关注基本的故事事件和主要角色。'
+        : 'very simple, suitable for ages 4-6. Focus on basic story events and main characters.',
+      medium: language === 'zh'
+        ? '中等挑战，适合7-9岁。包括一些推理和顺序问题。'
+        : 'moderately challenging, suitable for ages 7-9. Include some inference and sequence questions.',
+      hard: language === 'zh'
+        ? '更复杂，适合10-12岁。包括词汇、主题和因果问题。'
+        : 'more complex, suitable for ages 10-12. Include vocabulary, theme, and cause-effect questions.',
     };
 
-    const prompt = `You are a children's story comprehension quiz generator. Based on the following story, create ${questionCount} multiple-choice questions at ${difficulty} difficulty level.
+    const prompt = language === 'zh'
+      ? `你是儿童故事理解力测验生成器。根据以下故事，创建${questionCount}个${difficulty}难度级别的选择题。
+
+故事：
+${script}
+
+要求：
+- 总共${questionCount}个问题（不多不少）
+- 难度：${difficultyDescriptions[difficulty as keyof typeof difficultyDescriptions]}
+- 每个问题应该有1个正确答案和3个错误答案
+- 问题应该测试故事理解力（角色、事件、场景、情感）
+- 使用适合目标年龄组的简单语言
+- 错误答案应该看似合理但明显错误
+- 为正确答案包含简短、鼓励性的解释
+
+故事中的角色：${characterNames.join('、') || '各种角色'}
+阅读水平：${readingLevel}岁
+故事基调：${storyTone}
+
+将您的回答格式化为问题的JSON数组：
+[
+  {
+    "question": "当...时，[角色]做了什么？",
+    "option_a": "第一个答案",
+    "option_b": "第二个答案",
+    "option_c": "第三个答案",
+    "option_d": "第四个答案",
+    "correct_answer": "A",
+    "explanation": "简短解释为什么这是正确的"
+  }
+]
+
+重要提醒：
+- 只返回有效的JSON（没有markdown，没有代码块）
+- 恰好${questionCount}个问题
+- correct_answer必须是"A"、"B"、"C"或"D"`
+      : `You are a children's story comprehension quiz generator. Based on the following story, create ${questionCount} multiple-choice questions at ${difficulty} difficulty level.
 
 Story:
 ${script}
@@ -74,13 +121,17 @@ IMPORTANT:
 - Exactly ${questionCount} questions
 - correct_answer must be "A", "B", "C", or "D"`;
 
-    // Call OpenAI
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const systemMessage = language === 'zh'
+      ? '你是一个有用的助手，以有效的JSON格式生成儿童故事测验。'
+      : 'You are a helpful assistant that generates children\'s story quizzes in valid JSON format.';
+
+    // Call AI model
+    const completion = await client.chat.completions.create({
+      model,
       messages: [
         {
           role: 'system',
-          content: 'You are a helpful assistant that generates children\'s story quizzes in valid JSON format.',
+          content: systemMessage,
         },
         {
           role: 'user',
@@ -98,6 +149,9 @@ IMPORTANT:
     }
 
     console.log('📝 AI Response:', responseText.substring(0, 200) + '...');
+
+    // Log model usage
+    logModelUsage(language as 'en' | 'zh', model, completion.usage);
 
     // Parse JSON response
     let questions: any[];

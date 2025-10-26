@@ -17,6 +17,11 @@ import {
   type Character,
   type EnhancedSceneResult
 } from '@/lib/ai/scene-enhancer';
+import {
+  buildChineseEnhancementPrompt,
+  parseChineseEnhancementResponse,
+} from '@/lib/ai/scene-enhancer-chinese';
+import { getModelForLanguage, logModelUsage } from '@/lib/ai/deepseek-client';
 import { StoryTone, ExpansionLevel } from '@/lib/types/story';
 
 export const maxDuration = 60; // 1 minute timeout
@@ -24,7 +29,7 @@ export const maxDuration = 60; // 1 minute timeout
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { scenes, readingLevel, storyTone, characters, expansionLevel = 'minimal' } = body;
+    const { scenes, readingLevel, storyTone, characters, expansionLevel = 'minimal', language = 'en' } = body;
 
     // Validate inputs
     if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
@@ -67,30 +72,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`Enhancing ${scenes.length} scenes with reading level ${readingLevel}, ${storyTone} tone, and ${expansionLevel} expansion`);
+    console.log(`Enhancing ${scenes.length} scenes with reading level ${readingLevel}, ${storyTone} tone, ${expansionLevel} expansion, language: ${language}`);
 
-    // Build prompt for AI
-    const prompt = buildEnhancementPrompt(
-      scenes as SceneToEnhance[],
-      characters as Character[],
-      readingLevel,
-      storyTone as StoryTone,
-      expansionLevel as ExpansionLevel
-    );
+    // Build prompt based on language
+    const isEnglish = language === 'en';
+    const prompt = isEnglish
+      ? buildEnhancementPrompt(
+          scenes as SceneToEnhance[],
+          characters as Character[],
+          readingLevel,
+          storyTone as StoryTone,
+          expansionLevel as ExpansionLevel
+        )
+      : buildChineseEnhancementPrompt(
+          scenes as SceneToEnhance[],
+          characters as Character[],
+          readingLevel,
+          storyTone as StoryTone,
+          expansionLevel as ExpansionLevel
+        );
 
-    // Call OpenAI API
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    // Get appropriate AI model for language
+    const { client, model } = getModelForLanguage(language as 'en' | 'zh');
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+    console.log(`🤖 Using ${model} for ${language === 'zh' ? 'Chinese' : 'English'} story generation`);
+
+    const completion = await client.chat.completions.create({
+      model,
       max_tokens: 4096,
       temperature: 0.7,
       messages: [
         {
           role: 'system',
-          content: 'You are a children\'s storybook expert specializing in creating engaging, age-appropriate stories.'
+          content: language === 'zh'
+            ? '你是儿童故事书专家，专门创作引人入胜、适合年龄的中文故事。'
+            : 'You are a children\'s storybook expert specializing in creating engaging, age-appropriate stories.'
         },
         {
           role: 'user',
@@ -104,11 +120,16 @@ export async function POST(request: NextRequest) {
 
     console.log('AI Response:', responseText.substring(0, 200) + '...');
 
-    // Parse response
+    // Log model usage
+    logModelUsage(language as 'en' | 'zh', model, completion.usage);
+
+    // Parse response based on language
     let enhancedScenes: EnhancedSceneResult[];
 
     try {
-      enhancedScenes = parseEnhancementResponse(responseText, scenes);
+      enhancedScenes = language === 'zh'
+        ? parseChineseEnhancementResponse(responseText, scenes)
+        : parseEnhancementResponse(responseText, scenes);
     } catch (parseError) {
       console.error('Failed to parse AI response, using fallback:', parseError);
       enhancedScenes = createFallbackEnhancement(scenes);

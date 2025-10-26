@@ -39,6 +39,9 @@ export default function CreateStoryPage() {
   const [storyTone, setStoryTone] = useState<StoryTone>('playful');
   const [expansionLevel, setExpansionLevel] = useState<ExpansionLevel>('minimal');
 
+  // Language selection (NEW - Bilingual Support)
+  const [contentLanguage, setContentLanguage] = useState<'en' | 'zh'>('en');
+
   // Enhancement state (NEW)
   const [enhancedScenes, setEnhancedScenes] = useState<EnhancedScene[]>([]);
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -297,7 +300,7 @@ export default function CreateStoryPage() {
       const rawScenes = parseScriptIntoScenes(scriptInput, characters);
       setParsedScenes(rawScenes);
 
-      console.log(`Enhancing ${rawScenes.length} scenes with reading level ${readingLevel} and ${storyTone} tone`);
+      console.log(`Enhancing ${rawScenes.length} scenes with reading level ${readingLevel}, ${storyTone} tone, and ${contentLanguage} language`);
 
       // Call AI enhancement API
       const response = await fetch('/api/enhance-scenes', {
@@ -312,6 +315,7 @@ export default function CreateStoryPage() {
           readingLevel,
           storyTone,
           expansionLevel, // NEW: Pass expansion level to API
+          language: contentLanguage, // NEW: Pass content language (en or zh)
           characters: characters.map(c => ({
             name: c.name,
             description: Object.values(c.description).filter(Boolean).join(', ')
@@ -383,6 +387,7 @@ export default function CreateStoryPage() {
           script: scriptInput,
           readingLevel,
           storyTone,
+          language: contentLanguage, // NEW: Pass language for Chinese title generation
           characterNames: characters.map(c => c.name),
         }),
       });
@@ -423,17 +428,15 @@ export default function CreateStoryPage() {
     setSaveError('');
 
     try {
-      const authorText = authorName.trim()
-        ? (authorAge ? `By ${authorName}, age ${authorAge}` : `By ${authorName}`)
-        : '';
-
       const response = await fetch('/api/generate-cover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: saveTitle.trim(),
           description: saveDescription || '',
-          author: authorText,
+          author: authorName.trim() || undefined,
+          age: authorAge || undefined,
+          language: contentLanguage,
           characters: characters,
         }),
       });
@@ -489,6 +492,7 @@ export default function CreateStoryPage() {
           script: scriptInput,
           readingLevel,
           storyTone,
+          language: contentLanguage, // NEW: Pass language for Chinese quiz questions
           difficulty: quizDifficulty,
           questionCount: quizQuestionCount,
           characterNames: characters.map(c => c.name),
@@ -638,6 +642,7 @@ export default function CreateStoryPage() {
           originalScript: scriptInput,
           readingLevel: readingLevel, // NEW
           storyTone: storyTone,       // NEW
+          contentLanguage: contentLanguage, // NEW: Store content language (en or zh)
           characterIds: characterIds,
           scenes: scenesData,
           quizData: quizData || undefined, // Include quiz if generated
@@ -988,6 +993,95 @@ export default function CreateStoryPage() {
           </div>
         )}
 
+        {/* Step 1.5: Language Selection (NEW - Bilingual Support) */}
+        {characters.length > 0 && enhancedScenes.length === 0 && (
+          <div className="mb-8">
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl shadow-md p-6 border-2 border-purple-200">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-600 text-white font-bold text-sm">
+                  🌍
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Choose Story Language</h3>
+              </div>
+              <p className="text-gray-600 mb-4 ml-11 text-sm">
+                Select the language for your story. This determines the language you'll write your scenes in and the language of the final storybook.
+              </p>
+
+              <div className="ml-11 flex gap-4">
+                {/* English Option */}
+                <label
+                  className={`flex-1 cursor-pointer transition-all ${
+                    contentLanguage === 'en'
+                      ? 'ring-2 ring-blue-500 bg-blue-50'
+                      : 'bg-white hover:bg-gray-50'
+                  } border-2 border-gray-200 rounded-xl p-4`}
+                >
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="contentLanguage"
+                      value="en"
+                      checked={contentLanguage === 'en'}
+                      onChange={(e) => setContentLanguage(e.target.value as 'en' | 'zh')}
+                      className="w-5 h-5 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-2xl">🇺🇸</span>
+                        <span className="font-semibold text-gray-900">English Story</span>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        Write your scenes in English. Your child will read an English storybook.
+                      </p>
+                    </div>
+                  </div>
+                </label>
+
+                {/* Chinese Option */}
+                <label
+                  className={`flex-1 cursor-pointer transition-all ${
+                    contentLanguage === 'zh'
+                      ? 'ring-2 ring-purple-500 bg-purple-50'
+                      : 'bg-white hover:bg-gray-50'
+                  } border-2 border-gray-200 rounded-xl p-4`}
+                >
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="contentLanguage"
+                      value="zh"
+                      checked={contentLanguage === 'zh'}
+                      onChange={(e) => setContentLanguage(e.target.value as 'en' | 'zh')}
+                      className="w-5 h-5 text-purple-600 focus:ring-2 focus:ring-purple-500"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-2xl">🇨🇳</span>
+                        <span className="font-semibold text-gray-900">Chinese Story / 中文故事</span>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        用中文编写场景。您的孩子将阅读中文故事书。
+                      </p>
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              {/* Helpful hint based on selection */}
+              <div className="ml-11 mt-4 p-3 bg-white rounded-lg border border-gray-200">
+                <p className="text-sm text-gray-700">
+                  <span className="font-medium">💡 Tip:</span>{' '}
+                  {contentLanguage === 'en' ? (
+                    <>Write your scene descriptions in <strong>English</strong>. For example: "A rabbit hopping through the forest."</>
+                  ) : (
+                    <>请用<strong>中文</strong>描述您的场景。例如："一只兔子在森林里蹦蹦跳跳。"</>
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Step 2: Script Input */}
         {characters.length > 0 && enhancedScenes.length === 0 && (
           <div className="mb-8">
@@ -995,10 +1089,16 @@ export default function CreateStoryPage() {
               <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-sm">
                 2
               </div>
-              <h2 className="text-xl font-semibold text-gray-900">Write Story Scenes</h2>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Write Story Scenes {contentLanguage === 'zh' ? '/ 编写故事场景' : ''}
+              </h2>
             </div>
             <p className="text-gray-600 mb-4 ml-11">
-              Describe each scene of your story. Write simple descriptions for each part of your story.
+              {contentLanguage === 'en' ? (
+                'Describe each scene of your story. Write simple descriptions for each part of your story.'
+              ) : (
+                '描述您故事的每个场景。为故事的每个部分写简单的描述。'
+              )}
             </p>
             <ScriptInput
               value={scriptInput}
