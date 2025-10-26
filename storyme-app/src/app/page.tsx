@@ -570,22 +570,124 @@ export default function HomePage() {
       {/* Testimonials Section - Above Footer */}
       <Testimonials />
 
-      {/* Footer */}
-      <div className="bg-gradient-to-b from-blue-50 to-white border-t border-blue-100">
-        <div className="max-w-6xl mx-auto px-4 text-center py-8 sm:py-12">
-          {/* Main CTA */}
-          <div className="mb-8">
-            <p className="text-lg sm:text-xl text-gray-700 mb-6">
-              Every great story starts with a child's imagination.
+      {/* Pricing CTA Section */}
+      <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 border-t border-purple-100">
+        <div className="max-w-6xl mx-auto px-4 py-12 sm:py-16">
+          {/* Section Header */}
+          <div className="text-center mb-10">
+            <p className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+              Every great story starts with a child's imagination
             </p>
-            <Link
-              href="/signup"
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-3 rounded-full font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"
-            >
-              Start Creating →
-            </Link>
+            <p className="text-base sm:text-lg text-gray-600">
+              Check out our pricing plans and start inspiring your child's imagination journey today
+            </p>
           </div>
 
+          {/* Pricing Cards - Compact version */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 max-w-5xl mx-auto">
+            {/* Basic Plan */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-blue-200 hover:shadow-xl transition-all">
+              <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <span>📖</span> Basic
+              </h3>
+              <div className="mb-4">
+                <div className="text-3xl font-bold text-gray-900">$8.99<span className="text-base font-normal text-gray-600">/mo</span></div>
+                <div className="text-sm text-blue-600 font-semibold">20 stories/month</div>
+              </div>
+              <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500">✓</span> 20 stories per month
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500">✓</span> All story features
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500">✓</span> FREE Kids app
+                </li>
+              </ul>
+              <Link
+                href="/signup"
+                className="block w-full text-center bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-600 transition-all shadow-md"
+              >
+                Get Started
+              </Link>
+            </div>
+
+            {/* Premium Plan - Featured */}
+            <div className="bg-white rounded-2xl shadow-xl p-6 border-2 border-purple-400 hover:shadow-2xl transition-all relative transform md:scale-105">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold px-4 py-1 rounded-full">
+                MOST POPULAR
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <span>✨</span> Premium
+              </h3>
+              <div className="mb-4">
+                <div className="text-3xl font-bold text-gray-900">$14.99<span className="text-base font-normal text-gray-600">/mo</span></div>
+                <div className="text-sm text-purple-600 font-semibold">Unlimited stories</div>
+              </div>
+              <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500">✓</span> Unlimited stories
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500">✓</span> Priority support
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500">✓</span> Early features
+                </li>
+              </ul>
+              <Link
+                href="/signup"
+                className="block w-full text-center bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600 transition-all shadow-md"
+              >
+                Go Premium
+              </Link>
+            </div>
+
+            {/* Team Plan */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-green-200 hover:shadow-xl transition-all">
+              <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <span>👥</span> Team
+              </h3>
+              <div className="mb-4">
+                <div className="text-3xl font-bold text-gray-900">$59.99<span className="text-base font-normal text-gray-600">/mo</span></div>
+                <div className="text-sm text-green-600 font-semibold">5 accounts, unlimited each</div>
+              </div>
+              <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500">✓</span> 5 Studio accounts
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500">✓</span> Unlimited per account
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500">✓</span> All Premium features
+                </li>
+              </ul>
+              <Link
+                href="/signup"
+                className="block w-full text-center bg-gradient-to-r from-green-500 to-teal-500 text-white py-3 rounded-lg font-semibold hover:from-green-600 hover:to-teal-600 transition-all shadow-md"
+              >
+                Choose Team
+              </Link>
+            </div>
+          </div>
+
+          {/* Detailed Pricing Link */}
+          <div className="text-center">
+            <Link
+              href="/pricing"
+              className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold transition-colors"
+            >
+              View detailed pricing and features →
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="bg-gradient-to-b from-blue-50 to-white border-t border-blue-100">
+        <div className="max-w-6xl mx-auto px-4 text-center py-8">
           {/* Footer Links */}
           <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm text-gray-600 mb-4">
             <Link href="/about" className="hover:text-indigo-600 transition-colors">About</Link>

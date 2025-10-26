@@ -250,6 +250,7 @@ export default function UpgradePage() {
 
   const currentTier = subscription?.tier || 'free';
   const isTrial = currentTier === 'free' || currentTier === 'trial';
+  const isBasic = currentTier === 'basic';
   const isPremium = currentTier === 'premium';
   const isTeam = currentTier === 'team';
 
@@ -302,7 +303,7 @@ export default function UpgradePage() {
 
           {/* Usage Stats */}
           {subscription && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
                 <div className="text-sm text-gray-600 mb-1">Stories This Month</div>
                 <div className="text-2xl font-bold text-gray-900">
@@ -311,20 +312,11 @@ export default function UpgradePage() {
               </div>
 
               <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
-                <div className="text-sm text-gray-600 mb-1">Remaining</div>
+                <div className="text-sm text-gray-600 mb-1">Remaining This Month</div>
                 <div className="text-2xl font-bold text-gray-900">
                   {subscription.storiesRemaining}
                 </div>
               </div>
-
-              {isTrial && subscription.trialDaysRemaining !== null && (
-                <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-4 border border-yellow-200">
-                  <div className="text-sm text-gray-600 mb-1">Trial Days Left</div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {subscription.trialDaysRemaining} days
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -394,35 +386,43 @@ export default function UpgradePage() {
 
           {/* Upgrade Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Basic Plan - Show for trial, premium, and team users (downgrade option) */}
-            {!currentTier.includes('basic') && (
-              <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-blue-200 hover:border-blue-300 transition-all">
-                <div className="mb-4">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">📖 Basic</h3>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">
-                    {formatPrice(getTierPrice('basic', billingCycle === 'annual'))}
-                    <span className="text-sm font-normal text-gray-600">
-                      /{billingCycle === 'monthly' ? 'mo' : 'yr'}
-                    </span>
-                  </div>
-                  <div className="text-sm text-blue-600 font-semibold">20 stories/month</div>
+            {/* Basic Plan */}
+            <div className={`bg-white rounded-2xl shadow-lg p-6 relative ${
+              isBasic ? 'ring-2 ring-blue-500' : 'border-2 border-blue-200 hover:border-blue-300'
+            } transition-all`}>
+              {isBasic && (
+                <div className="absolute top-0 right-0 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
+                  CURRENT PLAN
                 </div>
+              )}
 
-                <ul className="space-y-2 mb-6 text-sm">
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span className="text-gray-600">20 new stories per month</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span className="text-gray-600">All story features</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span className="text-gray-600">FREE Kids app</span>
-                  </li>
-                </ul>
+              <div className="mb-4">
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">📖 Basic</h3>
+                <div className="text-3xl font-bold text-gray-900 mb-1">
+                  {formatPrice(getTierPrice('basic', billingCycle === 'annual'))}
+                  <span className="text-sm font-normal text-gray-600">
+                    /{billingCycle === 'monthly' ? 'mo' : 'yr'}
+                  </span>
+                </div>
+                <div className="text-sm text-blue-600 font-semibold">20 stories/month</div>
+              </div>
 
+              <ul className="space-y-2 mb-6 text-sm">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span className="text-gray-600">20 new stories per month</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span className="text-gray-600">All story features</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span className="text-gray-600">FREE Kids app</span>
+                </li>
+              </ul>
+
+              {!isBasic && (
                 <button
                   onClick={() => handleSelectPlan('basic', billingCycle)}
                   disabled={checkoutLoading === 'basic'}
@@ -430,8 +430,32 @@ export default function UpgradePage() {
                 >
                   {checkoutLoading === 'basic' ? 'Loading...' : (isPremium || isTeam) ? 'Downgrade to Basic' : 'Choose Basic'}
                 </button>
-              </div>
-            )}
+              )}
+              {isBasic && (
+                <div className="space-y-2">
+                  <button
+                    disabled
+                    className="w-full bg-gray-100 text-gray-400 py-3 rounded-lg font-semibold cursor-not-allowed"
+                  >
+                    Current Plan
+                  </button>
+                  {!subscription?.cancelAtPeriodEnd && (
+                    <button
+                      onClick={handleCancelSubscription}
+                      disabled={cancelling}
+                      className="w-full bg-white border-2 border-red-300 text-red-600 py-2 rounded-lg font-medium hover:bg-red-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {cancelling ? 'Cancelling...' : 'Cancel Subscription'}
+                    </button>
+                  )}
+                  {subscription?.cancelAtPeriodEnd && (
+                    <div className="w-full bg-orange-50 border-2 border-orange-300 text-orange-700 py-2 rounded-lg text-center text-sm">
+                      Cancels at period end
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Premium Plan */}
             <div className={`bg-white rounded-2xl shadow-lg p-6 relative ${
