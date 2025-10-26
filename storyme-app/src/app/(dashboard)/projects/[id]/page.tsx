@@ -11,7 +11,6 @@ import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeViewer';
-import AudioRecorder, { RecordingPage } from '@/components/story/AudioRecorder';
 import Tooltip from '@/components/ui/Tooltip';
 
 export default function StoryViewerPage() {
@@ -42,9 +41,12 @@ export default function StoryViewerPage() {
   const [hasQuiz, setHasQuiz] = useState(false);
   const [generatingQuiz, setGeneratingQuiz] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
-  const [showRecorder, setShowRecorder] = useState(false);
+  const [recordingMode, setRecordingMode] = useState(false);
   const [recordingPages, setRecordingPages] = useState<RecordingPage[]>([]);
   const [uploadingAudio, setUploadingAudio] = useState(false);
+  const [currentRecording, setCurrentRecording] = useState<Blob | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
 
   useEffect(() => {
     const loadData = async () => {
@@ -177,49 +179,16 @@ export default function StoryViewerPage() {
       return;
     }
 
-    // Build recording pages
-    const pages: RecordingPage[] = [];
+    console.log('🎙️ Entering recording mode...');
+    setRecordingMode(true);
+  };
 
-    // Debug: Log project data to see what we have
-    console.log('📚 Project data for recording:', project);
-    console.log('📚 Project scenes:', project.scenes);
-
-    // Page 1: Cover page
-    // Use the actual dedicated cover image URL from the project
-    const coverImageUrl = project.coverImageUrl || project.cover_image_url || '';
-    const coverText = project.author_name && project.author_age
-      ? `${project.title}, by ${project.author_name}, age ${project.author_age}`
-      : project.author_name
-      ? `${project.title}, by ${project.author_name}`
-      : project.title;
-
-    console.log('🖼️ Cover image URL:', coverImageUrl);
-    console.log('🖼️ Cover text:', coverText);
-
-    pages.push({
-      pageNumber: 1,
-      pageType: 'cover',
-      imageUrl: coverImageUrl,
-      textContent: coverText,
-    });
-
-    // Pages 2+: Scene pages
-    project.scenes.forEach((scene: any, index: number) => {
-      // Get the first image from the scene's images array
-      const sceneImageUrl = scene.images?.[0]?.imageUrl || '';
-      console.log(`🖼️ Scene ${index + 1} image:`, sceneImageUrl);
-
-      pages.push({
-        pageNumber: index + 2,
-        pageType: 'scene',
-        imageUrl: sceneImageUrl,
-        textContent: scene.caption || scene.description || '',
-        sceneId: scene.id,
-      });
-    });
-
-    setRecordingPages(pages);
-    setShowRecorder(true);
+  const handleExitRecordingMode = () => {
+    console.log('🎙️ Exiting recording mode...');
+    setRecordingMode(false);
+    setIsRecording(false);
+    setCurrentRecording(null);
+    setRecordingTime(0);
   };
 
   const handleUploadRecordings = async (recordings: any[]) => {
@@ -1267,15 +1236,41 @@ export default function StoryViewerPage() {
         </div>
       )}
 
-      {/* Audio Recorder Modal */}
-      {showRecorder && (
-        <AudioRecorder
-          projectId={projectId}
-          projectTitle={project?.title || 'Story'}
-          pages={recordingPages}
-          onComplete={handleUploadRecordings}
-          onExit={() => setShowRecorder(false)}
-        />
+      {/* Recording Mode Overlay - Shows recording controls over the story viewer */}
+      {recordingMode && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center p-4">
+          <div className="bg-white rounded-t-2xl shadow-2xl w-full max-w-4xl p-6 animate-slide-up">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">🎙️ Recording Mode</h3>
+                <p className="text-sm text-gray-600">Navigate pages and record audio for each</p>
+              </div>
+              <button
+                onClick={handleExitRecordingMode}
+                className="text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6">
+              <div className="text-center">
+                <button
+                  onClick={() => {/* TODO: Implement recording */}}
+                  className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-8 py-4 rounded-full hover:from-red-600 hover:to-pink-600 font-semibold shadow-lg transition-all transform hover:scale-105 flex items-center gap-3 mx-auto"
+                >
+                  <div className="w-4 h-4 bg-white rounded-full"></div>
+                  <span className="text-lg">Start Recording for Page {currentSceneIndex + 1}</span>
+                </button>
+                <p className="text-sm text-gray-600 mt-4">
+                  Use the navigation arrows or dots to move between pages
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
