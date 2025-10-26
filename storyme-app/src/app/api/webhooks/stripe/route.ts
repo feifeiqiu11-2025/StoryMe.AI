@@ -123,9 +123,12 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     return;
   }
 
-  console.log(`Updating subscription for user ${userId}:`, {
+  console.log(`[WEBHOOK] Updating subscription for user ${userId}:`, {
+    subscriptionId: subscription.id,
     status: subscription.status,
     tier,
+    currentPeriodStart: subscription.current_period_start,
+    currentPeriodEnd: subscription.current_period_end,
   });
 
   // Determine stories limit based on tier
@@ -181,12 +184,22 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
 
   if (isNewSubscription || billingCycleChanged || tierChanged) {
     userUpdateData.stories_created_this_month = 0;
-    console.log(`Resetting story count for user ${userId} (reason: ${
-      isNewSubscription ? 'new subscription' :
-      billingCycleChanged ? 'billing cycle changed' :
-      'tier changed'
-    })`);
+    console.log(`[WEBHOOK] Resetting story count for user ${userId}:`, {
+      reason: isNewSubscription ? 'new subscription' :
+              billingCycleChanged ? 'billing cycle changed' :
+              'tier changed',
+      oldTier: currentUser?.subscription_tier,
+      newTier: tier,
+      oldCount: currentUser?.stories_created_this_month,
+    });
   }
+
+  console.log(`[WEBHOOK] Updating user ${userId} in database:`, {
+    tier: userUpdateData.subscription_tier,
+    status: userUpdateData.subscription_status,
+    limit: userUpdateData.stories_limit,
+    resetCount: userUpdateData.stories_created_this_month === 0,
+  });
 
   const { error: userError } = await supabaseAdmin
     .from('users')
@@ -194,9 +207,11 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     .eq('id', userId);
 
   if (userError) {
-    console.error('Error updating user subscription:', userError);
+    console.error('[WEBHOOK] Error updating user subscription:', userError);
     throw userError;
   }
+
+  console.log(`[WEBHOOK] User ${userId} updated successfully in database`);
 
   // Upsert subscription record
   const subscriptionData: any = {
@@ -224,11 +239,15 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     .upsert(subscriptionData);
 
   if (subError) {
-    console.error('Error upserting subscription:', subError);
+    console.error('[WEBHOOK] Error upserting subscription:', subError);
     throw subError;
   }
 
-  console.log(`Successfully updated subscription for user ${userId}`);
+  console.log(`[WEBHOOK] ✓ Successfully updated subscription for user ${userId}`, {
+    tier: tier || 'basic',
+    status: subscription.status,
+    storiesLimit,
+  });
 }
 
 /**

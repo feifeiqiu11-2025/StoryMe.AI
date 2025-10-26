@@ -33,8 +33,79 @@ export default function UpgradePage() {
   const [cancelling, setCancelling] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
-  // Get plan from URL params (when user hits limit)
+  // Get URL params
   const suggestedPlan = searchParams?.get('plan') || null;
+  const success = searchParams?.get('success');
+  const canceled = searchParams?.get('canceled');
+  const sessionId = searchParams?.get('session_id');
+
+  // Payment verification state
+  const [paymentVerifying, setPaymentVerifying] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+
+  // Verify payment on success
+  useEffect(() => {
+    const verifyPayment = async () => {
+      if (success === 'true' && sessionId) {
+        setPaymentVerifying(true);
+        setPaymentMessage({ type: 'info', text: 'Verifying your payment...' });
+
+        try {
+          const response = await fetch(`/api/verify-payment?session_id=${sessionId}`);
+          const data = await response.json();
+
+          if (response.ok) {
+            if (data.payment.isComplete) {
+              setPaymentMessage({
+                type: 'success',
+                text: '✓ Payment successful! Your subscription is now active. Redirecting...'
+              });
+
+              // Reload subscription data after 2 seconds
+              setTimeout(() => {
+                window.location.href = '/upgrade';
+              }, 2000);
+            } else {
+              setPaymentMessage({
+                type: 'info',
+                text: data.message || 'Payment is being processed. This may take a few moments...'
+              });
+
+              // Retry verification after 3 seconds if payment incomplete
+              setTimeout(() => {
+                window.location.reload();
+              }, 3000);
+            }
+          } else {
+            setPaymentMessage({
+              type: 'error',
+              text: data.error || 'Could not verify payment. Please refresh the page or contact support.'
+            });
+          }
+        } catch (error) {
+          console.error('Payment verification error:', error);
+          setPaymentMessage({
+            type: 'error',
+            text: 'Error verifying payment. Please refresh the page.'
+          });
+        } finally {
+          setPaymentVerifying(false);
+        }
+      } else if (canceled === 'true') {
+        setPaymentMessage({
+          type: 'info',
+          text: 'Payment was canceled. You can try again when ready.'
+        });
+
+        // Clear the message after 5 seconds
+        setTimeout(() => {
+          window.location.href = '/upgrade';
+        }, 5000);
+      }
+    };
+
+    verifyPayment();
+  }, [success, canceled, sessionId]);
 
   useEffect(() => {
     const loadSubscription = async () => {
@@ -166,12 +237,12 @@ export default function UpgradePage() {
     }
   };
 
-  if (loading) {
+  if (loading || paymentVerifying) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading subscription...</p>
+          <p className="text-gray-600">{paymentVerifying ? 'Verifying payment...' : 'Loading subscription...'}</p>
         </div>
       </div>
     );
@@ -185,6 +256,34 @@ export default function UpgradePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Payment Status Message */}
+        {paymentMessage && (
+          <div className={`rounded-2xl shadow-xl p-6 mb-8 border-2 ${
+            paymentMessage.type === 'success'
+              ? 'bg-green-50 border-green-200'
+              : paymentMessage.type === 'error'
+              ? 'bg-red-50 border-red-200'
+              : 'bg-blue-50 border-blue-200'
+          }`}>
+            <div className="flex items-start gap-3">
+              <span className="text-3xl">
+                {paymentMessage.type === 'success' ? '✓' : paymentMessage.type === 'error' ? '✗' : 'ℹ️'}
+              </span>
+              <div className="flex-1">
+                <p className={`text-lg font-semibold ${
+                  paymentMessage.type === 'success'
+                    ? 'text-green-900'
+                    : paymentMessage.type === 'error'
+                    ? 'text-red-900'
+                    : 'text-blue-900'
+                }`}>
+                  {paymentMessage.text}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Current Subscription Status */}
         <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 mb-8">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
@@ -235,10 +334,23 @@ export default function UpgradePage() {
               <div className="flex items-start gap-3">
                 <span className="text-2xl">⚠️</span>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Story Limit Reached</h3>
+                  <h3 className="font-semibold text-gray-900 mb-1">
+                    {subscription.status === 'incomplete' ? 'Payment Processing' : 'Story Limit Reached'}
+                  </h3>
                   <p className="text-sm text-gray-700">
-                    You've used all your stories for this {isTrial ? 'trial' : 'month'}. Upgrade to continue creating!
+                    {subscription.status === 'incomplete'
+                      ? 'Your payment is being processed. This usually takes a few moments. Please refresh the page in a minute or contact support if this persists.'
+                      : `You've used all your stories for this ${isTrial ? 'trial' : 'month'}. Upgrade to continue creating!`
+                    }
                   </p>
+                  {subscription.status === 'incomplete' && (
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
+                    >
+                      Refresh Status
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
