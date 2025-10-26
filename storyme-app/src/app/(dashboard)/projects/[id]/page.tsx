@@ -185,9 +185,8 @@ export default function StoryViewerPage() {
     console.log('📚 Project scenes:', project.scenes);
 
     // Page 1: Cover page
-    // Use the actual cover image URL from the project, or first scene's first image
-    const firstSceneImage = project.scenes[0]?.images?.[0]?.imageUrl;
-    const coverImageUrl = project.cover_image_url || firstSceneImage || '';
+    // Use the actual dedicated cover image URL from the project
+    const coverImageUrl = project.coverImageUrl || project.cover_image_url || '';
     const coverText = project.author_name && project.author_age
       ? `${project.title}, by ${project.author_name}, age ${project.author_age}`
       : project.author_name
@@ -195,6 +194,7 @@ export default function StoryViewerPage() {
       : project.title;
 
     console.log('🖼️ Cover image URL:', coverImageUrl);
+    console.log('🖼️ Cover text:', coverText);
 
     pages.push({
       pageNumber: 1,

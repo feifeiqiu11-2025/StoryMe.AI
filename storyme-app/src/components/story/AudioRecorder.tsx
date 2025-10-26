@@ -456,14 +456,14 @@ export default function AudioRecorder({
             </div>
           </div>
 
-          <div className="p-8">
-            {/* Image Preview */}
-            <div className="mb-6 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl overflow-hidden aspect-video flex items-center justify-center relative">
+          {/* Image Preview with Overlay Navigation */}
+          <div className="relative">
+            <div className="bg-gradient-to-br from-blue-100 to-purple-100 overflow-hidden aspect-video flex items-center justify-center">
               {currentPage.imageUrl ? (
                 <img
                   src={currentPage.imageUrl}
                   alt={`Page ${currentPage.pageNumber}`}
-                  className="max-w-full max-h-full object-contain"
+                  className="w-full h-full object-contain"
                   onError={(e) => {
                     console.error('Image load error:', currentPage.imageUrl);
                     e.currentTarget.style.display = 'none';
@@ -478,6 +478,65 @@ export default function AudioRecorder({
                 </div>
               )}
             </div>
+
+            {/* Overlay Navigation Controls */}
+            <div className="absolute inset-0 flex items-center justify-between px-4 pointer-events-none">
+              <button
+                onClick={goToPreviousPage}
+                disabled={currentPageIndex === 0}
+                className="pointer-events-auto bg-black bg-opacity-60 hover:bg-opacity-80 text-white p-4 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+
+              <button
+                onClick={goToNextPage}
+                disabled={currentPageIndex === totalPages - 1}
+                className="pointer-events-auto bg-black bg-opacity-60 hover:bg-opacity-80 text-white p-4 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Page Indicator Dots */}
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-black bg-opacity-60 px-4 py-2 rounded-full max-w-[90%] overflow-x-auto">
+              {pages.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    stopPreview();
+                    setCurrentPageIndex(index);
+                  }}
+                  className={`w-2 h-2 rounded-full transition-all flex-shrink-0 ${
+                    index === currentPageIndex
+                      ? 'bg-white w-6'
+                      : recordings.has(pages[index].pageNumber)
+                      ? 'bg-green-400 bg-opacity-90'
+                      : 'bg-white bg-opacity-50 hover:bg-opacity-75'
+                  }`}
+                />
+              ))}
+            </div>
+
+            {/* Page Counter */}
+            <div className="absolute top-4 right-4 bg-black bg-opacity-60 text-white px-4 py-2 rounded-full text-sm font-semibold">
+              {currentPageIndex + 1} / {totalPages}
+            </div>
+
+            {/* Recorded Indicator */}
+            {currentRecording && (
+              <div className="absolute top-4 left-4 flex items-center gap-2 bg-green-500 bg-opacity-90 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+                Recorded
+              </div>
+            )}
+          </div>
+
+          <div className="p-8">
 
             {/* Text to Read */}
             <div className="mb-8">
@@ -650,27 +709,6 @@ export default function AudioRecorder({
               </button>
             </div>
           </div>
-        </div>
-
-        {/* Page Progress Dots */}
-        <div className="mt-6 flex gap-2 overflow-x-auto max-w-full pb-2">
-          {pages.map((page, index) => (
-            <button
-              key={page.pageNumber}
-              onClick={() => {
-                stopPreview();
-                setCurrentPageIndex(index);
-              }}
-              className={`transition-all rounded-full ${
-                recordings.has(page.pageNumber)
-                  ? 'bg-green-500 w-3 h-3' // Recorded
-                  : index === currentPageIndex
-                  ? 'bg-purple-600 w-8 h-3' // Current
-                  : 'bg-gray-300 w-3 h-3' // Not recorded
-              }`}
-              title={`Page ${page.pageNumber}${recordings.has(page.pageNumber) ? ' (recorded)' : ''}`}
-            />
-          ))}
         </div>
       </div>
     </div>
