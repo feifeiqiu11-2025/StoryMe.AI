@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeViewer';
+import AudioRecorder, { RecordingPage } from '@/components/story/AudioRecorder';
 import ProfileMenu from '@/components/ui/ProfileMenu';
 
 function StoryViewer() {
@@ -34,6 +35,9 @@ function StoryViewer() {
   const [loadingAudio, setLoadingAudio] = useState(false);
   const [generatingAudio, setGeneratingAudio] = useState(false);
   const [hasAudio, setHasAudio] = useState(false);
+  const [showRecorder, setShowRecorder] = useState(false);
+  const [recordingPages, setRecordingPages] = useState<RecordingPage[]>([]);
+  const [uploadingAudio, setUploadingAudio] = useState(false);
 
   // Check authentication status
   useEffect(() => {
@@ -116,6 +120,107 @@ function StoryViewer() {
       alert(`❌ Error generating audio: ${error.message || 'Unknown error'}`);
     } finally {
       setGeneratingAudio(false);
+    }
+  };
+
+  const handleRecordAudio = async () => {
+    if (!story || !story.scenes || story.scenes.length === 0) {
+      alert('No scenes available to record audio');
+      return;
+    }
+
+    if (!user) {
+      alert('Please sign in to record audio for your story');
+      return;
+    }
+
+    // Build recording pages
+    const pages: RecordingPage[] = [];
+
+    // Page 1: Cover page
+    const coverImageUrl = story.scenes[0]?.imageUrl || '/api/placeholder/1024/1024';
+    const coverText = story.author_name && story.author_age
+      ? `${story.title}, by ${story.author_name}, age ${story.author_age}`
+      : story.author_name
+      ? `${story.title}, by ${story.author_name}`
+      : story.title;
+
+    pages.push({
+      pageNumber: 1,
+      pageType: 'cover',
+      imageUrl: coverImageUrl,
+      textContent: coverText,
+    });
+
+    // Pages 2+: Scene pages
+    story.scenes.forEach((scene: any, index: number) => {
+      pages.push({
+        pageNumber: index + 2,
+        pageType: 'scene',
+        imageUrl: scene.imageUrl || '/api/placeholder/1024/1024',
+        textContent: scene.caption || scene.description,
+        sceneId: scene.id,
+      });
+    });
+
+    setRecordingPages(pages);
+    setShowRecorder(true);
+  };
+
+  const handleUploadRecordings = async (recordings: any[]) => {
+    setUploadingAudio(true);
+
+    try {
+      console.log(`🎙️ Uploading ${recordings.length} audio recordings...`);
+
+      // Prepare form data
+      const formData = new FormData();
+      formData.append('projectId', storyId);
+      formData.append('language', 'en'); // TODO: Support multi-language
+      formData.append('voiceProfileName', `${displayName}'s Voice`);
+
+      // Build metadata array
+      const metadata = recordings.map((rec, index) => {
+        const page = recordingPages.find(p => p.pageNumber === rec.pageNumber);
+        return {
+          pageNumber: rec.pageNumber,
+          pageType: page?.pageType || 'scene',
+          sceneId: page?.sceneId,
+          quizQuestionId: page?.quizQuestionId,
+          textContent: page?.textContent || '',
+          duration: rec.duration,
+        };
+      });
+
+      formData.append('audioMetadata', JSON.stringify(metadata));
+
+      // Append audio files
+      recordings.forEach((rec) => {
+        formData.append(`audio_${rec.pageNumber}`, rec.audioBlob, `page-${rec.pageNumber}.webm`);
+      });
+
+      // Upload
+      const response = await fetch('/api/upload-user-audio', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert(`✅ Success! ${data.successfulPages} pages uploaded.\n\nYour voice is now part of the story!`);
+        setShowRecorder(false);
+        setHasAudio(true);
+        await checkAudioExists();
+      } else {
+        console.error('Upload failed:', data);
+        alert(`❌ Upload failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      alert(`❌ Error uploading audio: ${error.message || 'Unknown error'}`);
+    } finally {
+      setUploadingAudio(false);
     }
   };
 
@@ -430,21 +535,39 @@ function StoryViewer() {
                     '📖 Reading Mode'
                   )}
                 </button>
-                {user && !hasAudio && (
-                  <button
-                    onClick={handleGenerateAudio}
-                    disabled={generatingAudio}
-                    className="bg-gradient-to-r from-green-600 to-teal-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-teal-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {generatingAudio ? (
-                      <span className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Generating Audio...
-                      </span>
-                    ) : (
-                      '🎵 Generate Audio'
+                {user && (
+                  <>
+                    <button
+                      onClick={handleRecordAudio}
+                      disabled={uploadingAudio}
+                      className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-pink-600 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {uploadingAudio ? (
+                        <span className="flex items-center gap-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Saving...
+                        </span>
+                      ) : (
+                        '🎙️ Record Your Voice'
+                      )}
+                    </button>
+                    {!hasAudio && (
+                      <button
+                        onClick={handleGenerateAudio}
+                        disabled={generatingAudio}
+                        className="bg-gradient-to-r from-green-600 to-teal-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-teal-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {generatingAudio ? (
+                          <span className="flex items-center gap-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Generating...
+                          </span>
+                        ) : (
+                          '🤖 Generate AI Audio'
+                        )}
+                      </button>
                     )}
-                  </button>
+                  </>
                 )}
                 <button
                   onClick={handleDownloadPDF}
@@ -483,6 +606,17 @@ function StoryViewer() {
           projectTitle={story?.title || 'Storybook'}
           pages={readingPages}
           onExit={() => setReadingMode(false)}
+        />
+      )}
+
+      {/* Audio Recorder */}
+      {showRecorder && recordingPages.length > 0 && (
+        <AudioRecorder
+          projectId={storyId}
+          projectTitle={story?.title || 'Your Story'}
+          pages={recordingPages}
+          onComplete={handleUploadRecordings}
+          onExit={() => setShowRecorder(false)}
         />
       )}
     </div>
