@@ -7,8 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-// Maximum duration for this API route (10 minutes for multiple uploads)
-export const maxDuration = 600;
+// Maximum duration for this API route (5 minutes for multiple uploads - Vercel Hobby limit)
+export const maxDuration = 300;
 
 interface AudioUpload {
   pageNumber: number;
