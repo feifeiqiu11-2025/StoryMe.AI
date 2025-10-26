@@ -1502,8 +1502,9 @@ export default function StoryViewerPage() {
             onPause={() => setIsPlaying(false)}
           />
 
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center p-4">
-            <div className="bg-white rounded-t-2xl shadow-2xl w-full max-w-4xl p-6">
+          {/* Recording panel - bottom right corner, doesn't block content */}
+          <div className="fixed bottom-4 right-4 z-50 max-w-md">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 border-2 border-purple-200">
               {/* Header */}
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -1539,30 +1540,30 @@ export default function StoryViewerPage() {
               </div>
 
               {/* Recording Controls */}
-              <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6">
-                <div className="mb-4 text-center">
-                  <span className="text-sm font-semibold text-gray-700">Page {currentSceneIndex + 1} of {allPages.length}</span>
+              <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-4">
+                <div className="mb-3 text-center">
+                  <span className="text-xs font-semibold text-gray-700">Page {currentSceneIndex + 1} of {allPages.length}</span>
                 </div>
 
                 {pageRecordings.has(currentSceneIndex) ? (
                   // Has recording - show preview controls
                   <div className="text-center">
-                    <div className="flex items-center justify-center gap-2 mb-4">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <span className="text-green-700 font-semibold">Recorded ({formatTime(pageRecordings.get(currentSceneIndex)!.duration)})</span>
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-green-700 font-semibold text-sm">Recorded ({formatTime(pageRecordings.get(currentSceneIndex)!.duration)})</span>
                     </div>
-                    <div className="flex items-center justify-center gap-4">
+                    <div className="flex flex-col gap-2">
                       <button
                         onClick={isPlaying ? stopPreview : playRecording}
-                        className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-semibold shadow-lg transition-all"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-semibold shadow-lg transition-all text-sm"
                       >
                         {isPlaying ? '⏹️ Stop' : '▶️ Play'}
                       </button>
                       <button
                         onClick={deleteRecording}
-                        className="bg-red-600 text-white px-6 py-3 rounded-xl hover:bg-red-700 font-semibold shadow-lg transition-all"
+                        className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 font-semibold shadow-lg transition-all text-sm"
                       >
-                        🗑️ Delete & Re-record
+                        🗑️ Delete
                       </button>
                     </div>
                   </div>
@@ -1571,36 +1572,38 @@ export default function StoryViewerPage() {
                   <div className="text-center">
                     <button
                       onClick={startRecording}
-                      className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-8 py-4 rounded-full hover:from-red-600 hover:to-pink-600 font-semibold shadow-lg transition-all transform hover:scale-105 flex items-center gap-3 mx-auto"
+                      className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-full hover:from-red-600 hover:to-pink-600 font-semibold shadow-lg transition-all w-full"
                     >
-                      <div className="w-4 h-4 bg-white rounded-full"></div>
-                      <span className="text-lg">Start Recording</span>
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-3 h-3 bg-white rounded-full"></div>
+                        <span>Start Recording</span>
+                      </div>
                     </button>
-                    <p className="text-sm text-gray-600 mt-4">
-                      Use navigation arrows to switch pages • Max 60s per page
+                    <p className="text-xs text-gray-600 mt-2">
+                      Max 60s per page
                     </p>
                   </div>
                 ) : (
                   // Recording in progress
                   <div className="text-center">
-                    <div className="flex items-center justify-center gap-4 mb-4">
+                    <div className="flex items-center justify-center gap-2 mb-3">
                       <div className="flex gap-1">
                         {[...Array(3)].map((_, i) => (
                           <div
                             key={i}
-                            className="w-2 h-8 bg-red-500 rounded-full animate-pulse"
+                            className="w-1.5 h-6 bg-red-500 rounded-full animate-pulse"
                             style={{ animationDelay: `${i * 0.15}s` }}
                           />
                         ))}
                       </div>
-                      <span className="text-2xl font-bold text-gray-900">
+                      <span className="text-xl font-bold text-gray-900">
                         {formatTime(recordingTime)}
                       </span>
-                      <span className="text-sm text-gray-600">/ 60s</span>
+                      <span className="text-xs text-gray-600">/ 60s</span>
                     </div>
 
-                    <div className="w-full max-w-md mx-auto mb-6">
-                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="w-full mb-4">
+                      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-gradient-to-r from-red-500 to-pink-500 transition-all"
                           style={{ width: `${(recordingTime / 60) * 100}%` }}
@@ -1608,27 +1611,27 @@ export default function StoryViewerPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-center gap-4">
+                    <div className="flex flex-col gap-2">
                       {!isPaused ? (
                         <button
                           onClick={pauseRecording}
-                          className="bg-yellow-500 text-white px-6 py-3 rounded-xl hover:bg-yellow-600 font-semibold shadow-lg transition-all"
+                          className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 font-semibold shadow-lg transition-all text-sm"
                         >
                           ⏸️ Pause
                         </button>
                       ) : (
                         <button
                           onClick={resumeRecording}
-                          className="bg-green-500 text-white px-6 py-3 rounded-xl hover:bg-green-600 font-semibold shadow-lg transition-all"
+                          className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 font-semibold shadow-lg transition-all text-sm"
                         >
                           ▶️ Resume
                         </button>
                       )}
                       <button
                         onClick={stopRecording}
-                        className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-semibold shadow-lg transition-all"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-semibold shadow-lg transition-all text-sm"
                       >
-                        ⏹️ Stop & Save
+                        ⏹️ Stop
                       </button>
                     </div>
                   </div>
