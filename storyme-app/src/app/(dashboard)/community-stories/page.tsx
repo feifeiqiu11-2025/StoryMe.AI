@@ -8,19 +8,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { StoryCard, type StoryCardData } from '@/components/story/StoryCard';
 
-interface PublicStory {
-  id: string;
-  title: string;
-  description?: string;
-  authorName?: string;
-  authorAge?: number;
-  viewCount: number;
-  featured: boolean;
+// Extend StoryCardData with community-specific fields
+interface PublicStory extends StoryCardData {
   publishedAt: string;
-  scenes?: Array<{
-    imageUrl: string | null;
-  }>;
 }
 
 export default function DashboardCommunityStoriesPage() {
@@ -29,7 +21,7 @@ export default function DashboardCommunityStoriesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'popular' | 'recent'>('popular');
+  const [sortBy, setSortBy] = useState<'popular' | 'recent'>('recent');
 
   useEffect(() => {
     fetchPublicStories();
@@ -38,7 +30,7 @@ export default function DashboardCommunityStoriesPage() {
   const fetchPublicStories = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/stories/public?limit=100`);
+      const response = await fetch(`/api/stories/public?limit=100&sortBy=${sortBy}`);
       const data = await response.json();
 
       if (response.ok && data.projects) {
@@ -238,59 +230,3 @@ export default function DashboardCommunityStoriesPage() {
   );
 }
 
-// Story Card Component
-function StoryCard({ story, onClick }: { story: PublicStory; onClick: () => void }) {
-  const coverImage = story.scenes?.[0]?.imageUrl;
-
-  return (
-    <div
-      onClick={onClick}
-      className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all transform hover:-translate-y-1 cursor-pointer"
-    >
-      {/* Cover Image */}
-      <div className="relative aspect-square bg-gradient-to-br from-blue-100 to-purple-100">
-        {coverImage ? (
-          <img
-            src={coverImage}
-            alt={story.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="text-6xl">📖</span>
-          </div>
-        )}
-
-        {/* Featured Badge */}
-        {story.featured && (
-          <div className="absolute top-2 right-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-            ⭐ Featured
-          </div>
-        )}
-
-        {/* View Count */}
-        <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-xs font-medium">
-          👁️ {story.viewCount || 0}
-        </div>
-      </div>
-
-      {/* Story Info */}
-      <div className="p-4">
-        <h3 className="font-bold text-gray-900 text-lg mb-1 line-clamp-2">
-          {story.title}
-        </h3>
-        {story.description && (
-          <p className="text-gray-600 text-sm mb-2 line-clamp-2">
-            {story.description}
-          </p>
-        )}
-        {story.authorName && (
-          <p className="text-xs text-gray-500 italic">
-            by {story.authorName}
-            {story.authorAge && `, age ${story.authorAge}`}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}

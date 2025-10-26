@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10');
     const offset = parseInt(searchParams.get('offset') || '0');
     const featured = searchParams.get('featured') === 'true';
+    const sortBy = searchParams.get('sortBy') || 'recent'; // 'popular' or 'recent'
 
     // Validate params
     if (limit < 1 || limit > 100) {
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
         created_at,
         author_name,
         author_age,
+        cover_image_url,
         scenes (
           id,
           scene_number,
@@ -61,10 +63,15 @@ export async function GET(request: NextRequest) {
       query = query.order('featured', { ascending: false });
     }
 
-    // Order by view count (top stories first), then by published date
-    query = query
-      .order('view_count', { ascending: false })
-      .order('published_at', { ascending: false });
+    // Order by sortBy parameter: 'popular' = view_count, 'recent' = published_at
+    if (sortBy === 'popular') {
+      query = query
+        .order('view_count', { ascending: false })
+        .order('published_at', { ascending: false });
+    } else {
+      // Sort by recent (published_at descending)
+      query = query.order('published_at', { ascending: false });
+    }
 
     const { data: projects, error } = await query;
 
@@ -90,6 +97,7 @@ export async function GET(request: NextRequest) {
       createdAt: project.created_at,
       authorName: project.author_name,
       authorAge: project.author_age,
+      coverImageUrl: project.cover_image_url,
       scenes: project.scenes?.map((scene: any) => ({
         id: scene.id,
         sceneNumber: scene.scene_number,

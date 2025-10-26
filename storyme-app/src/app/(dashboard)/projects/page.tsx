@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import type { StoryVisibility } from '@/lib/types/story';
+import { StoryCard, type StoryCardData } from '@/components/story/StoryCard';
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -227,155 +228,29 @@ export default function ProjectsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => {
-              const firstImage = project.scenes?.[0]?.images?.[0]?.imageUrl;
-              const sceneCount = project.scenes?.length || 0;
-              const createdDate = new Date(project.createdAt).toLocaleDateString();
-
-              const isPublic = project.visibility === 'public';
-              const isFeatured = project.featured;
-              const viewCount = project.viewCount || 0;
+              const storyData: StoryCardData = {
+                id: project.id,
+                title: project.title,
+                description: project.description,
+                coverImageUrl: project.coverImageUrl,
+                visibility: project.visibility,
+                viewCount: project.viewCount,
+                featured: project.featured,
+                sceneCount: project.scenes?.length || 0,
+                createdAt: project.createdAt,
+                scenes: project.scenes,
+              };
 
               return (
-                <div
+                <StoryCard
                   key={project.id}
-                  className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all transform hover:-translate-y-1 cursor-pointer"
+                  story={storyData}
                   onClick={() => router.push(`/projects/${project.id}`)}
-                >
-                  {/* Cover Image with Privacy Badges */}
-                  {firstImage ? (
-                    <div className="relative h-48 bg-gradient-to-br from-blue-100 to-purple-100">
-                      <img
-                        src={firstImage}
-                        alt={project.title}
-                        className="w-full h-full object-cover"
-                      />
-                      {/* Privacy Badge (Top Left) */}
-                      <div className="absolute top-2 left-2">
-                        {isPublic ? (
-                          <div className="flex items-center gap-1 bg-green-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-md">
-                            <span>🌍</span>
-                            <span>Public</span>
-                            {viewCount > 0 && (
-                              <>
-                                <span className="mx-1">•</span>
-                                <span>👁️ {viewCount}</span>
-                              </>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1 bg-gray-600 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-md">
-                            <span>🔒</span>
-                            <span>Private</span>
-                          </div>
-                        )}
-                      </div>
-                      {/* Featured Badge (Top Right) */}
-                      {isFeatured && (
-                        <div className="absolute top-2 right-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-md">
-                          <span>⭐ Featured</span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="relative h-48 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-                      <div className="text-6xl">📖</div>
-                      {/* Privacy Badge (Top Left) */}
-                      <div className="absolute top-2 left-2">
-                        {isPublic ? (
-                          <div className="flex items-center gap-1 bg-green-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-md">
-                            <span>🌍</span>
-                            <span>Public</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1 bg-gray-600 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-md">
-                            <span>🔒</span>
-                            <span>Private</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="p-6">
-                    {/* Title and Meta */}
-                    <div className="mb-3">
-                      <h3 className="text-xl font-bold text-gray-900 mb-1 line-clamp-1">
-                        {project.title}
-                      </h3>
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <span>{sceneCount} scenes</span>
-                        <span>•</span>
-                        <span>{createdDate}</span>
-                      </div>
-                    </div>
-
-                    {project.description && (
-                      <p className="text-gray-600 text-sm mb-4 line-clamp-1">
-                        {project.description}
-                      </p>
-                    )}
-
-                    {/* Action Buttons - Single Row */}
-                    <div className="flex items-center gap-2">
-                      {/* Public Toggle */}
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium text-gray-600">Public:</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePrivacyToggle(project.id, project.visibility || 'private');
-                          }}
-                          disabled={updatingPrivacy === project.id}
-                          className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-                            isPublic
-                              ? 'bg-green-500 text-white hover:bg-green-600'
-                              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-                          } ${updatingPrivacy === project.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          title={isPublic ? 'Make Private' : 'Make Public'}
-                        >
-                          {updatingPrivacy === project.id ? (
-                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                          ) : (
-                            <span>{isPublic ? 'Yes' : 'No'}</span>
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Share Button (only if public) */}
-                      {isPublic && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleShare(project.id);
-                          }}
-                          className="p-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-all"
-                          title="Share this story"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                          </svg>
-                        </button>
-                      )}
-
-                      {/* Spacer */}
-                      <div className="flex-1"></div>
-
-                      {/* Delete Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteConfirm(project.id);
-                        }}
-                        className="p-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-all"
-                        title="Delete this story"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                  variant="myStories"
+                  onPrivacyToggle={handlePrivacyToggle}
+                  onDelete={() => setDeleteConfirm(project.id)}
+                  isUpdatingPrivacy={updatingPrivacy === project.id}
+                />
               );
             })}
           </div>

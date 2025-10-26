@@ -19,6 +19,7 @@ interface PublicStory {
   viewCount: number;
   featured: boolean;
   publishedAt: string;
+  coverImageUrl?: string;
   scenes?: Array<{
     imageUrl: string | null;
   }>;
@@ -30,7 +31,7 @@ export default function PublicStoriesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'popular' | 'recent'>('popular');
+  const [sortBy, setSortBy] = useState<'popular' | 'recent'>('recent');
 
   useEffect(() => {
     fetchPublicStories();
@@ -39,7 +40,7 @@ export default function PublicStoriesPage() {
   const fetchPublicStories = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/stories/public?limit=100`);
+      const response = await fetch(`/api/stories/public?limit=100&sortBy=${sortBy}`);
       const data = await response.json();
 
       if (response.ok && data.projects) {
@@ -290,7 +291,7 @@ export default function PublicStoriesPage() {
 
 // Story Card Component
 function StoryCard({ story, onClick }: { story: PublicStory; onClick: () => void }) {
-  const coverImage = story.scenes?.[0]?.imageUrl;
+  const coverImage = story.coverImageUrl || story.scenes?.[0]?.imageUrl;
 
   return (
     <div
