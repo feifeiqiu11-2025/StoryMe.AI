@@ -81,11 +81,36 @@ export default function AudioRecorder({
 
   const requestMicPermission = async () => {
     try {
+      // Check if MediaDevices API is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('MediaDevices API not supported in this browser');
+        alert('❌ Audio recording is not supported in your browser. Please use Chrome, Firefox, Safari, or Edge.');
+        setMicPermissionDenied(true);
+        return;
+      }
+
+      // Check if running in secure context (HTTPS or localhost)
+      if (!window.isSecureContext) {
+        console.error('Not a secure context - HTTPS required for microphone access');
+        alert('❌ Audio recording requires a secure connection (HTTPS). Please access the site via HTTPS.');
+        setMicPermissionDenied(true);
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       setMicPermissionDenied(false);
-    } catch (error) {
-      console.error('Microphone permission denied:', error);
+    } catch (error: any) {
+      console.error('Microphone permission error:', error);
+
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        alert('❌ Microphone access denied. Please allow microphone access in your browser settings.');
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        alert('❌ No microphone found. Please connect a microphone and try again.');
+      } else {
+        alert(`❌ Failed to access microphone: ${error.message || 'Unknown error'}`);
+      }
+
       setMicPermissionDenied(true);
     }
   };
@@ -296,19 +321,28 @@ export default function AudioRecorder({
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
             Microphone Access Required
           </h2>
-          <p className="text-gray-600 mb-6">
-            Please allow microphone access to record audio for your story.
+          <p className="text-gray-600 mb-4">
+            Audio recording requires microphone access to work.
           </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
+            <p className="text-sm text-gray-700 mb-2 font-semibold">To fix this:</p>
+            <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+              <li>Make sure you're using HTTPS (not HTTP)</li>
+              <li>Click the lock icon in your browser's address bar</li>
+              <li>Allow microphone permissions for this site</li>
+              <li>Refresh the page and try again</li>
+            </ol>
+          </div>
           <div className="flex gap-4 justify-center">
             <button
               onClick={requestMicPermission}
-              className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-semibold"
+              className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-semibold transition-all"
             >
               Try Again
             </button>
             <button
               onClick={onExit}
-              className="bg-gray-200 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-300 font-semibold"
+              className="bg-gray-200 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-300 font-semibold transition-all"
             >
               Cancel
             </button>
