@@ -26,7 +26,7 @@ export async function checkStoryCreationLimit(userId: string): Promise<Subscript
   // Note: using trial_ends_at (existing field) instead of trial_end_date
   const { data: user, error } = await supabase
     .from('users')
-    .select('subscription_tier, subscription_status, stories_created_this_month, stories_limit, trial_ends_at')
+    .select('subscription_tier, subscription_status, stories_created_this_month, stories_limit, trial_ends_at, billing_cycle_start')
     .eq('id', userId)
     .single();
 
@@ -41,19 +41,65 @@ export async function checkStoryCreationLimit(userId: string): Promise<Subscript
     };
   }
 
-  const {
+  let {
     subscription_tier,
     subscription_status,
     stories_created_this_month,
     stories_limit,
     trial_ends_at,
+    billing_cycle_start,
   } = user;
 
+  // Check if billing cycle has passed and reset count if needed
+  // This handles cases where the webhook didn't fire or there's a timing issue
+  if (billing_cycle_start && subscription_tier !== 'free' && subscription_tier !== 'trial') {
+    const billingCycleStartDate = new Date(billing_cycle_start);
+    const now = new Date();
+    const daysSinceBillingStart = Math.floor((now.getTime() - billingCycleStartDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    // If more than 30 days have passed since billing cycle start, reset the count
+    if (daysSinceBillingStart >= 30 && stories_created_this_month > 0) {
+      console.log(`Auto-resetting story count for user ${userId} - billing cycle passed (${daysSinceBillingStart} days)`);
+
+      // Reset the count in database
+      await supabase
+        .from('users')
+        .update({
+          stories_created_this_month: 0,
+          billing_cycle_start: now.toISOString(),
+        })
+        .eq('id', userId);
+
+      // Update local value for this check
+      stories_created_this_month = 0;
+    }
+  }
+
   // Check if subscription is active
-  if (subscription_status !== 'active' && subscription_status !== 'trialing') {
+  // Note: 'incomplete' status is allowed for new subscriptions that are being processed
+  // Users with paid tiers (basic, premium, team) and 'incomplete' status can create stories
+  // while payment is being processed, but we'll verify limits strictly
+  const allowedStatuses = ['active', 'trialing', 'incomplete'];
+  const isPaidTier = subscription_tier === 'basic' || subscription_tier === 'premium' || subscription_tier === 'team';
+  const isIncomplete = subscription_status === 'incomplete';
+
+  if (!allowedStatuses.includes(subscription_status || '')) {
     return {
       canCreate: false,
       reason: 'Your subscription is not active. Please update your payment method or upgrade.',
+      storiesUsed: stories_created_this_month || 0,
+      storiesLimit: stories_limit || 0,
+      tier: subscription_tier || 'unknown',
+      status: subscription_status || 'unknown',
+    };
+  }
+
+  // If status is incomplete but user has a paid tier, allow story creation with limits
+  // The webhook will update status to 'active' once payment is confirmed
+  if (isIncomplete && !isPaidTier) {
+    return {
+      canCreate: false,
+      reason: 'Your subscription payment is being processed. Please check back in a few minutes or contact support if this persists.',
       storiesUsed: stories_created_this_month || 0,
       storiesLimit: stories_limit || 0,
       tier: subscription_tier || 'unknown',

@@ -133,6 +133,20 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   if (tier === 'basic') storiesLimit = 20;
   if (tier === 'premium' || tier === 'team') storiesLimit = -1; // unlimited
 
+  // Get current user data to check if billing cycle changed
+  const { data: currentUser } = await supabaseAdmin
+    .from('users')
+    .select('billing_cycle_start, subscription_tier, stories_created_this_month')
+    .eq('id', userId)
+    .single();
+
+  const currentBillingCycleStart = currentUser?.billing_cycle_start
+    ? new Date(currentUser.billing_cycle_start).getTime()
+    : 0;
+  const newBillingCycleStart = subscription.current_period_start
+    ? new Date(subscription.current_period_start * 1000).getTime()
+    : 0;
+
   // Update user subscription in database
   const userUpdateData: any = {
     subscription_tier: tier || 'basic',
@@ -150,6 +164,28 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   // Add billing_cycle_start only if current_period_start exists
   if (subscription.current_period_start) {
     userUpdateData.billing_cycle_start = new Date(subscription.current_period_start * 1000).toISOString();
+  }
+
+  // Reset story count in these cases:
+  // 1. New subscription (no previous billing cycle)
+  // 2. Billing cycle changed (new month started)
+  // 3. Tier changed (upgrade/downgrade) - give them a fresh start
+  // 4. Status changed from incomplete to active (payment completed)
+  const isNewSubscription = !currentUser?.billing_cycle_start;
+  const billingCycleChanged = newBillingCycleStart > 0 && currentBillingCycleStart > 0 &&
+    newBillingCycleStart !== currentBillingCycleStart;
+  const tierChanged = currentUser?.subscription_tier !== tier;
+  const statusBecameActive = currentUser?.subscription_tier !== 'free' &&
+    subscription.status === 'active' &&
+    (!currentUser || currentUser.subscription_tier === tier);
+
+  if (isNewSubscription || billingCycleChanged || tierChanged) {
+    userUpdateData.stories_created_this_month = 0;
+    console.log(`Resetting story count for user ${userId} (reason: ${
+      isNewSubscription ? 'new subscription' :
+      billingCycleChanged ? 'billing cycle changed' :
+      'tier changed'
+    })`);
   }
 
   const { error: userError } = await supabaseAdmin
