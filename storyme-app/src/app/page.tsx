@@ -79,30 +79,6 @@ export default function HomePage() {
           <HeroStoryShowcase />
         </div>
 
-        {/* Our Mission Section */}
-        <div className="bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow-xl p-5 sm:p-6 mb-8 sm:mb-10 border border-blue-100">
-          <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
-            <div className="flex-shrink-0 mx-auto sm:mx-0">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-blue-400 to-purple-500 rounded-xl flex items-center justify-center shadow-lg transform rotate-3">
-                <span className="text-2xl sm:text-3xl">🎯</span>
-              </div>
-            </div>
-            <div className="flex-1">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 flex items-center gap-2">
-                Our Mission 🚀
-              </h2>
-              <div className="text-sm sm:text-base text-gray-700 space-y-2 leading-relaxed">
-                <p>
-                  KindleWood Studio empowers families, teachers, and creators to turn children&apos;s imagination into bilingual stories and educational experiences.
-                </p>
-                <p>
-                  From story creation to learning apps and Spotify story libraries, we help every child read, listen, and learn — anywhere their imagination takes them.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Personal Story Section */}
         <div className="bg-gradient-to-br from-white to-yellow-50 rounded-2xl shadow-xl p-5 sm:p-6 mb-8 sm:mb-10 border border-yellow-100">
           <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
@@ -115,7 +91,7 @@ export default function HomePage() {
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 flex items-center gap-2">
                 What Sparked KindleWood 🌟
               </h2>
-              <div className="text-sm sm:text-base text-gray-700 space-y-2 leading-relaxed">
+              <div className="text-sm sm:text-base text-gray-700 space-y-3 leading-relaxed">
                 <p>
                   One evening, my 4-year-old came running to me, eyes sparkling with excitement.
                   He had just made up a wild story about how his friend got eaten by a dragon 🐉 — and how he and his superhero squad saved the day! 🦸‍♂️
@@ -126,9 +102,15 @@ export default function HomePage() {
                 <p>
                   Around the same time, he was just beginning to learn how to read, and I noticed how much more excited he was to read his own stories. Seeing himself as the hero made reading fun, personal, and meaningful.
                 </p>
-                <p className="italic text-gray-600 bg-white/50 p-3 rounded-lg border-l-4 border-orange-400 text-sm">
+                <p className="italic text-gray-600 bg-white/50 p-4 rounded-lg border-l-4 border-orange-400 text-sm">
                   <span className="text-xl mr-1">✨</span>
-                  That moment, KindleWood was born — to help parents capture their child's imagination and turn it into personalized storybooks that inspire a love for reading and create memories to cherish forever.
+                  That moment, KindleWood Studio was born — to help parents capture their child's imagination and turn it into personalized storybooks that inspire a lifelong love of reading and creativity.
+                </p>
+                <p className="text-gray-700">
+                  In a world where technology is everywhere, I wanted to build something that uses AI not to replace imagination, but to amplify it — helping children see themselves as creators, not just consumers.
+                </p>
+                <p className="font-medium text-gray-800">
+                  Our mission is to nurture curiosity, imagination, and bilingual learning through stories that grow with them — wherever they read, listen, and learn. 🌱
                 </p>
               </div>
             </div>
@@ -320,13 +302,15 @@ export default function HomePage() {
         </div>
 
         {/* How It Works */}
-        <div className="bg-gradient-to-br from-white to-blue-50 rounded-3xl shadow-2xl p-6 sm:p-10 md:p-12 mb-12 sm:mb-16 border border-blue-100">
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4 text-center flex items-center justify-center gap-3">
-            <span>🔮 How It Works</span>
+        <div className="mb-12 sm:mb-16">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-6 sm:mb-8">
+            🔮 How It Works
           </h2>
-          <p className="text-center text-gray-600 mb-8 text-base sm:text-lg">
-            Creating a KindleWood book is simple, fun, and magical — for both you and your child.
-          </p>
+
+          <div className="bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow-xl p-6 sm:p-10 border border-blue-100">
+            <p className="text-center text-gray-600 mb-8 text-base sm:text-lg">
+              Creating a KindleWood book is simple, fun, and magical — for both you and your child.
+            </p>
           <div className="space-y-6">
             <div className="flex items-start gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl shadow-md hover:shadow-lg transition-shadow">
               <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full flex items-center justify-center font-bold text-xl shadow-lg">
@@ -401,8 +385,177 @@ export default function HomePage() {
           <p className="text-center text-gray-700 mt-8 text-base sm:text-lg">
             💫 <em>From imagination to a beautifully illustrated storybook — in just minutes. Then share it everywhere your child learns.</em>
           </p>
+          </div>
         </div>
 
+      </div>
+
+      {/* A Letter from the Founder Section */}
+      <div className="max-w-6xl mx-auto px-4 pt-0 pb-12 sm:pb-16">
+
+        {/* Section Title - Outside the card */}
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-6 sm:mb-8">
+          💌 A Letter from the Founder
+        </h2>
+
+        {/* Single unified letter card */}
+        <div className="bg-gradient-to-br from-white to-amber-50 rounded-2xl shadow-xl p-6 sm:p-10 border border-amber-200">
+
+          {/* Letter Content */}
+          <div className="space-y-5 text-gray-700 leading-relaxed">
+
+            {/* Opening */}
+            <p className="text-base sm:text-lg">
+              When I think of the kids I know — my sons Connor and Carter, the neighborhood kids racing off after school — I feel both excitement and a little worry. We're living in a moment where intelligence is no longer enough; AI can write, code, and even "think." But one thing it can't do — and what will truly define our children's future — is <strong>creativity</strong>.
+            </p>
+
+            {/* Research Section */}
+            <div className="my-6">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">
+                The Hard Numbers Behind What Feels Intuitive
+              </h3>
+
+              <div className="bg-blue-50 rounded-xl p-6 border-l-4 border-blue-500 mb-6">
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <span className="text-blue-600 font-bold flex-shrink-0 mt-1">•</span>
+                    <div>
+                      <strong className="text-gray-900">Creative children grow into more adaptable, confident adults.</strong><br />
+                      <span className="text-sm text-gray-600">
+                        A 2024 Crayola study found that <em>92% of kids aged 6–12 believe being creative boosts their confidence</em>.
+                        (<a href="https://www.prnewswire.com/news-releases/new-crayola-childrens-study-reveals-a-powerful-link-between-creativity-and-confidence-302326950.html" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">PR Newswire</a>)
+                      </span>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="text-blue-600 font-bold flex-shrink-0 mt-1">•</span>
+                    <div>
+                      <strong className="text-gray-900">Creativity fuels lifelong success.</strong><br />
+                      <span className="text-sm text-gray-600">
+                        Research shows it predicts higher academic achievement, career satisfaction, and problem-solving ability.
+                        (<a href="https://www.psychologytoday.com/us/blog/work-your-mind/202111/the-long-lasting-benefits-of-childhood-creativity" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">Psychology Today</a>,{' '}
+                        <a href="https://www.purdue.edu/uns" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">Purdue University</a>)
+                      </span>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="text-blue-600 font-bold flex-shrink-0 mt-1">•</span>
+                    <div>
+                      <strong className="text-gray-900">Creativity supports mental health and resilience.</strong><br />
+                      <span className="text-sm text-gray-600">
+                        Studies link creative expression with better emotional well-being and stress regulation.
+                        (<a href="https://ncch.org.uk/uploads/Creativity-and-Mental-Health-in-Schools-Briefing.pdf" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">National Centre for Creative Health</a>,{' '}
+                        <a href="https://online.maryville.edu" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">Maryville University</a>)
+                      </span>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+
+              <p className="text-gray-800 font-medium bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200 mb-6">
+                In short, when kids imagine and make, they're not just playing — they're building <em className="text-blue-700">uniquely human strengths</em> that no machine can replicate.
+              </p>
+
+              <p className="text-base sm:text-lg">
+                As information becomes instantly available, what matters most is <strong>how</strong> children think — not what they memorize. The power to connect ideas, to ask "what if," and to tell new stories will shape the next generation of innovators, scientists, and dreamers.
+              </p>
+            </div>
+
+            {/* How KindleWood Supports */}
+            <div className="my-6">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">
+                How KindleWood Supports That Journey
+              </h3>
+
+              <p className="text-base sm:text-lg mb-6">
+                At <strong className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">KindleWood Studio</strong>, we're building an AI-powered ecosystem designed to help children grow not just smarter, but more creative, imaginative, empathetic, and confident.
+              </p>
+
+              <div className="space-y-4">
+                <div className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl p-5 border-l-4 border-pink-500">
+                  <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                    <span>📖</span> Storytelling as a Launchpad
+                  </h4>
+                  <p className="text-sm sm:text-base text-gray-700">
+                    Every child has a story to tell. KindleWood turns their ideas into bilingual, illustrated storybooks — where they are the author, director, and dreamer. This creative act builds voice, confidence, and self-expression.
+                  </p>
+                </div>
+
+                <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-5 border-l-4 border-purple-500">
+                  <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                    <span>🤖</span> AI as a Co-Creator, Not a Replacement
+                  </h4>
+                  <p className="text-sm sm:text-base text-gray-700">
+                    Rather than seeing AI as the "answer machine," we treat it as a creative partner. The child proposes, imagines, tweaks — and the AI helps scaffold, sketch, illustrate, and reflect. This keeps the child in the driver's seat. The message we send: <em className="font-medium text-purple-700">You are the creator; the tool is the amplifier.</em>
+                  </p>
+                </div>
+
+                <div className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl p-5 border-l-4 border-teal-500">
+                  <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <span>🌟</span> Beyond Creativity: Building Core Life Skills
+                  </h4>
+                  <ul className="space-y-2 text-sm sm:text-base text-gray-700">
+                    <li className="flex items-start gap-2">
+                      <span className="text-teal-600 font-bold mt-1">→</span>
+                      Share stories with friends or family → building empathy and communication
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-teal-600 font-bold mt-1">→</span>
+                      Reflect on "What if?" and "Why?" → building critical thinking
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-teal-600 font-bold mt-1">→</span>
+                      Iterate and experiment → building resilience and growth mindset
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-teal-600 font-bold mt-1">→</span>
+                      Expand narratives across languages → building global perspective
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-5 border-l-4 border-orange-500">
+                  <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                    <span>📚</span> Balanced with Traditional Academic Foundations
+                  </h4>
+                  <p className="text-sm sm:text-base text-gray-700">
+                    Foundational skills like reading and writing still matter — but as <em className="font-medium text-orange-700">tools for thinking</em> rather than rote tasks. Kids don't just learn to read stories; they learn to create them.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Closing Reflection */}
+            <div className="my-6 pt-6 border-t border-amber-300">
+              <p className="text-base sm:text-lg mb-6">
+                When I reflect on my own journey — from building AI-powered products for enterprise customers, to designing and constructing our family home, to co-creating stories with my kids at bedtime — I've realized something simple yet profound:
+              </p>
+
+              <blockquote className="bg-gradient-to-r from-amber-100 to-yellow-100 border-l-4 border-amber-500 p-6 rounded-lg my-6">
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 italic">
+                  "The tools may evolve, but imagination is timeless."
+                </p>
+              </blockquote>
+
+              <p className="text-base sm:text-lg mb-8">
+                It's what bridges innovation and emotion — how we build not just products or houses, but futures worth living in. KindleWood Studio is my way of passing that belief forward — a space where every child can see themselves as a creator, every parent can nurture imagination, and every story becomes a small act of hope for the future.
+              </p>
+            </div>
+
+            {/* Signature */}
+            <div className="mt-10 pt-6 border-t-2 border-amber-300">
+              <p className="text-gray-600 mb-6 italic text-base">With gratitude and imagination,</p>
+              <p
+                className="text-5xl sm:text-6xl text-blue-900 mb-2"
+                style={{ fontFamily: "var(--font-signature)" }}
+              >
+                Feifei Qiu
+              </p>
+              <p className="text-sm text-gray-600 mt-3">Founder & Mom, KindleWood Studio</p>
+            </div>
+
+          </div>
+        </div>
       </div>
 
       {/* Testimonials Section - Above Footer */}
