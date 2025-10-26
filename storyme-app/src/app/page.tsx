@@ -583,57 +583,173 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Pricing Cards - Compact version */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 max-w-5xl mx-auto">
+          {/* Pricing Cards - Full detailed version */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            {/* Free Trial */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-gray-200 hover:shadow-xl transition-all">
+              <div className="mb-4">
+                <h3 className="text-xl font-bold text-gray-900 mb-1 flex items-center gap-2">
+                  <span>🎁</span> Free Trial
+                </h3>
+                <p className="text-sm text-gray-600">Perfect for getting started</p>
+              </div>
+              <div className="mb-6">
+                <div className="text-4xl font-bold text-gray-900">Free</div>
+                <div className="inline-block mt-2 px-3 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-full">
+                  5 stories total
+                </div>
+              </div>
+              <ul className="space-y-2.5 mb-6 text-sm text-gray-700">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>5 stories to create</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>7 days access</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>AI story generation</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Audio narration (EN + ZH)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>High-quality PDF download</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Spotify publishing</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>FREE Kids app access</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>All Premium features</span>
+                </li>
+              </ul>
+              <Link
+                href="/signup"
+                className="block w-full text-center bg-gray-600 text-white py-3 rounded-lg font-semibold hover:bg-gray-700 transition-all shadow-md"
+              >
+                Start Free Trial
+              </Link>
+            </div>
+
             {/* Basic Plan */}
             <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-blue-200 hover:shadow-xl transition-all">
-              <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-                <span>📖</span> Basic
-              </h3>
               <div className="mb-4">
-                <div className="text-3xl font-bold text-gray-900">$8.99<span className="text-base font-normal text-gray-600">/mo</span></div>
-                <div className="text-sm text-blue-600 font-semibold">20 stories/month</div>
+                <h3 className="text-xl font-bold text-gray-900 mb-1 flex items-center gap-2">
+                  <span>📖</span> Basic
+                </h3>
+                <p className="text-sm text-gray-600">For regular storytellers</p>
               </div>
-              <ul className="space-y-2 mb-6 text-sm text-gray-600">
+              <div className="mb-6">
+                <div className="text-4xl font-bold text-gray-900">$8.99<span className="text-lg font-normal text-gray-600">/mo</span></div>
+                <div className="inline-block mt-2 px-3 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-full">
+                  20 stories/month
+                </div>
+              </div>
+              <ul className="space-y-2.5 mb-6 text-sm text-gray-700">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-500">✓</span> 20 stories per month
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>20 new stories per month</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-500">✓</span> All story features
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>AI story generation</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-500">✓</span> FREE Kids app
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Audio narration (EN + ZH)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>High-quality PDF download</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Spotify publishing</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>FREE Kids app access</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Unlimited child profiles</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Quiz generation</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Reading analytics</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>FREE translation</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Edit existing stories (soon)</span>
                 </li>
               </ul>
               <Link
                 href="/signup"
                 className="block w-full text-center bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-600 transition-all shadow-md"
               >
-                Get Started
+                Choose Basic
               </Link>
             </div>
 
             {/* Premium Plan - Featured */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 border-2 border-purple-400 hover:shadow-2xl transition-all relative transform md:scale-105">
+            <div className="bg-white rounded-2xl shadow-xl p-6 border-2 border-purple-400 hover:shadow-2xl transition-all relative transform lg:scale-105">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold px-4 py-1 rounded-full">
-                MOST POPULAR
+                POPULAR
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-                <span>✨</span> Premium
-              </h3>
               <div className="mb-4">
-                <div className="text-3xl font-bold text-gray-900">$14.99<span className="text-base font-normal text-gray-600">/mo</span></div>
-                <div className="text-sm text-purple-600 font-semibold">Unlimited stories</div>
+                <h3 className="text-xl font-bold text-gray-900 mb-1 flex items-center gap-2">
+                  <span>✨</span> Premium
+                </h3>
+                <p className="text-sm text-gray-600">For unlimited creativity</p>
               </div>
-              <ul className="space-y-2 mb-6 text-sm text-gray-600">
+              <div className="mb-6">
+                <div className="text-4xl font-bold text-gray-900">$14.99<span className="text-lg font-normal text-gray-600">/mo</span></div>
+                <div className="inline-block mt-2 px-3 py-1 bg-purple-50 text-purple-700 text-xs font-semibold rounded-full">
+                  Unlimited stories
+                </div>
+              </div>
+              <ul className="space-y-2.5 mb-6 text-sm text-gray-700">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-500">✓</span> Unlimited stories
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Unlimited story creation</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-500">✓</span> Priority support
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Everything in Basic</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-500">✓</span> Early features
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Priority support</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Early access to features</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Advanced analytics (soon)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>No limits ever</span>
                 </li>
               </ul>
               <Link
@@ -646,22 +762,42 @@ export default function HomePage() {
 
             {/* Team Plan */}
             <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-green-200 hover:shadow-xl transition-all">
-              <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-                <span>👥</span> Team
-              </h3>
               <div className="mb-4">
-                <div className="text-3xl font-bold text-gray-900">$59.99<span className="text-base font-normal text-gray-600">/mo</span></div>
-                <div className="text-sm text-green-600 font-semibold">5 accounts, unlimited each</div>
+                <h3 className="text-xl font-bold text-gray-900 mb-1 flex items-center gap-2">
+                  <span>👥</span> Team
+                </h3>
+                <p className="text-sm text-gray-600">For families & educators</p>
               </div>
-              <ul className="space-y-2 mb-6 text-sm text-gray-600">
+              <div className="mb-6">
+                <div className="text-4xl font-bold text-gray-900">$59.99<span className="text-lg font-normal text-gray-600">/mo</span></div>
+                <div className="inline-block mt-2 px-3 py-1 bg-green-50 text-green-700 text-xs font-semibold rounded-full">
+                  Unlimited per account
+                </div>
+              </div>
+              <ul className="space-y-2.5 mb-6 text-sm text-gray-700">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-500">✓</span> 5 Studio accounts
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>5 separate Studio accounts</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-500">✓</span> Unlimited per account
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Unlimited stories per account</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-500">✓</span> All Premium features
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>All Premium features</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Priority support for all</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Shared billing</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>$12/user (save $2.99)</span>
                 </li>
               </ul>
               <Link
