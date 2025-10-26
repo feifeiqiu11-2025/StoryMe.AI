@@ -57,6 +57,12 @@ export default function StoryViewerPage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
 
+  // Draggable panel state
+  const [panelPosition, setPanelPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const panelRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const loadData = async () => {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -382,6 +388,46 @@ export default function StoryViewerPage() {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Drag handlers for movable panel
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!panelRef.current) return;
+
+    const rect = panelRef.current.getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+    setIsDragging(true);
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging || !panelRef.current) return;
+
+    const maxX = window.innerWidth - panelRef.current.offsetWidth;
+    const maxY = window.innerHeight - panelRef.current.offsetHeight;
+
+    const newX = Math.max(0, Math.min(e.clientX - dragOffset.x, maxX));
+    const newY = Math.max(0, Math.min(e.clientY - dragOffset.y, maxY));
+
+    setPanelPosition({ x: newX, y: newY });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Add/remove mouse event listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragOffset]);
 
   const handleSaveAllRecordings = async () => {
     if (pageRecordings.size === 0) {
@@ -1502,14 +1548,34 @@ export default function StoryViewerPage() {
             onPause={() => setIsPlaying(false)}
           />
 
-          {/* Recording panel - bottom right corner, doesn't block content */}
-          <div className="fixed bottom-4 right-4 z-50 max-w-md">
+          {/* Recording panel - draggable, positioned at bottom-right by default */}
+          <div
+            ref={panelRef}
+            className="fixed z-50 max-w-md"
+            style={{
+              left: panelPosition.x ? `${panelPosition.x}px` : 'auto',
+              top: panelPosition.y ? `${panelPosition.y}px` : 'auto',
+              right: !panelPosition.x ? '1rem' : 'auto',
+              bottom: !panelPosition.y ? '1rem' : 'auto',
+              cursor: isDragging ? 'grabbing' : 'auto',
+            }}
+          >
             <div className="bg-white rounded-2xl shadow-2xl p-6 border-2 border-purple-200">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
+              {/* Drag Handle + Header */}
+              <div
+                onMouseDown={handleMouseDown}
+                className="flex items-center justify-between mb-4 cursor-grab active:cursor-grabbing"
+              >
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">🎙️ Recording Mode</h3>
-                  <p className="text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="w-4 h-0.5 bg-gray-400 rounded"></div>
+                      <div className="w-4 h-0.5 bg-gray-400 rounded"></div>
+                      <div className="w-4 h-0.5 bg-gray-400 rounded"></div>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">🎙️ Recording Mode</h3>
+                  </div>
+                  <p className="text-sm text-gray-600 ml-6">
                     {pageRecordings.size} of {allPages.length} pages recorded
                   </p>
                 </div>
