@@ -5,18 +5,39 @@
 
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import SocialLoginButtons from '@/components/auth/SocialLoginButtons';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [redirectPath, setRedirectPath] = useState('/dashboard');
+
+  // Check for redirect parameter in URL
+  useEffect(() => {
+    const redirect = searchParams.get('redirect');
+    const plan = searchParams.get('plan');
+    const cycle = searchParams.get('cycle');
+
+    if (redirect) {
+      // Reconstruct the full redirect URL with all parameters
+      let fullRedirect = redirect;
+      if (plan) {
+        fullRedirect += `?plan=${plan}`;
+        if (cycle) {
+          fullRedirect += `&cycle=${cycle}`;
+        }
+      }
+      setRedirectPath(fullRedirect);
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,8 +101,8 @@ export default function LoginPage() {
       }
 
       // Use window.location for more reliable redirect
-      console.log('Redirecting to dashboard...');
-      window.location.href = '/dashboard';
+      console.log('Redirecting to:', redirectPath);
+      window.location.href = redirectPath;
     } catch (err) {
       console.error('Login error:', err);
       setError('An unexpected error occurred. Please try again.');
@@ -94,7 +115,7 @@ export default function LoginPage() {
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Sign In</h2>
 
       {/* OAuth Buttons (Primary) */}
-      <SocialLoginButtons mode="signin" redirectTo="/dashboard" />
+      <SocialLoginButtons mode="signin" redirectTo={redirectPath} />
 
       {/* Email/Password Form (Secondary - Always Visible) */}
       <form onSubmit={handleLogin} className="space-y-4 mt-6">

@@ -5,8 +5,8 @@
 
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import SocialLoginButtons from '@/components/auth/SocialLoginButtons';
@@ -14,6 +14,7 @@ import PrivacyConsentModal from '@/components/auth/PrivacyConsentModal';
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,11 +22,31 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showConsentModal, setShowConsentModal] = useState(false);
+  const [redirectPath, setRedirectPath] = useState('/dashboard');
   const [pendingSignupData, setPendingSignupData] = useState<{
     email: string;
     password: string;
     name: string;
   } | null>(null);
+
+  // Check for redirect parameter in URL
+  useEffect(() => {
+    const redirect = searchParams.get('redirect');
+    const plan = searchParams.get('plan');
+    const cycle = searchParams.get('cycle');
+
+    if (redirect) {
+      // Reconstruct the full redirect URL with all parameters
+      let fullRedirect = redirect;
+      if (plan) {
+        fullRedirect += `?plan=${plan}`;
+        if (cycle) {
+          fullRedirect += `&cycle=${cycle}`;
+        }
+      }
+      setRedirectPath(fullRedirect);
+    }
+  }, [searchParams]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,8 +159,8 @@ export default function SignupPage() {
       }
 
       // Use window.location for more reliable redirect
-      console.log('Redirecting to dashboard...');
-      window.location.href = '/dashboard';
+      console.log('Redirecting to:', redirectPath);
+      window.location.href = redirectPath;
     } catch (err) {
       console.error('Signup error:', err);
       setError('An unexpected error occurred. Please try again.');
@@ -167,7 +188,7 @@ export default function SignupPage() {
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Create Account</h2>
 
       {/* OAuth Buttons (Primary) */}
-      <SocialLoginButtons mode="signup" redirectTo="/dashboard" />
+      <SocialLoginButtons mode="signup" redirectTo={redirectPath} />
 
       {/* Email/Password Form (Secondary - Always Visible) */}
       <form onSubmit={handleSignup} className="space-y-4 mt-6">

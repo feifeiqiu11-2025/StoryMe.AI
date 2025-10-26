@@ -6,9 +6,10 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
 interface PricingTier {
   id: string;
@@ -111,10 +112,46 @@ export default function PricingPage() {
   const router = useRouter();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [loading, setLoading] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const supabase = createClient();
+
+  // Check authentication status on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsAuthenticated(!!user);
+    };
+
+    checkAuth();
+  }, [supabase]);
 
   const handleSelectPlan = async (tierId: string) => {
     if (tierId === 'trial') {
       router.push('/signup');
+      return;
+    }
+
+    // Check if user is authenticated before proceeding
+    if (isAuthenticated === false) {
+      // User not logged in - show friendly modal asking them to authenticate
+      const shouldProceed = confirm(
+        '🔒 Please sign in to continue\n\n' +
+        'You need to create a free account or sign in to subscribe to a plan.\n\n' +
+        'Click OK to continue (you can sign in or sign up on the next page).\n' +
+        'Click Cancel to return to the pricing page.'
+      );
+
+      if (shouldProceed) {
+        // Go to login page (which also has sign up option)
+        router.push(`/login?redirect=/pricing&plan=${tierId}&cycle=${billingCycle}`);
+      }
+      // If Cancel clicked, do nothing - stay on pricing page
+      return;
+    }
+
+    // If auth status is still loading, wait
+    if (isAuthenticated === null) {
+      console.log('Authentication status still loading...');
       return;
     }
 
@@ -140,7 +177,14 @@ export default function PricingPage() {
         window.location.href = data.url;
       } else {
         console.error('Failed to create checkout session:', data.error);
-        alert(data.error || 'Failed to start checkout. Please try again.');
+
+        // Better error handling with specific messages
+        if (response.status === 401) {
+          alert('🔒 Please sign in first to subscribe to a plan.');
+          router.push(`/login?redirect=/pricing&plan=${tierId}&cycle=${billingCycle}`);
+        } else {
+          alert(data.error || 'Failed to start checkout. Please try again.');
+        }
         setLoading(null);
       }
     } catch (error) {
