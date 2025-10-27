@@ -83,21 +83,23 @@ export default function FounderJournalPage() {
           <div className="space-y-2">
             <a
               href="#october-26-2025"
-              className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-all py-2 px-3 rounded-lg hover:bg-white/60 cursor-pointer"
+              className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-all py-2 px-3 rounded-lg hover:bg-white/60 cursor-pointer group"
             >
               <span className="text-lg">✨</span>
               <span className="font-semibold underline decoration-dotted">The Power of a Mom's Voice</span>
               <span className="text-gray-500">—</span>
               <span className="text-sm text-gray-500">Oct 26, 2025</span>
+              <span className="ml-auto text-gray-400 group-hover:text-indigo-600 transition-colors">↗</span>
             </a>
             <a
               href="#october-19-2025"
-              className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-all py-2 px-3 rounded-lg hover:bg-white/60 cursor-pointer"
+              className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-all py-2 px-3 rounded-lg hover:bg-white/60 cursor-pointer group"
             >
               <span className="text-lg">🌈</span>
               <span className="font-semibold underline decoration-dotted">The Viral Loop of Imagination</span>
               <span className="text-gray-500">—</span>
               <span className="text-sm text-gray-500">Oct 19, 2025</span>
+              <span className="ml-auto text-gray-400 group-hover:text-indigo-600 transition-colors">↗</span>
             </a>
           </div>
         </div>
