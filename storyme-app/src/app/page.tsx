@@ -594,8 +594,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4 text-center py-8">
           {/* Footer Links */}
           <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm text-gray-600 mb-4">
-            <Link href="/about" className="hover:text-indigo-600 transition-colors">About</Link>
-            <Link href="/contact" className="hover:text-indigo-600 transition-colors">Contact</Link>
+            <a href="mailto:KindleWoodsAI@Gmail.com" className="hover:text-indigo-600 transition-colors">Contact</a>
             <Link href="/privacy" className="hover:text-indigo-600 transition-colors">Privacy</Link>
             <Link href="/terms" className="hover:text-indigo-600 transition-colors">Terms</Link>
           </div>
