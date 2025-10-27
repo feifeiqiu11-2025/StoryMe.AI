@@ -120,12 +120,14 @@ export default function PublicStoryViewerPage() {
     setGeneratingPDF(true);
 
     try {
-      // Prepare scenes data
-      const scenesData = story.scenes.map((scene: any) => ({
-        sceneNumber: scene.sceneNumber,
-        description: scene.description || scene.caption,
-        imageUrl: scene.imageUrl,
-      }));
+      // Prepare scenes data - MUST sort by sceneNumber to ensure correct page order
+      const scenesData = story.scenes
+        .sort((a: any, b: any) => a.sceneNumber - b.sceneNumber)
+        .map((scene: any) => ({
+          sceneNumber: scene.sceneNumber,
+          description: scene.description || scene.caption,
+          imageUrl: scene.imageUrl,
+        }));
 
       if (scenesData.length === 0) {
         alert('No scenes with images found');
@@ -184,7 +186,8 @@ export default function PublicStoryViewerPage() {
     );
   }
 
-  const scenes = story.scenes || [];
+  // IMPORTANT: Sort scenes by sceneNumber to ensure correct page order
+  const scenes = (story.scenes || []).sort((a: any, b: any) => a.sceneNumber - b.sceneNumber);
   const currentScene = scenes[currentSceneIndex];
 
   return (

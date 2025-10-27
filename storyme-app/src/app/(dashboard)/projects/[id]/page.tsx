@@ -754,9 +754,10 @@ export default function StoryViewerPage() {
     setGeneratingPDF(true);
 
     try {
-      // Prepare scenes data
+      // Prepare scenes data - MUST sort by sceneNumber to ensure correct page order
       const scenesData = project.scenes
         .filter((scene: any) => scene.images && scene.images.length > 0)
+        .sort((a: any, b: any) => a.sceneNumber - b.sceneNumber)
         .map((scene: any) => ({
           sceneNumber: scene.sceneNumber,
           description: scene.description,
@@ -1063,7 +1064,8 @@ export default function StoryViewerPage() {
     return null;
   }
 
-  const scenes = project.scenes || [];
+  // IMPORTANT: Sort scenes by sceneNumber to ensure correct page order
+  const scenes = (project.scenes || []).sort((a: any, b: any) => a.sceneNumber - b.sceneNumber);
 
   // Build combined pages array: cover + scenes + quiz
   const allPages = [
