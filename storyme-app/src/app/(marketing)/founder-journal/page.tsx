@@ -89,7 +89,7 @@ export default function FounderJournalPage() {
               <span className="font-semibold underline decoration-dotted">The Power of a Mom's Voice</span>
               <span className="text-gray-500">—</span>
               <span className="text-sm text-gray-500">Oct 26, 2025</span>
-              <span className="ml-auto text-gray-400 group-hover:text-indigo-600 transition-colors">↗</span>
+              <span className="ml-2 text-gray-400 group-hover:text-indigo-600 transition-colors">↗</span>
             </a>
             <a
               href="#october-19-2025"
@@ -99,7 +99,7 @@ export default function FounderJournalPage() {
               <span className="font-semibold underline decoration-dotted">The Viral Loop of Imagination</span>
               <span className="text-gray-500">—</span>
               <span className="text-sm text-gray-500">Oct 19, 2025</span>
-              <span className="ml-auto text-gray-400 group-hover:text-indigo-600 transition-colors">↗</span>
+              <span className="ml-2 text-gray-400 group-hover:text-indigo-600 transition-colors">↗</span>
             </a>
           </div>
         </div>
