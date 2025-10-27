@@ -350,6 +350,18 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
         </Page>
       ))}
 
+      {/* Back Cover - Pre-rendered Marketing Page */}
+      <Page size={{ width: 576, height: 720 }} style={styles.page}>
+        <Image
+          src="/images/pdf-back-cover.png"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+          }}
+        />
+      </Page>
+
     </Document>
   );
 };
