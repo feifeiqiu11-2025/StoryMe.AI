@@ -111,12 +111,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   sceneText: {
-    fontSize: 22,
+    fontSize: 20,
     fontFamily: 'Noto Sans SC',
-    lineHeight: 2.0,
+    lineHeight: 1.8,
     color: '#374151',
     textAlign: 'center',
     fontWeight: 'bold',
+    maxWidth: '100%',
+    wordWrap: 'break-word',
+    overflow: 'hidden',
   },
   sceneNumber: {
     position: 'absolute',

@@ -68,6 +68,9 @@ export async function generateAndDownloadStoryPDF(
   filename?: string
 ): Promise<void> {
   const blob = await generateStoryPDF(storyData);
-  const finalFilename = filename || `${storyData.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+  // Sanitize filename while preserving Chinese and other Unicode characters
+  // Only remove characters that are invalid in filenames: \ / : * ? " < > |
+  const sanitizedTitle = storyData.title.replace(/[\\/:*?"<>|]/g, '_');
+  const finalFilename = filename || `${sanitizedTitle}.pdf`;
   downloadPDF(blob, finalFilename);
 }
