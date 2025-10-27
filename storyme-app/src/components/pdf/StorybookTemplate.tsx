@@ -6,17 +6,20 @@
 import React from 'react';
 import { Document, Page, View, Text, Image, StyleSheet, Font } from '@react-pdf/renderer';
 
-// Register Chinese fonts for PDF rendering
+// Register Chinese fonts for PDF rendering with proper format
+// Using direct CDN links with proper CORS support
 Font.register({
   family: 'Noto Sans SC',
   fonts: [
     {
-      src: 'https://fonts.gstatic.com/s/notosanssc/v36/k3kXo84MPvpLmixcA63oeALhL4iJ-Q7m8w.ttf',
+      src: 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@4.5.11/files/noto-sans-sc-chinese-simplified-400-normal.woff',
       fontWeight: 400,
+      format: 'woff' as any,
     },
     {
-      src: 'https://fonts.gstatic.com/s/notosanssc/v36/k3kQo84MPvpLmixcA63oeALZJamO9yP66K4bLAxhZWI.ttf',
+      src: 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@4.5.11/files/noto-sans-sc-chinese-simplified-700-normal.woff',
       fontWeight: 700,
+      format: 'woff' as any,
     },
   ],
 });
