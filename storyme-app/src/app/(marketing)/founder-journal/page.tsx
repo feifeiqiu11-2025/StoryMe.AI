@@ -80,26 +80,22 @@ export default function FounderJournalPage() {
 
         {/* Journal Index */}
         <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-6 sm:p-8 border border-indigo-200 mb-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <span>📚</span>
-            <span>Journal Entries</span>
-          </h2>
           <div className="space-y-2">
             <a
               href="#october-26-2025"
-              className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-colors py-1"
+              className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-all py-2 px-3 rounded-lg hover:bg-white/60 cursor-pointer"
             >
               <span className="text-lg">✨</span>
-              <span className="font-semibold">The Power of a Mom's Voice</span>
+              <span className="font-semibold underline decoration-dotted">The Power of a Mom's Voice</span>
               <span className="text-gray-500">—</span>
               <span className="text-sm text-gray-500">Oct 26, 2025</span>
             </a>
             <a
               href="#october-19-2025"
-              className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-colors py-1"
+              className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-all py-2 px-3 rounded-lg hover:bg-white/60 cursor-pointer"
             >
               <span className="text-lg">🌈</span>
-              <span className="font-semibold">The Viral Loop of Imagination</span>
+              <span className="font-semibold underline decoration-dotted">The Viral Loop of Imagination</span>
               <span className="text-gray-500">—</span>
               <span className="text-sm text-gray-500">Oct 19, 2025</span>
             </a>
