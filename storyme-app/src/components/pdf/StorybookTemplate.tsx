@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   },
   sceneImageContainer: {
     width: '100%',
-    height: '65%',
+    height: '60%',
     backgroundColor: '#F3F4F6',
   },
   sceneImage: {
@@ -105,22 +105,20 @@ const styles = StyleSheet.create({
     objectFit: 'contain',
   },
   sceneTextContainer: {
-    height: '35%',
-    padding: '20 40',
+    height: '40%',
+    paddingTop: 20,
+    paddingBottom: 20,
+    paddingLeft: 50,
+    paddingRight: 50,
     justifyContent: 'center',
     backgroundColor: '#ffffff',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
   },
   sceneText: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: 'Noto Sans SC',
-    lineHeight: 1.6,
+    lineHeight: 1.5,
     color: '#374151',
     textAlign: 'center',
-    fontWeight: 'bold',
-    width: '100%',
   },
   sceneNumber: {
     position: 'absolute',
