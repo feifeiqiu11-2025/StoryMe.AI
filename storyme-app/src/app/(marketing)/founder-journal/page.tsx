@@ -5,10 +5,61 @@
 
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import LandingNav from '@/components/navigation/LandingNav';
+import { StoryCard, type StoryCardData } from '@/components/story/StoryCard';
+
+// Featured stories for the October 19th entry
+const DRAGON_STORIES = [
+  {
+    id: '2b8f5dcb-c6c0-418f-8772-a61f69d20613',
+    description: "Connor's Dragon Story",
+  },
+  {
+    id: '52c19d59-c305-4a75-a527-cec759359b27',
+    description: "Carter's Dragon Story",
+  },
+];
 
 export default function FounderJournalPage() {
+  const router = useRouter();
+  const [dragonStories, setDragonStories] = useState<StoryCardData[]>([]);
+  const [loadingStories, setLoadingStories] = useState(true);
+
+  useEffect(() => {
+    // Fetch the dragon stories
+    const fetchDragonStories = async () => {
+      try {
+        const promises = DRAGON_STORIES.map(async (story) => {
+          const response = await fetch(`/api/stories/public/${story.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            return {
+              ...data.story,
+              description: story.description,
+            };
+          }
+          return null;
+        });
+
+        const results = await Promise.all(promises);
+        setDragonStories(results.filter((s): s is StoryCardData => s !== null));
+      } catch (error) {
+        console.error('Error fetching dragon stories:', error);
+      } finally {
+        setLoadingStories(false);
+      }
+    };
+
+    fetchDragonStories();
+  }, []);
+
+  const handleStoryClick = (storyId: string) => {
+    router.push(`/stories/${storyId}?from=journal`);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       {/* Navigation */}
@@ -27,7 +78,130 @@ export default function FounderJournalPage() {
           </p>
         </div>
 
-        {/* Journal Entry */}
+        {/* Journal Entry - October 19th, 2025 */}
+        <article className="bg-white rounded-2xl shadow-xl p-8 sm:p-12 border border-purple-200 mb-8">
+          {/* Entry Header */}
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center text-2xl shadow-lg">
+                🌈
+              </div>
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                  The Viral Loop of Imagination
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">October 19th, 2025 — by Feifei Qiu, Founder of KindleWood Studio</p>
+              </div>
+            </div>
+            <div className="h-1 w-full bg-gradient-to-r from-purple-200 to-pink-200 rounded-full"></div>
+          </div>
+
+          {/* Entry Content */}
+          <div className="space-y-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+            <p>
+              Every evening, when we open KindleWood Studio to create a new story together, I see something magical happen — a network effect of creativity.
+            </p>
+
+            <p>
+              It starts with one small idea — sometimes just a silly sentence or a "what if this happens" from my kids — and then it grows.
+            </p>
+
+            <p>
+              Last night, Connor came up with a wild story:
+            </p>
+
+            <blockquote className="bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-500 p-6 rounded-lg my-6 italic">
+              <p className="text-lg sm:text-xl font-medium text-gray-900">
+                "A dragon set fire to the ocean and turned the water purple. No one could live there anymore. So Connor gathered Daddy, Mommy, and his little brother to take the purple water to the Antarctic and refill the ocean with blue water again."
+              </p>
+            </blockquote>
+
+            <p>
+              When we turned his words into vivid illustrations — watching the ocean turn purple, the family marching bravely to save it — his eyes lit up. The moment he saw his story come alive, he immediately said, <strong>"Let's add more! The dragon come back set the fire on sand beach...!"</strong>
+            </p>
+
+            <p>
+              And then, something even more beautiful happened.
+            </p>
+
+            <p>
+              My three-year-old, who had been quietly watching, started telling his version:
+            </p>
+
+            <blockquote className="bg-gradient-to-r from-pink-50 to-rose-50 border-l-4 border-pink-500 p-6 rounded-lg my-6 italic">
+              <p className="text-lg sm:text-xl font-medium text-gray-900">
+                "A dragon set fire to the ocean and turned it purple…<span className="text-gray-600">(I thought he gonna simply copy brother's story, but he twisted)</span>... but then the dragon felt sad and turned it back blue again."
+              </p>
+            </blockquote>
+
+            <p>
+              Two brothers. Two versions of the same story.
+              <br />
+              One about teamwork and courage, the other about empathy and change.
+            </p>
+
+            <p>
+              Their imaginations, though inspired by the same spark, reflected who they are:
+            </p>
+
+            <div className="bg-blue-50 rounded-xl p-6 my-6">
+              <p className="mb-2">
+                <strong className="text-blue-900">Connor</strong> — thoughtful, caring, the problem solver.
+              </p>
+              <p>
+                <strong className="text-pink-900">Carter</strong> — sweet, wild, and full of surprises. ❤️
+              </p>
+            </div>
+
+            <p>
+              It made me realize: <strong className="text-gray-900">creativity spreads.</strong>
+              <br />
+              When children see their ideas matter, it fuels a loop — from imagination to creation, from one mind to another.
+            </p>
+
+            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-6 border-l-4 border-amber-500 my-8">
+              <p className="text-gray-800 leading-relaxed">
+                That's the true network effect I want KindleWood Studio to ignite — not through algorithms or growth hacks, but through wonder.
+                One child's story inspiring another's.
+                One moment of imagination becoming many.
+              </p>
+            </div>
+          </div>
+
+          {/* Featured Stories from the Journal Entry */}
+          {!loadingStories && dragonStories.length > 0 && (
+            <div className="mt-10 pt-8 border-t-2 border-purple-200">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <span>🐉</span>
+                <span>The Dragon Stories</span>
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {dragonStories.map((story) => (
+                  <StoryCard
+                    key={story.id}
+                    story={story}
+                    onClick={() => handleStoryClick(story.id)}
+                    variant="community"
+                    showAuthor={false}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Author Signature */}
+          <div className="mt-10 pt-6 border-t-2 border-purple-200">
+            <p
+              className="text-4xl sm:text-5xl text-blue-900"
+              style={{ fontFamily: "var(--font-signature)" }}
+            >
+              Feifei Qiu
+            </p>
+            <p className="text-sm text-gray-600 mt-2">Founder & Mom, KindleWood Studio</p>
+          </div>
+        </article>
+
+        {/* Journal Entry - October 26th, 2025 */}
         <article className="bg-white rounded-2xl shadow-xl p-8 sm:p-12 border border-purple-200 mb-8">
           {/* Entry Header */}
           <div className="mb-8">
@@ -39,7 +213,7 @@ export default function FounderJournalPage() {
                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
                   The Power of a Mom's Voice
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">October 2025 — by Feifei Qiu, Founder of KindleWood Studio</p>
+                <p className="text-sm text-gray-500 mt-1">October 26th, 2025 — by Feifei Qiu, Founder of KindleWood Studio</p>
               </div>
             </div>
             <div className="h-1 w-full bg-gradient-to-r from-purple-200 to-pink-200 rounded-full"></div>
