@@ -78,12 +78,136 @@ export default function FounderJournalPage() {
           </p>
         </div>
 
-        {/* Journal Entry - October 19th, 2025 */}
-        <article className="bg-white rounded-2xl shadow-xl p-8 sm:p-12 border border-purple-200 mb-8">
+        {/* Journal Index */}
+        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-6 sm:p-8 border border-indigo-200 mb-12">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <span>📚</span>
+            <span>Journal Entries</span>
+          </h2>
+          <div className="space-y-3">
+            <a
+              href="#october-26-2025"
+              className="block bg-white rounded-xl p-4 hover:shadow-md transition-all hover:translate-x-1 border border-purple-100"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center text-lg flex-shrink-0">
+                  ✨
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-gray-900">The Power of a Mom's Voice</h3>
+                  <p className="text-sm text-gray-500">October 26th, 2025</p>
+                </div>
+              </div>
+            </a>
+            <a
+              href="#october-19-2025"
+              className="block bg-white rounded-xl p-4 hover:shadow-md transition-all hover:translate-x-1 border border-purple-100"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center text-lg flex-shrink-0">
+                  🌈
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-gray-900">The Viral Loop of Imagination</h3>
+                  <p className="text-sm text-gray-500">October 19th, 2025</p>
+                </div>
+              </div>
+            </a>
+          </div>
+        </div>
+
+        {/* Journal Entry - October 26th, 2025 */}
+        <article id="october-26-2025" className="bg-white rounded-2xl shadow-xl p-8 sm:p-12 border border-purple-200 mb-8 scroll-mt-8">
           {/* Entry Header */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center text-2xl shadow-lg">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center text-2xl shadow-md border-2 border-purple-200">
+                ✨
+              </div>
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                  The Power of a Mom's Voice
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">October 26th, 2025 — by Feifei Qiu, Founder of KindleWood Studio</p>
+              </div>
+            </div>
+            <div className="h-1 w-full bg-gradient-to-r from-purple-200 to-pink-200 rounded-full"></div>
+          </div>
+
+          {/* Entry Content */}
+          <div className="space-y-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+            <p>
+              Today, while working on Chinese storybooks creation flow, I wanted the narration to sound truly authentic. I started by trying OpenAI's TTS voice — it was fluent, but something felt off. The tone, rhythm — it didn't sound right.
+            </p>
+
+            <p>
+              I looked into other options, like Azure's Chinese TTS, which can sound smoother. But before testing more AI models, I thought — <em className="font-medium">why not just record it myself?</em>
+            </p>
+
+            <p>
+              So I did. Recorded myself for the story my kids and I created together.
+            </p>
+
+            <p>
+              Later, when I played the story back, my boys listened carefully and said:
+            </p>
+
+            <blockquote className="bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-500 p-6 rounded-lg my-6 italic">
+              <p className="text-lg sm:text-xl font-medium text-gray-900">
+                "Mama, I like your voice better than the other one (AI voice over)."
+              </p>
+            </blockquote>
+
+            <p>
+              That one sentence made my day. It reminded me that while AI can do incredible things — generate stories, draw beautiful pictures, translate languages — there are some parts of storytelling that only a human heart can give.
+            </p>
+
+            <p className="font-medium text-gray-900">
+              Because no AI voice can replace the comfort of a parent's "once upon a time."
+            </p>
+
+            <p>
+              I was thinking to train AI to clone human voices, but now this made me pause and wonder: <strong>Do we need a AI cloned human voice at all?</strong>
+            </p>
+
+            <p>
+              Maybe the slight imperfections, the uneven breaths, the laughter tucked into a word — those are what make a story <strong>ALIVE</strong>.
+            </p>
+
+            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-6 border-l-4 border-amber-500 my-8">
+              <p className="text-gray-800 leading-relaxed">
+                At KindleWood Studio, we're building tools to help parents and teachers create stories effortlessly. But what I never want to lose is the human connection — the sound of <em className="font-medium">you</em> telling your child's story.
+              </p>
+            </div>
+
+            <div className="text-center my-8 space-y-2">
+              <p className="text-lg font-semibold text-gray-900">
+                AI can help us craft the story.
+              </p>
+              <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">
+                But it's our voices that make it unforgettable.
+              </p>
+            </div>
+          </div>
+
+          {/* Author Signature */}
+          <div className="mt-10 pt-6 border-t-2 border-purple-200">
+            <p
+              className="text-4xl sm:text-5xl text-blue-900"
+              style={{ fontFamily: "var(--font-signature)" }}
+            >
+              Feifei Qiu
+            </p>
+            <p className="text-sm text-gray-600 mt-2">Founder & Mom, KindleWood Studio</p>
+          </div>
+        </article>
+
+        {/* Journal Entry - October 19th, 2025 */}
+        <article id="october-19-2025" className="bg-white rounded-2xl shadow-xl p-8 sm:p-12 border border-purple-200 mb-8 scroll-mt-8">
+          {/* Entry Header */}
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center text-2xl shadow-md border-2 border-purple-200">
                 🌈
               </div>
               <div>
@@ -171,6 +295,11 @@ export default function FounderJournalPage() {
           {/* Featured Stories from the Journal Entry */}
           {!loadingStories && dragonStories.length > 0 && (
             <div className="mt-10 pt-8 border-t-2 border-purple-200">
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6 border-l-4 border-blue-400">
+                <p className="text-gray-800 text-base sm:text-lg leading-relaxed">
+                  Want to see what sparked this moment? Check out these two dragon stories from the boys — each one reflecting their unique imagination and perspective. 🐉✨
+                </p>
+              </div>
               <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <span>🐉</span>
                 <span>The Dragon Stories</span>
