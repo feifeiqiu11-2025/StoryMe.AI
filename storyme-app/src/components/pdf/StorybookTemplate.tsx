@@ -2,11 +2,12 @@
  * Main Storybook PDF Template
  * Uses @react-pdf/renderer to create a beautiful children's book layout
  *
- * Page Size: 8.5" x 8.5" (612pt x 612pt) - Square Format
- * This is the most popular size for children's picture books:
- * - Professional printing: Standard square format, easy to hold for kids
- * - Home printing: Can print on 8.5" x 11" paper and trim to square
- * - Alternative: Can easily scale to 8" x 10" or US Letter (8.5" x 11") if needed
+ * Page Size: 8" x 10" (576pt x 720pt) - Portrait Format
+ * This is the standard size for children's picture books with text:
+ * - Layout: 70% image (full width, no borders) + 30% text caption
+ * - Professional printing: Standard portrait book size
+ * - Home printing: Can print on 8.5" x 11" paper with small margins
+ * - Image focus: Full-bleed images maximize visual impact
  */
 
 import React from 'react';
@@ -102,30 +103,27 @@ const styles = StyleSheet.create({
   },
   sceneImageContainer: {
     width: '100%',
-    height: '55%',
+    height: '70%',
     backgroundColor: '#F3F4F6',
-    paddingTop: 20,
-    paddingLeft: 20,
-    paddingRight: 20,
   },
   sceneImage: {
     width: '100%',
     height: '100%',
-    objectFit: 'contain',
+    objectFit: 'cover',
   },
   sceneTextContainer: {
-    height: '45%',
-    paddingTop: 40,
-    paddingBottom: 40,
-    paddingLeft: 60,
-    paddingRight: 60,
+    height: '30%',
+    paddingTop: 25,
+    paddingBottom: 25,
+    paddingLeft: 40,
+    paddingRight: 40,
     justifyContent: 'center',
     backgroundColor: '#ffffff',
   },
   sceneText: {
-    fontSize: 22,
+    fontSize: 20,
     fontFamily: 'Noto Sans SC',
-    lineHeight: 1.5,
+    lineHeight: 1.6,
     color: '#1F2937',
     textAlign: 'center',
     fontWeight: 'bold',
@@ -220,9 +218,9 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
   return (
     <Document>
       {/* Cover Page - AI Generated or Fallback */}
-      {/* Using 8.5x8.5 inch square format - standard for children's picture books */}
+      {/* Using 8x10 inch portrait format - standard for children's picture books */}
       {coverImageUrl ? (
-        <Page size={{ width: 612, height: 612 }} style={styles.page}>
+        <Page size={{ width: 576, height: 720 }} style={styles.page}>
           {/* AI-generated background image */}
           <View style={{ position: 'absolute', width: '100%', height: '100%' }}>
             <Image
@@ -270,7 +268,7 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
           </View>
         </Page>
       ) : (
-        <Page size={{ width: 612, height: 612 }} style={styles.page}>
+        <Page size={{ width: 576, height: 720 }} style={styles.page}>
           <View style={styles.coverPage}>
             <View style={styles.coverDecorationTop} />
             <Text style={styles.coverTitle}>{title}</Text>
@@ -289,7 +287,7 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
 
       {/* Scene Pages */}
       {scenes.map((scene, index) => (
-        <Page key={index} size={{ width: 612, height: 612 }} style={styles.page}>
+        <Page key={index} size={{ width: 576, height: 720 }} style={styles.page}>
           <View style={styles.scenePage}>
             {/* Image Section */}
             <View style={styles.sceneImageContainer}>
