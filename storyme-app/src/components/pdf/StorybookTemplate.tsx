@@ -121,9 +121,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   sceneText: {
-    fontSize: 18,
+    fontSize: 24,
     fontFamily: 'Noto Sans SC',
-    lineHeight: 1.8,
+    lineHeight: 1.6,
     color: '#1F2937',
     textAlign: 'center',
     fontWeight: 'bold',
@@ -202,6 +202,45 @@ interface StorybookTemplateProps {
   createdDate?: string;
 }
 
+/**
+ * Helper function to detect if text contains Chinese characters
+ */
+function containsChinese(text: string): boolean {
+  return /[\u4e00-\u9fa5]/.test(text);
+}
+
+/**
+ * Helper function to wrap Chinese text at 20 characters per line
+ * Only applies to Chinese text, English text keeps natural wrapping
+ */
+function wrapChineseText(text: string): string {
+  if (!containsChinese(text)) {
+    // English text - return as is, natural wrapping will work
+    return text;
+  }
+
+  // Chinese text - hard wrap at 20 characters per line
+  const maxCharsPerLine = 20;
+  const lines: string[] = [];
+  let currentLine = '';
+
+  for (let i = 0; i < text.length; i++) {
+    currentLine += text[i];
+
+    if (currentLine.length >= maxCharsPerLine) {
+      lines.push(currentLine);
+      currentLine = '';
+    }
+  }
+
+  // Add remaining text
+  if (currentLine.length > 0) {
+    lines.push(currentLine);
+  }
+
+  return lines.join('\n');
+}
+
 export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
   title,
   description,
@@ -233,37 +272,38 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
               }}
             />
           </View>
-          {/* Author overlay at bottom only */}
+          {/* Author & Copyright at bottom 10% of page */}
           <View style={{
             position: 'absolute',
-            bottom: 20,
+            bottom: 0,
             width: '100%',
+            height: '10%',
+            justifyContent: 'center',
             alignItems: 'center',
           }}>
             <View style={{
               backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              padding: 15,
-              borderRadius: 10,
+              paddingVertical: 8,
+              paddingHorizontal: 20,
+              borderRadius: 8,
             }}>
               <Text style={{
-                fontSize: 24,
+                fontSize: 14,
                 fontFamily: 'Noto Sans SC',
                 color: '#4B5563',
                 textAlign: 'center',
               }}>
                 By {author}
               </Text>
-              {createdDate && (
-                <Text style={{
-                  fontSize: 14,
-                  fontFamily: 'Noto Sans SC',
-                  color: '#6B7280',
-                  textAlign: 'center',
-                  marginTop: 5,
-                }}>
-                  {createdDate}
-                </Text>
-              )}
+              <Text style={{
+                fontSize: 10,
+                fontFamily: 'Noto Sans SC',
+                color: '#6B7280',
+                textAlign: 'center',
+                marginTop: 4,
+              }}>
+                © 2025 KindleWood Studio
+              </Text>
             </View>
           </View>
         </Page>
@@ -300,7 +340,7 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
             {/* Text Section */}
             <View style={styles.sceneTextContainer}>
               <Text style={styles.sceneText}>
-                {scene.caption || scene.description}
+                {wrapChineseText(scene.caption || scene.description || '')}
               </Text>
               <Text style={styles.sceneNumber}>
                 {scene.sceneNumber}
