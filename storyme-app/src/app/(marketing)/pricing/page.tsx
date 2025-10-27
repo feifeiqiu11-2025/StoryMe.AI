@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import PricingCards from '@/components/pricing/PricingCards';
+import LandingNav from '@/components/navigation/LandingNav';
 
 export default function PricingPage() {
   const router = useRouter();
@@ -100,18 +101,8 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      {/* Header */}
-      <header className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-        <Link href="/" className="text-lg font-bold hover:opacity-80 transition-opacity cursor-pointer text-gray-900">
-          📚 Kindle<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-600">Wood</span> Studio ✨
-        </Link>
-        <Link
-          href="/dashboard"
-          className="text-gray-700 hover:text-gray-900 font-medium px-6 py-2 rounded-lg hover:bg-white/50 transition-all"
-        >
-          Dashboard
-        </Link>
-      </header>
+      {/* Navigation */}
+      <LandingNav />
 
       <div className="max-w-7xl mx-auto px-4 py-12">
         {/* Hero Section */}
