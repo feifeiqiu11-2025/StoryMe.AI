@@ -84,34 +84,24 @@ export default function FounderJournalPage() {
             <span>📚</span>
             <span>Journal Entries</span>
           </h2>
-          <div className="space-y-3">
+          <div className="space-y-2">
             <a
               href="#october-26-2025"
-              className="block bg-white rounded-xl p-4 hover:shadow-md transition-all hover:translate-x-1 border border-purple-100"
+              className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-colors py-1"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center text-lg flex-shrink-0">
-                  ✨
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-bold text-gray-900">The Power of a Mom's Voice</h3>
-                  <p className="text-sm text-gray-500">October 26th, 2025</p>
-                </div>
-              </div>
+              <span className="text-lg">✨</span>
+              <span className="font-semibold">The Power of a Mom's Voice</span>
+              <span className="text-gray-500">—</span>
+              <span className="text-sm text-gray-500">Oct 26, 2025</span>
             </a>
             <a
               href="#october-19-2025"
-              className="block bg-white rounded-xl p-4 hover:shadow-md transition-all hover:translate-x-1 border border-purple-100"
+              className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-colors py-1"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center text-lg flex-shrink-0">
-                  🌈
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-bold text-gray-900">The Viral Loop of Imagination</h3>
-                  <p className="text-sm text-gray-500">October 19th, 2025</p>
-                </div>
-              </div>
+              <span className="text-lg">🌈</span>
+              <span className="font-semibold">The Viral Loop of Imagination</span>
+              <span className="text-gray-500">—</span>
+              <span className="text-sm text-gray-500">Oct 19, 2025</span>
             </a>
           </div>
         </div>
