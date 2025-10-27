@@ -115,10 +115,10 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Why Families and Educators Love KindleWood Studio */}
+        {/* Why Kids, Families & Educators Love KindleWood Studio */}
         <div className="mb-10 sm:mb-12">
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-6 sm:mb-8">
-            🎯 Why Families and Educators Love KindleWood Studio
+            🎯 Why Kids, Families & Educators Love KindleWood Studio
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
             {/* Card 1: Your Child Is the Story */}
@@ -126,7 +126,7 @@ export default function HomePage() {
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-rose-500 rounded-xl flex items-center justify-center shadow-md">
-                    <span className="text-2xl">📖</span>
+                    <span className="text-2xl">💖</span>
                   </div>
                 </div>
                 <div>
@@ -134,28 +134,26 @@ export default function HomePage() {
                     Your Child Is the Story
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    Upload a photo once, and your child becomes the hero of every adventure.
-                    Our AI keeps them recognizable across every page — as they grow, their story library grows with them.
+                    Upload a photo once, and your child becomes the hero of every adventure. Our AI keeps them recognizable across every page — as they grow, their story library grows with them.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Card 2: Create in Minutes, Inspire for Years */}
+            {/* Card 2: Real Voices, Real Connection */}
             <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-purple-100">
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl flex items-center justify-center shadow-md">
-                    <span className="text-2xl">🎨</span>
+                    <span className="text-2xl">🎤</span>
                   </div>
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-900 mb-2 text-lg">
-                    Create in Minutes, Inspire for Years
+                    Real Voices, Real Connection
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    Record your voice, upload a video, or type a few sentences — our AI turns rough ideas into beautiful bilingual storybooks.
-                    In just 5 minutes, you can create professional-quality stories and learning materials. No design skills needed.
+                    Record your own voice — or a teacher's — to narrate each story. Kids light up hearing familiar voices tell their adventures. Because no AI voice can replace the comfort of a parent's "once upon a time." (AI narration also available for convenience in multiple languages.)
                   </p>
                 </div>
               </div>
@@ -177,9 +175,7 @@ export default function HomePage() {
                     Fun, Bilingual Learning That Feels Like Play
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    Stories sync with the KindleWood Kids app for interactive reading in English and Chinese.
-                    Kids tap words to hear pronunciation, take fun quizzes, and get AI-powered explanations.
-                    Learning feels like playing — and every story teaches something new.
+                    Stories sync with the KindleWood Kids app for interactive reading in English and Chinese. Kids tap words to hear pronunciation, take fun quizzes, and get AI-powered explanations. Learning feels like play — and every story teaches something new.
                   </p>
                 </div>
               </div>
@@ -190,7 +186,7 @@ export default function HomePage() {
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-xl flex items-center justify-center shadow-md">
-                    <span className="text-2xl">🧩</span>
+                    <span className="text-2xl">🌱</span>
                   </div>
                 </div>
                 <div>
@@ -198,8 +194,7 @@ export default function HomePage() {
                     Created by Families, Enriched by Educators
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    Teachers can co-create and share educational storybooks — from phonics to science concepts — while maintaining classroom control.
-                    Parents can blend teacher-created lessons with family stories for a personalized learning journey.
+                    Teachers can co-create and share educational storybooks — from phonics to science concepts — while parents personalize stories with family characters or voices.
                   </p>
                 </div>
               </div>
@@ -213,7 +208,7 @@ export default function HomePage() {
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center shadow-md">
-                    <span className="text-2xl">💬</span>
+                    <span className="text-2xl">🛡️</span>
                   </div>
                 </div>
                 <div>
@@ -221,9 +216,7 @@ export default function HomePage() {
                     Safe, Ad-Free Reading You Control
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    A kid-friendly space with no ads, no outside links, and no in-app purchases.
-                    Your child only sees the stories you or their teacher publish.
-                    Supports bilingual reading in English and Chinese, giving you complete peace of mind.
+                    A kid-friendly space with no ads or outside links. Your child only sees stories shared by you or trusted teachers — supporting bilingual learning in complete peace of mind.
                   </p>
                 </div>
               </div>
@@ -237,7 +230,7 @@ export default function HomePage() {
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center shadow-md">
-                    <span className="text-2xl">🎯</span>
+                    <span className="text-2xl">🏆</span>
                   </div>
                 </div>
                 <div>
@@ -245,8 +238,7 @@ export default function HomePage() {
                     Set Goals Together, Celebrate Progress
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    Set reading or learning goals, earn badges, and celebrate milestones.
-                    Parents and teachers can track progress, quiz scores, and reading streaks — turning motivation into meaningful growth.
+                    Set reading or learning goals, earn badges, and celebrate milestones. Parents and teachers can track progress and celebrate small wins together.
                   </p>
                 </div>
               </div>
@@ -265,8 +257,7 @@ export default function HomePage() {
                     Stories Everywhere They Go
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    Read at home, listen on Spotify, or print as keepsake books.
-                    One story can travel from bedtime to classroom to car rides — helping kids stay curious and connected everywhere.
+                    Read at home, listen on Spotify, or print as keepsake books. Every story can travel from bedtime to car rides — helping kids stay curious and connected.
                   </p>
                 </div>
               </div>
@@ -280,7 +271,7 @@ export default function HomePage() {
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 bg-gradient-to-br from-violet-400 to-purple-500 rounded-xl flex items-center justify-center shadow-md">
-                    <span className="text-2xl">✨</span>
+                    <span className="text-2xl">🌟</span>
                   </div>
                 </div>
                 <div>
@@ -288,7 +279,7 @@ export default function HomePage() {
                     Partner to Empower Every Young Author
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    Schools and educators can publish their own learning collections, connect home and classroom learning, and inspire children to become confident storytellers in both languages.
+                    Schools and educators can publish classroom story collections and inspire confident storytellers in both languages.
                   </p>
                 </div>
               </div>
