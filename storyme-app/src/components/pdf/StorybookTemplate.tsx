@@ -1,6 +1,12 @@
 /**
  * Main Storybook PDF Template
  * Uses @react-pdf/renderer to create a beautiful children's book layout
+ *
+ * Page Size: 8.5" x 8.5" (612pt x 612pt) - Square Format
+ * This is the most popular size for children's picture books:
+ * - Professional printing: Standard square format, easy to hold for kids
+ * - Home printing: Can print on 8.5" x 11" paper and trim to square
+ * - Alternative: Can easily scale to 8" x 10" or US Letter (8.5" x 11") if needed
  */
 
 import React from 'react';
@@ -210,8 +216,9 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
   return (
     <Document>
       {/* Cover Page - AI Generated or Fallback */}
+      {/* Using 8.5x8.5 inch square format - standard for children's picture books */}
       {coverImageUrl ? (
-        <Page size="A4" style={styles.page}>
+        <Page size={{ width: 612, height: 612 }} style={styles.page}>
           {/* AI-generated background image */}
           <View style={{ position: 'absolute', width: '100%', height: '100%' }}>
             <Image
@@ -259,7 +266,7 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
           </View>
         </Page>
       ) : (
-        <Page size="A4" style={styles.page}>
+        <Page size={{ width: 612, height: 612 }} style={styles.page}>
           <View style={styles.coverPage}>
             <View style={styles.coverDecorationTop} />
             <Text style={styles.coverTitle}>{title}</Text>
@@ -278,7 +285,7 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
 
       {/* Scene Pages */}
       {scenes.map((scene, index) => (
-        <Page key={index} size="A4" style={styles.page}>
+        <Page key={index} size={{ width: 612, height: 612 }} style={styles.page}>
           <View style={styles.scenePage}>
             {/* Image Section */}
             <View style={styles.sceneImageContainer}>
