@@ -262,9 +262,31 @@ export default function FounderJournalPage() {
               But watching them learn together, inspiring each other — that's the real magic.
             </p>
 
+            <p>
+              And just when I thought I was the one building the "smart" app — Carter proved otherwise.
+            </p>
+
+            <p>
+              When Carter tapping the word <em>snowman</em> and hearing its explanation, my three-year-old looked at the screen and said:
+            </p>
+
+            <blockquote className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-cyan-500 p-6 rounded-lg my-6 italic">
+              <p className="text-lg sm:text-xl font-medium text-gray-900">
+                "Moana, play snowman movie!" <span className="text-gray-600">(He meant Frozen 😅)</span>
+              </p>
+            </blockquote>
+
+            <p className="font-medium text-gray-800">
+              Looks like he's already thinking ahead of the founder.
+            </p>
+
+            <p>
+              We've added interactive learning for now, but my vision goes further — a world where kids can talk with the stories they love. Imagine role play between a child and AI characters, or a Q&A space where kids freely ask questions and the system learns to respond in their language and tone. It's not easy to process little kids' voices — but if there's one thing I've learned, it's that curiosity always finds a way.
+            </p>
+
             <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-6 border-l-4 border-amber-500 my-8">
               <p className="text-gray-800 leading-relaxed">
-                Our loft has officially been renamed <em className="font-semibold">"the working shop,"</em> and every night it's filled with curiosity, laughter, and new words.
+                Our loft area has officially been renamed <em className="font-semibold">"the working shop"</em> by Connor, and every night it's filled with curiosity, imagination, laughter, and new words.
               </p>
             </div>
 
