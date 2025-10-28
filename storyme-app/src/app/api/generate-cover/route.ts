@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
 import { Character } from '@/lib/types/story';
-import { overlayCoverText } from '@/lib/services/cover-overlay.service';
 import { createClient } from '@/lib/supabase/server';
 
 export const maxDuration = 300; // 5 minutes timeout for Vercel
@@ -62,20 +61,12 @@ export async function POST(request: NextRequest) {
       emphasizeGenericCharacters: true,
     });
 
-    console.log(`✅ Base cover generated successfully in ${result.generationTime}s`);
-    console.log(`Base cover URL: ${result.imageUrl}`);
+    console.log(`✅ Cover generated successfully in ${result.generationTime}s`);
+    console.log(`AI-generated cover URL: ${result.imageUrl}`);
 
-    // Step 2: Overlay text on the cover image
-    console.log('📝 Overlaying text on cover...');
-    const coverWithText = await overlayCoverText(result.imageUrl, {
-      title,
-      author,
-      age,
-      language: language as 'en' | 'zh',
-    });
-
-    // Step 3: Upload the final cover with text to Supabase storage
-    console.log('☁️ Uploading final cover to storage...');
+    // Step 2: Upload the AI-generated cover directly to Supabase storage (no text overlay)
+    // Note: Text overlay (author, copyright) will be added by PDF generation if needed
+    console.log('☁️ Uploading cover to storage...');
     const supabase = await createClient();
 
     // Get user (authenticated or guest)
@@ -84,10 +75,17 @@ export async function POST(request: NextRequest) {
     // Use user ID if authenticated, otherwise use 'guest' folder
     const userId = user?.id || 'guest';
 
+    // Fetch the AI-generated image as a buffer
+    const imageResponse = await fetch(result.imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch AI-generated image: ${imageResponse.statusText}`);
+    }
+    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+
     const fileName = `${userId}/covers/${Date.now()}.png`;
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('generated-images')
-      .upload(fileName, coverWithText, {
+      .upload(fileName, imageBuffer, {
         contentType: 'image/png',
         cacheControl: '3600',
       });
@@ -103,7 +101,7 @@ export async function POST(request: NextRequest) {
       .getPublicUrl(fileName);
 
     const finalCoverUrl = urlData.publicUrl;
-    console.log(`✅ Final cover with text uploaded: ${finalCoverUrl}`);
+    console.log(`✅ Cover uploaded successfully: ${finalCoverUrl}`);
 
     return NextResponse.json({
       success: true,
