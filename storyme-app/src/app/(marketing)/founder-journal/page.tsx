@@ -11,6 +11,64 @@ import { useRouter } from 'next/navigation';
 import LandingNav from '@/components/navigation/LandingNav';
 import { StoryCard, type StoryCardData } from '@/components/story/StoryCard';
 
+// Share button component
+const ShareButton = ({ entryId, title }: { entryId: string; title: string }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/founder-journal#${entryId}`;
+
+    // Try native share API first (mobile)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `KindleWood Journal: ${title}`,
+          url: url,
+        });
+        return;
+      } catch (err) {
+        // User cancelled or share failed, fall back to copy
+      }
+    }
+
+    // Fall back to copy to clipboard
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleShare}
+      className="ml-auto flex-shrink-0 p-2 rounded-lg hover:bg-blue-100 transition-colors group"
+      title="Share this entry"
+    >
+      {copied ? (
+        <span className="text-green-600 text-sm font-medium">✓ Copied!</span>
+      ) : (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-5 w-5 text-gray-400 group-hover:text-blue-600 transition-colors"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+          />
+        </svg>
+      )}
+    </button>
+  );
+};
+
 // Featured stories for the October 19th entry
 const DRAGON_STORIES = [
   {
@@ -82,7 +140,17 @@ export default function FounderJournalPage() {
         <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-6 sm:p-8 border border-indigo-200 mb-12">
           <div className="space-y-2">
             <a
-              href="#october-26-2025"
+              href="#learning-is-contagious"
+              className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-all py-2 px-3 rounded-lg hover:bg-white/60 cursor-pointer group"
+            >
+              <span className="text-lg">💫</span>
+              <span className="font-semibold underline decoration-dotted">Learning Is Contagious</span>
+              <span className="text-gray-500">—</span>
+              <span className="text-sm text-gray-500">Oct 27, 2025</span>
+              <span className="ml-2 text-gray-400 group-hover:text-indigo-600 transition-colors">↗</span>
+            </a>
+            <a
+              href="#the-power-of-a-moms-voice"
               className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-all py-2 px-3 rounded-lg hover:bg-white/60 cursor-pointer group"
             >
               <span className="text-lg">✨</span>
@@ -92,7 +160,7 @@ export default function FounderJournalPage() {
               <span className="ml-2 text-gray-400 group-hover:text-indigo-600 transition-colors">↗</span>
             </a>
             <a
-              href="#october-19-2025"
+              href="#the-viral-loop-of-imagination"
               className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-all py-2 px-3 rounded-lg hover:bg-white/60 cursor-pointer group"
             >
               <span className="text-lg">🌈</span>
@@ -104,20 +172,150 @@ export default function FounderJournalPage() {
           </div>
         </div>
 
+        {/* Journal Entry - October 27th, 2025 */}
+        <article id="learning-is-contagious" className="bg-white rounded-2xl shadow-xl p-8 sm:p-12 border border-purple-200 mb-8 scroll-mt-8">
+          {/* Entry Header */}
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center text-2xl shadow-md border-2 border-blue-200">
+                💫
+              </div>
+              <div className="flex-1">
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                  Learning Is Contagious
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">October 27th, 2025 — by Feifei Qiu, Founder of KindleWood Studio</p>
+              </div>
+              <ShareButton entryId="learning-is-contagious" title="Learning Is Contagious" />
+            </div>
+            <div className="h-1 w-full bg-gradient-to-r from-blue-200 to-purple-200 rounded-full"></div>
+          </div>
+
+          {/* Entry Content */}
+          <div className="space-y-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+            <p>
+              The first few nights, the boys enjoyed making stories together. They loved watching their wild ideas come alive — listening, imagining, and laughing it out loud.
+            </p>
+
+            <p>
+              Then something small but magical happened.
+            </p>
+
+            <p>
+              When they listened to songs or stories, Connor or Carter would suddenly ask, <em>"What does whooshed mean? What does zoom mean?"</em>
+            </p>
+
+            <p>
+              Not because I didn't want to answer — but as a non-native English speaker, sometimes I had to pause and look up the words myself. That moment sparked an idea:
+            </p>
+
+            <blockquote className="bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-500 p-6 rounded-lg my-6">
+              <p className="text-lg sm:text-xl font-medium text-gray-900">
+                What if the app could help kids (and parents like me) learn together — instantly, interactively, joyfully?
+              </p>
+            </blockquote>
+
+            <p className="font-semibold text-gray-900">
+              So we built it.
+            </p>
+
+            <p>
+              Now, in the KindleWood Kids app, every word is tappable — kids can hear pronunciation, get explanations, and grow their vocabulary in a natural, playful way.
+            </p>
+
+            <p>
+              Over the past three nights, I've watched Connor completely immersed — tapping each word, listening carefully, and even writing them down on paper. (Of course, he chose a few funny ones to start! 😄)
+            </p>
+
+            {/* Second Image - Small, with text wrapping */}
+            <div className="float-right ml-6 mb-4 mt-2 w-64 sm:w-72 rounded-xl overflow-hidden shadow-lg border-2 border-purple-100">
+              <img
+                src="/images/journal/learning-contagious-2.jpg"
+                alt="Close-up of Connor's word practice on paper"
+                className="w-full h-auto object-cover"
+              />
+            </div>
+
+            <div className="bg-gradient-to-r from-pink-50 to-rose-50 border-l-4 border-pink-400 p-6 rounded-lg my-6">
+              <p className="text-base sm:text-lg italic text-gray-800">
+                When he tapped the word <em className="font-semibold">Mommy</em>, he looked right at me, smiling — no words needed.<br />
+                That look said, <strong className="text-pink-700">"I love you, Mom."</strong><br />
+                I don't think I've ever felt more emotional or proud.
+              </p>
+            </div>
+
+            <p>
+              Even little Carter, who usually runs around swinging his sword and hammer, now lies next to his brother, tapping words, sketching, and learning too.
+            </p>
+
+            {/* First Image - Full width */}
+            <div className="my-8 rounded-xl overflow-hidden shadow-lg border-2 border-blue-100">
+              <img
+                src="/images/journal/learning-contagious-1.jpg"
+                alt="Connor and Carter working together at their learning station"
+                className="w-full h-auto object-cover"
+              />
+            </div>
+
+            <p>
+              They still argue over which story to listen to — so yes, we now have two iPads. 😄<br />
+              But watching them learn together, inspiring each other — that's the real magic.
+            </p>
+
+            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-6 border-l-4 border-amber-500 my-8">
+              <p className="text-gray-800 leading-relaxed">
+                Our loft has officially been renamed <em className="font-semibold">"the working shop,"</em> and every night it's filled with curiosity, laughter, and new words.
+              </p>
+            </div>
+
+            <div className="text-center my-8">
+              <p className="text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+                Learning really is contagious. 💫
+              </p>
+            </div>
+
+            {/* Video Section - At the end */}
+            <div className="mt-10 flex justify-center">
+              <div className="rounded-xl overflow-hidden shadow-lg border-2 border-purple-100" style={{ maxWidth: '500px', width: '100%' }}>
+                <video
+                  controls
+                  className="w-full h-auto"
+                  poster="/images/journal/learning-contagious-1.jpg"
+                >
+                  <source src="/images/journal/learning-contagious-video.mp4" type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            </div>
+          </div>
+
+          {/* Author Signature */}
+          <div className="mt-10 pt-6 border-t-2 border-purple-200">
+            <p
+              className="text-4xl sm:text-5xl text-blue-900"
+              style={{ fontFamily: "var(--font-signature)" }}
+            >
+              Feifei Qiu
+            </p>
+            <p className="text-sm text-gray-600 mt-2">Founder & Mom, KindleWood Studio</p>
+          </div>
+        </article>
+
         {/* Journal Entry - October 26th, 2025 */}
-        <article id="october-26-2025" className="bg-white rounded-2xl shadow-xl p-8 sm:p-12 border border-purple-200 mb-8 scroll-mt-8">
+        <article id="the-power-of-a-moms-voice" className="bg-white rounded-2xl shadow-xl p-8 sm:p-12 border border-purple-200 mb-8 scroll-mt-8">
           {/* Entry Header */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center text-2xl shadow-md border-2 border-purple-200">
                 ✨
               </div>
-              <div>
+              <div className="flex-1">
                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
                   The Power of a Mom's Voice
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">October 26th, 2025 — by Feifei Qiu, Founder of KindleWood Studio</p>
               </div>
+              <ShareButton entryId="the-power-of-a-moms-voice" title="The Power of a Mom's Voice" />
             </div>
             <div className="h-1 w-full bg-gradient-to-r from-purple-200 to-pink-200 rounded-full"></div>
           </div>
@@ -191,19 +389,20 @@ export default function FounderJournalPage() {
         </article>
 
         {/* Journal Entry - October 19th, 2025 */}
-        <article id="october-19-2025" className="bg-white rounded-2xl shadow-xl p-8 sm:p-12 border border-purple-200 mb-8 scroll-mt-8">
+        <article id="the-viral-loop-of-imagination" className="bg-white rounded-2xl shadow-xl p-8 sm:p-12 border border-purple-200 mb-8 scroll-mt-8">
           {/* Entry Header */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center text-2xl shadow-md border-2 border-purple-200">
                 🌈
               </div>
-              <div>
+              <div className="flex-1">
                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
                   The Viral Loop of Imagination
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">October 19th, 2025 — by Feifei Qiu, Founder of KindleWood Studio</p>
               </div>
+              <ShareButton entryId="the-viral-loop-of-imagination" title="The Viral Loop of Imagination" />
             </div>
             <div className="h-1 w-full bg-gradient-to-r from-purple-200 to-pink-200 rounded-full"></div>
           </div>
@@ -305,92 +504,6 @@ export default function FounderJournalPage() {
               </div>
             </div>
           )}
-
-          {/* Author Signature */}
-          <div className="mt-10 pt-6 border-t-2 border-purple-200">
-            <p
-              className="text-4xl sm:text-5xl text-blue-900"
-              style={{ fontFamily: "var(--font-signature)" }}
-            >
-              Feifei Qiu
-            </p>
-            <p className="text-sm text-gray-600 mt-2">Founder & Mom, KindleWood Studio</p>
-          </div>
-        </article>
-
-        {/* Journal Entry - October 26th, 2025 */}
-        <article className="bg-white rounded-2xl shadow-xl p-8 sm:p-12 border border-purple-200 mb-8">
-          {/* Entry Header */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center text-2xl shadow-lg">
-                ✨
-              </div>
-              <div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                  The Power of a Mom's Voice
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">October 26th, 2025 — by Feifei Qiu, Founder of KindleWood Studio</p>
-              </div>
-            </div>
-            <div className="h-1 w-full bg-gradient-to-r from-purple-200 to-pink-200 rounded-full"></div>
-          </div>
-
-          {/* Entry Content */}
-          <div className="space-y-5 text-gray-700 leading-relaxed text-base sm:text-lg">
-            <p>
-              Today, while working on Chinese storybooks creation flow, I wanted the narration to sound truly authentic. I started by trying OpenAI's TTS voice — it was fluent, but something felt off. The tone, rhythm — it didn't sound right.
-            </p>
-
-            <p>
-              I looked into other options, like Azure's Chinese TTS, which can sound smoother. But before testing more AI models, I thought — <em className="font-medium">why not just record it myself?</em>
-            </p>
-
-            <p>
-              So I did. Recorded myself for the story my kids and I created together.
-            </p>
-
-            <p>
-              Later, when I played the story back, my boys listened carefully and said:
-            </p>
-
-            <blockquote className="bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-500 p-6 rounded-lg my-6 italic">
-              <p className="text-lg sm:text-xl font-medium text-gray-900">
-                "Mama, I like your voice better than the other one (AI voice over)."
-              </p>
-            </blockquote>
-
-            <p>
-              That one sentence made my day. It reminded me that while AI can do incredible things — generate stories, draw beautiful pictures, translate languages — there are some parts of storytelling that only a human heart can give.
-            </p>
-
-            <p className="font-medium text-gray-900">
-              Because no AI voice can replace the comfort of a parent's "once upon a time."
-            </p>
-
-            <p>
-              I was thinking to train AI to clone human voices, but now this made me pause and wonder: <strong>Do we need a AI cloned human voice at all?</strong>
-            </p>
-
-            <p>
-              Maybe the slight imperfections, the uneven breaths, the laughter tucked into a word — those are what make a story <strong>ALIVE</strong>.
-            </p>
-
-            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-6 border-l-4 border-amber-500 my-8">
-              <p className="text-gray-800 leading-relaxed">
-                At KindleWood Studio, we're building tools to help parents and teachers create stories effortlessly. But what I never want to lose is the human connection — the sound of <em className="font-medium">you</em> telling your child's story.
-              </p>
-            </div>
-
-            <div className="text-center my-8 space-y-2">
-              <p className="text-lg font-semibold text-gray-900">
-                AI can help us craft the story.
-              </p>
-              <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">
-                But it's our voices that make it unforgettable.
-              </p>
-            </div>
-          </div>
 
           {/* Author Signature */}
           <div className="mt-10 pt-6 border-t-2 border-purple-200">
