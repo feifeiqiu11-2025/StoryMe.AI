@@ -27,9 +27,9 @@ export async function POST(request: NextRequest) {
     let coverDescription: string;
 
     if (language === 'en') {
-      // English: Include title in AI prompt (AI generates the title text artistically)
-      // IMPORTANT: Specify English-only text to prevent random Chinese/foreign characters
-      coverDescription = `Children's storybook cover illustration with English title "${title}" prominently displayed at the top in ENGLISH LANGUAGE ONLY. ${description ? description + '. ' : ''}Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Beautiful typography for the title in clear English text, clean composition with space at bottom for author credits. Book cover style illustration. NO foreign language text, NO Chinese characters, NO random symbols - only English letters for the title`;
+      // English: Include ONLY the title text in AI prompt
+      // IMPORTANT: AI often generates gibberish text - be very explicit about what NOT to include
+      coverDescription = `Children's storybook cover illustration with ONLY the title "${title}" displayed at the top in clear English letters. ${description ? description + '. ' : ''}Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Clean composition focusing on the illustration and title. NO subtitles, NO taglines, NO author text, NO publisher text, NO random words or letters anywhere on the cover - ONLY the title "${title}" and the illustration. Book cover style with minimal text`;
     } else {
       // Chinese: NO TEXT AT ALL (prevents random Chinese characters, we'll overlay programmatically)
       coverDescription = `Children's storybook cover illustration WITHOUT ANY TEXT WHATSOEVER. ${description ? description + '. ' : ''}Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Clean composition with clear space at top for title and bottom for credits. Book cover style illustration. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO CHINESE CHARACTERS, NO NUMBERS, NO SYMBOLS on the image - ONLY pure visual illustration with NO text elements at all`;
