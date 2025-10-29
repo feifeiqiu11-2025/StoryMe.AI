@@ -24,21 +24,33 @@ export async function DELETE(request: Request) {
 
     // Delete all user data in the correct order (respecting foreign keys)
 
-    // 1. Delete scenes (depends on stories)
+    // 1. Delete scenes (CASCADE from projects, but delete manually for clarity)
+    // Note: scenes table has no user_id, only project_id
+    // We need to delete via projects first, or let CASCADE handle it
+    const { data: userProjects } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('user_id', userId);
+
+    if (userProjects && userProjects.length > 0) {
+      const projectIds = userProjects.map(p => p.id);
+
+      // Delete scenes for user's projects
+      await supabase
+        .from('scenes')
+        .delete()
+        .in('project_id', projectIds);
+    }
+
+    // 2. Delete projects (was called 'stories' incorrectly)
     await supabase
-      .from('scenes')
+      .from('projects')
       .delete()
       .eq('user_id', userId);
 
-    // 2. Delete stories
+    // 3. Delete characters from character library (was called 'characters' incorrectly)
     await supabase
-      .from('stories')
-      .delete()
-      .eq('user_id', userId);
-
-    // 3. Delete characters
-    await supabase
-      .from('characters')
+      .from('character_library')
       .delete()
       .eq('user_id', userId);
 
