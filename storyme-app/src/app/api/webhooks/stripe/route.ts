@@ -45,7 +45,34 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  console.log('Stripe webhook received:', event.type);
+  console.log(`[WEBHOOK] Stripe webhook received: ${event.type} (ID: ${event.id})`);
+
+  // Layer 5: Idempotency Check - Prevent processing the same event twice
+  // Stripe may send the same event multiple times if they don't receive a 200 response quickly
+  const { data: existingEvent } = await supabaseAdmin
+    .from('webhook_events')
+    .select('id, processed_at')
+    .eq('stripe_event_id', event.id)
+    .single();
+
+  if (existingEvent) {
+    console.log(`[WEBHOOK] Event ${event.id} already processed at ${existingEvent.processed_at}, skipping`);
+    return NextResponse.json({
+      received: true,
+      skipped: true,
+      reason: 'Event already processed (idempotency check)'
+    });
+  }
+
+  // Record that we're processing this event (before actual processing for safety)
+  await supabaseAdmin
+    .from('webhook_events')
+    .insert({
+      stripe_event_id: event.id,
+      event_type: event.type,
+      success: false,  // Will update to true if successful
+      metadata: event as any
+    });
 
   try {
     switch (event.type) {
@@ -71,13 +98,29 @@ export async function POST(request: NextRequest) {
         break;
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        console.log(`[WEBHOOK] Unhandled event type: ${event.type}`);
     }
 
+    // Mark event as successfully processed
+    await supabaseAdmin
+      .from('webhook_events')
+      .update({ success: true })
+      .eq('stripe_event_id', event.id);
+
+    console.log(`[WEBHOOK] Event ${event.id} processed successfully`);
     return NextResponse.json({ received: true });
 
   } catch (error) {
-    console.error('Error processing webhook:', error);
+    console.error(`[WEBHOOK] Error processing event ${event.id}:`, error);
+
+    // Record the error
+    await supabaseAdmin
+      .from('webhook_events')
+      .update({
+        success: false,
+        error_message: error instanceof Error ? error.message : 'Unknown error'
+      })
+      .eq('stripe_event_id', event.id);
     return NextResponse.json(
       {
         error: 'Webhook processing failed',
@@ -216,7 +259,36 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
 
   console.log(`[WEBHOOK] User ${userId} updated successfully in database`);
 
-  // Upsert subscription record
+  // Layer 4: Smart Upsert - Only update if new data is better quality
+  // Check if subscription record already exists
+  const { data: existingSubscription } = await supabaseAdmin
+    .from('subscriptions')
+    .select('*')
+    .eq('stripe_subscription_id', subscription.id)
+    .single();
+
+  // Determine if we should update based on data quality
+  const hasValidDates = subscription.current_period_start && subscription.current_period_end;
+  const existingHasValidDates = existingSubscription?.current_period_start && existingSubscription?.current_period_end;
+
+  // Don't downgrade data quality: Skip update if existing has valid dates but new data doesn't
+  if (existingSubscription && existingHasValidDates && !hasValidDates) {
+    console.log(`[WEBHOOK] Skipping subscription update - existing record has better data quality`, {
+      subscriptionId: subscription.id,
+      existingDates: {
+        start: existingSubscription.current_period_start,
+        end: existingSubscription.current_period_end
+      },
+      newDates: {
+        start: subscription.current_period_start,
+        end: subscription.current_period_end
+      }
+    });
+    // Still update user table (already done above), just skip subscriptions table update
+    return;
+  }
+
+  // Build subscription data object
   const subscriptionData: any = {
     user_id: userId,
     stripe_subscription_id: subscription.id,
@@ -236,6 +308,12 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   if (subscription.canceled_at) {
     subscriptionData.cancelled_at = new Date(subscription.canceled_at * 1000).toISOString();
   }
+
+  console.log(`[WEBHOOK] Upserting subscription with data quality check passed`, {
+    subscriptionId: subscription.id,
+    hasValidDates,
+    willUpdate: true
+  });
 
   const { error: subError } = await supabaseAdmin
     .from('subscriptions')
