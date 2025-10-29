@@ -1,7 +1,7 @@
 -- Cleanup duplicate subscription records caused by webhook race conditions
 -- This script removes duplicate subscriptions created before the upsert fix was applied
 
--- Step 1: Delete duplicate subscription records for kindlewoodsai@gmail.com
+-- Step 1a: Delete duplicate subscription records for kindlewoodsai@gmail.com
 -- Keep only the record with valid current_period_start/end dates (id: d1d96e56-1062-49d9-84ef-67cbcadb1784)
 DELETE FROM subscriptions
 WHERE stripe_subscription_id = 'sub_1SNdOeAg7OQqrjiWAtFXxvPs'
@@ -10,14 +10,31 @@ WHERE stripe_subscription_id = 'sub_1SNdOeAg7OQqrjiWAtFXxvPs'
     'eb3423a7-b611-4747-9c0e-8d14ea7f722c'   -- active with NULL dates
   );
 
--- Step 2: Fix user's billing_cycle_start and clear trial_ends_at
--- Set billing_cycle_start from the good subscription record
+-- Step 1b: Delete duplicate subscription records for xshephy@gmail.com
+-- Keep only the record with valid current_period_start/end dates (id: df2a5dda-b16b-411f-bc92-a82cbbe0d253)
+DELETE FROM subscriptions
+WHERE stripe_subscription_id = 'sub_1SMaJeAg7OQqrjiWRHYOGttn'
+  AND id IN (
+    'f62e5dc1-7882-403c-87ac-b608305db9d8',  -- active with NULL dates
+    '97b78c1a-a923-4190-9773-08b79fc329ee'   -- incomplete with NULL dates
+  );
+
+-- Step 2a: Fix kindlewoodsai@gmail.com user data
 UPDATE users
 SET
   trial_ends_at = NULL,  -- Clear trial end date for paid user
   billing_cycle_start = '2025-10-29 17:42:56'::timestamp with time zone  -- From subscription current_period_start
 WHERE id = '09ce1483-a8f6-4488-a9b5-e7dfa323efb0'
   AND email = 'kindlewoodsai@gmail.com';
+
+-- Step 2b: Fix xshephy@gmail.com user data
+UPDATE users
+SET
+  trial_ends_at = NULL,  -- Clear trial end date for paid user
+  billing_cycle_start = '2025-10-26 20:13:26'::timestamp with time zone,  -- From subscription current_period_start
+  subscription_status = 'active'  -- Fix status from 'incomplete' to 'active'
+WHERE id = 'f75e26b7-4177-4c2a-b3eb-55c5d6055b54'
+  AND email = 'xshephy@gmail.com';
 
 -- Step 3: Verify the fix by checking for any remaining duplicates
 -- This query should return 0 rows after cleanup
