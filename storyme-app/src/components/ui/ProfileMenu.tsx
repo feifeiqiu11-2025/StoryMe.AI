@@ -101,6 +101,13 @@ export default function ProfileMenu({ displayName }: ProfileMenuProps) {
   }
 
   const isPremium = usage.tier === 'premium';
+  const isBasic = usage.tier === 'basic';
+  const isPaidTier = isPremium || isBasic;
+
+  // Determine user tier display text
+  const tierDisplayText = isPremium ? '✨ Premium Member'
+    : isBasic ? '⭐ Basic Member'
+    : '🎁 Free Trial';
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -128,7 +135,7 @@ export default function ProfileMenu({ displayName }: ProfileMenuProps) {
           <div className="px-4 py-3 border-b border-gray-100">
             <p className="text-sm font-semibold text-gray-900">{displayName}</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              {isPremium ? '✨ Premium Member' : '🎁 Free Trial'}
+              {tierDisplayText}
             </p>
           </div>
 
