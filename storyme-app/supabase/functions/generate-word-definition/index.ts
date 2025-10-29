@@ -53,26 +53,45 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a helpful reading tutor for young children. You explain words in a simple, fun, and age-appropriate way.`
+            content: language === 'zh' || language === 'zh-CN' || language === 'zh-TW'
+              ? `你是一位专门为3-8岁儿童服务的阅读导师。用简单、有趣、适合年龄的方式解释汉字和词语。`
+              : `You are a super fun reading buddy for kids aged 3-8! You explain words in the simplest, most exciting way possible.`
           },
           {
             role: 'user',
-            content: `A ${child_age}-year-old child is reading a story and tapped on the word "${word}" in this sentence:
+            content: language === 'zh' || language === 'zh-CN' || language === 'zh-TW'
+              ? `一个${child_age}岁的孩子正在读故事，点击了这个句子中的词语"${word}"：
 "${sentence}"
 
-Please provide:
-1. A simple, age-appropriate definition (2-3 short sentences that a ${child_age}-year-old can understand)
-2. A new example sentence using the word (at a ${child_age}-year-old reading level, NOT the same sentence from the story)
-3. A single emoji that represents the word
+请提供：
+1. 简单有趣的解释（1-2句话，用${child_age}岁孩子能懂的语言，要活泼有趣）
+2. 一个新的例句（适合${child_age}岁孩子的阅读水平，不要使用故事原句）
+3. 一个代表这个词的表情符号
 
-Respond ONLY with valid JSON in this exact format:
+只用JSON格式回复：
 {
-  "definition": "your definition here",
-  "example_sentence": "your example here",
+  "definition": "你的解释",
+  "example_sentence": "你的例句",
+  "visual_aid_emoji": "表情"
+}
+
+让解释简短、有趣，让${child_age}岁的孩子容易理解！`
+              : `A ${child_age}-year-old is reading and tapped on "${word}" in this sentence:
+"${sentence}"
+
+Create a FUN mini-lesson! Provide:
+1. A SHORT, exciting definition (1 sentence max, use simple words a ${child_age}-year-old knows)
+2. A fun example sentence (simple and playful, NOT from the story)
+3. A perfect emoji for this word
+
+Respond ONLY with valid JSON:
+{
+  "definition": "your super short definition",
+  "example_sentence": "your fun example",
   "visual_aid_emoji": "emoji"
 }
 
-Make it fun, friendly, and easy for a ${child_age}-year-old to understand!`
+Make it SHORT, FUN, and perfect for a ${child_age}-year-old!`
           }
         ],
         temperature: 0.7,
