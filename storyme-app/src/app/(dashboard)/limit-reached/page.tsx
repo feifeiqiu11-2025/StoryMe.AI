@@ -120,8 +120,11 @@ export default function LimitReachedPage() {
               Upgrade to unlock:
             </h2>
             <div className="grid md:grid-cols-2 gap-4">
-              {/* Basic Tier */}
-              <div className="bg-white rounded-xl p-4 shadow-sm">
+              {/* Basic Tier - Clickable */}
+              <button
+                onClick={() => router.push('/upgrade?plan=basic')}
+                className="bg-white rounded-xl p-4 shadow-sm hover:shadow-lg transition-all border-2 border-transparent hover:border-purple-300 text-left"
+              >
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-2xl">⭐</span>
                   <h3 className="font-bold text-gray-900">Basic Plan</h3>
@@ -141,10 +144,16 @@ export default function LimitReachedPage() {
                     <span>Export to PDF</span>
                   </li>
                 </ul>
-              </div>
+                <div className="mt-4 text-center text-sm font-semibold text-purple-600">
+                  Select Basic →
+                </div>
+              </button>
 
-              {/* Premium Tier */}
-              <div className="bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl p-4 shadow-sm border-2 border-purple-300">
+              {/* Premium Tier - Clickable */}
+              <button
+                onClick={() => router.push('/upgrade?plan=premium')}
+                className="bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl p-4 shadow-sm hover:shadow-lg transition-all border-2 border-purple-300 hover:border-purple-500 text-left"
+              >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <span className="text-2xl">✨</span>
@@ -167,7 +176,10 @@ export default function LimitReachedPage() {
                     <span>All Basic features</span>
                   </li>
                 </ul>
-              </div>
+                <div className="mt-4 text-center text-sm font-semibold text-purple-600">
+                  Select Premium →
+                </div>
+              </button>
             </div>
           </div>
 

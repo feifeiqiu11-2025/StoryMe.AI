@@ -5,7 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getUserUsage } from '@/lib/utils/rate-limit';
+import { checkStoryCreationLimit } from '@/lib/subscription/middleware';
 
 export async function GET() {
   try {
@@ -19,19 +19,10 @@ export async function GET() {
       );
     }
 
-    const usage = await getUserUsage(user.id);
+    // Use checkStoryCreationLimit to get proper canCreate status
+    const limitCheck = await checkStoryCreationLimit(user.id);
 
-    if (!usage) {
-      return NextResponse.json(
-        { error: 'Unable to fetch usage data' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      usage,
-    });
+    return NextResponse.json(limitCheck);
   } catch (error) {
     console.error('Error fetching usage limits:', error);
     return NextResponse.json(
