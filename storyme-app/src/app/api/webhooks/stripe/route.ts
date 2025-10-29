@@ -159,9 +159,11 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     stripe_customer_id: subscription.customer as string,
   };
 
-  // If subscription is active, end the trial
-  if (subscription.status === 'active') {
+  // If user has a paid subscription, mark trial as completed and clear trial_ends_at
+  // Trial is one-time only - once completed, it stays completed even if user cancels and resubscribes
+  if (tier && tier !== 'free') {
     userUpdateData.trial_status = 'completed';
+    userUpdateData.trial_ends_at = null;  // Clear trial end date for paid users
   }
 
   // Add billing_cycle_start only if current_period_start exists
@@ -236,7 +238,10 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
 
   const { error: subError } = await supabaseAdmin
     .from('subscriptions')
-    .upsert(subscriptionData);
+    .upsert(subscriptionData, {
+      onConflict: 'stripe_subscription_id',  // Prevent duplicate subscriptions
+      ignoreDuplicates: false  // Update existing record on conflict
+    });
 
   if (subError) {
     console.error('[WEBHOOK] Error upserting subscription:', subError);
@@ -263,7 +268,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
   console.log(`Subscription deleted for user ${userId}`);
 
-  // Revert user to trial/free tier
+  // Revert user to free tier (no new trial - trial is one-time only)
   const { error: userError } = await supabaseAdmin
     .from('users')
     .update({
@@ -271,6 +276,8 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
       subscription_status: 'cancelled',
       stories_limit: 5,
       stripe_subscription_id: null,
+      billing_cycle_start: null,  // No longer on a billing cycle
+      // Keep trial_ends_at and trial_status as-is (trial was already used)
     })
     .eq('id', userId);
 

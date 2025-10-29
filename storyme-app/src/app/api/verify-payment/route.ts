@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { stripe } from '@/lib/stripe/config';
+import Stripe from 'stripe';
 
 export async function GET(request: NextRequest) {
   try {
@@ -79,6 +80,12 @@ export async function GET(request: NextRequest) {
       if (subscriptionTier === 'basic') storiesLimit = 20;
       if (subscriptionTier === 'premium' || subscriptionTier === 'team') storiesLimit = -1;
 
+      // Get actual period start from subscription object
+      const subscriptionObj = session.subscription as Stripe.Subscription;
+      const periodStart = subscriptionObj?.current_period_start
+        ? new Date(subscriptionObj.current_period_start * 1000).toISOString()
+        : new Date().toISOString(); // Fallback to now if not available
+
       // Update database immediately
       const { error: updateError } = await supabase
         .from('users')
@@ -86,11 +93,12 @@ export async function GET(request: NextRequest) {
           subscription_tier: subscriptionTier,
           subscription_status: subscriptionStatus,
           stories_limit: storiesLimit,
-          stripe_subscription_id: typeof session.subscription === 'object' ? session.subscription.id : session.subscription,
+          stripe_subscription_id: subscriptionObj?.id || session.subscription as string,
           stripe_customer_id: session.customer as string,
-          billing_cycle_start: new Date().toISOString(),
+          billing_cycle_start: periodStart,  // Use actual period start from Stripe
           stories_created_this_month: 0, // Reset count on new subscription
           trial_status: 'completed',
+          trial_ends_at: null,  // Clear trial end date for paid users
         })
         .eq('id', user.id);
 
