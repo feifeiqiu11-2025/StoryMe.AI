@@ -14,6 +14,7 @@ interface UsageData {
   limit: number;
   tier: string;
   trialEndsAt: string | null;
+  trialStatus: string | null;
 }
 
 interface ProfileMenuProps {
@@ -34,7 +35,7 @@ export default function ProfileMenu({ displayName }: ProfileMenuProps) {
         if (user) {
           const { data, error } = await supabase
             .from('users')
-            .select('images_generated_count, images_limit, subscription_tier, trial_ends_at')
+            .select('images_generated_count, images_limit, subscription_tier, trial_ends_at, trial_status')
             .eq('id', user.id)
             .single();
 
@@ -43,7 +44,8 @@ export default function ProfileMenu({ displayName }: ProfileMenuProps) {
               count: data.images_generated_count || 0,
               limit: data.images_limit || 50,
               tier: data.subscription_tier || 'free',
-              trialEndsAt: data.trial_ends_at
+              trialEndsAt: data.trial_ends_at,
+              trialStatus: data.trial_status
             });
           }
         }
@@ -87,8 +89,11 @@ export default function ProfileMenu({ displayName }: ProfileMenuProps) {
   const isCritical = percentage >= 90;
 
   // Calculate days remaining in trial
+  // Only show trial countdown if trial is still ACTIVE (not completed)
   let daysRemaining = null;
-  if (usage.trialEndsAt) {
+  const isTrialActive = usage.trialStatus === 'active' && usage.trialEndsAt;
+
+  if (isTrialActive) {
     const endDate = new Date(usage.trialEndsAt);
     const now = new Date();
     const diff = endDate.getTime() - now.getTime();

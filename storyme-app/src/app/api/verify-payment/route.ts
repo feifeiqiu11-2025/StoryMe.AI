@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
           billing_cycle_start: periodStart,  // Use actual period start from Stripe
           stories_created_this_month: 0, // Reset count on new subscription
           trial_status: 'completed',
-          trial_ends_at: null,  // Clear trial end date for paid users
+          // Keep trial_ends_at for historical data - UI checks trial_status
         })
         .eq('id', user.id);
 

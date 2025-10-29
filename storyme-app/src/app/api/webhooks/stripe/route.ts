@@ -159,11 +159,12 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     stripe_customer_id: subscription.customer as string,
   };
 
-  // If user has a paid subscription, mark trial as completed and clear trial_ends_at
+  // If user has a paid subscription, mark trial as completed
+  // Keep trial_ends_at for historical records - UI checks trial_status to determine if trial is active
   // Trial is one-time only - once completed, it stays completed even if user cancels and resubscribes
   if (tier && tier !== 'free') {
     userUpdateData.trial_status = 'completed';
-    userUpdateData.trial_ends_at = null;  // Clear trial end date for paid users
+    // Keep trial_ends_at for historical data
   }
 
   // Add billing_cycle_start only if current_period_start exists
