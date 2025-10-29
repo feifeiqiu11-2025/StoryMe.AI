@@ -135,8 +135,8 @@ export default function CreateStoryPage() {
 
         // Check if user can create stories
         if (!data.canCreate) {
-          // Redirect to upgrade page instead of showing modal
-          router.push('/upgrade');
+          // Redirect to limit-reached transition page
+          router.push('/limit-reached');
         }
       } catch (error) {
         console.error('Error checking limits:', error);
