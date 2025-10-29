@@ -77,7 +77,22 @@ export async function POST(request: Request) {
       });
     } else {
       // No existing subscription - create checkout session instead
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin') || 'http://localhost:3002';
+      // Get the app URL - prioritize production domain
+      const origin = request.headers.get('origin') || request.headers.get('referer')?.split('/').slice(0, 3).join('/');
+      const isProduction = process.env.NODE_ENV === 'production';
+      const productionDomain = 'https://www.kindlewoodstudio.ai';
+
+      // In production, always use custom domain; in dev, use origin or localhost
+      const appUrl = isProduction
+        ? productionDomain
+        : (origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002');
+
+      console.log(`[CHANGE-SUBSCRIPTION] Creating session with URLs:`, {
+        appUrl,
+        isProduction,
+        origin,
+        env: process.env.NEXT_PUBLIC_APP_URL
+      });
 
       // Get or create customer
       let customerId = userData.stripe_customer_id;
