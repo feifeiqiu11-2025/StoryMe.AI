@@ -35,14 +35,14 @@ export default function ProfileMenu({ displayName }: ProfileMenuProps) {
         if (user) {
           const { data, error } = await supabase
             .from('users')
-            .select('images_generated_count, images_limit, subscription_tier, trial_ends_at, trial_status')
+            .select('stories_created_this_month, stories_limit, subscription_tier, trial_ends_at, trial_status')
             .eq('id', user.id)
             .single();
 
           if (data && !error) {
             setUsage({
-              count: data.images_generated_count || 0,
-              limit: data.images_limit || 50,
+              count: data.stories_created_this_month || 0,
+              limit: data.stories_limit || 5,
               tier: data.subscription_tier || 'free',
               trialEndsAt: data.trial_ends_at,
               trialStatus: data.trial_status
@@ -143,14 +143,14 @@ export default function ProfileMenu({ displayName }: ProfileMenuProps) {
           <div className="px-4 py-3 space-y-3">
             {isPremium ? (
               <div className="px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-semibold text-center">
-                ✨ Unlimited Images
+                ✨ Unlimited Stories
               </div>
             ) : (
               <>
-                {/* Image Usage */}
+                {/* Story Usage */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Images Used</span>
+                    <span className="text-gray-600">Stories Created</span>
                     <span className={`font-semibold ${isCritical ? 'text-red-600' : isLow ? 'text-orange-600' : 'text-blue-600'}`}>
                       {usage.count} / {usage.limit}
                     </span>
@@ -168,7 +168,7 @@ export default function ProfileMenu({ displayName }: ProfileMenuProps) {
                     />
                   </div>
                   <p className={`text-xs ${isCritical ? 'text-red-600' : isLow ? 'text-orange-600' : 'text-gray-500'}`}>
-                    {remaining} images remaining
+                    {remaining} stories remaining
                   </p>
                 </div>
 
