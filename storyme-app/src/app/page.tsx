@@ -395,7 +395,15 @@ export default function HomePage() {
 
             {/* Opening */}
             <p className="text-base sm:text-lg">
-              When I think of the kids I know — my sons Connor and Carter, the neighborhood kids racing off after school — I feel both excitement and a little worry. We're living in a moment where intelligence is no longer enough; AI can write, code, and even "think." But one thing it can't do — and what will truly define our children's future — is <strong>creativity</strong>.
+              When I think of the kids I know — my sons Connor and Carter, the neighborhood kids racing off after school — I feel both excitement and a little worry. We're living in a moment where intelligence is no longer enough; AI can write, code, and even "think." But one thing it can't do — and what will truly define our children's future — is <strong>creativity, empathy, and the courage to imagine something new</strong>.
+            </p>
+
+            <p className="text-base sm:text-lg">
+              The goal for the next generation isn't to compete with machines, but to collaborate with them — to turn technology into a creative amplifier, not a substitute for thinking.
+            </p>
+
+            <p className="text-base sm:text-lg font-medium text-gray-800">
+              Our children's edge won't be how fast they answer — it'll be the questions they dare to ask.
             </p>
 
             {/* Research Section */}
@@ -486,19 +494,19 @@ export default function HomePage() {
                   <ul className="space-y-2 text-sm sm:text-base text-gray-700">
                     <li className="flex items-start gap-2">
                       <span className="text-teal-600 font-bold mt-1">→</span>
-                      Share stories with friends or family → building empathy and communication
+                      Share stories with friends and family → empathy & communication
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-teal-600 font-bold mt-1">→</span>
-                      Reflect on "What if?" and "Why?" → building critical thinking
+                      Reflect on "What if?" and "Why?" → curiosity & critical thinking
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-teal-600 font-bold mt-1">→</span>
-                      Iterate and experiment → building resilience and growth mindset
+                      Iterate and experiment → resilience & growth mindset
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-teal-600 font-bold mt-1">→</span>
-                      Expand narratives across languages → building global perspective
+                      Expand narratives across languages → global perspective
                     </li>
                   </ul>
                 </div>
