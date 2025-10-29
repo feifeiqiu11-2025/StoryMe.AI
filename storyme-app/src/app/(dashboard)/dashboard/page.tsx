@@ -11,11 +11,16 @@ import Link from 'next/link';
 import { sampleStorybooks } from '@/data/sample-storybooks';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
+import UpgradeModal from '@/components/ui/UpgradeModal';
 
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<'trial_expired' | 'story_limit_reached'>('story_limit_reached');
+  const [storiesUsed, setStoriesUsed] = useState(0);
+  const [storiesLimit, setStoriesLimit] = useState(5);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -58,6 +63,42 @@ export default function DashboardPage() {
     loadUser();
   }, [router]);
 
+  const handleCreateStoryClick = async () => {
+    // Check story creation limits before allowing navigation
+    try {
+      const response = await fetch('/api/usage/limits');
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Failed to check limits:', data);
+        // If check fails, allow navigation (fail open)
+        router.push('/create');
+        return;
+      }
+
+      // Check if user can create stories
+      if (!data.canCreate) {
+        // Determine the reason
+        if (data.reason?.includes('trial has expired')) {
+          setUpgradeReason('trial_expired');
+        } else {
+          setUpgradeReason('story_limit_reached');
+        }
+        setStoriesUsed(data.storiesUsed || 0);
+        setStoriesLimit(data.storiesLimit || 5);
+        setShowUpgradeModal(true);
+        return;
+      }
+
+      // User can create, navigate to create page
+      router.push('/create');
+    } catch (error) {
+      console.error('Error checking limits:', error);
+      // On error, allow navigation (fail open)
+      router.push('/create');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -94,9 +135,9 @@ export default function DashboardPage() {
         {/* Quick Actions Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Create Story */}
-          <Link
-            href="/create"
-            className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-8 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-blue-200 hover:border-blue-300"
+          <button
+            onClick={handleCreateStoryClick}
+            className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-8 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-blue-200 hover:border-blue-300 text-left"
           >
             <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform shadow-md">
               ✨
@@ -108,7 +149,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2 text-blue-600 font-semibold group-hover:gap-3 transition-all text-sm">
               Start Creating →
             </div>
-          </Link>
+          </button>
 
           {/* Character Library */}
           <Link
@@ -276,6 +317,15 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        reason={upgradeReason}
+        storiesUsed={storiesUsed}
+        storiesLimit={storiesLimit}
+      />
     </div>
   );
 }

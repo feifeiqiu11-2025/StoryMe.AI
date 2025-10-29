@@ -239,9 +239,12 @@ After deployment, monitor Stripe webhook logs to ensure:
 ### Database Migrations
 1. `supabase/migrations/20251029000001_fix_subscription_sync_trigger.sql`
 2. `supabase/migrations/20251029000002_cleanup_duplicate_subscriptions.sql`
+3. `supabase/migrations/20251029000003_create_webhook_events_table.sql`
+4. `supabase/migrations/20251029000004_add_missing_subscription_markfaye.sql`
 
 ### Documentation
 1. `PAYMENT_BUGS_FIX_INSTRUCTIONS.md` (this file)
+2. `PAYMENT_SYSTEM_ARCHITECTURE.md` (comprehensive architecture document)
 
 ---
 

@@ -20,6 +20,7 @@ import { parseScriptIntoScenes } from '@/lib/scene-parser';
 import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import { getGuestStory, clearGuestStory } from '@/lib/utils/guest-story-storage';
+import UpgradeModal from '@/components/ui/UpgradeModal';
 
 const CHARACTERS_STORAGE_KEY = 'storyme_character_library';
 const ART_STYLE = "children's book illustration, colorful, whimsical";
@@ -81,6 +82,12 @@ export default function CreateStoryPage() {
   const [quizDifficulty, setQuizDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
   const [quizQuestionCount, setQuizQuestionCount] = useState<number>(3);
 
+  // Upgrade modal state
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<'trial_expired' | 'story_limit_reached'>('story_limit_reached');
+  const [storiesUsed, setStoriesUsed] = useState(0);
+  const [storiesLimit, setStoriesLimit] = useState(5);
+
   useEffect(() => {
     const loadUser = async () => {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -118,6 +125,40 @@ export default function CreateStoryPage() {
 
     loadUser();
   }, [router]);
+
+  // Check story creation limits on page load
+  useEffect(() => {
+    const checkLimits = async () => {
+      if (!user) return;
+
+      try {
+        const response = await fetch('/api/usage/limits');
+        const data = await response.json();
+
+        if (!response.ok) {
+          console.error('Failed to check limits:', data);
+          return;
+        }
+
+        // Check if user can create stories
+        if (!data.canCreate) {
+          // Determine the reason
+          if (data.reason?.includes('trial has expired')) {
+            setUpgradeReason('trial_expired');
+          } else {
+            setUpgradeReason('story_limit_reached');
+          }
+          setStoriesUsed(data.storiesUsed || 0);
+          setStoriesLimit(data.storiesLimit || 5);
+          setShowUpgradeModal(true);
+        }
+      } catch (error) {
+        console.error('Error checking limits:', error);
+      }
+    };
+
+    checkLimits();
+  }, [user]);
 
   // Restore guest story if user just signed in from guest mode
   useEffect(() => {
@@ -1598,6 +1639,15 @@ export default function CreateStoryPage() {
         )}
       </div>
       </div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        reason={upgradeReason}
+        storiesUsed={storiesUsed}
+        storiesLimit={storiesLimit}
+      />
     </>
   );
 }
