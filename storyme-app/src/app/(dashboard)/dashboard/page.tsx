@@ -11,16 +11,11 @@ import Link from 'next/link';
 import { sampleStorybooks } from '@/data/sample-storybooks';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
-import UpgradeModal from '@/components/ui/UpgradeModal';
 
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [upgradeReason, setUpgradeReason] = useState<'trial_expired' | 'story_limit_reached'>('story_limit_reached');
-  const [storiesUsed, setStoriesUsed] = useState(0);
-  const [storiesLimit, setStoriesLimit] = useState(5);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -78,15 +73,8 @@ export default function DashboardPage() {
 
       // Check if user can create stories
       if (!data.canCreate) {
-        // Determine the reason
-        if (data.reason?.includes('trial has expired')) {
-          setUpgradeReason('trial_expired');
-        } else {
-          setUpgradeReason('story_limit_reached');
-        }
-        setStoriesUsed(data.storiesUsed || 0);
-        setStoriesLimit(data.storiesLimit || 5);
-        setShowUpgradeModal(true);
+        // Redirect to upgrade page instead of showing modal
+        router.push('/upgrade');
         return;
       }
 
@@ -317,15 +305,6 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
-
-      {/* Upgrade Modal */}
-      <UpgradeModal
-        isOpen={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        reason={upgradeReason}
-        storiesUsed={storiesUsed}
-        storiesLimit={storiesLimit}
-      />
     </div>
   );
 }
