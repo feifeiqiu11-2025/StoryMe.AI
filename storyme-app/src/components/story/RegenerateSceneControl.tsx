@@ -30,18 +30,18 @@ export default function RegenerateSceneControl({
   onRegenerate,
 }: RegenerateSceneControlProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [editedPrompt, setEditedPrompt] = useState(originalPrompt);
+  const [userFeedback, setUserFeedback] = useState('');
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleRegenerate = async () => {
-    if (!editedPrompt.trim()) {
-      setError('Prompt cannot be empty');
+    if (!userFeedback.trim()) {
+      setError('Please tell us what to improve about this scene');
       return;
     }
 
-    if (editedPrompt.trim().length < 10) {
-      setError('Prompt is too short. Please provide more detail.');
+    if (userFeedback.trim().length < 10) {
+      setError('Please provide more detail about what to improve (at least 10 characters)');
       return;
     }
 
@@ -55,7 +55,8 @@ export default function RegenerateSceneControl({
         body: JSON.stringify({
           sceneId,
           sceneNumber,
-          customPrompt: editedPrompt.trim(),
+          userFeedback: userFeedback.trim(),
+          originalPrompt,
           originalSceneDescription: sceneDescription,
           characters,
           artStyle,
@@ -90,7 +91,7 @@ export default function RegenerateSceneControl({
 
   const handleCancel = () => {
     setIsExpanded(false);
-    setEditedPrompt(originalPrompt); // Reset to original
+    setUserFeedback(''); // Clear feedback
     setError(null);
   };
 
@@ -98,20 +99,18 @@ export default function RegenerateSceneControl({
     return (
       <button
         onClick={() => setIsExpanded(true)}
-        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all font-medium shadow-md hover:shadow-lg flex items-center gap-2"
+        className="px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-md hover:bg-purple-100 hover:border-purple-300 transition-colors text-sm font-medium"
       >
-        <span className="text-lg">⚡</span>
         Regenerate Scene
       </button>
     );
   }
 
   return (
-    <div className="bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-300 rounded-lg p-4 space-y-3 shadow-sm">
+    <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-3 space-y-2.5 shadow-sm">
       <div className="flex items-center justify-between">
-        <h4 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-          <span className="text-xl">🎨</span>
-          Customize & Regenerate Scene {sceneNumber}
+        <h4 className="text-sm font-semibold text-gray-900">
+          Tell us what to improve
         </h4>
         <button
           onClick={handleCancel}
@@ -124,29 +123,27 @@ export default function RegenerateSceneControl({
         </button>
       </div>
 
-      {/* Editable Prompt - Single field */}
-      <div className="space-y-2">
-        <label htmlFor="edited-prompt" className="block text-sm font-semibold text-gray-700">
-          AI Prompt:
-        </label>
+      {/* User Feedback Input */}
+      <div>
         <textarea
-          id="edited-prompt"
-          value={editedPrompt}
-          onChange={(e) => setEditedPrompt(e.target.value)}
+          id="user-feedback"
+          value={userFeedback}
+          onChange={(e) => setUserFeedback(e.target.value)}
           disabled={isRegenerating}
-          rows={4}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed resize-none"
-          placeholder="Edit the AI prompt to improve this scene..."
+          rows={2}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed resize-none"
+          placeholder="e.g., Remove extra person, fix hand position, add more trees..."
+          required
         />
-        <p className="text-xs text-gray-500">
-          💡 Be specific about character poses, expressions, actions, and background details.
+        <p className="text-xs text-gray-500 mt-1.5">
+          💡 Describe what to fix: extra objects, wrong anatomy, missing items, expressions, etc.
         </p>
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-          <p className="text-sm text-red-600 font-medium">⚠️ {error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-md p-2">
+          <p className="text-xs text-red-600 font-medium">⚠️ {error}</p>
         </div>
       )}
 
@@ -154,26 +151,23 @@ export default function RegenerateSceneControl({
       <div className="flex gap-2">
         <button
           onClick={handleRegenerate}
-          disabled={isRegenerating || !editedPrompt.trim()}
-          className="flex-1 px-3 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+          disabled={isRegenerating || !userFeedback.trim()}
+          className="px-4 py-1.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-md hover:from-purple-700 hover:to-blue-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm"
         >
           {isRegenerating ? (
             <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               <span>Generating...</span>
             </>
           ) : (
-            <>
-              <span>🔄</span>
-              <span>Regenerate</span>
-            </>
+            <span>Regenerate</span>
           )}
         </button>
 
         <button
           onClick={handleCancel}
           disabled={isRegenerating}
-          className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          className="px-4 py-1.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm"
         >
           Cancel
         </button>
@@ -181,11 +175,10 @@ export default function RegenerateSceneControl({
 
       {/* Generating Status */}
       {isRegenerating && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
-          <div className="text-xs text-blue-700 font-medium flex items-center gap-2">
-            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            Generating new image... This may take 15-30 seconds.
-          </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
+          <p className="text-xs text-blue-700">
+            ⏳ Generating new image... This may take 15-30 seconds.
+          </p>
         </div>
       )}
     </div>

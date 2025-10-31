@@ -30,33 +30,43 @@ const toneOptions: Array<{
 ];
 
 const readingLevelLabels: Record<number, { emoji: string; label: string; example: string }> = {
-  3: {
+  1: {
+    emoji: '🍼',
+    label: 'Age 1',
+    example: 'Dog!'
+  },
+  2: {
     emoji: '👶',
+    label: 'Age 2',
+    example: 'Mommy. Ball.'
+  },
+  3: {
+    emoji: '👧',
     label: 'Age 3',
     example: 'Emma plays. She is happy!'
   },
   4: {
-    emoji: '👧',
+    emoji: '🧒',
     label: 'Age 4',
     example: 'Emma plays outside. She has fun!'
   },
   5: {
-    emoji: '🧒',
+    emoji: '👦',
     label: 'Age 5',
     example: 'Emma went to the park. She had so much fun!'
   },
   6: {
-    emoji: '👦',
+    emoji: '📖',
     label: 'Age 6',
     example: 'Emma was playing at the sunny park with her friends.'
   },
   7: {
-    emoji: '📖',
+    emoji: '📚',
     label: 'Age 7',
     example: 'Emma discovered a magical playground where all the swings sparkled.'
   },
   8: {
-    emoji: '📚',
+    emoji: '🎓',
     label: 'Age 8',
     example: 'Emma explored the enchanted park and found a secret garden full of colorful flowers.'
   },
@@ -88,7 +98,7 @@ export default function StorySettingsPanel({
         <div className="relative px-2">
           <input
             type="range"
-            min={3}
+            min={1}
             max={8}
             step={1}
             value={readingLevel}
@@ -99,7 +109,7 @@ export default function StorySettingsPanel({
 
           {/* Age markers */}
           <div className="flex justify-between mt-2 px-1">
-            {[3, 4, 5, 6, 7, 8].map((age) => (
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((age) => (
               <button
                 key={age}
                 onClick={() => !disabled && onReadingLevelChange(age)}

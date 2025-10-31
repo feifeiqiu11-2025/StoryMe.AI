@@ -15,6 +15,7 @@ export default function LandingNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [productsDropdownOpen, setProductsDropdownOpen] = useState(false);
   const [founderDropdownOpen, setFounderDropdownOpen] = useState(false);
+  const [communityDropdownOpen, setCommunityDropdownOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
@@ -32,6 +33,7 @@ export default function LandingNav() {
 
   const productsRef = useRef<HTMLDivElement>(null);
   const founderRef = useRef<HTMLDivElement>(null);
+  const communityRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -41,6 +43,9 @@ export default function LandingNav() {
       }
       if (founderRef.current && !founderRef.current.contains(event.target as Node)) {
         setFounderDropdownOpen(false);
+      }
+      if (communityRef.current && !communityRef.current.contains(event.target as Node)) {
+        setCommunityDropdownOpen(false);
       }
     }
 
@@ -157,14 +162,45 @@ export default function LandingNav() {
               )}
             </div>
 
-            <Link
-              href="/stories"
-              className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors ${
-                isActive('/stories') ? 'text-blue-600 border-b-2 border-blue-600' : ''
-              }`}
-            >
-              Community Stories
-            </Link>
+            {/* Community Dropdown */}
+            <div className="relative" ref={communityRef}>
+              <button
+                onClick={() => setCommunityDropdownOpen(!communityDropdownOpen)}
+                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors flex items-center gap-1 ${
+                  isActive('/stories') || isActive('/little-artists') || isActive('/community-stories') ? 'text-blue-600 border-b-2 border-blue-600' : ''
+                }`}
+              >
+                Community
+                <svg
+                  className={`w-4 h-4 transition-transform ${communityDropdownOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {communityDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
+                  <Link
+                    href="/stories"
+                    onClick={() => setCommunityDropdownOpen(false)}
+                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 transition-colors"
+                  >
+                    <div className="font-semibold text-gray-900">📚 Community Stories</div>
+                    <div className="text-xs text-gray-500 mt-0.5">Discover amazing stories</div>
+                  </Link>
+                  <Link
+                    href="/little-artists"
+                    onClick={() => setCommunityDropdownOpen(false)}
+                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 transition-colors"
+                  >
+                    <div className="font-semibold text-gray-900">🎨 Little Artists</div>
+                    <div className="text-xs text-gray-500 mt-0.5">Meet our young creators</div>
+                  </Link>
+                </div>
+              )}
+            </div>
           </nav>
 
           {/* Auth Buttons - Desktop */}
@@ -242,7 +278,8 @@ export default function LandingNav() {
                 <div className="ml-4 mt-2 space-y-1">
                   <Link
                     href="/products"
-                    className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
+                    className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
+                    style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
                   >
                     KindleWood Ecosystem
                   </Link>
@@ -279,13 +316,15 @@ export default function LandingNav() {
                 <div className="ml-4 mt-2 space-y-1">
                   <Link
                     href="/founder-letter"
-                    className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
+                    className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
+                    style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
                   >
                     A Letter from the Founder
                   </Link>
                   <Link
                     href="/founder-journal"
-                    className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
+                    className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
+                    style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
                   >
                     Founder's Journal
                   </Link>
@@ -293,14 +332,41 @@ export default function LandingNav() {
               )}
             </div>
 
-            <Link
-              href="/stories"
-              className={`block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors ${
-                isActive('/stories') ? 'bg-blue-50 text-blue-600 font-semibold' : ''
-              }`}
-            >
-              Community Stories
-            </Link>
+            {/* Community - Mobile */}
+            <div>
+              <button
+                onClick={() => setCommunityDropdownOpen(!communityDropdownOpen)}
+                className="w-full flex items-center justify-between px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
+              >
+                <span>Community</span>
+                <svg
+                  className={`w-4 h-4 transition-transform ${communityDropdownOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {communityDropdownOpen && (
+                <div className="ml-4 mt-2 space-y-1">
+                  <Link
+                    href="/stories"
+                    className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
+                    style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
+                  >
+                    📚 Community Stories
+                  </Link>
+                  <Link
+                    href="/little-artists"
+                    className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
+                    style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
+                  >
+                    🎨 Little Artists
+                  </Link>
+                </div>
+              )}
+            </div>
 
             {/* Auth Button - Mobile */}
             {isMounted && (

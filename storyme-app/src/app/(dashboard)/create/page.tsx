@@ -399,6 +399,11 @@ export default function CreateStoryPage() {
     );
   };
 
+  // NEW: Handle scenes update (delete/add)
+  const handleScenesUpdate = (updatedScenes: EnhancedScene[]) => {
+    setEnhancedScenes(updatedScenes);
+  };
+
   // NEW: Generate AI-powered title and description
   const handleGenerateMetadata = async () => {
     setIsGeneratingMetadata(true);
@@ -938,7 +943,7 @@ export default function CreateStoryPage() {
                     };
                     setCharacters([...characters, newCharacter]);
                   }}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium text-sm shadow transition-all"
+                  className="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 font-semibold text-sm shadow-md transition-all"
                 >
                   + Add Character
                 </button>
@@ -1202,7 +1207,12 @@ export default function CreateStoryPage() {
               onApprove={handleGenerateImages}
               onBack={handleRegenerateAll}
               onCaptionEdit={handleCaptionEdit}
+              onScenesUpdate={handleScenesUpdate}
               isGenerating={isGenerating}
+              readingLevel={readingLevel}
+              storyTone={storyTone}
+              expansionLevel={expansionLevel}
+              contentLanguage={contentLanguage}
             />
           </div>
         )}

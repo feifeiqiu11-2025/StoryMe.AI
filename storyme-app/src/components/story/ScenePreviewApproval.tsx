@@ -6,6 +6,7 @@
 
 'use client';
 
+import React, { useState } from 'react';
 import { EnhancedScene } from '@/lib/types/story';
 
 interface ScenePreviewApprovalProps {
@@ -15,7 +16,13 @@ interface ScenePreviewApprovalProps {
   onApprove: () => void;
   onBack: () => void;
   onCaptionEdit?: (sceneNumber: number, newCaption: string) => void;
+  onScenesUpdate?: (updatedScenes: EnhancedScene[]) => void;
   isGenerating: boolean;
+  // Settings for new scene enhancement
+  readingLevel?: number;
+  storyTone?: string;
+  expansionLevel?: string;
+  contentLanguage?: 'en' | 'zh';
 }
 
 export default function ScenePreviewApproval({
@@ -25,8 +32,23 @@ export default function ScenePreviewApproval({
   onApprove,
   onBack,
   onCaptionEdit,
+  onScenesUpdate,
   isGenerating,
+  readingLevel = 5,
+  storyTone = 'playful',
+  expansionLevel = 'minimal',
+  contentLanguage = 'en',
 }: ScenePreviewApprovalProps) {
+  // Add Scene Modal State
+  const [showAddSceneModal, setShowAddSceneModal] = useState(false);
+  const [insertAfterSceneNumber, setInsertAfterSceneNumber] = useState(0);
+  const [newSceneDescription, setNewSceneDescription] = useState('');
+  const [selectedCharacters, setSelectedCharacters] = useState<string[]>([]);
+  const [isEnhancingNewScene, setIsEnhancingNewScene] = useState(false);
+  const [addSceneError, setAddSceneError] = useState('');
+
+  // Re-enhance All State
+  const [isReEnhancing, setIsReEnhancing] = useState(false);
   // Find characters that AI added (not in user's original list)
   const allCharacters = new Set<string>();
   enhancedScenes.forEach(scene => {
@@ -40,6 +62,175 @@ export default function ScenePreviewApproval({
   );
 
   const sceneCountIncreased = enhancedScenes.length > originalSceneCount;
+
+  // Delete scene handler
+  const handleDeleteScene = (sceneNumber: number) => {
+    if (!onScenesUpdate) return;
+
+    if (enhancedScenes.length <= 1) {
+      alert('Cannot delete the only scene. Stories must have at least one scene.');
+      return;
+    }
+
+    if (!confirm(`Delete Scene ${sceneNumber}? This cannot be undone.`)) {
+      return;
+    }
+
+    // Remove scene and re-number
+    const updatedScenes = enhancedScenes
+      .filter(s => s.sceneNumber !== sceneNumber)
+      .map((s, index) => ({
+        ...s,
+        sceneNumber: index + 1 // Re-number sequentially
+      }));
+
+    onScenesUpdate(updatedScenes);
+  };
+
+  // Add scene handler
+  const handleAddSceneClick = (afterSceneNumber: number) => {
+    if (enhancedScenes.length >= 20) {
+      alert('Maximum 20 scenes allowed per story.');
+      return;
+    }
+
+    setInsertAfterSceneNumber(afterSceneNumber);
+    setNewSceneDescription('');
+    setSelectedCharacters([]);
+    setAddSceneError('');
+    setShowAddSceneModal(true);
+  };
+
+  // Confirm add scene - call API to enhance
+  const handleConfirmAddScene = async () => {
+    if (!onScenesUpdate) return;
+
+    if (!newSceneDescription.trim()) {
+      setAddSceneError('Please enter a scene description');
+      return;
+    }
+
+    if (newSceneDescription.trim().length < 10) {
+      setAddSceneError('Please provide more detail (at least 10 characters)');
+      return;
+    }
+
+    setIsEnhancingNewScene(true);
+    setAddSceneError('');
+
+    try {
+      // Call API to enhance the new scene
+      const response = await fetch('/api/enhance-single-scene', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sceneDescription: newSceneDescription.trim(),
+          characterNames: selectedCharacters,
+          readingLevel,
+          storyTone,
+          expansionLevel,
+          language: contentLanguage
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to enhance scene');
+      }
+
+      const data = await response.json();
+
+      // Insert new scene at correct position
+      const newScene: EnhancedScene = {
+        sceneNumber: insertAfterSceneNumber + 1, // Will be re-numbered
+        raw_description: newSceneDescription.trim(),
+        enhanced_prompt: data.enhanced_prompt,
+        caption: data.caption,
+        characterNames: selectedCharacters
+      };
+
+      // Insert and re-number all scenes
+      const updatedScenes = [
+        ...enhancedScenes.slice(0, insertAfterSceneNumber),
+        newScene,
+        ...enhancedScenes.slice(insertAfterSceneNumber)
+      ].map((s, index) => ({
+        ...s,
+        sceneNumber: index + 1
+      }));
+
+      onScenesUpdate(updatedScenes);
+      setShowAddSceneModal(false);
+
+    } catch (error) {
+      console.error('Failed to add scene:', error);
+      setAddSceneError(error instanceof Error ? error.message : 'Failed to add scene. Please try again.');
+    } finally {
+      setIsEnhancingNewScene(false);
+    }
+  };
+
+  // Re-enhance all scenes handler
+  const handleReEnhanceAll = async () => {
+    if (!onScenesUpdate) return;
+
+    if (!confirm(`Re-enhance all ${enhancedScenes.length} scenes? This will update captions and image prompts based on your current story settings. Scene count will stay at ${enhancedScenes.length}.`)) {
+      return;
+    }
+
+    setIsReEnhancing(true);
+
+    try {
+      // Process each scene individually using the enhance-single-scene API
+      // to preserve scene count and just update captions/prompts
+      const enhancedResults = await Promise.all(
+        enhancedScenes.map(async (scene) => {
+          try {
+            const response = await fetch('/api/enhance-single-scene', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sceneDescription: scene.raw_description || scene.caption,
+                characterNames: scene.characterNames || [],
+                readingLevel,
+                storyTone,
+                expansionLevel,
+                language: contentLanguage
+              })
+            });
+
+            if (!response.ok) {
+              console.warn(`Failed to enhance scene ${scene.sceneNumber}, keeping original`);
+              return scene; // Keep original on error
+            }
+
+            const data = await response.json();
+
+            // Return enhanced scene with same scene number
+            return {
+              ...scene,
+              enhanced_prompt: data.enhanced_prompt,
+              caption: data.caption,
+            };
+          } catch (error) {
+            console.error(`Error enhancing scene ${scene.sceneNumber}:`, error);
+            return scene; // Keep original on error
+          }
+        })
+      );
+
+      // Update with enhanced results, maintaining scene order and count
+      onScenesUpdate(enhancedResults);
+
+      console.log(`✓ Re-enhanced ${enhancedResults.length} scenes (kept count at ${enhancedScenes.length})`);
+
+    } catch (error) {
+      console.error('Failed to re-enhance scenes:', error);
+      alert('Failed to re-enhance scenes. Please try again.');
+    } finally {
+      setIsReEnhancing(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
@@ -113,14 +304,14 @@ export default function ScenePreviewApproval({
         {/* Scene List */}
         <div className="space-y-4">
           {enhancedScenes.map((scene, index) => (
-            <div
-              key={scene.sceneNumber}
-              className="bg-white rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow"
-            >
+            <React.Fragment key={scene.sceneNumber}>
+              <div className="bg-white rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow relative">
               <div className="flex items-start gap-4">
                 {/* Scene Number */}
-                <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                  {scene.sceneNumber}
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                    {scene.sceneNumber}
+                  </div>
                 </div>
 
                 {/* Scene Content */}
@@ -197,12 +388,86 @@ export default function ScenePreviewApproval({
                   </details>
                 </div>
               </div>
+
+              {/* Action buttons - bottom right */}
+              {onScenesUpdate && !isGenerating && (
+                <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-100">
+                  {/* Delete button */}
+                  {enhancedScenes.length > 1 && (
+                    <button
+                      onClick={() => handleDeleteScene(scene.sceneNumber)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                      title="Delete this scene"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
+
+                  {/* Add scene button */}
+                  <button
+                    onClick={() => handleAddSceneClick(scene.sceneNumber)}
+                    disabled={enhancedScenes.length >= 20}
+                    className="text-green-600 hover:text-green-700 hover:bg-green-50 p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={enhancedScenes.length >= 20 ? "Maximum 20 scenes reached" : `Add a new scene after this one`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </div>
+            </React.Fragment>
           ))}
         </div>
 
+        {/* Max scenes warning */}
+        {enhancedScenes.length >= 20 && onScenesUpdate && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+            <p className="text-sm text-yellow-800 font-medium">
+              ⚠️ Maximum 20 scenes reached. Delete a scene to add new ones.
+            </p>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="mt-8 bg-white rounded-2xl shadow-xl p-6">
+          {/* Re-enhance All Scenes Section */}
+          {onScenesUpdate && (
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-xl p-4 mb-6">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 text-2xl">✨</div>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-gray-900 mb-1">
+                    Made changes to your scenes?
+                  </h4>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Re-enhance all scenes to update captions and image prompts based on your edits. Scene count stays the same.
+                  </p>
+                  <button
+                    onClick={handleReEnhanceAll}
+                    disabled={isReEnhancing || isGenerating}
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2.5 rounded-lg hover:from-purple-700 hover:to-blue-700 font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isReEnhancing ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Re-enhancing {enhancedScenes.length} scenes...
+                      </>
+                    ) : (
+                      <>
+                        <span>🔄</span>
+                        Re-enhance All {enhancedScenes.length} Scenes
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
             <button
               onClick={onBack}
@@ -237,6 +502,117 @@ export default function ScenePreviewApproval({
             </p>
           </div>
         </div>
+
+        {/* Add Scene Modal */}
+        {showAddSceneModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900">
+                  Add New Scene After Scene {insertAfterSceneNumber}
+                </h3>
+                <button
+                  onClick={() => setShowAddSceneModal(false)}
+                  disabled={isEnhancingNewScene}
+                  className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Scene Description */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Scene Description <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={newSceneDescription}
+                    onChange={(e) => setNewSceneDescription(e.target.value)}
+                    disabled={isEnhancingNewScene}
+                    rows={4}
+                    placeholder="Describe what happens in this scene..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    required
+                  />
+                </div>
+
+                {/* Character Selection */}
+                {userCharacters.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Characters in this scene (optional)
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {userCharacters.map(char => (
+                        <label key={char} className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-200 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={selectedCharacters.includes(char)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedCharacters([...selectedCharacters, char]);
+                              } else {
+                                setSelectedCharacters(selectedCharacters.filter(c => c !== char));
+                              }
+                            }}
+                            disabled={isEnhancingNewScene}
+                            className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                          <span className="text-sm font-medium text-gray-700">{char}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Info Box */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+                  💡 AI will enhance your description to create detailed image prompts and age-appropriate captions using your story settings.
+                </div>
+
+                {/* Error Message */}
+                {addSceneError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-sm text-red-700 font-medium">⚠️ {addSceneError}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={handleConfirmAddScene}
+                  disabled={!newSceneDescription.trim() || isEnhancingNewScene}
+                  className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-2.5 rounded-lg hover:from-green-700 hover:to-emerald-700 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isEnhancingNewScene ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Enhancing...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add & Enhance Scene
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowAddSceneModal(false)}
+                  disabled={isEnhancingNewScene}
+                  className="px-4 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

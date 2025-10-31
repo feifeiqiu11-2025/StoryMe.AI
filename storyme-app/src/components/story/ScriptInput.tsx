@@ -130,10 +130,22 @@ ${characters[0]?.name || 'Connor'} swinging on the swing, laughing happily`
             ? '⚠️ Add characters first to start writing scenes'
             : 'ℹ️ Mention character names in each scene (3-15 scenes recommended)'}
         </div>
-        <div className={`font-medium ${sceneCount > 15 ? 'text-red-600' : 'text-gray-600'}`}>
-          {sceneCount} scene{sceneCount !== 1 ? 's' : ''}
+        <div className={`font-medium ${sceneCount > 20 ? 'text-red-600' : sceneCount > 15 ? 'text-orange-600' : 'text-gray-600'}`}>
+          {sceneCount} scene{sceneCount !== 1 ? 's' : ''} {sceneCount > 20 ? '(MAX 20)' : ''}
         </div>
       </div>
+
+      {/* Max 20 scenes warning */}
+      {sceneCount > 20 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+          <p className="text-sm text-red-700 font-medium">
+            ⚠️ Maximum 20 scenes allowed per story
+          </p>
+          <p className="text-xs text-red-600 mt-1">
+            You have {sceneCount} scenes. Please remove {sceneCount - 20} scene{sceneCount - 20 > 1 ? 's' : ''} before continuing.
+          </p>
+        </div>
+      )}
 
       {error && (
         <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">

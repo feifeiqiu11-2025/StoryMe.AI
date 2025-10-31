@@ -185,14 +185,31 @@ export default function ImageGallery({
             className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow"
           >
             <div className="flex gap-6">
-              {/* Image */}
-              <div className="flex-shrink-0">
+              {/* Image with download overlay */}
+              <div className="flex-shrink-0 relative">
                 {image.status === 'completed' ? (
-                  <img
-                    src={image.imageUrl}
-                    alt={`Scene ${image.sceneNumber}`}
-                    className="w-80 h-80 object-cover rounded-lg shadow-md"
-                  />
+                  <>
+                    <img
+                      src={image.imageUrl}
+                      alt={`Scene ${image.sceneNumber}`}
+                      className="w-80 h-80 object-cover rounded-lg shadow-md"
+                    />
+                    {/* Download icon overlay - bottom right */}
+                    {!isGuestMode && (
+                      <a
+                        href={image.imageUrl}
+                        download={`scene-${image.sceneNumber}.jpg`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="absolute bottom-2 right-2 bg-white/90 hover:bg-white p-2 rounded-lg shadow-md hover:shadow-lg transition-all"
+                        title="Download this image"
+                      >
+                        <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </a>
+                    )}
+                  </>
                 ) : (
                   <div className="w-80 h-80 bg-gray-100 rounded-lg flex items-center justify-center">
                     <div className="text-center text-gray-500">
@@ -214,24 +231,22 @@ export default function ImageGallery({
 
               {/* Details */}
               <div className="flex-1 space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Scene {image.sceneNumber}
-                    </h3>
-                    <p className="text-sm text-gray-600 mt-1">
-                      {image.sceneDescription}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Scene {image.sceneNumber}
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {image.sceneDescription}
+                  </p>
+                  {image.characterRatings && image.characterRatings.length > 0 && (
+                    <p className="text-xs text-blue-600 mt-2">
+                      Characters: {image.characterRatings.map(r => r.characterName).join(', ')}
                     </p>
-                    {image.characterRatings && image.characterRatings.length > 0 && (
-                      <p className="text-xs text-blue-600 mt-2">
-                        Characters: {image.characterRatings.map(r => r.characterName).join(', ')}
-                      </p>
-                    )}
-                  </div>
+                  )}
 
-                  {/* Regenerate Button - Prominent position next to title */}
+                  {/* Regenerate Button - Below characters, left-aligned, smaller */}
                   {image.status === 'completed' && onRegenerateScene && (
-                    <div className="flex-shrink-0">
+                    <div className="mt-3">
                       <RegenerateSceneControl
                         sceneId={image.id}
                         sceneNumber={image.sceneNumber}
@@ -247,19 +262,21 @@ export default function ImageGallery({
 
                 {image.status === 'completed' && (
                   <>
-                    {/* Overall Scene Rating */}
-                    <SceneRatingCard
-                      imageId={image.id}
-                      sceneNumber={image.sceneNumber}
-                      initialRatings={{
-                        overallRating: image.overallRating || sceneRatings[image.id]?.overallRating,
-                        ratingFeedback: image.ratingFeedback || sceneRatings[image.id]?.ratingFeedback,
-                      }}
-                      onSave={(ratings) => handleSceneRating(image.id, ratings)}
-                    />
+                    {/* Temporarily hidden - Overall Scene Rating */}
+                    {false && (
+                      <SceneRatingCard
+                        imageId={image.id}
+                        sceneNumber={image.sceneNumber}
+                        initialRatings={{
+                          overallRating: image.overallRating || sceneRatings[image.id]?.overallRating,
+                          ratingFeedback: image.ratingFeedback || sceneRatings[image.id]?.ratingFeedback,
+                        }}
+                        onSave={(ratings) => handleSceneRating(image.id, ratings)}
+                      />
+                    )}
 
-                    {/* Per-character rating buttons */}
-                    {image.characterRatings && Array.isArray(image.characterRatings) && image.characterRatings.length > 0 && (
+                    {/* Temporarily hidden - Per-character rating buttons */}
+                    {false && image.characterRatings && Array.isArray(image.characterRatings) && image.characterRatings.length > 0 && (
                       <div className="space-y-2 mt-3">
                         <p className="text-sm font-medium text-gray-700">
                           Rate character consistency:
@@ -298,24 +315,6 @@ export default function ImageGallery({
                           </div>
                         ))}
                       </div>
-                    )}
-
-                    {/* Meta info */}
-                    <div className="text-xs text-gray-500 space-y-1">
-                      <p>Generation time: {(image.generationTime || 0).toFixed(1)}s</p>
-                    </div>
-
-                    {/* Download button - Only show in authenticated mode */}
-                    {!isGuestMode && (
-                      <a
-                        href={image.imageUrl}
-                        download={`scene-${image.sceneNumber}.jpg`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-block px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
-                      >
-                        Download Image
-                      </a>
                     )}
                   </>
                 )}
