@@ -4,6 +4,9 @@
  * Matches database schema (snake_case) with TypeScript interfaces
  */
 
+// Re-export artist types
+export * from '../types/artist';
+
 // ============================================
 // USER MODELS
 // ============================================
@@ -58,6 +61,13 @@ export interface CharacterLibrary {
   lora_url?: string;
   lora_trained_at?: string;
   art_style_preference?: 'cartoon' | 'watercolor' | 'realistic';
+
+  // Artist Community Features (NEW)
+  source_type?: 'user' | 'artist_community';
+  artist_id?: string;
+  artwork_id?: string;
+  is_public?: boolean;
+  usage_count_total?: number;
 
   created_at: string;
   updated_at: string;

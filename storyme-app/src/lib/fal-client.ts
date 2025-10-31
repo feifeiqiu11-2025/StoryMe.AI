@@ -223,3 +223,93 @@ export async function generateImageWithMultipleCharacters({
     throw new Error(`Image generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
+
+/**
+ * Transform sketch to character with style selection
+ * Used by Little Artists feature
+ */
+export interface SketchTransformParams {
+  sketchImageUrl: string;
+  characterName?: string;
+  style: 'sketch-to-character' | 'cartoon' | 'watercolor' | 'realistic';
+  preserveSketchStyle?: boolean;
+}
+
+export async function transformSketchToCharacter({
+  sketchImageUrl,
+  characterName = 'character',
+  style = 'sketch-to-character',
+  preserveSketchStyle = true,
+}: SketchTransformParams): Promise<GenerateImageResult> {
+  initializeFalClient();
+
+  const startTime = Date.now();
+
+  try {
+    // Style-specific prompts
+    const stylePrompts: Record<string, string> = {
+      'sketch-to-character': 'children\'s book character, maintain original sketch style and personality, clean lines, vibrant colors, whimsical',
+      'cartoon': 'cartoon character, animated style, bold colors, smooth gradients, Disney Pixar style',
+      'watercolor': 'watercolor painting character, soft colors, artistic brush strokes, painted texture',
+      'realistic': 'realistic children\'s book illustration, detailed features, photographic quality, professional',
+    };
+
+    const styleGuide = stylePrompts[style];
+    const preservePrompt = preserveSketchStyle
+      ? ', preserve the original drawing style, personality and unique features from the sketch'
+      : '';
+
+    // Build comprehensive prompt that focuses on transforming the sketch itself
+    // Note: We don't include character name in prompt to avoid confusion - the model should transform what's in the sketch
+    const prompt = `Transform this sketch drawing into a beautiful ${styleGuide}${preservePrompt}. Keep the same character/subject from the original sketch. High quality children's book illustration, professional, appealing to children, friendly expression.`;
+
+    console.log('Sketch transformation prompt:', prompt);
+    console.log('Sketch image URL:', sketchImageUrl);
+
+    // Use FLUX LoRA image-to-image model for better content preservation
+    // Balanced strength: preserve character shape but allow color and style transformation
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result: any = await fal.subscribe("fal-ai/flux-lora/image-to-image", {
+      input: {
+        prompt: prompt,
+        image_url: sketchImageUrl, // Input sketch to transform
+        strength: 0.65, // Balanced: preserve character but allow vibrant colors and cartoon style
+        image_size: "square_hd",
+        num_inference_steps: 35, // Higher steps for better quality
+        guidance_scale: 7.5, // Higher guidance to follow the sketch closely
+        num_images: 1,
+        enable_safety_checker: true,
+      },
+      logs: true,
+      onQueueUpdate: (update) => {
+        if (update.status === "IN_PROGRESS") {
+          console.log("Sketch transformation progress:", update.logs);
+        }
+      },
+    });
+
+    const endTime = Date.now();
+    const generationTime = (endTime - startTime) / 1000;
+
+    console.log('Sketch transformation result:', JSON.stringify(result, null, 2));
+
+    // Handle different response formats
+    const images = result.data?.images || result.images || [];
+
+    if (!images || images.length === 0) {
+      throw new Error('No images generated - response format: ' + JSON.stringify(result).substring(0, 200));
+    }
+
+    const imageUrl = images[0].url || images[0];
+
+    return {
+      imageUrl: typeof imageUrl === 'string' ? imageUrl : imageUrl.url,
+      generationTime,
+      seed: result.data?.seed || result.seed || 0,
+      prompt: prompt,
+    };
+  } catch (error) {
+    console.error('Sketch transformation error:', error);
+    throw new Error(`Sketch transformation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}

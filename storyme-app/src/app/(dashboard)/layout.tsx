@@ -10,6 +10,7 @@ import Link from 'next/link';
 import ProfileMenu from '@/components/ui/ProfileMenu';
 import EmailVerificationBanner from '@/components/auth/EmailVerificationBanner';
 import HamburgerMenu from '@/components/navigation/HamburgerMenu';
+import DashboardNav from '@/components/navigation/DashboardNav';
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient();
@@ -40,38 +41,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
               </Link>
               <span className="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded-full">BETA</span>
             </div>
-            <nav className="hidden md:flex space-x-6">
-              <Link
-                href="/dashboard"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/create"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
-              >
-                Create Story
-              </Link>
-              <Link
-                href="/characters"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
-              >
-                Characters
-              </Link>
-              <Link
-                href="/projects"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
-              >
-                My Stories
-              </Link>
-              <Link
-                href="/community-stories"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
-              >
-                Community Stories
-              </Link>
-            </nav>
+            <DashboardNav />
             <div className="flex items-center">
               <ProfileMenu displayName={displayName} />
             </div>

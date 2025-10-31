@@ -9,6 +9,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import LandingNav from '@/components/navigation/LandingNav';
 
 interface PublicStory {
   id: string;
@@ -85,33 +86,11 @@ export default function PublicStoriesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-            <div className="flex items-center gap-6">
-              <Link href="/" className="text-2xl font-bold">
-                Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Me</span>
-              </Link>
-              <nav className="flex gap-4">
-                <Link href="/" className="text-gray-600 hover:text-gray-900 font-medium">
-                  Home
-                </Link>
-                <Link href="/stories" className="text-blue-600 font-semibold">
-                  Public Stories
-                </Link>
-              </nav>
-            </div>
-            <Link
-              href="/login"
-              className="text-gray-700 hover:text-gray-900 font-medium px-6 py-2 rounded-lg hover:bg-gray-100 transition-all"
-            >
-              Sign In
-            </Link>
-          </div>
-        </header>
+        {/* Navigation */}
+        <LandingNav />
 
         {/* Main Content */}
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto px-4 py-12">
           {/* Page Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
