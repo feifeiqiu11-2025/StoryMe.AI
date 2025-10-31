@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeViewer';
 import Tooltip from '@/components/ui/Tooltip';
+import TagSelector from '@/components/story/TagSelector';
 
 export default function StoryViewerPage() {
   const router = useRouter();
@@ -1392,7 +1393,7 @@ export default function StoryViewerPage() {
               </div>
 
               {/* Section 2: Publishing */}
-              <div>
+              <div className="mb-5">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                   Publishing
                 </h3>
@@ -1494,21 +1495,28 @@ export default function StoryViewerPage() {
                       )}
                     </button>
                   </Tooltip>
-
-                  {/* Spacer to push delete to the right on desktop */}
-                  <div className="flex-1 hidden sm:block"></div>
-
-                  {/* Delete Story */}
-                  <Tooltip text="Delete this story permanently">
-                    <Link
-                      href="/projects"
-                      className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium shadow-md transition-all"
-                    >
-                      <span>←</span>
-                      <span className="hidden sm:inline">Back</span>
-                    </Link>
-                  </Tooltip>
                 </div>
+              </div>
+
+              {/* Section 3: Tags & Categories */}
+              <div className="mb-5">
+                <TagSelector
+                  projectId={projectId}
+                  initialTags={project.tags || []}
+                />
+              </div>
+
+              {/* Back to Top - Bottom Right */}
+              <div className="flex justify-end">
+                <Tooltip text="Scroll back to top of page">
+                  <button
+                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium shadow-md transition-all"
+                  >
+                    <span>↑</span>
+                    <span>Back to Top</span>
+                  </button>
+                </Tooltip>
               </div>
             </div>
           </div>
