@@ -1,79 +1,32 @@
-/**
- * Middleware for handling authentication and protected routes
- * Refreshes Supabase session and redirects unauthenticated users
- */
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-import { createServerClient } from '@supabase/ssr';
-import { NextResponse, type NextRequest } from 'next/server';
-
-export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({
-            request,
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
+// This middleware runs on all API routes
+export function middleware(request: NextRequest) {
+  // Handle preflight requests
+  if (request.method === 'OPTIONS') {
+    return new NextResponse(null, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Max-Age': '86400',
       },
-    }
-  );
-
-  // Refresh session if expired
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Protected routes that require authentication
-  const protectedPaths = ['/dashboard', '/characters', '/projects', '/settings'];
-  const isProtectedPath = protectedPaths.some((path) =>
-    request.nextUrl.pathname.startsWith(path)
-  );
-
-  // Redirect to login if accessing protected route without authentication
-  if (isProtectedPath && !user) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/login';
-    redirectUrl.searchParams.set('redirectedFrom', request.nextUrl.pathname);
-    return NextResponse.redirect(redirectUrl);
+    });
   }
 
-  // Redirect to dashboard if accessing auth pages while authenticated
-  const authPaths = ['/login', '/signup'];
-  const isAuthPath = authPaths.some((path) => request.nextUrl.pathname.startsWith(path));
-
-  if (isAuthPath && user) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/dashboard';
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  return supabaseResponse;
+  // Continue with the request and add CORS headers to the response
+  const response = NextResponse.next();
+  
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  return response;
 }
 
+// Configure which routes to run middleware on
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - api/auth/signout (sign-out API route)
-     * - public folder
-     */
-    '/((?!_next/static|_next/image|favicon.ico|api/auth/signout|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: '/api/:path*',  // Only run on API routes
 };
