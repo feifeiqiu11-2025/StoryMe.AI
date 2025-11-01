@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// Specify Edge Runtime for Vercel
+export const runtime = 'edge';
+
 // This middleware runs on all API routes
 export function middleware(request: NextRequest) {
   // Handle preflight requests
