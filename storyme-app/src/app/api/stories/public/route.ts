@@ -10,10 +10,12 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '10');
+    const limit = parseInt(searchParams.get('limit') || '20'); // Changed default to 20
     const offset = parseInt(searchParams.get('offset') || '0');
     const featured = searchParams.get('featured') === 'true';
     const sortBy = searchParams.get('sortBy') || 'recent'; // 'popular' or 'recent'
+    const tags = searchParams.get('tags')?.split(',').filter(Boolean) || []; // NEW: Tag filtering
+    const search = searchParams.get('search') || ''; // NEW: Search query
 
     // Validate params
     if (limit < 1 || limit > 100) {
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest) {
     // Use service role client to bypass RLS for public display
     const supabase = createServiceRoleClient();
 
-    // Build query for public stories with scenes and images
+    // Build query for public stories with scenes, images, and tags
     let query = supabase
       .from('projects')
       .select(`
@@ -52,11 +54,25 @@ export async function GET(request: NextRequest) {
             id,
             image_url
           )
+        ),
+        project_tags (
+          tag_id,
+          story_tags (
+            id,
+            name,
+            slug,
+            icon,
+            display_order
+          )
         )
-      `)
+      `, { count: 'exact' }) // Get total count for pagination
       .eq('visibility', 'public')
-      .eq('status', 'completed')
-      .range(offset, offset + limit - 1);
+      .eq('status', 'completed');
+
+    // Apply search filter (title or description)
+    if (search) {
+      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,author_name.ilike.%${search}%`);
+    }
 
     // If featured=true, prioritize featured stories
     if (featured) {
@@ -73,7 +89,10 @@ export async function GET(request: NextRequest) {
       query = query.order('published_at', { ascending: false });
     }
 
-    const { data: projects, error } = await query;
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: projects, error, count } = await query;
 
     if (error) {
       console.error('Error fetching public stories:', error);
@@ -83,8 +102,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Transform data to include only first image per scene
-    const formattedProjects = projects.map((project: any) => ({
+    // Transform data to include only first image per scene and tags
+    let formattedProjects = projects.map((project: any) => ({
       id: project.id,
       title: project.title,
       description: project.description,
@@ -105,12 +124,35 @@ export async function GET(request: NextRequest) {
         caption: scene.caption,
         imageUrl: scene.generated_images?.[0]?.image_url || null,
       })) || [],
+      tags: project.project_tags?.map((pt: any) => ({
+        id: pt.story_tags.id,
+        name: pt.story_tags.name,
+        slug: pt.story_tags.slug,
+        icon: pt.story_tags.icon,
+        displayOrder: pt.story_tags.display_order,
+      })) || [],
     }));
+
+    // Filter by tags if provided (client-side filtering)
+    if (tags.length > 0) {
+      formattedProjects = formattedProjects.filter((project: any) => {
+        const projectTagSlugs = project.tags.map((t: any) => t.slug);
+        // Project must have at least one of the requested tags
+        return tags.some(tag => projectTagSlugs.includes(tag));
+      });
+    }
+
+    // Calculate pagination metadata
+    const totalCount = count || 0;
+    const currentPage = Math.floor(offset / limit) + 1;
+    const totalPages = Math.ceil(totalCount / limit);
 
     return NextResponse.json({
       success: true,
-      projects: formattedProjects,
-      count: formattedProjects.length,
+      stories: formattedProjects, // Changed from 'projects' to 'stories' for consistency
+      totalCount,
+      currentPage,
+      totalPages,
       offset,
       limit,
     });

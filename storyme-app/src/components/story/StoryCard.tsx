@@ -8,6 +8,8 @@
 
 import React from 'react';
 
+import type { StoryTag } from '@/lib/types/story';
+
 export interface StoryCardData {
   id: string;
   title: string;
@@ -20,6 +22,7 @@ export interface StoryCardData {
   visibility?: 'public' | 'private';
   sceneCount?: number;
   createdAt?: string;
+  tags?: StoryTag[]; // NEW: Story tags
   // Fallback for legacy data
   scenes?: Array<{
     imageUrl?: string | null;
@@ -142,6 +145,26 @@ export function StoryCard({
               </>
             )}
             {showDate && formattedDate && <span>{formattedDate}</span>}
+          </div>
+        )}
+
+        {/* Tags (NEW) */}
+        {story.tags && story.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {story.tags.slice(0, 2).map(tag => (
+              <span
+                key={tag.id}
+                className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium"
+              >
+                {tag.icon && <span className="text-sm">{tag.icon}</span>}
+                {tag.name}
+              </span>
+            ))}
+            {story.tags.length > 2 && (
+              <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">
+                +{story.tags.length - 2}
+              </span>
+            )}
           </div>
         )}
 

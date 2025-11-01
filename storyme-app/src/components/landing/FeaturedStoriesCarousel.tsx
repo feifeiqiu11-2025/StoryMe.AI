@@ -52,8 +52,8 @@ export default function FeaturedStoriesCarousel({ onStoryClick }: FeaturedStorie
       const response = await fetch('/api/stories/public?limit=10&featured=true');
       const data = await response.json();
 
-      if (response.ok && data.projects) {
-        setStories(data.projects);
+      if (response.ok && data.stories) {
+        setStories(data.stories);
       } else {
         throw new Error(data.error || 'Failed to load stories');
       }

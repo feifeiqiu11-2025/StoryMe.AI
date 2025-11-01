@@ -43,8 +43,8 @@ export default function HeroStoryShowcase() {
         const data = await response.json();
 
         // Get up to 5 stories for the slideshow
-        if (data.projects && data.projects.length > 0) {
-          setStories(data.projects);
+        if (data.stories && data.stories.length > 0) {
+          setStories(data.stories);
         }
       } catch (err) {
         console.error('Error fetching featured stories:', err);

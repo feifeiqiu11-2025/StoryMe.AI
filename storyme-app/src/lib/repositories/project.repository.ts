@@ -56,6 +56,16 @@ export class ProjectRepository extends BaseRepository<Project> {
         scenes (
           *,
           images:generated_images (*)
+        ),
+        project_tags (
+          tag_id,
+          story_tags (
+            id,
+            name,
+            slug,
+            icon,
+            display_order
+          )
         )
       `)
       .eq('id', id)
@@ -121,6 +131,16 @@ export class ProjectRepository extends BaseRepository<Project> {
             image_url,
             thumbnail_url,
             status
+          )
+        ),
+        project_tags (
+          tag_id,
+          story_tags (
+            id,
+            name,
+            slug,
+            icon,
+            display_order
           )
         )
       `)

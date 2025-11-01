@@ -22,6 +22,28 @@ export type StoryVisibility =
   | 'private'       // Only creator can see (default for safety)
   | 'public';       // Visible on landing page and public gallery
 
+// Story tag interface
+export interface StoryTag {
+  id: string;
+  name: string;              // Display name: "Bedtime Stories"
+  slug: string;              // URL-friendly: "bedtime-stories"
+  description?: string;      // Optional description
+  icon?: string;             // Emoji or icon: "🌙"
+  displayOrder: number;      // For UI ordering
+  createdAt: string;
+}
+
+// Predefined tag slugs (for type safety and autocomplete)
+export const PREDEFINED_TAG_SLUGS = {
+  AVOCADO_AMA: 'avocado-ama',
+  BEDTIME: 'bedtime-stories',
+  CHINESE: 'chinese-stories',
+  ORIGINAL: 'original-stories',
+  LEARNING: 'learning',
+} as const;
+
+export type TagSlug = typeof PREDEFINED_TAG_SLUGS[keyof typeof PREDEFINED_TAG_SLUGS];
+
 export interface CharacterDescription {
   hairColor?: string;
   skinTone?: string;
@@ -136,6 +158,8 @@ export interface Project {
 
   // Relations (optional)
   scenes?: ProjectScene[];
+  tags?: StoryTag[];         // Tags associated with this story
+  tagIds?: string[];         // Just IDs (for mutations)
 }
 
 // Scene within a saved project
