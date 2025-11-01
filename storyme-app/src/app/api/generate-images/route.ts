@@ -98,16 +98,16 @@ export async function POST(request: NextRequest) {
     const sceneSettings = buildConsistentSceneSettings(scenes);
     console.log('Scene settings for consistency:', Array.from(sceneSettings.entries()));
 
-    for (const scene of scenes) {
+    // CHANGED: Generate all scenes in PARALLEL instead of sequential to avoid timeout
+    console.log(`🚀 Starting PARALLEL generation of ${scenes.length} scenes...`);
+
+    const generationPromises = scenes.map(async (scene) => {
       try {
         console.log(`Generating image for scene ${scene.sceneNumber}: ${scene.description}`);
-        console.log(`Characters in scene: ${scene.characterNames?.join(', ') || 'all'}`);
 
         // Extract scene location for consistency
         const sceneLocation = extractSceneLocation(scene.description);
         const locationSetting = sceneLocation ? sceneSettings.get(sceneLocation) : undefined;
-
-        console.log(`Scene location: ${sceneLocation}, Setting: ${locationSetting}`);
 
         // Filter characters that appear in this scene (or use all if not specified)
         const sceneCharacters = scene.characterNames && scene.characterNames.length > 0
@@ -133,40 +133,71 @@ export async function POST(request: NextRequest) {
           characterName: char.name,
         }));
 
-        const generatedImage: GeneratedImage = {
-          id: `img-${scene.id}`,
-          sceneId: scene.id,
-          sceneNumber: scene.sceneNumber,
-          sceneDescription: scene.description,
-          imageUrl: result.imageUrl,
-          prompt: result.prompt,
-          generationTime: result.generationTime,
-          status: 'completed',
-          characterRatings,
-        };
-
-        generatedImages.push(generatedImage);
         console.log(`✓ Scene ${scene.sceneNumber} completed in ${result.generationTime}s`);
+
+        return {
+          success: true,
+          image: {
+            id: `img-${scene.id}`,
+            sceneId: scene.id,
+            sceneNumber: scene.sceneNumber,
+            sceneDescription: scene.description,
+            imageUrl: result.imageUrl,
+            prompt: result.prompt,
+            generationTime: result.generationTime,
+            status: 'completed' as const,
+            characterRatings,
+          }
+        };
       } catch (error) {
         console.error(`✗ Scene ${scene.sceneNumber} failed:`, error);
 
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         errors.push(`Scene ${scene.sceneNumber}: ${errorMessage}`);
 
-        // Add failed image to results
+        return {
+          success: false,
+          image: {
+            id: `img-${scene.id}`,
+            sceneId: scene.id,
+            sceneNumber: scene.sceneNumber,
+            sceneDescription: scene.description,
+            imageUrl: '',
+            prompt: scene.description,
+            generationTime: 0,
+            status: 'failed' as const,
+            error: errorMessage,
+          }
+        };
+      }
+    });
+
+    // Wait for all scenes to complete (or fail) - don't let one failure stop others
+    const results = await Promise.allSettled(generationPromises);
+
+    // Process results
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        generatedImages.push(result.value.image);
+      } else {
+        // Promise itself was rejected (shouldn't happen with try/catch above, but just in case)
+        console.error(`Scene ${index + 1} promise rejected:`, result.reason);
+        errors.push(`Scene ${index + 1}: Promise rejected`);
         generatedImages.push({
-          id: `img-${scene.id}`,
-          sceneId: scene.id,
-          sceneNumber: scene.sceneNumber,
-          sceneDescription: scene.description,
+          id: `img-${scenes[index].id}`,
+          sceneId: scenes[index].id,
+          sceneNumber: scenes[index].sceneNumber,
+          sceneDescription: scenes[index].description,
           imageUrl: '',
-          prompt: scene.description,
+          prompt: scenes[index].description,
           generationTime: 0,
           status: 'failed',
-          error: errorMessage,
+          error: 'Promise rejected',
         });
       }
-    }
+    });
+
+    console.log(`✅ Parallel generation complete: ${generatedImages.filter(img => img.status === 'completed').length}/${scenes.length} successful`);
 
     // Return results even if some images failed
     const successfulCount = generatedImages.filter(img => img.status === 'completed').length;
