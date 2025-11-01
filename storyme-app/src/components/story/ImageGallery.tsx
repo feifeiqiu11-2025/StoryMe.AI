@@ -187,12 +187,18 @@ export default function ImageGallery({
             <div className="flex gap-6">
               {/* Image with download overlay */}
               <div className="flex-shrink-0 relative">
-                {image.status === 'completed' ? (
+                {image.status === 'completed' && image.imageUrl ? (
                   <>
                     <img
                       src={image.imageUrl}
                       alt={`Scene ${image.sceneNumber}`}
                       className="w-80 h-80 object-cover rounded-lg shadow-md"
+                      onError={(e) => {
+                        // Handle broken image links
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        target.parentElement?.classList.add('broken-image');
+                      }}
                     />
                     {/* Download icon overlay - bottom right */}
                     {!isGuestMode && (
@@ -210,6 +216,15 @@ export default function ImageGallery({
                       </a>
                     )}
                   </>
+                ) : image.status === 'completed' && !image.imageUrl ? (
+                  // Handle case where status is completed but no imageUrl (ERROR STATE)
+                  <div className="w-80 h-80 bg-red-50 rounded-lg flex items-center justify-center border-2 border-red-200">
+                    <div className="text-center text-red-600">
+                      <span className="text-4xl">⚠️</span>
+                      <p className="mt-2 text-sm font-medium">Image URL Missing</p>
+                      <p className="mt-1 text-xs">Please regenerate this scene</p>
+                    </div>
+                  </div>
                 ) : (
                   <div className="w-80 h-80 bg-gray-100 rounded-lg flex items-center justify-center">
                     <div className="text-center text-gray-500">
