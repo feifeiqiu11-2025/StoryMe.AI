@@ -26,6 +26,18 @@ export default function ImageGallery({
   artStyle,
   isGuestMode = false,
 }: ImageGalleryProps) {
+  // Debug logging
+  console.log('[ImageGallery] Rendering with', {
+    imageCount: generatedImages.length,
+    images: generatedImages.map(img => ({
+      sceneNumber: img.sceneNumber,
+      status: img.status,
+      hasImageUrl: !!img.imageUrl,
+      imageUrlLength: img.imageUrl?.length || 0,
+      imageUrlPreview: img.imageUrl?.substring(0, 50)
+    }))
+  });
+
   // Track ratings per image per character
   const [ratings, setRatings] = useState<Record<string, Record<string, 'good' | 'bad'>>>({});
 
