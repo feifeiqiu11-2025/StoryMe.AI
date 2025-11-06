@@ -288,7 +288,7 @@ const backCoverHTML = `
   <!-- Footer -->
   <div class="footer">
     <div class="footer-text">© 2025 KindleWood Studio. All rights reserved.</div>
-    <div class="footer-email">KindleWoodsAI@Gmail.com</div>
+    <div class="footer-email">Admin@KindleWoodStudio.ai</div>
   </div>
 </body>
 </html>

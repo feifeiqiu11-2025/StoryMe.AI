@@ -4,6 +4,8 @@
  * Used for API responses and UI components
  */
 
+import type { StoryTag } from './models';
+
 // ============================================
 // CHARACTER DTOs
 // ============================================
@@ -89,6 +91,7 @@ export interface ProjectDTO {
   featured?: boolean;
   viewCount?: number;
   shareCount?: number;
+  tags?: StoryTag[];
 }
 
 export interface CreateProjectDTO {

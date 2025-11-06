@@ -140,9 +140,15 @@ export function projectWithCharactersToDTO(project: ProjectWithCharacters): Proj
 }
 
 export function projectWithScenesToDTO(project: ProjectWithScenes): ProjectWithScenesDTO {
+  // Extract tags from the project_tags join table
+  const tags = (project.project_tags || [])
+    .map(pt => pt.story_tags)
+    .filter(Boolean);
+
   return {
     ...projectToDTO(project),
     scenes: (project.scenes || []).map(sceneWithImagesToDTO),
+    tags,
   };
 }
 

@@ -13,14 +13,13 @@ import { createClient } from '@/lib/supabase/client';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeViewer';
 import AudioRecorder, { RecordingPage } from '@/components/story/AudioRecorder';
-import ProfileMenu from '@/components/ui/ProfileMenu';
+import LandingNav from '@/components/navigation/LandingNav';
 
 function StoryViewer() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const storyId = params.id as string;
-  const fromCommunity = searchParams?.get('from') === 'community';
 
   const [user, setUser] = useState<any>(null);
   const [displayName, setDisplayName] = useState<string>('');
@@ -359,78 +358,21 @@ function StoryViewer() {
   const scenes = (story.scenes || []).sort((a: any, b: any) => a.sceneNumber - b.sceneNumber);
   const currentScene = scenes[currentSceneIndex];
 
+  // This page is for community/public stories only (route: /stories/[id])
+  // My Stories use a different route (/projects/[id])
+  // Therefore, we should ALWAYS hide Record Audio and Download PDF buttons on this page
+  const isCommunityStory = true;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      {/* Header Navigation */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-4">
-              <Link href={user ? "/dashboard" : "/"} className="text-2xl font-bold hover:opacity-80 transition-opacity">
-                📚 Story<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Me</span> ✨
-              </Link>
-              <span className="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded-full">BETA</span>
-            </div>
-            {user ? (
-              <>
-                <nav className="hidden md:flex space-x-6">
-                  <Link
-                    href="/dashboard"
-                    className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
-                  >
-                    Dashboard
-                  </Link>
-                  <Link
-                    href="/characters"
-                    className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
-                  >
-                    Characters
-                  </Link>
-                  <Link
-                    href="/projects"
-                    className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
-                  >
-                    My Stories
-                  </Link>
-                  <Link
-                    href="/create"
-                    className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
-                  >
-                    Create Story
-                  </Link>
-                  <Link
-                    href="/community-stories"
-                    className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
-                  >
-                    Community Stories
-                  </Link>
-                </nav>
-                <div className="flex items-center">
-                  <ProfileMenu displayName={displayName} />
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center gap-4">
-                <Link href="/stories" className="text-gray-600 hover:text-gray-900 font-medium">
-                  Browse Stories
-                </Link>
-                <Link
-                  href="/signup"
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold transition-all shadow-lg"
-                >
-                  Create Your Story
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+      {/* Navigation */}
+      <LandingNav />
 
       {/* Main Content */}
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Story Header */}
         <div className="mb-8">
-          <Link href={fromCommunity ? "/community-stories" : "/stories"} className="text-blue-600 hover:text-blue-700 font-medium mb-4 inline-block">
+          <Link href="/stories" className="text-blue-600 hover:text-blue-700 font-medium mb-4 inline-block">
             ← Back to Community Stories
           </Link>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">{story.title}</h1>
@@ -538,7 +480,8 @@ function StoryViewer() {
                     '📖 Reading Mode'
                   )}
                 </button>
-                {user && (
+                {/* Only show Record Audio and Generate AI Audio if NOT community story */}
+                {user && !isCommunityStory && (
                   <>
                     <button
                       onClick={handleRecordAudio}
@@ -572,20 +515,23 @@ function StoryViewer() {
                     )}
                   </>
                 )}
-                <button
-                  onClick={handleDownloadPDF}
-                  disabled={generatingPDF}
-                  className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl hover:from-orange-700 hover:to-red-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {generatingPDF ? (
-                    <span className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Generating PDF...
-                    </span>
-                  ) : (
-                    '📄 Download PDF'
-                  )}
-                </button>
+                {/* Only show Download PDF if NOT community story */}
+                {!isCommunityStory && (
+                  <button
+                    onClick={handleDownloadPDF}
+                    disabled={generatingPDF}
+                    className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl hover:from-orange-700 hover:to-red-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {generatingPDF ? (
+                      <span className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Generating PDF...
+                      </span>
+                    ) : (
+                      '📄 Download PDF'
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>

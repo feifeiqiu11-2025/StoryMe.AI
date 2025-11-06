@@ -175,7 +175,7 @@ export default function HomePage() {
                     Fun, Bilingual Learning That Feels Like Play
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    Stories sync with the KindleWood Kids app for interactive reading in English and Chinese. Kids tap words to hear pronunciation, take fun quizzes, and get AI-powered explanations. Learning feels like play — and every story teaches something new.
+                    Stories sync with the <Link href="https://kindle-wood-kids.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700 underline font-medium">KindleWood Kids</Link> app for interactive reading in English and Chinese. Kids tap words to hear pronunciation, take fun quizzes, and get AI-powered explanations. Learning feels like play — and every story teaches something new.
                   </p>
                 </div>
               </div>
@@ -366,7 +366,7 @@ export default function HomePage() {
                   Publish & Share Everywhere <span className="text-xl">🌍</span>
                 </h3>
                 <p className="text-gray-600 leading-relaxed">
-                  Publish to the KindleWood Kids app for interactive reading. Send to Spotify for car rides and bedtime. Share with family and friends. Your stories follow your child everywhere they learn. (Coming soon)
+                  Publish to the <Link href="https://kindle-wood-kids.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700 underline font-medium">KindleWood Kids</Link> app for interactive reading. Send to Spotify for car rides and bedtime. Share with family and friends. Your stories follow your child everywhere they learn. (Coming soon)
                 </p>
               </div>
             </div>
@@ -593,7 +593,8 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4 text-center py-8">
           {/* Footer Links */}
           <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm text-gray-600 mb-4">
-            <a href="mailto:KindleWoodsAI@Gmail.com" className="hover:text-indigo-600 transition-colors">Contact</a>
+            <a href="mailto:Admin@KindleWoodStudio.ai" className="hover:text-indigo-600 transition-colors">Contact</a>
+            <Link href="/support" className="hover:text-indigo-600 transition-colors">Support</Link>
             <Link href="/privacy" className="hover:text-indigo-600 transition-colors">Privacy</Link>
             <Link href="/terms" className="hover:text-indigo-600 transition-colors">Terms</Link>
           </div>

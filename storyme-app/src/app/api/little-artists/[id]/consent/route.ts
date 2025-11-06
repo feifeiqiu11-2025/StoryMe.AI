@@ -50,7 +50,7 @@ async function sendAdminReviewEmail(artist: any, parentEmail: string, artworks: 
     });
 
     // Email content
-    const adminEmail = 'kindlewoods@gmail.com';
+    const adminEmail = 'Admin@KindleWoodStudio.ai';
     const subject = `New Little Artist Ready for Review: ${artist.name}, age ${artist.age || 'N/A'}`;
 
     // Build artworks HTML

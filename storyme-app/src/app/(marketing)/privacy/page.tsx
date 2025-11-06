@@ -178,7 +178,7 @@ export default function PrivacyPolicyPage() {
                   <li><strong>Control:</strong> Manage what data is collected and how it's used</li>
                 </ul>
                 <p className="text-gray-700 mt-2">
-                  To exercise these rights, sign in to your account and manage child profiles in Settings, or contact us at kindlewood@gmail.com.
+                  To exercise these rights, sign in to your account and manage child profiles in Settings, or contact us at Admin@KindleWoodStudio.ai.
                 </p>
               </div>
 
@@ -226,7 +226,7 @@ export default function PrivacyPolicyPage() {
             </p>
             <div className="bg-gray-50 rounded-lg p-4 mt-4">
               <p className="text-gray-700 mb-2">
-                <strong>Email:</strong> <a href="mailto:kindlewood@gmail.com" className="text-blue-600 hover:text-blue-700 underline">kindlewood@gmail.com</a>
+                <strong>Email:</strong> <a href="mailto:Admin@KindleWoodStudio.ai" className="text-blue-600 hover:text-blue-700 underline">Admin@KindleWoodStudio.ai</a>
               </p>
               <p className="text-gray-700 text-sm">
                 We will respond to your privacy inquiries within 30 days.

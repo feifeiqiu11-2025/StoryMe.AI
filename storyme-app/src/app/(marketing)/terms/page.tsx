@@ -246,7 +246,7 @@ export default function TermsOfServicePage() {
             </p>
             <div className="bg-gray-50 rounded-lg p-4 mt-4">
               <p className="text-gray-700">
-                <strong>Email:</strong> <a href="mailto:kindlewood@gmail.com" className="text-blue-600 hover:text-blue-700 underline">kindlewood@gmail.com</a>
+                <strong>Email:</strong> <a href="mailto:Admin@KindleWoodStudio.ai" className="text-blue-600 hover:text-blue-700 underline">Admin@KindleWoodStudio.ai</a>
               </p>
             </div>
           </section>

@@ -277,6 +277,16 @@ export interface CharacterTag {
   created_at: string;
 }
 
+export interface StoryTag {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  display_order: number;
+  created_at: string;
+}
+
 // ============================================
 // COMPOSITE MODELS (with relations)
 // ============================================
@@ -291,6 +301,10 @@ export interface ProjectWithCharacters extends Project {
 
 export interface ProjectWithScenes extends Project {
   scenes?: SceneWithImages[];
+  project_tags?: Array<{
+    tag_id: string;
+    story_tags: StoryTag;
+  }>;
 }
 
 export interface SceneWithImages extends Scene {
