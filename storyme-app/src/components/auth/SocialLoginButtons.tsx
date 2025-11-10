@@ -42,6 +42,8 @@ export default function SocialLoginButtons({ mode, redirectTo }: SocialLoginButt
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
+            // Add friendly app branding hints
+            hd: 'kindlewoodstudio.ai', // Hint domain for Google
           },
         },
       });
