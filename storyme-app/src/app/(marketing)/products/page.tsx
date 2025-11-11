@@ -75,10 +75,6 @@ export default function ProductsPage() {
               </li>
               <li className="flex items-start gap-3">
                 <span className="text-purple-600 font-bold flex-shrink-0 mt-1">✓</span>
-                <span className="text-gray-700"><strong>Performance Dashboard</strong> — Track kids' reading and learning performance <span className="text-xs text-purple-600 font-semibold">(Coming Soon)</span></span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-purple-600 font-bold flex-shrink-0 mt-1">✓</span>
                 <span className="text-gray-700"><strong>Educator Tools</strong> — Create and share educational content with families and classrooms</span>
               </li>
             </ul>
@@ -92,10 +88,7 @@ export default function ProductsPage() {
           </div>
 
           {/* KindleWood Kids */}
-          <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-blue-200 hover:shadow-2xl transition-all relative flex flex-col">
-            <span className="absolute top-6 right-6 text-xs font-semibold px-3 py-1 bg-green-100 text-green-700 rounded-full">
-              Coming Soon
-            </span>
+          <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-blue-200 hover:shadow-2xl transition-all flex flex-col">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
                 <span className="text-3xl">📱</span>
@@ -133,16 +126,12 @@ export default function ProductsPage() {
               </li>
               <li className="flex items-start gap-3">
                 <span className="text-blue-600 font-bold flex-shrink-0 mt-1">✓</span>
-                <span className="text-gray-700"><strong>Role-Play Interactive Learning</strong> — Immersive, interactive learning experiences <span className="text-xs text-blue-600 font-semibold">(Coming Soon)</span></span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-blue-600 font-bold flex-shrink-0 mt-1">✓</span>
                 <span className="text-gray-700"><strong>100% Safe</strong> — No ads, no in-app purchases, no external links</span>
               </li>
             </ul>
 
             <div className="block w-full bg-gray-100 text-gray-500 px-6 py-3 rounded-lg font-semibold text-center border border-gray-300">
-              Coming Soon - FREE for All Users
+              FREE for All Users
             </div>
           </div>
         </div>

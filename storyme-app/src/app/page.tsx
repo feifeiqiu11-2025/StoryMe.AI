@@ -179,10 +179,7 @@ export default function HomePage() {
             </div>
 
             {/* Card 3: Fun, Bilingual Learning That Feels Like Play */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-blue-100 relative">
-              <span className="absolute top-4 right-4 text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
-                Coming Soon
-              </span>
+            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-blue-100">
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-xl flex items-center justify-center shadow-md">
@@ -220,10 +217,7 @@ export default function HomePage() {
             </div>
 
             {/* Card 5: Safe, Ad-Free Reading You Control */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-green-100 relative">
-              <span className="absolute top-4 right-4 text-xs font-semibold px-2 py-1 bg-green-100 text-green-700 rounded-full">
-                Coming Soon
-              </span>
+            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-green-100">
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center shadow-md">
@@ -242,10 +236,7 @@ export default function HomePage() {
             </div>
 
             {/* Card 6: Set Goals Together, Celebrate Progress */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-orange-100 relative">
-              <span className="absolute top-4 right-4 text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded-full">
-                Coming Soon
-              </span>
+            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-orange-100">
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center shadow-md">
@@ -283,10 +274,7 @@ export default function HomePage() {
             </div>
 
             {/* Card 8: Partner to Empower Every Young Author */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-violet-100 relative">
-              <span className="absolute top-4 right-4 text-xs font-semibold px-2 py-1 bg-violet-100 text-violet-700 rounded-full">
-                Coming Soon
-              </span>
+            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-violet-100">
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 bg-gradient-to-br from-violet-400 to-purple-500 rounded-xl flex items-center justify-center shadow-md">
@@ -364,10 +352,6 @@ export default function HomePage() {
                 </li>
                 <li className="flex items-start gap-2 sm:gap-3">
                   <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Performance Dashboard</strong> — Track kids' reading and learning performance <span className="text-xs text-purple-600 font-semibold">(Coming Soon)</span></span>
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
                   <span className="text-gray-700"><strong>Educator Tools</strong> — Create and share educational content with families and classrooms</span>
                 </li>
               </ul>
@@ -381,10 +365,7 @@ export default function HomePage() {
             </div>
 
             {/* KindleWood Kids */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border-2 border-blue-200 hover:shadow-2xl transition-all flex flex-col relative">
-              <span className="absolute top-4 sm:top-6 right-4 sm:right-6 text-xs font-semibold px-2 sm:px-3 py-1 bg-green-100 text-green-700 rounded-full">
-                Coming Soon
-              </span>
+            <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border-2 border-blue-200 hover:shadow-2xl transition-all flex flex-col">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
                   <span className="text-2xl sm:text-3xl">📱</span>
@@ -422,16 +403,12 @@ export default function HomePage() {
                 </li>
                 <li className="flex items-start gap-2 sm:gap-3">
                   <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Role-Play Interactive Learning</strong> — Immersive, interactive learning experiences <span className="text-xs text-blue-600 font-semibold">(Coming Soon)</span></span>
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
                   <span className="text-gray-700"><strong>100% Safe</strong> — No ads, no in-app purchases, no external links</span>
                 </li>
               </ul>
 
               <div className="block w-full bg-gray-100 text-gray-500 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-semibold text-center border border-gray-300 text-sm sm:text-base">
-                Coming Soon - FREE for All Users
+                FREE for All Users
               </div>
             </div>
           </div>

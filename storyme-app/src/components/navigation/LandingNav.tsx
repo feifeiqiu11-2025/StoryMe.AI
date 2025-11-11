@@ -69,7 +69,6 @@ export default function LandingNav() {
             <Link href="/" className="text-xl sm:text-2xl font-bold hover:opacity-80 transition-opacity text-gray-900">
               📚 Kindle<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-600">Wood</span> Studio ✨
             </Link>
-            <span className="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded-full">BETA</span>
           </div>
 
           {/* Desktop Navigation */}
