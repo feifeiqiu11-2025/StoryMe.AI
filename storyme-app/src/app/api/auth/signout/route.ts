@@ -1,6 +1,7 @@
 /**
  * Sign Out API Route
  * Handles user logout and redirects to home page
+ * Updated: 2025-01-11 - Production deployment
  */
 
 import { createServerClient } from '@supabase/ssr';
