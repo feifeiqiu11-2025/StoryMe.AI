@@ -24,3 +24,46 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* iOS Safari Input Fixes - Force dark text color on all inputs */
+input,
+textarea,
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  color: #111827 !important; /* Force dark gray text (gray-900) */
+  -webkit-text-fill-color: #111827 !important; /* Override iOS autofill text color */
+}
+
+/* Fix iOS Safari autofill background and text */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+textarea:-webkit-autofill:active {
+  -webkit-text-fill-color: #111827 !important; /* Force dark text on autofill */
+  -webkit-box-shadow: 0 0 0 1000px white inset !important; /* Override autofill background */
+  box-shadow: 0 0 0 1000px white inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Ensure placeholder text is visible but lighter */
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af !important; /* gray-400 */
+  opacity: 1 !important;
+  -webkit-text-fill-color: #9ca3af !important;
+}
+
+/* Fix disabled input text color on iOS */
+input:disabled,
+textarea:disabled,
+select:disabled {
+  color: #6b7280 !important; /* gray-500 for disabled state */
+  -webkit-text-fill-color: #6b7280 !important;
+  opacity: 0.6;
+}
