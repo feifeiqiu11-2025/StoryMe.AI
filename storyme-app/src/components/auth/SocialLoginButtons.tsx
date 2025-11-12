@@ -35,7 +35,13 @@ export default function SocialLoginButtons({ mode, redirectTo }: SocialLoginButt
       const next = redirectTo || '/dashboard';
       const callbackUrl = `${baseUrl}/api/auth/callback?next=${encodeURIComponent(next)}`;
 
-      const { error } = await supabase.auth.signInWithOAuth({
+      console.log(`[${provider.toUpperCase()} OAuth] Initiating sign-in`, {
+        provider,
+        redirectTo: callbackUrl,
+        next,
+      });
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: callbackUrl,
@@ -49,12 +55,20 @@ export default function SocialLoginButtons({ mode, redirectTo }: SocialLoginButt
       });
 
       if (error) {
+        console.error(`[${provider.toUpperCase()} OAuth] Error from Supabase:`, {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+          details: error,
+        });
         throw error;
       }
 
+      console.log(`[${provider.toUpperCase()} OAuth] Success, redirecting...`, data);
+
       // OAuth redirect happens automatically, no need to handle response
     } catch (err: any) {
-      console.error(`${provider} OAuth error:`, err);
+      console.error(`[${provider.toUpperCase()} OAuth] Caught error:`, err);
       setError(err.message || `Failed to sign in with ${provider}`);
     } finally {
       setLoading(null);

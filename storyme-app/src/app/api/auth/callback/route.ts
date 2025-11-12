@@ -57,7 +57,11 @@ export async function GET(request: Request) {
             images_generated_count: 0,
             images_limit: 50,
             trial_status: 'active',
-            privacy_consent_given: false, // New users must consent
+            privacy_consent_given: true, // OAuth users implicitly consent
+            privacy_consent_date: new Date().toISOString(),
+            privacy_consent_version: '1.0',
+            terms_accepted: true,
+            terms_accepted_date: new Date().toISOString(),
           }]);
 
         if (userError) {
@@ -69,18 +73,11 @@ export async function GET(request: Request) {
         }
       }
 
-      // Redirect logic: new users go to consent page, existing users go to destination
+      // Redirect logic: all users go to their destination (consent handled during creation)
       const forwardedHost = request.headers.get('x-forwarded-host');
       const isLocalEnv = process.env.NODE_ENV === 'development';
 
-      let redirectUrl: string;
-      if (isNewUser) {
-        // New OAuth users must accept privacy consent first
-        redirectUrl = `/consent?next=${encodeURIComponent(next)}`;
-      } else {
-        // Existing users go directly to destination
-        redirectUrl = next;
-      }
+      const redirectUrl = next;
 
       if (isLocalEnv) {
         return NextResponse.redirect(`${origin}${redirectUrl}`);
