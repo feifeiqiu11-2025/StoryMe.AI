@@ -50,14 +50,6 @@ export default function Testimonials() {
       <div className="max-w-6xl mx-auto px-4">
         {/* Section Header */}
         <div className="text-center mb-6">
-          <div className="inline-block mb-3">
-            <div className="flex items-center gap-2 bg-gradient-to-r from-blue-100 to-purple-100 px-4 py-2 rounded-full">
-              <span className="text-2xl">💬</span>
-              <span className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
-                TESTIMONIALS
-              </span>
-            </div>
-          </div>
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
             Voice from Our Little Authors
           </h2>
