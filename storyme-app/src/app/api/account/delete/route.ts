@@ -9,20 +9,46 @@ import { NextResponse } from 'next/server';
 
 export async function DELETE(request: Request) {
   try {
-    // Use regular client to authenticate the user
-    const supabase = await createClient();
+    // Get auth token from Authorization header (for cross-app requests)
+    const authHeader = request.headers.get('Authorization');
+    const token = authHeader?.replace('Bearer ', '');
 
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Use service role client to validate token and get user
+    const serviceRoleClient = createServiceRoleClient();
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
+    let user;
+    let userId;
+
+    if (token) {
+      // Authenticate using bearer token from Kids app
+      const { data: { user: tokenUser }, error: tokenError } =
+        await serviceRoleClient.auth.getUser(token);
+
+      if (tokenError || !tokenUser) {
+        return NextResponse.json(
+          { error: 'Not authenticated' },
+          { status: 401 }
+        );
+      }
+      user = tokenUser;
+      userId = tokenUser.id;
+    } else {
+      // Fall back to cookie-based auth for Studio app web UI
+      const supabase = await createClient();
+      const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !cookieUser) {
+        return NextResponse.json(
+          { error: 'Not authenticated' },
+          { status: 401 }
+        );
+      }
+      user = cookieUser;
+      userId = cookieUser.id;
     }
 
-    const userId = user.id;
+    // Use service role client for all deletions
+    const supabase = serviceRoleClient;
 
     // Delete all user data in the correct order (respecting foreign keys)
 
@@ -115,8 +141,7 @@ export async function DELETE(request: Request) {
       .eq('id', userId);
 
     // 10. Delete auth user (requires service role client with admin privileges)
-    const serviceRoleClient = createServiceRoleClient();
-    const { error: deleteAuthError } = await serviceRoleClient.auth.admin.deleteUser(userId);
+    const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(userId);
 
     if (deleteAuthError) {
       console.error('Error deleting auth user:', deleteAuthError);
