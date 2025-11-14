@@ -4,10 +4,12 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { NextResponse } from 'next/server';
 
 export async function DELETE(request: Request) {
   try {
+    // Use regular client to authenticate the user
     const supabase = await createClient();
 
     // Get current user
@@ -112,8 +114,9 @@ export async function DELETE(request: Request) {
       .delete()
       .eq('id', userId);
 
-    // 10. Delete auth user (this will cascade delete everything in auth schema)
-    const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(userId);
+    // 10. Delete auth user (requires service role client with admin privileges)
+    const serviceRoleClient = createServiceRoleClient();
+    const { error: deleteAuthError } = await serviceRoleClient.auth.admin.deleteUser(userId);
 
     if (deleteAuthError) {
       console.error('Error deleting auth user:', deleteAuthError);
