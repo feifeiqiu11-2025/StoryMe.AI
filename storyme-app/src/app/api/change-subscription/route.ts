@@ -5,22 +5,52 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { stripe, getPriceId } from '@/lib/stripe/config';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
+    // Get auth token from Authorization header (for cross-app requests)
+    const authHeader = request.headers.get('Authorization');
+    const token = authHeader?.replace('Bearer ', '');
 
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Use service role client to validate token and get user
+    const serviceRoleClient = createServiceRoleClient();
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
+    let user;
+    let userId;
+
+    if (token) {
+      // Authenticate using bearer token from Kids app
+      const { data: { user: tokenUser }, error: tokenError } =
+        await serviceRoleClient.auth.getUser(token);
+
+      if (tokenError || !tokenUser) {
+        return NextResponse.json(
+          { error: 'Not authenticated' },
+          { status: 401 }
+        );
+      }
+      user = tokenUser;
+      userId = tokenUser.id;
+    } else {
+      // Fall back to cookie-based auth for Studio app web UI
+      const supabase = await createClient();
+      const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !cookieUser) {
+        return NextResponse.json(
+          { error: 'Not authenticated' },
+          { status: 401 }
+        );
+      }
+      user = cookieUser;
+      userId = cookieUser.id;
     }
+
+    // Use service role client for database operations
+    const supabase = serviceRoleClient;
 
     // Get tier and cycle from request
     const { tier, cycle } = await request.json();
