@@ -11,6 +11,8 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import StoryCarouselCard, { type MockStory } from './StoryCarouselCard';
 import type { ProjectWithScenesDTO } from '@/lib/domain/dtos';
+import type { StoryTag, TagCategory } from '@/lib/types/story';
+import { getCategoryDisplayName, getCategoryIcon } from '@/lib/utils/tagHelpers';
 
 // Mock stories for when no real stories exist
 const MOCK_STORIES: MockStory[] = [
@@ -28,6 +30,8 @@ export default function CommunityStoriesCarousel() {
   const router = useRouter();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [stories, setStories] = useState<ProjectWithScenesDTO[]>([]);
+  const [allTags, setAllTags] = useState<StoryTag[]>([]);
+  const [selectedFilter, setSelectedFilter] = useState<TagCategory | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -40,6 +44,22 @@ export default function CommunityStoriesCarousel() {
       setUser(user);
     };
     checkAuth();
+  }, []);
+
+  // Fetch all tags for filtering
+  useEffect(() => {
+    async function fetchTags() {
+      try {
+        const response = await fetch('/api/tags');
+        if (response.ok) {
+          const data = await response.json();
+          setAllTags(data.tags || []);
+        }
+      } catch (error) {
+        console.error('Error fetching tags:', error);
+      }
+    }
+    fetchTags();
   }, []);
 
   // Fetch featured stories
@@ -105,9 +125,62 @@ export default function CommunityStoriesCarousel() {
     router.push('/stories');
   };
 
+  // Filter stories based on selected category
+  const getFilteredStories = (): ProjectWithScenesDTO[] => {
+    if (selectedFilter === 'all') {
+      return stories;
+    }
+
+    return stories.filter(story => {
+      if (!story.tags || story.tags.length === 0) return false;
+
+      // Check if story has any tag matching the selected category
+      return story.tags.some(tag => tag.category === selectedFilter);
+    });
+  };
+
+  // Group filtered stories by sub-category (for Collections and Learning)
+  const getGroupedStories = (): { subCategory: string; stories: ProjectWithScenesDTO[] }[] => {
+    const filteredStories = getFilteredStories();
+
+    if (selectedFilter === 'all' || selectedFilter === 'avocado-ama' || selectedFilter === 'original-stories') {
+      // No grouping needed for these filters
+      return [{ subCategory: '', stories: filteredStories }];
+    }
+
+    // Group by sub-category for Collections and Learning
+    const grouped = new Map<string, ProjectWithScenesDTO[]>();
+
+    filteredStories.forEach(story => {
+      if (!story.tags) return;
+
+      story.tags.forEach(tag => {
+        // Only group tags that belong to the selected category and have a parent (are sub-categories)
+        if (tag.category === selectedFilter && tag.parentId) {
+          const subCategoryName = tag.name;
+          if (!grouped.has(subCategoryName)) {
+            grouped.set(subCategoryName, []);
+          }
+          // Add story if not already in this sub-category group
+          const stories = grouped.get(subCategoryName)!;
+          if (!stories.find(s => s.id === story.id)) {
+            stories.push(story);
+          }
+        }
+      });
+    });
+
+    // Convert to array and sort by sub-category name
+    return Array.from(grouped.entries())
+      .map(([subCategory, stories]) => ({ subCategory, stories }))
+      .sort((a, b) => a.subCategory.localeCompare(b.subCategory));
+  };
+
   // Determine which stories to display
-  const displayStories = stories.length > 0 ? stories : MOCK_STORIES;
+  const filteredStories = getFilteredStories();
+  const displayStories = stories.length > 0 ? filteredStories : MOCK_STORIES;
   const isMock = stories.length === 0;
+  const shouldShowGrouping = (selectedFilter === 'collections' || selectedFilter === 'learning') && stories.length > 0;
 
   if (loading) {
     return (
@@ -140,6 +213,35 @@ export default function CommunityStoriesCarousel() {
         </a>
       </div>
 
+      {/* Filter Buttons */}
+      {!isMock && (
+        <div className="mb-4">
+          <p className="text-sm text-gray-600 mb-2">Filter by:</p>
+          <div className="flex flex-wrap gap-2">
+            {(['all', 'collections', 'learning', 'avocado-ama', 'original-stories'] as const).map((filter) => {
+              const isActive = selectedFilter === filter;
+              const displayName = getCategoryDisplayName(filter);
+              const icon = getCategoryIcon(filter);
+
+              return (
+                <button
+                  key={filter}
+                  onClick={() => setSelectedFilter(filter)}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all inline-flex items-center gap-1.5 ${
+                    isActive
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                  }`}
+                >
+                  <span className="text-base leading-none">{icon}</span>
+                  <span>{displayName}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Carousel Container */}
       <div
         className="relative group/carousel"
@@ -160,21 +262,62 @@ export default function CommunityStoriesCarousel() {
         {/* Scrollable Container */}
         <div
           ref={scrollContainerRef}
-          className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-2"
+          className="overflow-x-auto scrollbar-hide scroll-smooth pb-2"
           style={{
             scrollbarWidth: 'none',
             msOverflowStyle: 'none',
           }}
         >
-          {displayStories.map((story, index) => (
-            <StoryCarouselCard
-              key={isMock ? index : (story as ProjectWithScenesDTO).id}
-              story={story}
-              variant="carousel"
-              onClick={handleCardClick}
-              isMock={isMock}
-            />
-          ))}
+          {shouldShowGrouping ? (
+            // Group stories by sub-category for Collections and Learning
+            getGroupedStories().length > 0 ? (
+              <div className="space-y-6">
+                {getGroupedStories().map(group => (
+                  <div key={group.subCategory}>
+                    {/* Sub-category header */}
+                    <h3 className="text-base sm:text-lg font-medium text-gray-700 mb-3">
+                      {group.subCategory}
+                    </h3>
+                    {/* Stories in this sub-category */}
+                    <div className="flex gap-4 overflow-x-auto scrollbar-hide">
+                      {group.stories.map(story => (
+                        <StoryCarouselCard
+                          key={story.id}
+                          story={story}
+                          variant="carousel"
+                          onClick={handleCardClick}
+                          isMock={false}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No stories found for this category yet.
+              </div>
+            )
+          ) : (
+            // Default: single row of stories
+            displayStories.length > 0 ? (
+              <div className="flex gap-4">
+                {displayStories.map((story, index) => (
+                  <StoryCarouselCard
+                    key={isMock ? index : (story as ProjectWithScenesDTO).id}
+                    story={story}
+                    variant="carousel"
+                    onClick={handleCardClick}
+                    isMock={isMock}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No stories found for this filter.
+              </div>
+            )
+          )}
         </div>
 
         {/* Right Arrow */}

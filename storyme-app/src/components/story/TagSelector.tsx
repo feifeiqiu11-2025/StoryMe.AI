@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import type { StoryTag } from '@/lib/types/story';
+import { groupTagsByCategory } from '@/lib/utils/tagHelpers';
 
 interface TagSelectorProps {
   projectId: string;
@@ -100,6 +101,9 @@ export default function TagSelector({ projectId, initialTags = [], onTagsChange 
     );
   }
 
+  // Group tags by category for hierarchical display
+  const groupedTags = groupTagsByCategory(availableTags);
+
   return (
     <div className="bg-white rounded-xl shadow-lg p-6">
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -109,25 +113,44 @@ export default function TagSelector({ projectId, initialTags = [], onTagsChange 
         Help others discover your story by adding relevant tags
       </p>
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        {availableTags.map(tag => {
-          const isSelected = selectedTags.some(t => t.id === tag.id);
+      {/* Display tags grouped by category */}
+      <div className="space-y-6 mb-4">
+        {groupedTags.map(group => (
+          <div key={group.category}>
+            {/* Category Header */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-lg">{group.icon}</span>
+              <h4 className="text-sm font-semibold text-gray-700">
+                {group.name}
+                <span className="text-xs text-gray-500 ml-2 font-normal">
+                  (pick all that apply)
+                </span>
+              </h4>
+            </div>
 
-          return (
-            <button
-              key={tag.id}
-              onClick={() => toggleTag(tag)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all inline-flex items-center gap-1.5 ${
-                isSelected
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
-              }`}
-            >
-              {tag.icon && <span className="text-base leading-none">{tag.icon}</span>}
-              <span>{tag.name}</span>
-            </button>
-          );
-        })}
+            {/* Tags for this category */}
+            <div className="flex flex-wrap gap-2">
+              {group.tags.map(tag => {
+                const isSelected = selectedTags.some(t => t.id === tag.id);
+
+                return (
+                  <button
+                    key={tag.id}
+                    onClick={() => toggleTag(tag)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all inline-flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                    }`}
+                  >
+                    {tag.icon && <span className="text-base leading-none">{tag.icon}</span>}
+                    <span>{tag.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       {hasChanges && (

@@ -31,6 +31,9 @@ export async function GET() {
       slug: tag.slug,
       description: tag.description,
       icon: tag.icon,
+      category: tag.category,
+      parentId: tag.parent_id,
+      isLeaf: tag.is_leaf ?? true, // Default to true for backwards compatibility
       displayOrder: tag.display_order,
       createdAt: tag.created_at,
     })) || [];

@@ -86,9 +86,8 @@ export default function PublicStoriesPage() {
   };
 
   const toggleTag = (tagSlug: string) => {
-    setSelectedTags(prev =>
-      prev.includes(tagSlug) ? prev.filter(t => t !== tagSlug) : [...prev, tagSlug]
-    );
+    // Single selection: clicking a tag replaces the current selection
+    setSelectedTags([tagSlug]);
     setCurrentPage(1);
   };
 
@@ -119,6 +118,48 @@ export default function PublicStoriesPage() {
   const handleStoryClick = (storyId: string) => {
     router.push(`/stories/${storyId}`);
   };
+
+  // Group stories by subcategory when filtering by Collections or Learning
+  const getGroupedStories = () => {
+    // Only group if we're filtering by a single category tag
+    if (selectedTags.length !== 1) return null;
+
+    const selectedTag = availableTags.find(t => t.slug === selectedTags[0]);
+    if (!selectedTag) return null;
+
+    // Only group for Collections and Learning categories
+    if (selectedTag.category !== 'collections' && selectedTag.category !== 'learning') {
+      return null;
+    }
+
+    // Group stories by their subcategory tags
+    const grouped = new Map<string, PublicStory[]>();
+
+    stories.forEach(story => {
+      if (!story.tags) return;
+
+      story.tags.forEach(tag => {
+        // Only include tags that belong to the selected category and have a parent (are subcategories)
+        if (tag.category === selectedTag.category && tag.parentId) {
+          if (!grouped.has(tag.name)) {
+            grouped.set(tag.name, []);
+          }
+          // Add story if not already in this group
+          const groupStories = grouped.get(tag.name)!;
+          if (!groupStories.find(s => s.id === story.id)) {
+            groupStories.push(story);
+          }
+        }
+      });
+    });
+
+    // Convert to array and sort by subcategory name
+    return Array.from(grouped.entries())
+      .map(([subCategory, stories]) => ({ subCategory, stories }))
+      .sort((a, b) => a.subCategory.localeCompare(b.subCategory));
+  };
+
+  const groupedStories = getGroupedStories();
 
   // Separate featured and regular stories
   const featuredStories = stories.filter(s => s.featured);
@@ -184,7 +225,16 @@ export default function PublicStoriesPage() {
             </button>
 
             {availableTags
-              .sort((a, b) => a.displayOrder - b.displayOrder)
+              .filter(tag =>
+                // Only show top-level categories (Collections, Learning) and special categories (Avocado, Original)
+                (!tag.isLeaf && tag.parentId === null) ||
+                (tag.isLeaf && tag.parentId === null && (tag.category === 'avocado-ama' || tag.category === 'original-stories'))
+              )
+              .sort((a, b) => {
+                // Custom sort order: Collections, Learning, Avocado, Original
+                const order = ['collections', 'learning', 'avocado-ama', 'original-stories'];
+                return order.indexOf(a.category || '') - order.indexOf(b.category || '');
+              })
               .map(tag => (
                 <button
                   key={tag.id}
@@ -262,28 +312,57 @@ export default function PublicStoriesPage() {
           </div>
         )}
 
-        {/* Regular Stories */}
+        {/* Regular Stories - Grouped by subcategory or flat grid */}
         {!loading && !error && regularStories.length > 0 && (
           <div>
-            {featuredStories.length > 0 && (
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <span>📖</span>
-                <span>All Stories</span>
-              </h2>
+            {groupedStories ? (
+              // Show grouped by subcategory
+              <div className="space-y-12">
+                {groupedStories.map(group => (
+                  <div key={group.subCategory}>
+                    <h3 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-4">
+                      {group.subCategory}
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {group.stories.map((story) => (
+                        <StoryCard
+                          key={story.id}
+                          story={story}
+                          onClick={() => handleStoryClick(story.id)}
+                          variant="community"
+                          showFeaturedBadge={false}
+                          showViewCount={true}
+                          showAuthor={true}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              // Show flat grid
+              <>
+                {featuredStories.length > 0 && (
+                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                    <span>📖</span>
+                    <span>All Stories</span>
+                  </h2>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {regularStories.map((story) => (
+                    <StoryCard
+                      key={story.id}
+                      story={story}
+                      onClick={() => handleStoryClick(story.id)}
+                      variant="community"
+                      showFeaturedBadge={false}
+                      showViewCount={true}
+                      showAuthor={true}
+                    />
+                  ))}
+                </div>
+              </>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {regularStories.map((story) => (
-                <StoryCard
-                  key={story.id}
-                  story={story}
-                  onClick={() => handleStoryClick(story.id)}
-                  variant="community"
-                  showFeaturedBadge={false}
-                  showViewCount={true}
-                  showAuthor={true}
-                />
-              ))}
-            </div>
           </div>
         )}
 

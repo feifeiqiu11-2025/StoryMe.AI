@@ -22,24 +22,49 @@ export type StoryVisibility =
   | 'private'       // Only creator can see (default for safety)
   | 'public';       // Visible on landing page and public gallery
 
-// Story tag interface
+// Story tag interface with hierarchical structure
 export interface StoryTag {
   id: string;
   name: string;              // Display name: "Bedtime Stories"
   slug: string;              // URL-friendly: "bedtime-stories"
   description?: string;      // Optional description
   icon?: string;             // Emoji or icon: "🌙"
+  category?: string;         // Category: "collections", "learning", "avocado-ama", "original-stories"
+  parentId?: string | null;  // Parent tag ID for hierarchical structure
+  isLeaf: boolean;           // true = can be tagged directly, false = category only
   displayOrder: number;      // For UI ordering
   createdAt: string;
 }
 
+// Tag categories
+export type TagCategory =
+  | 'collections'       // Thematic collections (has sub-categories)
+  | 'learning'          // Educational purpose (has sub-categories)
+  | 'avocado-ama'       // School partner (both category and tag)
+  | 'original-stories'; // User-created (both category and tag)
+
 // Predefined tag slugs (for type safety and autocomplete)
 export const PREDEFINED_TAG_SLUGS = {
-  AVOCADO_AMA: 'avocado-ama',
-  BEDTIME: 'bedtime-stories',
-  CHINESE: 'chinese-stories',
-  ORIGINAL: 'original-stories',
+  // Top-level categories
+  COLLECTIONS: 'collections',
   LEARNING: 'learning',
+  AVOCADO_AMA: 'avocado-ama',
+  ORIGINAL: 'original-stories',
+
+  // Collection sub-categories
+  SPACE_SCIENCE: 'space-science',
+  ANIMALS: 'animals',
+  JOBS: 'jobs-careers',
+  FANTASY: 'fantasy-magic',
+  SPORTS: 'sports',
+  FAMILY: 'family-friends',
+  BEDTIME: 'bedtime-stories',
+
+  // Learning sub-categories
+  CHINESE: 'chinese-stories',
+  MATH: 'math',
+  STEM: 'stem',
+  LIFE_SKILLS: 'life-skills',
 } as const;
 
 export type TagSlug = typeof PREDEFINED_TAG_SLUGS[keyof typeof PREDEFINED_TAG_SLUGS];

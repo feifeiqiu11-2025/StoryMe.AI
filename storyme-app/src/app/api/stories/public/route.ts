@@ -62,6 +62,9 @@ export async function GET(request: NextRequest) {
             name,
             slug,
             icon,
+            category,
+            parent_id,
+            is_leaf,
             display_order
           )
         )
@@ -129,16 +132,24 @@ export async function GET(request: NextRequest) {
         name: pt.story_tags.name,
         slug: pt.story_tags.slug,
         icon: pt.story_tags.icon,
+        category: pt.story_tags.category,
+        parentId: pt.story_tags.parent_id,
+        isLeaf: pt.story_tags.is_leaf ?? true,
         displayOrder: pt.story_tags.display_order,
       })) || [],
     }));
 
     // Filter by tags if provided (client-side filtering)
+    // Support filtering by both tag slug AND category
     if (tags.length > 0) {
       formattedProjects = formattedProjects.filter((project: any) => {
         const projectTagSlugs = project.tags.map((t: any) => t.slug);
-        // Project must have at least one of the requested tags
-        return tags.some(tag => projectTagSlugs.includes(tag));
+        const projectTagCategories = project.tags.map((t: any) => t.category);
+
+        // Project must have at least one of the requested tags (by slug or category)
+        return tags.some(tag =>
+          projectTagSlugs.includes(tag) || projectTagCategories.includes(tag)
+        );
       });
     }
 
