@@ -2,12 +2,13 @@
  * Main Storybook PDF Template
  * Uses @react-pdf/renderer to create a beautiful children's book layout
  *
- * Page Size: 8" x 10" (576pt x 720pt) - Portrait Format
- * This is the standard size for children's picture books with text:
- * - Layout: 70% image (full width, no borders) + 30% text caption
- * - Professional printing: Standard portrait book size
- * - Home printing: Can print on 8.5" x 11" paper with small margins
- * - Image focus: Full-bleed images maximize visual impact
+ * Page Size: A5 (420pt x 595pt) - Portrait Format
+ * This is optimized for booklet-style printing on Letter/A4 paper:
+ * - Layout: 65% image + 35% text caption with smart font sizing
+ * - Booklet printing: Perfect for folding Letter/A4 paper in half
+ * - Home printing: Maximizes paper usage, no wasted space
+ * - Image: Uses 'contain' to prevent cropping/squishing
+ * - Smart font sizing: Automatically adjusts for long captions
  */
 
 import React from 'react';
@@ -103,39 +104,40 @@ const styles = StyleSheet.create({
   },
   sceneImageContainer: {
     width: '100%',
-    height: '68%',
+    height: '65%',
     backgroundColor: '#F3F4F6',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sceneImage: {
     width: '100%',
     height: '100%',
-    objectFit: 'cover',
+    objectFit: 'contain',
   },
   sceneTextContainer: {
-    flex: 1,
-    paddingTop: 20,
-    paddingBottom: 30,
-    paddingLeft: 30,
-    paddingRight: 30,
-    justifyContent: 'space-between',
+    height: '35%',
+    paddingTop: 15,
+    paddingBottom: 20,
+    paddingLeft: 25,
+    paddingRight: 25,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
     backgroundColor: '#ffffff',
-    overflow: 'hidden',
   },
-  sceneText: {
-    fontSize: 24,
-    fontFamily: 'Noto Sans SC',
-    lineHeight: 1.6,
-    color: '#1F2937',
-    textAlign: 'center',
-    fontWeight: 'bold',
+  sceneTextWrapper: {
     flex: 1,
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sceneNumber: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: 'Noto Sans SC',
     color: '#9CA3AF',
     textAlign: 'right',
-    marginTop: 10,
+    marginTop: 8,
   },
   backCoverPage: {
     flex: 1,
@@ -211,17 +213,16 @@ function containsChinese(text: string): boolean {
 }
 
 /**
- * Helper function to wrap Chinese text at 20 characters per line
+ * Helper function to wrap Chinese text at characters per line
  * Only applies to Chinese text, English text keeps natural wrapping
  */
-function wrapChineseText(text: string): string {
+function wrapChineseText(text: string, maxCharsPerLine: number = 18): string {
   if (!containsChinese(text)) {
     // English text - return as is, natural wrapping will work
     return text;
   }
 
-  // Chinese text - hard wrap at 20 characters per line
-  const maxCharsPerLine = 20;
+  // Chinese text - hard wrap at specified characters per line
   const lines: string[] = [];
   let currentLine = '';
 
@@ -242,6 +243,24 @@ function wrapChineseText(text: string): string {
   return lines.join('\n');
 }
 
+/**
+ * Smart font sizing based on caption length
+ * Returns font size and line height for optimal readability
+ */
+function getSmartFontSize(text: string): { fontSize: number; lineHeight: number } {
+  const length = text.length;
+
+  if (length <= 80) {
+    return { fontSize: 20, lineHeight: 1.5 };
+  } else if (length <= 120) {
+    return { fontSize: 18, lineHeight: 1.4 };
+  } else if (length <= 160) {
+    return { fontSize: 16, lineHeight: 1.4 };
+  } else {
+    return { fontSize: 14, lineHeight: 1.3 };
+  }
+}
+
 export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
   title,
   description,
@@ -258,9 +277,9 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
   return (
     <Document>
       {/* Cover Page - AI Generated or Fallback */}
-      {/* Using 8x10 inch portrait format - standard for children's picture books */}
+      {/* Using A5 format (420pt x 595pt) - optimized for booklet printing */}
       {coverImageUrl ? (
-        <Page size={{ width: 576, height: 720 }} style={styles.page}>
+        <Page size={{ width: 420, height: 595 }} style={styles.page}>
           {/* AI-generated background image */}
           <View style={{ position: 'absolute', width: '100%', height: '100%' }}>
             <Image
@@ -273,43 +292,36 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
               }}
             />
           </View>
-          {/* Author & Copyright at bottom 10% of page */}
+          {/* Author & Copyright centered at bottom */}
           <View style={{
             position: 'absolute',
-            bottom: 0,
+            bottom: 30,
             width: '100%',
-            height: '10%',
             justifyContent: 'center',
             alignItems: 'center',
           }}>
-            <View style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              paddingVertical: 8,
-              paddingHorizontal: 20,
-              borderRadius: 8,
+            <Text style={{
+              fontSize: 13,
+              fontFamily: 'Noto Sans SC',
+              color: '#1F2937',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              marginBottom: 6,
             }}>
-              <Text style={{
-                fontSize: 14,
-                fontFamily: 'Noto Sans SC',
-                color: '#4B5563',
-                textAlign: 'center',
-              }}>
-                By {author}
-              </Text>
-              <Text style={{
-                fontSize: 10,
-                fontFamily: 'Noto Sans SC',
-                color: '#6B7280',
-                textAlign: 'center',
-                marginTop: 4,
-              }}>
-                © 2025 KindleWood Studio
-              </Text>
-            </View>
+              By {author}
+            </Text>
+            <Text style={{
+              fontSize: 9,
+              fontFamily: 'Noto Sans SC',
+              color: '#4B5563',
+              textAlign: 'center',
+            }}>
+              © 2025 KindleWood Studio
+            </Text>
           </View>
         </Page>
       ) : (
-        <Page size={{ width: 576, height: 720 }} style={styles.page}>
+        <Page size={{ width: 420, height: 595 }} style={styles.page}>
           <View style={styles.coverPage}>
             <View style={styles.coverDecorationTop} />
             <Text style={styles.coverTitle}>{title}</Text>
@@ -327,32 +339,46 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
       )}
 
       {/* Scene Pages */}
-      {scenes.map((scene, index) => (
-        <Page key={index} size={{ width: 576, height: 720 }} style={styles.page}>
-          <View style={styles.scenePage}>
-            {/* Image Section */}
-            <View style={styles.sceneImageContainer}>
-              <Image
-                src={scene.imageUrl}
-                style={styles.sceneImage}
-              />
-            </View>
+      {scenes.map((scene, index) => {
+        const caption = scene.caption || scene.description || '';
+        const { fontSize, lineHeight } = getSmartFontSize(caption);
 
-            {/* Text Section */}
-            <View style={styles.sceneTextContainer}>
-              <Text style={styles.sceneText}>
-                {wrapChineseText(scene.caption || scene.description || '')}
-              </Text>
-              <Text style={styles.sceneNumber}>
-                {scene.sceneNumber}
-              </Text>
+        return (
+          <Page key={index} size={{ width: 420, height: 595 }} style={styles.page}>
+            <View style={styles.scenePage}>
+              {/* Image Section - 65% with contain to prevent squishing */}
+              <View style={styles.sceneImageContainer}>
+                <Image
+                  src={scene.imageUrl}
+                  style={styles.sceneImage}
+                />
+              </View>
+
+              {/* Text Section - 35% with smart font sizing */}
+              <View style={styles.sceneTextContainer}>
+                <View style={styles.sceneTextWrapper}>
+                  <Text style={{
+                    fontSize,
+                    lineHeight,
+                    fontFamily: 'Noto Sans SC',
+                    color: '#1F2937',
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                  }}>
+                    {wrapChineseText(caption)}
+                  </Text>
+                </View>
+                <Text style={styles.sceneNumber}>
+                  {scene.sceneNumber}
+                </Text>
+              </View>
             </View>
-          </View>
-        </Page>
-      ))}
+          </Page>
+        );
+      })}
 
       {/* Back Cover - Pre-rendered Marketing Page */}
-      <Page size={{ width: 576, height: 720 }} style={styles.page}>
+      <Page size={{ width: 420, height: 595 }} style={styles.page}>
         <Image
           src="/images/pdf-back-cover.png"
           style={{
