@@ -189,6 +189,82 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFD700',
     marginTop: 50,
   },
+  communityPage: {
+    backgroundColor: '#F9FAFB',
+    padding: 18,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  communityHeader: {
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  communityDecoration: {
+    width: '60%',
+    height: 2,
+    backgroundColor: '#7C3AED',
+    marginBottom: 8,
+  },
+  communityTitle: {
+    fontSize: 18,
+    fontFamily: 'Noto Sans SC',
+    color: '#1F2937',
+    textAlign: 'center',
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  communitySubtitle: {
+    fontSize: 12,
+    fontFamily: 'Noto Sans SC',
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  communityGrid: {
+    display: 'flex',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  storyCard: {
+    width: '31%',
+    marginBottom: 8,
+  },
+  storyCardImage: {
+    width: '100%',
+    height: 85,
+    objectFit: 'contain',
+    marginBottom: 4,
+  },
+  storyCardContent: {
+    paddingHorizontal: 2,
+  },
+  storyCardTitle: {
+    fontSize: 8,
+    fontFamily: 'Noto Sans SC',
+    color: '#1F2937',
+    fontWeight: 'bold',
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  storyCardAuthor: {
+    fontSize: 6,
+    fontFamily: 'Noto Sans SC',
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  communityFooter: {
+    marginTop: 6,
+    alignItems: 'center',
+  },
+  communityWebsite: {
+    fontSize: 10,
+    fontFamily: 'Noto Sans SC',
+    color: '#7C3AED',
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
 });
 
 interface StorybookTemplateProps {
@@ -260,6 +336,58 @@ function getSmartFontSize(text: string): { fontSize: number; lineHeight: number 
     return { fontSize: 14, lineHeight: 1.3 };
   }
 }
+
+/**
+ * Featured community stories for PDF showcase
+ * Real stories from KindleWood Community database
+ */
+const FEATURED_COMMUNITY_STORIES = [
+  {
+    title: "Take care of our new cat friend",
+    author: "By Connor, age 5",
+    imageUrl: "https://v3b.fal.media/files/b/panda/76J905JG57Wn6xhz1u1Ec_b2b068c54a274ed09fc48ec2e17bc9be.jpg"
+  },
+  {
+    title: "Connor's First Taekwondo Class",
+    author: "By Connor",
+    imageUrl: "https://qxeiajnmprinwydlozlq.supabase.co/storage/v1/object/public/generated-images/98bfdbb1-4098-4098-a433-14adede6122c/covers/1762485155281.png"
+  },
+  {
+    title: "Carter's Brave Soccer Day",
+    author: "By Carter",
+    imageUrl: "https://qxeiajnmprinwydlozlq.supabase.co/storage/v1/object/public/generated-images/98bfdbb1-4098-4098-a433-14adede6122c/covers/1762997800987.png"
+  },
+  {
+    title: "Teachers",
+    author: "By KindleWood Studio",
+    imageUrl: "https://qxeiajnmprinwydlozlq.supabase.co/storage/v1/object/public/generated-images/98bfdbb1-4098-4098-a433-14adede6122c/covers/1763149800245.png"
+  },
+  {
+    title: "Learn about Hospital",
+    author: "By KindleWood Studio",
+    imageUrl: "https://qxeiajnmprinwydlozlq.supabase.co/storage/v1/object/public/generated-images/98bfdbb1-4098-4098-a433-14adede6122c/covers/1762998310307.png"
+  },
+  {
+    title: "Firefighters",
+    author: "By Phoebe, age 6",
+    imageUrl: "https://qxeiajnmprinwydlozlq.supabase.co/storage/v1/object/public/generated-images/ce3fd991-04fc-4842-bfe1-6eaeceb9e59f/covers/1763144123894.png"
+  },
+  {
+    title: "Emma's Hawaiian Treasure Hunt",
+    author: "By Emma, age 4",
+    imageUrl: "https://qxeiajnmprinwydlozlq.supabase.co/storage/v1/object/public/generated-images/d7ca9615-06fc-449a-bd45-cb5006971619/covers/1763110054393.png"
+  },
+  {
+    title: "劳动最快乐",
+    author: "By Connor + KindleWood Studio",
+    imageUrl: "https://qxeiajnmprinwydlozlq.supabase.co/storage/v1/object/public/generated-images/98bfdbb1-4098-4098-a433-14adede6122c/covers/1762138402160.png"
+  },
+  {
+    title: "Follow Connor to build his forever home",
+    author: "By Connor & Carter",
+    imageUrl: "https://qxeiajnmprinwydlozlq.supabase.co/storage/v1/object/public/generated-images/98bfdbb1-4098-4098-a433-14adede6122c/covers/1762648994419.png"
+  },
+];
 
 export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
   title,
@@ -376,6 +504,36 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
           </Page>
         );
       })}
+
+      {/* Community Stories Showcase Page */}
+      <Page size={{ width: 420, height: 595 }} style={styles.communityPage}>
+        {/* Header */}
+        <View style={styles.communityHeader}>
+          <Text style={styles.communityTitle}>
+            Discover More Stories from KindleWood Community
+          </Text>
+        </View>
+
+        {/* Story Grid - 3 columns x 3 rows */}
+        <View style={styles.communityGrid}>
+          {FEATURED_COMMUNITY_STORIES.map((story, index) => (
+            <View key={index} style={styles.storyCard}>
+              <Image src={story.imageUrl} style={styles.storyCardImage} />
+              <View style={styles.storyCardContent}>
+                <Text style={styles.storyCardTitle}>{story.title}</Text>
+                <Text style={styles.storyCardAuthor}>{story.author}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* Footer */}
+        <View style={styles.communityFooter}>
+          <Text style={styles.communityWebsite}>
+            https://www.kindlewoodstudio.ai/stories
+          </Text>
+        </View>
+      </Page>
 
       {/* Back Cover - Pre-rendered Marketing Page */}
       <Page size={{ width: 420, height: 595 }} style={styles.page}>
