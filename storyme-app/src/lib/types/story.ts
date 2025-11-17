@@ -103,7 +103,8 @@ export interface EnhancedScene {
   title?: string;                // Scene title for preview (NEW)
   raw_description: string;       // Original user input
   enhanced_prompt: string;       // AI-enhanced for image generation
-  caption: string;               // Age-appropriate caption for PDF
+  caption: string;               // Age-appropriate caption for PDF (English)
+  caption_chinese?: string;      // Chinese translation of caption (NEW - Bilingual Support)
   characterNames: string[];      // Characters in this scene
   isNewCharacter?: boolean;      // Flag if AI added new minor character (NEW)
 }

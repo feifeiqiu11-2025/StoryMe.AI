@@ -42,6 +42,9 @@ export default function CreateStoryPage() {
   // Language selection (NEW - Bilingual Support)
   const [contentLanguage, setContentLanguage] = useState<'en' | 'zh'>('en');
 
+  // Chinese translation toggle (NEW - Bilingual PDF Support)
+  const [generateChineseTranslation, setGenerateChineseTranslation] = useState(false);
+
   // Enhancement state (NEW)
   const [enhancedScenes, setEnhancedScenes] = useState<EnhancedScene[]>([]);
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -343,6 +346,7 @@ export default function CreateStoryPage() {
           storyTone,
           expansionLevel, // NEW: Pass expansion level to API
           language: contentLanguage, // NEW: Pass content language (en or zh)
+          generateChineseTranslation, // NEW: For bilingual English stories with Chinese captions
           characters: characters.map(c => ({
             name: c.name,
             description: Object.values(c.description).filter(Boolean).join(', ')
@@ -394,6 +398,17 @@ export default function CreateStoryPage() {
       prev.map(scene =>
         scene.sceneNumber === sceneNumber
           ? { ...scene, caption: newCaption }
+          : scene
+      )
+    );
+  };
+
+  // NEW: Handle Chinese caption editing
+  const handleCaptionChineseEdit = (sceneNumber: number, newCaptionChinese: string) => {
+    setEnhancedScenes(prev =>
+      prev.map(scene =>
+        scene.sceneNumber === sceneNumber
+          ? { ...scene, caption_chinese: newCaptionChinese }
           : scene
       )
     );
@@ -574,6 +589,7 @@ export default function CreateStoryPage() {
             raw_description: enhancedScene?.raw_description || img.sceneDescription,
             enhanced_prompt: enhancedScene?.enhanced_prompt || img.sceneDescription,
             caption: enhancedScene?.caption || img.sceneDescription,
+            caption_chinese: enhancedScene?.caption_chinese,  // NEW: Bilingual Support
             imageUrl: img.imageUrl,
             prompt: img.prompt,
             generationTime: img.generationTime,
@@ -771,6 +787,7 @@ export default function CreateStoryPage() {
         return {
           sceneNumber: img.sceneNumber,
           caption: enhancedScene?.caption || img.sceneDescription, // Use caption for PDF
+          caption_chinese: enhancedScene?.caption_chinese,  // NEW: Bilingual Support
           imageUrl: img.imageUrl,
         };
       });
@@ -1110,6 +1127,34 @@ export default function CreateStoryPage() {
                   )}
                 </p>
               </div>
+
+              {/* Chinese Translation Toggle (Only for English stories) */}
+              {contentLanguage === 'en' && (
+                <div className="ml-11 mt-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border-2 border-purple-200">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={generateChineseTranslation}
+                      onChange={(e) => setGenerateChineseTranslation(e.target.checked)}
+                      className="mt-1 w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-gray-900">Generate Chinese Translations</span>
+                        <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded-full">NEW</span>
+                      </div>
+                      <p className="text-sm text-gray-700 mb-2">
+                        Add Chinese captions to your English story for bilingual PDF export.
+                        Perfect for teaching children both languages!
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        <strong>Note:</strong> Chinese captions will appear below English text in PDF only.
+                        Audio and e-story features will remain English-only.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1207,12 +1252,14 @@ export default function CreateStoryPage() {
               onApprove={handleGenerateImages}
               onBack={handleRegenerateAll}
               onCaptionEdit={handleCaptionEdit}
+              onCaptionChineseEdit={handleCaptionChineseEdit}
               onScenesUpdate={handleScenesUpdate}
               isGenerating={isGenerating}
               readingLevel={readingLevel}
               storyTone={storyTone}
               expansionLevel={expansionLevel}
               contentLanguage={contentLanguage}
+              generateChineseTranslation={generateChineseTranslation}
             />
           </div>
         )}

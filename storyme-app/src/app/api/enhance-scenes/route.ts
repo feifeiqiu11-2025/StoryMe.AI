@@ -29,7 +29,15 @@ export const maxDuration = 60; // 1 minute timeout
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { scenes, readingLevel, storyTone, characters, expansionLevel = 'minimal', language = 'en' } = body;
+    const {
+      scenes,
+      readingLevel,
+      storyTone,
+      characters,
+      expansionLevel = 'minimal',
+      language = 'en',
+      generateChineseTranslation = false  // NEW: For bilingual English stories
+    } = body;
 
     // Validate inputs
     if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
@@ -136,6 +144,59 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`✓ Enhanced ${enhancedScenes.length} scenes successfully`);
+
+    // NEW: If bilingual mode, generate Chinese translations
+    if (language === 'en' && generateChineseTranslation) {
+      console.log('🌏 Generating Chinese translations for bilingual story...');
+
+      try {
+        const { client: zhClient, model: zhModel } = getModelForLanguage('zh');
+
+        // Build simple translation prompt
+        const captionsToTranslate = enhancedScenes.map(s => s.caption).join('\n\n');
+
+        const translationPrompt = `Translate the following English children's story captions to Chinese. Keep the same playful, age-appropriate tone. Return ONLY the translations, one per line, in the same order.
+
+English Captions:
+${captionsToTranslate}
+
+Chinese Translations:`;
+
+        const translationCompletion = await zhClient.chat.completions.create({
+          model: zhModel,
+          max_tokens: 2048,
+          temperature: 0.5,
+          messages: [
+            {
+              role: 'system',
+              content: '你是专业的儿童故事翻译专家，擅长将英文故事翻译成生动、适合儿童的中文。'
+            },
+            {
+              role: 'user',
+              content: translationPrompt
+            }
+          ]
+        });
+
+        const translationsText = translationCompletion.choices[0]?.message?.content || '';
+        const translations = translationsText.trim().split('\n').filter(t => t.trim());
+
+        console.log(`✓ Generated ${translations.length} Chinese translations`);
+
+        // Log translation usage
+        logModelUsage('zh', zhModel, translationCompletion.usage);
+
+        // Attach translations to enhanced scenes
+        enhancedScenes = enhancedScenes.map((scene, index) => ({
+          ...scene,
+          caption_chinese: translations[index] || scene.caption  // Fallback to English if missing
+        }));
+
+      } catch (translationError) {
+        console.error('Chinese translation failed, continuing without translations:', translationError);
+        // Don't fail the whole request, just skip translations
+      }
+    }
 
     return NextResponse.json({
       success: true,

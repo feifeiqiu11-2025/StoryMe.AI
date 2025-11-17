@@ -314,6 +314,7 @@ export class ProjectService {
         raw_description?: string;
         enhanced_prompt?: string;
         caption?: string;
+        caption_chinese?: string;  // NEW: Bilingual Support
         imageUrl: string;
         prompt: string;
         generationTime: number;
@@ -367,6 +368,7 @@ export class ProjectService {
           raw_description: sceneData.raw_description,        // NEW
           enhanced_prompt: sceneData.enhanced_prompt,        // NEW
           caption: sceneData.caption,                        // NEW
+          caption_chinese: sceneData.caption_chinese,        // NEW: Bilingual Support
           character_ids: data.characterIds,
         })
         .select()

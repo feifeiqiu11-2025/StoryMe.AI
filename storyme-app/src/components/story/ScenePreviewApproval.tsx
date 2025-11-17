@@ -16,6 +16,7 @@ interface ScenePreviewApprovalProps {
   onApprove: () => void;
   onBack: () => void;
   onCaptionEdit?: (sceneNumber: number, newCaption: string) => void;
+  onCaptionChineseEdit?: (sceneNumber: number, newCaptionChinese: string) => void;  // NEW
   onScenesUpdate?: (updatedScenes: EnhancedScene[]) => void;
   isGenerating: boolean;
   // Settings for new scene enhancement
@@ -23,6 +24,7 @@ interface ScenePreviewApprovalProps {
   storyTone?: string;
   expansionLevel?: string;
   contentLanguage?: 'en' | 'zh';
+  generateChineseTranslation?: boolean;  // NEW: For bilingual stories
 }
 
 export default function ScenePreviewApproval({
@@ -32,12 +34,14 @@ export default function ScenePreviewApproval({
   onApprove,
   onBack,
   onCaptionEdit,
+  onCaptionChineseEdit,
   onScenesUpdate,
   isGenerating,
   readingLevel = 5,
   storyTone = 'playful',
   expansionLevel = 'minimal',
   contentLanguage = 'en',
+  generateChineseTranslation = false,
 }: ScenePreviewApprovalProps) {
   // Add Scene Modal State
   const [showAddSceneModal, setShowAddSceneModal] = useState(false);
@@ -353,6 +357,41 @@ export default function ScenePreviewApproval({
                       </p>
                     )}
                   </div>
+
+                  {/* Chinese Caption - Editable (NEW - Bilingual Support) */}
+                  {generateChineseTranslation && (
+                    <div className="bg-purple-50 rounded-lg p-3 mb-3 border border-purple-200">
+                      <label className="text-sm font-medium text-purple-700 mb-1 flex items-center gap-2">
+                        <span>🇨🇳</span>
+                        <span>Chinese Caption (中文):</span>
+                      </label>
+                      {onCaptionChineseEdit ? (
+                        <textarea
+                          value={scene.caption_chinese || ''}
+                          onChange={(e) => {
+                            onCaptionChineseEdit(scene.sceneNumber, e.target.value);
+                            // Auto-resize textarea based on content
+                            e.target.style.height = 'auto';
+                            e.target.style.height = e.target.scrollHeight + 'px';
+                          }}
+                          onFocus={(e) => {
+                            // Set initial height on focus
+                            e.target.style.height = 'auto';
+                            e.target.style.height = e.target.scrollHeight + 'px';
+                          }}
+                          disabled={isGenerating}
+                          placeholder="Chinese translation will appear here..."
+                          className="w-full px-3 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 leading-relaxed overflow-hidden"
+                          rows={1}
+                          style={{ minHeight: '2.5rem' }}
+                        />
+                      ) : (
+                        <p className="text-gray-900 leading-relaxed">
+                          {scene.caption_chinese || <span className="text-gray-400 italic">No Chinese translation</span>}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Characters in Scene */}
                   {scene.characterNames && scene.characterNames.length > 0 && (

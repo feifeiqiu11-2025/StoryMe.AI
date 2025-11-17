@@ -274,8 +274,9 @@ interface StorybookTemplateProps {
   coverImageUrl?: string;
   scenes: Array<{
     sceneNumber: number;
-    caption?: string;       // Age-appropriate caption (NEW)
-    description?: string;   // Fallback for backward compatibility
+    caption?: string;          // Age-appropriate caption (English)
+    caption_chinese?: string;  // Chinese translation (NEW - Bilingual Support)
+    description?: string;      // Fallback for backward compatibility
     imageUrl: string;
   }>;
   createdDate?: string;
@@ -485,6 +486,7 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
               {/* Text Section - 35% with smart font sizing */}
               <View style={styles.sceneTextContainer}>
                 <View style={styles.sceneTextWrapper}>
+                  {/* English Caption */}
                   <Text style={{
                     fontSize,
                     lineHeight,
@@ -495,6 +497,20 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
                   }}>
                     {wrapChineseText(caption)}
                   </Text>
+
+                  {/* Chinese Caption (NEW - Bilingual Support) */}
+                  {scene.caption_chinese && (
+                    <Text style={{
+                      fontSize: fontSize - 2,  // Slightly smaller for Chinese
+                      lineHeight: lineHeight,
+                      fontFamily: 'Noto Sans SC',
+                      color: '#6B7280',  // Lighter gray
+                      textAlign: 'center',
+                      marginTop: 8,
+                    }}>
+                      {wrapChineseText(scene.caption_chinese)}
+                    </Text>
+                  )}
                 </View>
                 <Text style={styles.sceneNumber}>
                   {scene.sceneNumber}
