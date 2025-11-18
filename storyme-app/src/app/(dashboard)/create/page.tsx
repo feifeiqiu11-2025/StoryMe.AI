@@ -1128,33 +1128,6 @@ export default function CreateStoryPage() {
                 </p>
               </div>
 
-              {/* Chinese Translation Toggle (Only for English stories) */}
-              {contentLanguage === 'en' && (
-                <div className="ml-11 mt-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border-2 border-purple-200">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={generateChineseTranslation}
-                      onChange={(e) => setGenerateChineseTranslation(e.target.checked)}
-                      className="mt-1 w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-gray-900">Generate Chinese Translations</span>
-                        <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded-full">NEW</span>
-                      </div>
-                      <p className="text-sm text-gray-700 mb-2">
-                        Add Chinese captions to your English story for bilingual PDF export.
-                        Perfect for teaching children both languages!
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        <strong>Note:</strong> Chinese captions will appear below English text in PDF only.
-                        Audio and e-story features will remain English-only.
-                      </p>
-                    </div>
-                  </label>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -1206,6 +1179,37 @@ export default function CreateStoryPage() {
               onExpansionLevelChange={setExpansionLevel}
               disabled={isEnhancing}
             />
+
+            {/* Chinese Translation Checkbox (Only for English stories) */}
+            {contentLanguage === 'en' && (
+              <div className="mt-4 flex items-center gap-3">
+                <div className="relative inline-flex items-center">
+                  <input
+                    type="checkbox"
+                    id="bilingual-checkbox"
+                    checked={generateChineseTranslation}
+                    onChange={(e) => setGenerateChineseTranslation(e.target.checked)}
+                    disabled={isEnhancing}
+                    className="peer w-5 h-5 appearance-none bg-white border-2 border-gray-400 rounded cursor-pointer checked:bg-purple-600 checked:border-purple-600 focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  />
+                  <svg
+                    className="absolute w-3 h-3 left-1 top-1 pointer-events-none hidden peer-checked:block text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+                <label htmlFor="bilingual-checkbox" className="text-sm text-gray-700 cursor-pointer select-none">
+                  Generate bilingual PDF with Chinese translations
+                </label>
+              </div>
+            )}
 
             {/* Enhance Button */}
             <div className="mt-6 bg-white rounded-2xl shadow-xl p-8">

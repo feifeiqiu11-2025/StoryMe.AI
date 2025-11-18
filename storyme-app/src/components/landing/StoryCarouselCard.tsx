@@ -31,8 +31,8 @@ export default function StoryCarouselCard({
   isMock = false,
 }: StoryCarouselCardProps) {
   // Determine size based on variant
-  const heightClass = variant === 'hero' ? 'aspect-[5/3]' : 'h-[150px]';
-  const containerClass = variant === 'hero' ? 'w-full max-w-md lg:max-w-lg' : 'w-[150px] flex-shrink-0';
+  const heightClass = variant === 'hero' ? 'aspect-[5/3]' : 'h-[180px]';
+  const containerClass = variant === 'hero' ? 'w-full max-w-md lg:max-w-lg' : 'w-[180px] flex-shrink-0';
 
   // Handle mock stories
   if (isMock) {
@@ -54,12 +54,9 @@ export default function StoryCarouselCard({
             <h3 className={`text-white font-bold ${variant === 'hero' ? 'text-xl' : 'text-sm'} line-clamp-1`}>
               {mockStory.title}
             </h3>
-            <div className="flex items-center gap-1 mt-1">
-              <span className={variant === 'hero' ? 'text-xl' : 'text-sm'}>👦</span>
-              <p className={`text-white/90 ${variant === 'hero' ? 'text-base' : 'text-xs'} line-clamp-1`}>
-                by {mockStory.author}
-              </p>
-            </div>
+            <p className={`text-white/90 ${variant === 'hero' ? 'text-base' : 'text-xs'} line-clamp-1 mt-1`}>
+              by {mockStory.author}
+            </p>
           </div>
         </div>
       </div>
@@ -106,12 +103,9 @@ export default function StoryCarouselCard({
             {realStory.title || 'Untitled Story'}
           </h3>
           <div className="flex items-center justify-between mt-1">
-            <div className="flex items-center gap-1">
-              <span className={variant === 'hero' ? 'text-xl' : 'text-sm'}>👦</span>
-              <p className={`text-white/90 ${variant === 'hero' ? 'text-base' : 'text-xs'} line-clamp-1`}>
-                by {authorString}
-              </p>
-            </div>
+            <p className={`text-white/90 ${variant === 'hero' ? 'text-base' : 'text-xs'} line-clamp-1`}>
+              by {authorString}
+            </p>
             {variant === 'hero' && sceneCount > 0 && (
               <p className="text-white/80 text-sm">
                 {sceneCount} scene{sceneCount !== 1 ? 's' : ''}

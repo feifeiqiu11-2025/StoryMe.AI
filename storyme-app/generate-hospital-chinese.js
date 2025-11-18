@@ -1,0 +1,171 @@
+const { createClient } = require('@supabase/supabase-js');
+const OpenAI = require('openai');
+const fs = require('fs');
+const path = require('path');
+const readline = require('readline');
+
+// Read .env.local file manually
+const envPath = path.join(__dirname, '.env.local');
+const envFile = fs.readFileSync(envPath, 'utf8');
+const envVars = {};
+envFile.split('\n').forEach(line => {
+  const match = line.match(/^([^=]+)=(.*)$/);
+  if (match) {
+    let value = match[2].trim();
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    envVars[match[1].trim()] = value;
+  }
+});
+
+const supabaseUrl = envVars.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = envVars.SUPABASE_SERVICE_ROLE_KEY;
+const deepseekApiKey = envVars.DEEPSEEK_API_KEY;
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const deepseek = new OpenAI({
+  apiKey: deepseekApiKey,
+  baseURL: 'https://api.deepseek.com'
+});
+
+async function translateCaption(englishCaption) {
+  const translationPrompt = `Translate the following English children's story caption to Chinese. Keep the same playful, age-appropriate tone.
+
+IMPORTANT NAME TRANSLATIONS:
+- Connor → 康浩
+- Carter → 康乐
+- KindleWood → KindleWood (keep as English)
+
+English Caption:
+${englishCaption}
+
+Chinese Translation:`;
+
+  const completion = await deepseek.chat.completions.create({
+    model: 'deepseek-chat',
+    max_tokens: 500,
+    temperature: 0.5,
+    messages: [
+      {
+        role: 'system',
+        content: '你是专业的儿童故事翻译专家，擅长将英文故事翻译成生动、适合儿童的中文。请注意：Connor 翻译为"康浩"，Carter 翻译为"康乐"，KindleWood 保持英文不翻译。'
+      },
+      {
+        role: 'user',
+        content: translationPrompt
+      }
+    ]
+  });
+
+  return completion.choices[0]?.message?.content?.trim() || '';
+}
+
+function askQuestion(query) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise(resolve => rl.question(query, ans => {
+    rl.close();
+    resolve(ans);
+  }));
+}
+
+async function generateHospitalChinese() {
+  const projectId = 'eb9565a0-1372-45cf-9f15-2ac88bdba67f';
+
+  console.log('\n🚀 Starting Chinese caption generation for "Learn about Hospital" story...\n');
+
+  const { data: project, error } = await supabase
+    .from('projects')
+    .select('id, title, scenes(*)')
+    .eq('id', projectId)
+    .single();
+
+  if (error || !project) {
+    console.error('❌ Error fetching Hospital story:', error);
+    return;
+  }
+
+  console.log(`📖 Story: "${project.title}"`);
+  console.log(`   Total scenes: ${project.scenes.length}\n`);
+
+  const sortedScenes = project.scenes.sort((a, b) => a.scene_number - b.scene_number);
+  const scenesToTranslate = sortedScenes.filter(s => !s.caption_chinese && s.caption);
+
+  if (scenesToTranslate.length === 0) {
+    console.log('✅ All scenes already have Chinese captions');
+    return;
+  }
+
+  console.log(`🔄 Translating ${scenesToTranslate.length} scenes...\n`);
+
+  const translations = [];
+
+  for (const scene of scenesToTranslate) {
+    try {
+      console.log(`Scene ${scene.scene_number}: Translating...`);
+      const chineseCaption = await translateCaption(scene.caption);
+      translations.push({
+        sceneId: scene.id,
+        sceneNumber: scene.scene_number,
+        english: scene.caption,
+        chinese: chineseCaption
+      });
+      console.log(`✅ Done\n`);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      console.error(`❌ Error translating scene ${scene.scene_number}:`, error.message);
+    }
+  }
+
+  console.log('\n' + '='.repeat(100));
+  console.log('📊 TRANSLATION REVIEW - "Learn about Hospital" Story');
+  console.log('='.repeat(100) + '\n');
+
+  translations.forEach(t => {
+    console.log(`Scene ${t.sceneNumber}:`);
+    console.log(`  🇺🇸 English: ${t.english}`);
+    console.log(`  🇨🇳 Chinese: ${t.chinese}`);
+    console.log('');
+  });
+
+  console.log('='.repeat(100) + '\n');
+
+  const answer = await askQuestion('Do you want to save these translations to the database? (yes/no): ');
+
+  if (answer.toLowerCase() === 'yes' || answer.toLowerCase() === 'y') {
+    console.log('\n💾 Saving translations to database...\n');
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const t of translations) {
+      const { error } = await supabase
+        .from('scenes')
+        .update({ caption_chinese: t.chinese })
+        .eq('id', t.sceneId);
+
+      if (error) {
+        console.error(`❌ Error saving scene ${t.sceneNumber}:`, error);
+        errorCount++;
+      } else {
+        console.log(`✅ Saved scene ${t.sceneNumber}`);
+        successCount++;
+      }
+    }
+
+    console.log(`\n📊 Summary:`);
+    console.log(`   ✅ Successfully saved: ${successCount}`);
+    console.log(`   ❌ Errors: ${errorCount}`);
+    console.log(`\n✨ Once saved to DB, PDF export will automatically show both English and Chinese captions!`);
+
+  } else {
+    console.log('\n❌ Cancelled. No translations were saved to the database.');
+  }
+}
+
+generateHospitalChinese();

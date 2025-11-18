@@ -150,6 +150,10 @@ export interface SceneDTO {
   sceneNumber: number;
   description: string;
   simplifiedText?: string;
+  rawDescription?: string;      // Original user input
+  enhancedPrompt?: string;       // AI-enhanced for image generation
+  caption?: string;               // Age-appropriate caption for PDF
+  captionChinese?: string;        // Chinese translation (Bilingual Support)
   characterIds?: string[];
   characterNames?: string[]; // Helper for display
   locationType?: string;

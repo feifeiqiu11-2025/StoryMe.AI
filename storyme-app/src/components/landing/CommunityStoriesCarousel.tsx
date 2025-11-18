@@ -213,34 +213,6 @@ export default function CommunityStoriesCarousel() {
         </a>
       </div>
 
-      {/* Filter Buttons */}
-      {!isMock && (
-        <div className="mb-4">
-          <p className="text-sm text-gray-600 mb-2">Filter by:</p>
-          <div className="flex flex-wrap gap-2">
-            {(['all', 'collections', 'learning', 'avocado-ama', 'original-stories'] as const).map((filter) => {
-              const isActive = selectedFilter === filter;
-              const displayName = getCategoryDisplayName(filter);
-              const icon = getCategoryIcon(filter);
-
-              return (
-                <button
-                  key={filter}
-                  onClick={() => setSelectedFilter(filter)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all inline-flex items-center gap-1.5 ${
-                    isActive
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
-                  }`}
-                >
-                  <span className="text-base leading-none">{icon}</span>
-                  <span>{displayName}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Carousel Container */}
       <div

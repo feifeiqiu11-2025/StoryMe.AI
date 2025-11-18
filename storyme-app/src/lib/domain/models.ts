@@ -148,6 +148,7 @@ export interface Scene {
   raw_description?: string;      // Original user input
   enhanced_prompt?: string;       // AI-enhanced for image generation
   caption?: string;               // Age-appropriate caption for PDF
+  caption_chinese?: string;       // Chinese translation (Bilingual Support)
 
   // Characters in this scene
   character_ids?: string[];

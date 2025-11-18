@@ -116,6 +116,7 @@ const styles = StyleSheet.create({
     objectFit: 'contain',
   },
   sceneTextContainer: {
+    position: 'relative',
     height: '35%',
     paddingTop: 15,
     paddingBottom: 20,
@@ -125,6 +126,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     justifyContent: 'center',
     backgroundColor: '#ffffff',
+    overflow: 'hidden',  // Prevent content from overflowing
   },
   sceneTextWrapper: {
     flex: 1,
@@ -402,6 +404,12 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
   console.log('📖 PDF Template Received:');
   console.log('  - coverImageUrl:', coverImageUrl);
   console.log('  - Will use:', coverImageUrl ? 'AI Cover' : 'Fallback Cover');
+  console.log('  - Scenes data:', scenes.map(s => ({
+    sceneNumber: s.sceneNumber,
+    hasCaption: !!s.caption,
+    hasCaptionChinese: !!s.caption_chinese,
+    caption_chinese: s.caption_chinese
+  })));
 
   return (
     <Document>
@@ -512,7 +520,15 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
                     </Text>
                   )}
                 </View>
-                <Text style={styles.sceneNumber}>
+                {/* Page number - absolute positioned to prevent overflow */}
+                <Text style={{
+                  position: 'absolute',
+                  bottom: 8,
+                  right: 25,
+                  fontSize: 9,
+                  fontFamily: 'Noto Sans SC',
+                  color: '#9CA3AF',
+                }}>
                   {scene.sceneNumber}
                 </Text>
               </View>

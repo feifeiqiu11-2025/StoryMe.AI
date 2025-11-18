@@ -24,7 +24,7 @@ export default function FeedbackModal({
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [feedbackText, setFeedbackText] = useState('');
-  const [isPublic, setIsPublic] = useState(false);
+  const [isPublic, setIsPublic] = useState(true); // Default checked
   const [displayName, setDisplayName] = useState('');
 
   if (!isOpen) return null;
@@ -133,28 +133,38 @@ export default function FeedbackModal({
 
             {/* Public Display Option */}
             {rating >= 4 && (
-              <div className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isPublic}
-                    onChange={(e) => setIsPublic(e.target.checked)}
-                    disabled={loading}
-                    className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                  />
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-900 mb-1">
-                      Share as a testimonial on our website
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      Help other parents discover KindleWood! Your feedback may be featured on our landing page.
-                    </p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="relative inline-flex items-center">
+                    <input
+                      type="checkbox"
+                      id="testimonial-checkbox"
+                      checked={isPublic}
+                      onChange={(e) => setIsPublic(e.target.checked)}
+                      disabled={loading}
+                      className="peer w-5 h-5 appearance-none bg-white border-2 border-gray-400 rounded cursor-pointer checked:bg-blue-600 checked:border-blue-600 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    />
+                    <svg
+                      className="absolute w-3 h-3 left-1 top-1 pointer-events-none hidden peer-checked:block text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
                   </div>
-                </label>
+                  <label htmlFor="testimonial-checkbox" className="text-sm text-gray-700 cursor-pointer select-none">
+                    Share my feedback as a testimonial on the website
+                  </label>
+                </div>
 
                 {/* Display Name Input - Shown when public is checked */}
                 {isPublic && (
-                  <div className="mt-3">
+                  <div className="ml-7">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       How should we display your name?
                     </label>

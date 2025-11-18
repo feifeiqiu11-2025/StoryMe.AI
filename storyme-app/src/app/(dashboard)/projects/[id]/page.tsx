@@ -761,7 +761,9 @@ export default function StoryViewerPage() {
         .sort((a: any, b: any) => a.sceneNumber - b.sceneNumber)
         .map((scene: any) => ({
           sceneNumber: scene.sceneNumber,
-          description: scene.description,
+          caption: scene.caption || scene.description,  // Use caption for PDF
+          caption_chinese: scene.captionChinese || scene.caption_chinese,  // NEW: Bilingual Support (support both camelCase and snake_case)
+          description: scene.description,  // Keep for backward compatibility
           imageUrl: scene.images[0].imageUrl,
         }));
 
