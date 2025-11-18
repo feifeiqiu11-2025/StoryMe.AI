@@ -1,21 +1,21 @@
 /**
- * Main Storybook PDF Template
- * Uses @react-pdf/renderer to create a beautiful children's book layout
+ * Large Storybook PDF Template - 7" x 8.5" Portrait (Legal Booklet)
+ * Uses @react-pdf/renderer to create a large-format children's book
  *
- * Page Size: A5 (420pt x 595pt) - Portrait Format
- * This is optimized for booklet-style printing on Letter/A4 paper:
- * - Layout: 65% image + 35% text caption with smart font sizing
- * - Booklet printing: Perfect for folding Letter/A4 paper in half
- * - Home printing: Maximizes paper usage, no wasted space
- * - Image: Uses 'contain' to prevent cropping/squishing
- * - Smart font sizing: Automatically adjusts for long captions
+ * Page Size: 7" x 8.5" (504pt x 612pt) - Portrait Format
+ * Optimized for booklet-style printing on 8.5" x 14" (Legal) paper folded in half
+ *
+ * Layout:
+ * - Cover: 85% image + 15% author/copyright footer
+ * - Scenes: 65% image + 35% bilingual captions
+ * - Fonts: 14-20px (optimized for bilingual text)
+ * - Perfect for display or reading aloud to groups
  */
 
 import React from 'react';
 import { Document, Page, View, Text, Image, StyleSheet, Font } from '@react-pdf/renderer';
 
-// Register Chinese fonts for PDF rendering with proper format
-// Using direct CDN links with proper CORS support
+// Register Chinese fonts for PDF rendering
 Font.register({
   family: 'Noto Sans SC',
   fonts: [
@@ -32,72 +32,88 @@ Font.register({
   ],
 });
 
-// Define styles for PDF
+// Define styles for large format PDF
 const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
     backgroundColor: '#ffffff',
     padding: 0,
   },
-  coverPage: {
+  // Cover page with AI image (85% image, 15% footer)
+  coverImageContainer: {
+    width: '100%',
+    height: '85%',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  coverImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  coverFooter: {
+    height: '15%',
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    paddingTop: 20,
+  },
+  coverAuthor: {
+    fontSize: 18,
+    fontFamily: 'Noto Sans SC',
+    color: '#1F2937',
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  coverCopyright: {
+    fontSize: 12,
+    fontFamily: 'Noto Sans SC',
+    color: '#6B7280',
+  },
+  // Fallback cover page (no AI image)
+  coverPageFallback: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#4F46E5',
-    padding: 60,
+    padding: 80,
   },
   coverTitle: {
-    fontSize: 36,
+    fontSize: 48,
     fontWeight: 'bold',
     fontFamily: 'Noto Sans SC',
     color: '#ffffff',
     textAlign: 'center',
-    marginBottom: 30,
-    letterSpacing: 1,
+    marginBottom: 40,
+    letterSpacing: 1.5,
   },
   coverSubtitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontFamily: 'Noto Sans SC',
     color: '#E0E7FF',
     textAlign: 'center',
     marginBottom: 60,
-    maxWidth: '80%',
   },
-  coverTagline: {
-    fontSize: 16,
-    fontFamily: 'Noto Sans SC',
-    color: '#C7D2FE',
-    textAlign: 'center',
-    marginBottom: 30,
-    fontStyle: 'italic',
-  },
-  coverAuthor: {
-    fontSize: 24,
+  coverAuthorFallback: {
+    fontSize: 28,
     fontFamily: 'Noto Sans SC',
     color: '#ffffff',
     textAlign: 'center',
-    marginTop: 20,
+    marginTop: 30,
     fontWeight: 'bold',
   },
-  coverDate: {
-    fontSize: 12,
-    fontFamily: 'Noto Sans SC',
-    color: '#C7D2FE',
-    textAlign: 'center',
-    marginTop: 40,
-  },
-  coverDecorationTop: {
+  coverDecoration: {
     width: '60%',
-    height: 3,
+    height: 4,
     backgroundColor: '#FFD700',
-    marginBottom: 40,
+    marginVertical: 40,
   },
-  coverDecorationBottom: {
-    width: '60%',
-    height: 3,
-    backgroundColor: '#FFD700',
-    marginTop: 40,
-  },
+  // Scene pages (65% image, 35% captions - more space for bilingual text)
   scenePage: {
     flex: 1,
     flexDirection: 'column',
@@ -105,7 +121,7 @@ const styles = StyleSheet.create({
   sceneImageContainer: {
     width: '100%',
     height: '65%',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FFFFFF',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
@@ -119,15 +135,15 @@ const styles = StyleSheet.create({
   sceneTextContainer: {
     position: 'relative',
     height: '35%',
-    paddingTop: 15,
+    paddingTop: 20,
     paddingBottom: 20,
-    paddingLeft: 25,
-    paddingRight: 25,
+    paddingLeft: 35,
+    paddingRight: 35,
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
     backgroundColor: '#ffffff',
-    overflow: 'hidden',  // Prevent content from overflowing
+    overflow: 'hidden',
   },
   sceneTextWrapper: {
     flex: 1,
@@ -135,151 +151,72 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sceneNumber: {
-    fontSize: 9,
-    fontFamily: 'Noto Sans SC',
-    color: '#9CA3AF',
-    textAlign: 'right',
-    marginTop: 8,
-  },
-  backCoverPage: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#7C3AED',
-    padding: 60,
-  },
-  backCoverDecoration: {
-    width: '70%',
-    height: 4,
-    backgroundColor: '#FFD700',
-    marginBottom: 50,
-  },
-  backCoverText: {
-    fontSize: 56,
-    fontFamily: 'Noto Sans SC',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 50,
-    fontWeight: 'bold',
-    letterSpacing: 3,
-  },
-  backCoverMessage: {
-    fontSize: 16,
-    fontFamily: 'Noto Sans SC',
-    color: '#E9D5FF',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  backCoverAuthor: {
-    fontSize: 28,
-    fontFamily: 'Noto Sans SC',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 50,
-    fontWeight: 'bold',
-  },
-  backCoverLogo: {
-    fontSize: 14,
-    fontFamily: 'Noto Sans SC',
-    color: '#E9D5FF',
-    textAlign: 'center',
-    marginTop: 50,
-  },
-  backCoverDecorationBottom: {
-    width: '70%',
-    height: 4,
-    backgroundColor: '#FFD700',
-    marginTop: 50,
-  },
+  // Community page
   communityPage: {
     backgroundColor: '#F9FAFB',
-    padding: 18,
+    padding: 30,
     display: 'flex',
     flexDirection: 'column',
   },
-  communityHeader: {
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  communityDecoration: {
-    width: '60%',
-    height: 2,
-    backgroundColor: '#7C3AED',
-    marginBottom: 8,
-  },
   communityTitle: {
-    fontSize: 18,
+    fontSize: 24,
     fontFamily: 'Noto Sans SC',
     color: '#1F2937',
     textAlign: 'center',
     fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  communitySubtitle: {
-    fontSize: 12,
-    fontFamily: 'Noto Sans SC',
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 20,
   },
   communityGrid: {
     display: 'flex',
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 15,
   },
   storyCard: {
     width: '31%',
-    marginBottom: 8,
+    marginBottom: 15,
   },
   storyCardImage: {
     width: '100%',
-    height: 85,
+    height: 120,
     objectFit: 'contain',
-    marginBottom: 4,
-  },
-  storyCardContent: {
-    paddingHorizontal: 2,
+    marginBottom: 6,
   },
   storyCardTitle: {
-    fontSize: 8,
+    fontSize: 11,
     fontFamily: 'Noto Sans SC',
     color: '#1F2937',
     fontWeight: 'bold',
-    marginBottom: 2,
+    marginBottom: 3,
     textAlign: 'center',
   },
   storyCardAuthor: {
-    fontSize: 6,
+    fontSize: 8,
     fontFamily: 'Noto Sans SC',
     color: '#6B7280',
     textAlign: 'center',
   },
-  communityFooter: {
-    marginTop: 6,
-    alignItems: 'center',
-  },
   communityWebsite: {
-    fontSize: 10,
+    fontSize: 14,
     fontFamily: 'Noto Sans SC',
     color: '#7C3AED',
     textAlign: 'center',
     fontWeight: 'bold',
+    marginTop: 10,
   },
 });
 
-interface StorybookTemplateProps {
+interface StorybookTemplateLargeProps {
   title: string;
   description?: string;
   author?: string;
   coverImageUrl?: string;
   scenes: Array<{
     sceneNumber: number;
-    caption?: string;          // Age-appropriate caption (English)
-    caption_chinese?: string;  // Chinese translation (NEW - Bilingual Support)
-    description?: string;      // Fallback for backward compatibility
+    caption?: string;
+    caption_chinese?: string;
+    description?: string;
     imageUrl: string;
   }>;
   createdDate?: string;
@@ -293,29 +230,24 @@ function containsChinese(text: string): boolean {
 }
 
 /**
- * Helper function to wrap Chinese text at characters per line
- * Only applies to Chinese text, English text keeps natural wrapping
+ * Helper function to wrap Chinese text
  */
-function wrapChineseText(text: string, maxCharsPerLine: number = 18): string {
+function wrapChineseText(text: string, maxCharsPerLine: number = 25): string {
   if (!containsChinese(text)) {
-    // English text - return as is, natural wrapping will work
     return text;
   }
 
-  // Chinese text - hard wrap at specified characters per line
   const lines: string[] = [];
   let currentLine = '';
 
   for (let i = 0; i < text.length; i++) {
     currentLine += text[i];
-
     if (currentLine.length >= maxCharsPerLine) {
       lines.push(currentLine);
       currentLine = '';
     }
   }
 
-  // Add remaining text
   if (currentLine.length > 0) {
     lines.push(currentLine);
   }
@@ -324,18 +256,19 @@ function wrapChineseText(text: string, maxCharsPerLine: number = 18): string {
 }
 
 /**
- * Smart font sizing based on caption length
- * Returns font size and line height for optimal readability
+ * Smart font sizing for large format - optimized for 35% caption area
  */
-function getSmartFontSize(text: string): { fontSize: number; lineHeight: number } {
+function getSmartFontSizeLarge(text: string): { fontSize: number; lineHeight: number } {
   const length = text.length;
 
   if (length <= 80) {
-    return { fontSize: 20, lineHeight: 1.5 };
+    return { fontSize: 20, lineHeight: 1.4 };
   } else if (length <= 120) {
     return { fontSize: 18, lineHeight: 1.4 };
   } else if (length <= 160) {
-    return { fontSize: 16, lineHeight: 1.4 };
+    return { fontSize: 16, lineHeight: 1.3 };
+  } else if (length <= 200) {
+    return { fontSize: 15, lineHeight: 1.3 };
   } else {
     return { fontSize: 14, lineHeight: 1.3 };
   }
@@ -343,7 +276,6 @@ function getSmartFontSize(text: string): { fontSize: number; lineHeight: number 
 
 /**
  * Featured community stories for PDF showcase
- * Real stories from KindleWood Community database
  */
 const FEATURED_COMMUNITY_STORIES = [
   {
@@ -393,7 +325,7 @@ const FEATURED_COMMUNITY_STORIES = [
   },
 ];
 
-export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
+export const StorybookTemplateLarge: React.FC<StorybookTemplateLargeProps> = ({
   title,
   description,
   author = 'My Family',
@@ -401,106 +333,54 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
   scenes,
   createdDate,
 }) => {
-  // Debug logging
-  console.log('📖 PDF Template Received:');
+  console.log('📖 Large Format PDF Template (7" x 8.5"):');
   console.log('  - coverImageUrl:', coverImageUrl);
-  console.log('  - Will use:', coverImageUrl ? 'AI Cover' : 'Fallback Cover');
-  console.log('  - Scenes data:', scenes.map(s => ({
-    sceneNumber: s.sceneNumber,
-    hasCaption: !!s.caption,
-    hasCaptionChinese: !!s.caption_chinese,
-    caption_chinese: s.caption_chinese
-  })));
+  console.log('  - Will use:', coverImageUrl ? 'AI Cover (85% image)' : 'Fallback Cover');
 
   return (
     <Document>
-      {/* Cover Page - AI Generated or Fallback */}
-      {/* Using A5 format (420pt x 595pt) - optimized for booklet printing */}
+      {/* Cover Page - 7" x 8.5" portrait (504pt x 612pt) */}
       {coverImageUrl ? (
-        <Page size={{ width: 420, height: 595 }} style={styles.page}>
-          {/* 80% Image Section */}
-          <View style={{
-            width: '100%',
-            height: '80%',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            overflow: 'hidden',
-          }}>
-            <Image
-              src={coverImageUrl}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-            />
+        <Page size={{ width: 504, height: 612 }} style={styles.page}>
+          {/* 85% Image Section */}
+          <View style={styles.coverImageContainer}>
+            <Image src={coverImageUrl} style={styles.coverImage} />
           </View>
 
-          {/* 20% Footer Section */}
-          <View style={{
-            height: '20%',
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: '#ffffff',
-            paddingTop: 15,
-          }}>
-            <Text style={{
-              fontSize: 14,
-              fontFamily: 'Noto Sans SC',
-              color: '#1F2937',
-              fontWeight: 'bold',
-              marginBottom: 6,
-            }}>
-              By {author}
-            </Text>
-            <Text style={{
-              fontSize: 10,
-              fontFamily: 'Noto Sans SC',
-              color: '#6B7280',
-            }}>
-              © 2025 KindleWood Studio
-            </Text>
+          {/* 15% Footer Section */}
+          <View style={styles.coverFooter}>
+            <Text style={styles.coverAuthor}>By {author}</Text>
+            <Text style={styles.coverCopyright}>© 2025 KindleWood Studio</Text>
           </View>
         </Page>
       ) : (
-        <Page size={{ width: 420, height: 595 }} style={styles.page}>
-          <View style={styles.coverPage}>
-            <View style={styles.coverDecorationTop} />
+        <Page size={{ width: 504, height: 612 }} style={styles.page}>
+          <View style={styles.coverPageFallback}>
+            <View style={styles.coverDecoration} />
             <Text style={styles.coverTitle}>{title}</Text>
             {description && (
               <Text style={styles.coverSubtitle}>{description}</Text>
             )}
-            <Text style={styles.coverTagline}>A StoryMe Adventure</Text>
-            <View style={styles.coverDecorationBottom} />
-            <Text style={styles.coverAuthor}>By {author}</Text>
-            {createdDate && (
-              <Text style={styles.coverDate}>{createdDate}</Text>
-            )}
+            <View style={styles.coverDecoration} />
+            <Text style={styles.coverAuthorFallback}>By {author}</Text>
           </View>
         </Page>
       )}
 
-      {/* Scene Pages */}
+      {/* Scene Pages - 70% image, 30% captions */}
       {scenes.map((scene, index) => {
         const caption = scene.caption || scene.description || '';
-        const { fontSize, lineHeight } = getSmartFontSize(caption);
+        const { fontSize, lineHeight } = getSmartFontSizeLarge(caption);
 
         return (
-          <Page key={index} size={{ width: 420, height: 595 }} style={styles.page}>
+          <Page key={index} size={{ width: 504, height: 612 }} style={styles.page}>
             <View style={styles.scenePage}>
-              {/* Image Section - 65% with contain to prevent squishing */}
+              {/* 70% Image Section */}
               <View style={styles.sceneImageContainer}>
-                <Image
-                  src={scene.imageUrl}
-                  style={styles.sceneImage}
-                />
+                <Image src={scene.imageUrl} style={styles.sceneImage} />
               </View>
 
-              {/* Text Section - 35% with smart font sizing */}
+              {/* 30% Text Section */}
               <View style={styles.sceneTextContainer}>
                 <View style={styles.sceneTextWrapper}>
                   {/* English Caption */}
@@ -515,26 +395,27 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
                     {wrapChineseText(caption)}
                   </Text>
 
-                  {/* Chinese Caption (NEW - Bilingual Support) */}
+                  {/* Chinese Caption - Bilingual Support */}
                   {scene.caption_chinese && (
                     <Text style={{
-                      fontSize: fontSize - 2,  // Slightly smaller for Chinese
+                      fontSize: fontSize - 2,
                       lineHeight: lineHeight,
                       fontFamily: 'Noto Sans SC',
-                      color: '#6B7280',  // Lighter gray
+                      color: '#6B7280',
                       textAlign: 'center',
-                      marginTop: 8,
+                      marginTop: 12,
                     }}>
                       {wrapChineseText(scene.caption_chinese)}
                     </Text>
                   )}
                 </View>
-                {/* Page number - absolute positioned to prevent overflow */}
+
+                {/* Page number */}
                 <Text style={{
                   position: 'absolute',
-                  bottom: 8,
-                  right: 25,
-                  fontSize: 9,
+                  bottom: 15,
+                  right: 40,
+                  fontSize: 12,
                   fontFamily: 'Noto Sans SC',
                   color: '#9CA3AF',
                 }}>
@@ -547,37 +428,28 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
       })}
 
       {/* Community Stories Showcase Page */}
-      <Page size={{ width: 420, height: 595 }} style={styles.communityPage}>
-        {/* Header */}
-        <View style={styles.communityHeader}>
-          <Text style={styles.communityTitle}>
-            Discover More Stories from KindleWood Community
-          </Text>
-        </View>
+      <Page size={{ width: 504, height: 612 }} style={styles.communityPage}>
+        <Text style={styles.communityTitle}>
+          Discover More Stories from KindleWood Community
+        </Text>
 
-        {/* Story Grid - 3 columns x 3 rows */}
         <View style={styles.communityGrid}>
           {FEATURED_COMMUNITY_STORIES.map((story, index) => (
             <View key={index} style={styles.storyCard}>
               <Image src={story.imageUrl} style={styles.storyCardImage} />
-              <View style={styles.storyCardContent}>
-                <Text style={styles.storyCardTitle}>{story.title}</Text>
-                <Text style={styles.storyCardAuthor}>{story.author}</Text>
-              </View>
+              <Text style={styles.storyCardTitle}>{story.title}</Text>
+              <Text style={styles.storyCardAuthor}>{story.author}</Text>
             </View>
           ))}
         </View>
 
-        {/* Footer */}
-        <View style={styles.communityFooter}>
-          <Text style={styles.communityWebsite}>
-            https://www.kindlewoodstudio.ai/stories
-          </Text>
-        </View>
+        <Text style={styles.communityWebsite}>
+          https://www.kindlewoodstudio.ai/stories
+        </Text>
       </Page>
 
-      {/* Back Cover - Pre-rendered Marketing Page */}
-      <Page size={{ width: 420, height: 595 }} style={styles.page}>
+      {/* Back Cover */}
+      <Page size={{ width: 504, height: 612 }} style={styles.page}>
         <Image
           src="/images/pdf-back-cover.png"
           style={{
@@ -587,7 +459,6 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
           }}
         />
       </Page>
-
     </Document>
   );
 };

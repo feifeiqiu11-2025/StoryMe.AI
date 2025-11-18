@@ -5,6 +5,9 @@
 
 import { pdf } from '@react-pdf/renderer';
 import { StorybookTemplate } from '@/components/pdf/StorybookTemplate';
+import { StorybookTemplateLarge } from '@/components/pdf/StorybookTemplateLarge';
+
+export type PDFFormat = 'a5' | 'large';
 
 export interface StoryData {
   title: string;
@@ -24,11 +27,15 @@ export interface StoryData {
 /**
  * Generate PDF from story data
  * Returns a Blob that can be downloaded
+ * @param format - 'a5' for A5 booklet (420x595pt) or 'large' for Legal booklet (504x612pt)
  */
-export async function generateStoryPDF(storyData: StoryData): Promise<Blob> {
+export async function generateStoryPDF(storyData: StoryData, format: PDFFormat = 'a5'): Promise<Blob> {
   try {
+    // Select template based on format
+    const Template = format === 'large' ? StorybookTemplateLarge : StorybookTemplate;
+
     // Create PDF document
-    const doc = StorybookTemplate({
+    const doc = Template({
       title: storyData.title,
       description: storyData.description,
       author: storyData.author,
@@ -63,12 +70,14 @@ export function downloadPDF(blob: Blob, filename: string) {
 
 /**
  * Generate and download PDF in one step
+ * @param format - 'a5' for A5 booklet or 'large' for Legal booklet (7"x8.5")
  */
 export async function generateAndDownloadStoryPDF(
   storyData: StoryData,
-  filename?: string
+  filename?: string,
+  format: PDFFormat = 'a5'
 ): Promise<void> {
-  const blob = await generateStoryPDF(storyData);
+  const blob = await generateStoryPDF(storyData, format);
   // Sanitize filename while preserving Chinese and other Unicode characters
   // Only remove characters that are invalid in filenames: \ / : * ? " < > |
   const sanitizedTitle = storyData.title.replace(/[\\/:*?"<>|]/g, '_');

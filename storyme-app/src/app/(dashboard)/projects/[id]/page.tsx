@@ -24,6 +24,7 @@ export default function StoryViewerPage() {
   const [project, setProject] = useState<any>(null);
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [showPdfDropdown, setShowPdfDropdown] = useState(false);
   const [readingMode, setReadingMode] = useState(false);
   const [readingPages, setReadingPages] = useState<ReadingPage[]>([]);
   const [loadingAudio, setLoadingAudio] = useState(false);
@@ -64,6 +65,9 @@ export default function StoryViewerPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // PDF dropdown ref
+  const pdfDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -106,6 +110,23 @@ export default function StoryViewerPage() {
 
     loadData();
   }, [router, projectId]);
+
+  // Close PDF dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (pdfDropdownRef.current && !pdfDropdownRef.current.contains(event.target as Node)) {
+        setShowPdfDropdown(false);
+      }
+    };
+
+    if (showPdfDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showPdfDropdown]);
 
   const fetchProject = async () => {
     try {
@@ -746,13 +767,14 @@ export default function StoryViewerPage() {
     }
   };
 
-  const handleDownloadPDF = async () => {
+  const handleDownloadPDF = async (format: 'a5' | 'large') => {
     if (!project || !project.scenes || project.scenes.length === 0) {
       alert('No scenes to generate PDF');
       return;
     }
 
     setGeneratingPDF(true);
+    setShowPdfDropdown(false);
 
     try {
       // Prepare scenes data - MUST sort by sceneNumber to ensure correct page order
@@ -786,8 +808,9 @@ export default function StoryViewerPage() {
       console.log('  - Author:', authorString);
       console.log('  - Cover URL:', project.coverImageUrl || 'NULL - will use fallback');
       console.log('  - Scenes:', scenesData.length);
+      console.log('  - Format:', format);
 
-      // Generate and download PDF
+      // Generate and download PDF with selected format
       await generateAndDownloadStoryPDF({
         title: project.title,
         description: project.description,
@@ -795,7 +818,7 @@ export default function StoryViewerPage() {
         scenes: scenesData,
         createdDate: new Date(project.createdAt).toLocaleDateString(),
         author: authorString,
-      });
+      }, undefined, format);
 
     } catch (error) {
       console.error('PDF generation error:', error);
@@ -1371,26 +1394,51 @@ export default function StoryViewerPage() {
                     </button>
                   </Tooltip>
 
-                  {/* Export PDF */}
-                  <Tooltip text="Download this story as a PDF file">
-                    <button
-                      onClick={handleDownloadPDF}
-                      disabled={generatingPDF}
-                      className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:from-orange-700 hover:to-red-700 font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {generatingPDF ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          <span>Exporting...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>📄</span>
-                          <span>Export PDF</span>
-                        </>
-                      )}
-                    </button>
-                  </Tooltip>
+                  {/* Export PDF with Format Dropdown */}
+                  <div className="relative" ref={pdfDropdownRef}>
+                    <Tooltip text="Download this story as a PDF file">
+                      <button
+                        onClick={() => setShowPdfDropdown(!showPdfDropdown)}
+                        disabled={generatingPDF}
+                        className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:from-orange-700 hover:to-red-700 font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {generatingPDF ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            <span>Exporting...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>📄</span>
+                            <span>Export PDF</span>
+                            <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </>
+                        )}
+                      </button>
+                    </Tooltip>
+
+                    {/* Dropdown Menu */}
+                    {showPdfDropdown && !generatingPDF && (
+                      <div className="absolute top-full mt-2 left-0 bg-white border-2 border-orange-600 rounded-lg shadow-lg z-50 overflow-hidden min-w-[200px]">
+                        <button
+                          onClick={() => handleDownloadPDF('a5')}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-orange-50 transition-colors border-b border-gray-200"
+                        >
+                          <div className="font-medium text-gray-900">A5 Format</div>
+                          <div className="text-xs text-gray-500 mt-0.5">8.3" × 5.8" (Compact)</div>
+                        </button>
+                        <button
+                          onClick={() => handleDownloadPDF('large')}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-orange-50 transition-colors"
+                        >
+                          <div className="font-medium text-gray-900">Legal Format</div>
+                          <div className="text-xs text-gray-500 mt-0.5">7" × 8.5" (Large Print)</div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
