@@ -6,6 +6,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import LandingNav from '@/components/navigation/LandingNav';
 
 export default function ProductsPage() {
@@ -129,6 +130,23 @@ export default function ProductsPage() {
                 <span className="text-gray-700"><strong>100% Safe</strong> — No ads, no in-app purchases, no external links</span>
               </li>
             </ul>
+
+            {/* QR Code Section */}
+            <div className="flex items-center justify-center gap-4 mb-6 p-4">
+              <div className="flex-shrink-0">
+                <Image
+                  src="/images/qr-kindlewood-ios.png"
+                  alt="Download from App Store"
+                  width={100}
+                  height={100}
+                  className="rounded-lg"
+                />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-semibold text-gray-700">Scan to Download</p>
+                <p className="text-xs text-gray-500">from App Store</p>
+              </div>
+            </div>
 
             <div className="block w-full bg-gray-100 text-gray-500 px-6 py-3 rounded-lg font-semibold text-center border border-gray-300">
               FREE for All Users
