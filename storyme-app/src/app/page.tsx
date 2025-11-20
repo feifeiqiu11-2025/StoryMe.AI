@@ -575,9 +575,14 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="block w-full bg-gray-100 text-gray-500 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-semibold text-center border border-gray-300 text-sm sm:text-base">
+              <a
+                href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-semibold text-center transition-colors text-sm sm:text-base"
+              >
                 FREE for All Users
-              </div>
+              </a>
             </div>
           </div>
 
