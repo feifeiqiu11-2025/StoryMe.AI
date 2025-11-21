@@ -6,6 +6,53 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import { writeFile, unlink, readFile } from 'fs/promises';
+import { join } from 'path';
+import { tmpdir } from 'os';
+
+// Set FFmpeg path
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+
+/**
+ * Convert WebM audio buffer to MP3
+ * Required for iOS compatibility (iOS doesn't support WebM)
+ */
+async function convertWebmToMp3(webmBuffer: Buffer): Promise<Buffer> {
+  const tempId = `audio-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+  const inputPath = join(tmpdir(), `${tempId}.webm`);
+  const outputPath = join(tmpdir(), `${tempId}.mp3`);
+
+  try {
+    // Write WebM buffer to temp file
+    await writeFile(inputPath, webmBuffer);
+
+    // Convert to MP3
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg(inputPath)
+        .toFormat('mp3')
+        .audioCodec('libmp3lame')
+        .audioBitrate('128k')
+        .on('end', () => resolve())
+        .on('error', (err) => reject(err))
+        .save(outputPath);
+    });
+
+    // Read MP3 buffer
+    const mp3Buffer = await readFile(outputPath);
+
+    return mp3Buffer;
+  } finally {
+    // Cleanup temp files
+    try {
+      await unlink(inputPath);
+      await unlink(outputPath);
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
+}
 
 // Maximum duration for this API route (5 minutes for multiple uploads - Vercel Hobby limit)
 export const maxDuration = 300;
@@ -131,20 +178,37 @@ export async function POST(request: NextRequest) {
 
         // Convert File to Buffer
         const arrayBuffer = await audioFile.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+        let buffer: Buffer = Buffer.from(arrayBuffer);
+        let contentType = audioFile.type;
+        let fileExtension = 'mp3'; // Default to MP3 for iOS compatibility
 
-        // Determine file extension from MIME type
-        const fileExtension = audioFile.type.includes('webm') ? 'webm' :
-                             audioFile.type.includes('mp4') ? 'm4a' :
-                             audioFile.type.includes('mpeg') ? 'mp3' :
-                             'webm'; // Default
+        // Convert WebM to MP3 for iOS compatibility
+        if (audioFile.type.includes('webm')) {
+          console.log(`🔄 Converting WebM to MP3 for iOS compatibility...`);
+          try {
+            const mp3Buffer = await convertWebmToMp3(buffer);
+            buffer = mp3Buffer;
+            contentType = 'audio/mpeg';
+            fileExtension = 'mp3';
+            console.log(`✅ Conversion complete: ${buffer.length} bytes`);
+          } catch (conversionError: any) {
+            console.error(`❌ WebM to MP3 conversion failed:`, conversionError);
+            // Fall back to original WebM if conversion fails
+            fileExtension = 'webm';
+            contentType = audioFile.type;
+          }
+        } else if (audioFile.type.includes('mp4')) {
+          fileExtension = 'm4a';
+        } else if (audioFile.type.includes('mpeg')) {
+          fileExtension = 'mp3';
+        }
 
         // Upload to Supabase storage
         const filename = `${projectId}/user-recorded/page-${metadata.pageNumber}-${Date.now()}.${fileExtension}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('story-audio-files')
           .upload(filename, buffer, {
-            contentType: audioFile.type,
+            contentType: contentType,
             upsert: false, // Don't overwrite, create new files
           });
 
