@@ -163,18 +163,14 @@ function EnglishPoster() {
       <div className="absolute bottom-60 left-8 text-5xl opacity-20 rotate-6">🌟</div>
       <div className="absolute top-1/3 right-8 text-3xl opacity-25">📚</div>
       <div className="absolute bottom-32 right-20 text-4xl opacity-20 -rotate-6">🎨</div>
-      <div className="absolute top-1/2 left-4 text-4xl opacity-25 -rotate-6">📖</div>
 
       {/* Main Content */}
       <div className="relative z-10 p-8 md:p-12">
         {/* Hero Header */}
         <div className="text-center mb-8">
           <h1 className="text-5xl md:text-6xl font-black bg-gradient-to-r from-[#3B5FFF] via-[#8B5CF6] to-[#EC4899] bg-clip-text text-transparent mb-2">
-            KindleWood Kids
+            KindleWood Families
           </h1>
-          <p className="text-lg md:text-xl text-gray-600">
-            Free Reading & Learning App for Children <span className="text-sm font-medium text-purple-600">(Ages 3-12)</span>
-          </p>
           <p className="text-base text-gray-500 mt-1 italic">
             Where Imagination Grows into Learning — Read, Listen, and Learn Anywhere
           </p>
@@ -183,7 +179,12 @@ function EnglishPoster() {
         {/* Kids App Section */}
         <div className="relative mb-8">
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-200 transform -rotate-1 hover:rotate-0 transition-transform">
-            <div className="flex items-start gap-4">
+            {/* Highlight banner */}
+            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#3B5FFF] to-[#00C4A7] text-white px-4 py-1 rounded-full text-sm font-bold">
+              📱 Free Mobile App for Kids
+            </div>
+
+            <div className="flex items-start gap-4 mt-2">
               {/* App Store Screenshot */}
               <div className="flex-shrink-0 w-48 h-44 rounded-xl overflow-hidden relative">
                 <Image src="/images/app-store-preview.png" alt="KindleWood Kids App" fill className="object-cover object-top" />
@@ -191,13 +192,15 @@ function EnglishPoster() {
 
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-3">
-                  <h2 className="text-xl font-bold text-[#3B5FFF]">📱 Scan to Download</h2>
+                  <h2 className="text-xl font-bold text-[#3B5FFF]">KindleWood Kids App</h2>
                   <span className="bg-gradient-to-r from-[#00C4A7] to-[#10B981] text-white px-3 py-1 rounded-full text-xs font-bold ">
                     FREE 6 months
                   </span>
                 </div>
 
-                <p className="text-sm text-gray-600 mb-2 font-medium">New stories every day:</p>
+                <p className="text-sm text-gray-600 mb-2 font-medium">
+                  Read and learn in the most fun, interactive way! <span className="text-xs text-purple-600">(Ages 3-12)</span>
+                </p>
                 <div className="flex flex-wrap gap-2 mb-3">
                   <span className="bg-blue-100 px-2 py-1 rounded-full text-xs font-medium">Cool Jobs</span>
                   <span className="bg-purple-100 px-2 py-1 rounded-full text-xs font-medium">Sports</span>
@@ -205,11 +208,12 @@ function EnglishPoster() {
                   <span className="bg-yellow-100 px-2 py-1 rounded-full text-xs font-medium">Chinese Stories 😆</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-1 text-sm text-gray-700">
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm text-gray-700">
                   <span>🎧 Listen to stories</span>
                   <span>📖 Learn new facts</span>
                   <span>🔤 Tap-to-read words</span>
-                  <span>🎯 Read 5 → Get 🧁</span>
+                  <span>🎯 Set reading goals</span>
+                  <span>📊 Track progress</span>
                 </div>
               </div>
             </div>
@@ -235,10 +239,10 @@ function EnglishPoster() {
             <div className="mt-4">
               <h2 className="text-2xl font-bold text-[#8B5CF6] mb-1">🎨 KindleWood Studio</h2>
               <p className="text-gray-600 mb-3 font-medium text-sm">
-                Kids don't just read stories — they CREATE their own stories
+                Kids don't just read stories — they CREATE their own with imagination, their voice, and endless creativity!
               </p>
 
-              <div className="grid md:grid-cols-2 gap-4 mb-4">
+              <div className="grid md:grid-cols-2 gap-2 mb-4">
                 <div>
                   <p className="font-semibold text-gray-700 text-sm mb-2">You can:</p>
                   <div className="space-y-1 text-sm text-gray-600">
@@ -294,11 +298,45 @@ function EnglishPoster() {
           </div>
         </div>
 
-        {/* Story Cards + Community QR Section */}
-        <div className="flex gap-4 mb-6">
-          {/* Story Cards - Left side */}
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-gray-700 mb-3">📚 Popular Stories</p>
+        {/* Community Section */}
+        <div className="relative mb-8">
+          <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-3xl p-6 shadow-lg border border-green-200 transform -rotate-1 hover:rotate-0 transition-transform">
+            {/* Highlight banner */}
+            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#10B981] to-[#059669] text-white px-4 py-1 rounded-full text-sm font-bold">
+              🌱 501(c)(3) Non-Profit Partner
+            </div>
+
+            <div className="mt-4 flex items-start gap-4">
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-[#059669] mb-1">🤝 KindleWood Community</h2>
+                <p className="text-gray-600 mb-3 font-medium text-sm">
+                  Where young creators come together to tell their stories and inspire each other
+                </p>
+
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm text-gray-600 mb-3">
+                  <p>📝 Story creation workshops</p>
+                  <p>🏆 Monthly Storyteller Challenge</p>
+                  <p>📚 Make physical books</p>
+                  <p>🎨 Little Artist Challenge</p>
+                  <p>🎤 Become confident storytellers</p>
+                </div>
+              </div>
+
+              {/* WeChat QR */}
+              <div className="flex-shrink-0 bg-white rounded-xl p-3 shadow-md border border-gray-200">
+                <div className="w-24 h-24 rounded flex items-center justify-center mb-2">
+                  <Image src="/images/qr-community.png" alt="WeChat QR" width={96} height={96} className="rounded" />
+                </div>
+                <p className="text-[10px] text-center font-medium text-gray-600 leading-tight">Scan WeChat QR<br/>to Join Community</p>
+                <p className="text-[9px] text-center text-gray-400 mt-1">More sign-up options<br/>coming soon</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Story Cards Section */}
+        <div className="mb-6">
+          <p className="text-sm font-semibold text-gray-700 mb-3">📚 Popular Stories</p>
             <div className="grid grid-cols-3 gap-2">
               {/* Story Card 1 - Taekwondo */}
               <div className="bg-white rounded-lg overflow-hidden ">
@@ -343,19 +381,6 @@ function EnglishPoster() {
                 <p className="text-xs font-medium text-gray-700 truncate text-center py-1">Teachers</p>
               </div>
             </div>
-          </div>
-
-          {/* Community QR - Right side */}
-          <div className="flex-shrink-0">
-            <div className="bg-white rounded-2xl p-3   text-center">
-              <p className="text-xs font-semibold text-gray-700 mb-2">👨‍👩‍👧 Join Community</p>
-              <div className="w-20 h-20 mx-auto rounded-lg flex items-center justify-center mb-1">
-                <Image src="/images/qr-community.png" alt="Community QR" width={80} height={80} className="rounded" />
-              </div>
-              <p className="text-xs text-gray-500">Feedback</p>
-              <p className="text-xs text-gray-500">Workshops ❤️</p>
-            </div>
-          </div>
         </div>
 
         {/* Pricing footer */}
@@ -388,27 +413,28 @@ function ChinesePoster() {
       <div className="absolute bottom-60 left-8 text-5xl opacity-20 rotate-6">🌟</div>
       <div className="absolute top-1/3 right-8 text-3xl opacity-25">📚</div>
       <div className="absolute bottom-32 right-20 text-4xl opacity-20 -rotate-6">🎨</div>
-      <div className="absolute top-1/2 left-4 text-4xl opacity-25 -rotate-6">📖</div>
 
       {/* Main Content */}
       <div className="relative z-10 p-8 md:p-12">
         {/* Hero Header */}
         <div className="text-center mb-8">
           <h1 className="text-5xl md:text-6xl font-black bg-gradient-to-r from-[#3B5FFF] via-[#8B5CF6] to-[#EC4899] bg-clip-text text-transparent mb-2">
-            KindleWood Kids
+            KindleWood Families
           </h1>
-          <p className="text-lg md:text-xl text-gray-600">
-            免费儿童阅读 & 学习 App <span className="text-sm font-medium text-purple-600">(3-12岁)</span>
-          </p>
           <p className="text-base text-gray-500 mt-1 italic">
-            让孩子在想象力和创造力中学习和成长
+            让孩子在想象力和创造力中学习并成长
           </p>
         </div>
 
         {/* Kids App Section */}
         <div className="relative mb-8">
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-200 transform -rotate-1 hover:rotate-0 transition-transform">
-            <div className="flex items-start gap-4">
+            {/* Highlight banner */}
+            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#3B5FFF] to-[#00C4A7] text-white px-4 py-1 rounded-full text-sm font-bold">
+              📱 免费儿童手机App
+            </div>
+
+            <div className="flex items-start gap-4 mt-2">
               {/* App Store Screenshot */}
               <div className="flex-shrink-0 w-48 h-44 rounded-xl overflow-hidden relative">
                 <Image src="/images/app-store-preview.png" alt="KindleWood Kids App" fill className="object-cover object-top" />
@@ -416,13 +442,15 @@ function ChinesePoster() {
 
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-3">
-                  <h2 className="text-xl font-bold text-[#3B5FFF]">📱 扫码下载</h2>
+                  <h2 className="text-xl font-bold text-[#3B5FFF]">KindleWood Kids App</h2>
                   <span className="bg-gradient-to-r from-[#00C4A7] to-[#10B981] text-white px-3 py-1 rounded-full text-xs font-bold ">
                     半年免费
                   </span>
                 </div>
 
-                <p className="text-sm text-gray-600 mb-2 font-medium">每天都有全新故事更新：</p>
+                <p className="text-sm text-gray-600 mb-2 font-medium">
+                  用最有趣、最互动的方式阅读和学习！<span className="text-xs text-purple-600">(3-12岁)</span>
+                </p>
                 <div className="flex flex-wrap gap-2 mb-3">
                   <span className="bg-blue-100 px-2 py-1 rounded-full text-xs font-medium">Cool Jobs 职业</span>
                   <span className="bg-purple-100 px-2 py-1 rounded-full text-xs font-medium">Sports 体育</span>
@@ -430,11 +458,11 @@ function ChinesePoster() {
                   <span className="bg-yellow-100 px-2 py-1 rounded-full text-xs font-medium">中文故事 😆</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-1 text-sm text-gray-700">
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm text-gray-700">
                   <span>🎧 听故事</span>
                   <span>📖 学知识</span>
                   <span>🔤 点读学单词</span>
-                  <span>🎯 制定目标</span>
+                  <span>🎯 制定阅读目标</span>
                   <span>📊 跟踪阅读进度</span>
                 </div>
               </div>
@@ -455,16 +483,16 @@ function ChinesePoster() {
           <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl p-6 shadow-lg border border-purple-200 transform rotate-1 hover:rotate-0 transition-transform">
             {/* Highlight banner */}
             <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] text-white px-4 py-1 rounded-full text-sm font-bold ">
-              ✨ 想让孩子成为 Storyteller？
+              ✨ 想让孩子成为 Creator 和 Storyteller？
             </div>
 
             <div className="mt-4">
               <h2 className="text-2xl font-bold text-[#8B5CF6] mb-1">🎨 KindleWood Studio</h2>
               <p className="text-gray-600 mb-3 font-medium text-sm">
-                孩子不只"读故事"，还能"创造自己的故事"
+                孩子不只"读故事" — 还能用想象力、自己的声音，创造属于自己的故事！
               </p>
 
-              <div className="grid md:grid-cols-2 gap-4 mb-4">
+              <div className="grid md:grid-cols-2 gap-2 mb-4">
                 <div>
                   <p className="font-semibold text-gray-700 text-sm mb-2">你可以：</p>
                   <div className="space-y-1 text-sm text-gray-600">
@@ -520,11 +548,45 @@ function ChinesePoster() {
           </div>
         </div>
 
-        {/* Story Cards + Community QR Section */}
-        <div className="flex gap-4 mb-6">
-          {/* Story Cards - Left side */}
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-gray-700 mb-3">📚 热门故事</p>
+        {/* Community Section */}
+        <div className="relative mb-8">
+          <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-3xl p-6 shadow-lg border border-green-200 transform -rotate-1 hover:rotate-0 transition-transform">
+            {/* Highlight banner */}
+            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#10B981] to-[#059669] text-white px-4 py-1 rounded-full text-sm font-bold">
+              🌱 501(c)(3) 非营利合作伙伴
+            </div>
+
+            <div className="mt-4 flex items-start gap-4">
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-[#059669] mb-1">🤝 KindleWood Community</h2>
+                <p className="text-gray-600 mb-3 font-medium text-sm">
+                  小小创作者们在这里讲述自己的故事，互相激励和成长
+                </p>
+
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm text-gray-600 mb-3">
+                  <p>📝 故事创作工作坊</p>
+                  <p>🏆 月度故事家挑战赛</p>
+                  <p>📚 制作实体书</p>
+                  <p>🎨 小小艺术家挑战赛</p>
+                  <p>🎤 培养自信故事讲述者</p>
+                </div>
+              </div>
+
+              {/* WeChat QR */}
+              <div className="flex-shrink-0 bg-white rounded-xl p-3 shadow-md border border-gray-200">
+                <div className="w-24 h-24 rounded flex items-center justify-center mb-2">
+                  <Image src="/images/qr-community.png" alt="WeChat QR" width={96} height={96} className="rounded" />
+                </div>
+                <p className="text-[10px] text-center font-medium text-gray-600 leading-tight">扫微信二维码<br/>加入社区</p>
+                <p className="text-[9px] text-center text-gray-400 mt-1">更多注册方式<br/>即将推出</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Story Cards Section */}
+        <div className="mb-6">
+          <p className="text-sm font-semibold text-gray-700 mb-3">📚 热门故事</p>
             <div className="grid grid-cols-3 gap-2">
               {/* Story Card 1 - Taekwondo */}
               <div className="bg-white rounded-lg overflow-hidden  ">
@@ -569,20 +631,6 @@ function ChinesePoster() {
                 <p className="text-xs font-medium text-gray-700 truncate text-center py-1">老师</p>
               </div>
             </div>
-          </div>
-
-          {/* Community QR - Right side */}
-          <div className="flex-shrink-0">
-            <div className="bg-white rounded-2xl p-3   text-center">
-              <p className="text-xs font-semibold text-gray-700 mb-2">👨‍👩‍👧 扫码入群</p>
-              <div className="w-20 h-20 mx-auto rounded-lg flex items-center justify-center mb-1">
-                <Image src="/images/qr-community.png" alt="Community QR" width={80} height={80} className="rounded" />
-              </div>
-              <p className="text-xs text-gray-500">提意见，报Bug</p>
-              <p className="text-xs text-gray-500">参加Storyteller</p>
-              <p className="text-xs text-gray-500">Workshop ❤️</p>
-            </div>
-          </div>
         </div>
 
         {/* Pricing footer */}
