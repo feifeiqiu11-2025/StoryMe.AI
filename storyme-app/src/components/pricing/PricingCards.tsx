@@ -27,9 +27,9 @@ export const pricingTiers: PricingTier[] = [
     displayName: '🎁 Free Trial',
     price: { monthly: 0, annual: 0 },
     description: 'Perfect for getting started',
-    storiesLimit: '5 stories total',
+    storiesLimit: '2 stories total',
     features: [
-      '5 stories to create',
+      '2 stories to create',
       '7 days access',
       'AI story generation',
       'Audio narration (EN + ZH)',

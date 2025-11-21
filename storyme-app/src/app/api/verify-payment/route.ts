@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
       console.log(`[VERIFY-PAYMENT] Payment verified but database not updated. Updating user ${user.id} to tier: ${subscriptionTier}`);
 
       // Determine stories limit
-      let storiesLimit = 5;
+      let storiesLimit = 2; // default for free tier
       if (subscriptionTier === 'basic') storiesLimit = 20;
       if (subscriptionTier === 'premium' || subscriptionTier === 'team') storiesLimit = -1;
 

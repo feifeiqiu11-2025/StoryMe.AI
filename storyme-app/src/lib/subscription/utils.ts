@@ -82,7 +82,7 @@ export function calculateAnnualSavings(tier: string): number {
  */
 export function getTierFeatures(tier: string): string[] {
   const trialFeatures = [
-    'Up to 5 stories',
+    'Up to 2 stories',
     '7 days duration',
     'All Premium features',
     'AI story generation',

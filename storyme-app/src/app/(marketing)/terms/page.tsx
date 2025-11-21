@@ -114,7 +114,7 @@ export default function TermsOfServicePage() {
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">Free Trial</h3>
                 <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
                   <li>Duration: 7 days from signup</li>
-                  <li>Limit: Up to 5 stories total</li>
+                  <li>Limit: Up to 2 stories total</li>
                   <li>No credit card required</li>
                   <li>Full access to all features during trial</li>
                 </ul>

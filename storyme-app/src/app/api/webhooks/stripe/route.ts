@@ -175,7 +175,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   });
 
   // Determine stories limit based on tier
-  let storiesLimit = 5; // default
+  let storiesLimit = 2; // default for free tier
   if (tier === 'basic') storiesLimit = 20;
   if (tier === 'premium' || tier === 'team') storiesLimit = -1; // unlimited
 
@@ -353,7 +353,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     .update({
       subscription_tier: 'free',
       subscription_status: 'cancelled',
-      stories_limit: 5,
+      stories_limit: 2,
       stripe_subscription_id: null,
       billing_cycle_start: null,  // No longer on a billing cycle
       // Keep trial_ends_at and trial_status as-is (trial was already used)

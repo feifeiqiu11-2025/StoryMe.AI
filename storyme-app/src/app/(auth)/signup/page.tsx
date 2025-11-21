@@ -272,7 +272,7 @@ function SignupForm() {
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-green-600">✓</span>
-                  <span>Create up to 50 story images (including regenerations)</span>
+                  <span>Create up to 2 stories</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-green-600">✓</span>
