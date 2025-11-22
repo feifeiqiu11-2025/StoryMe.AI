@@ -141,16 +141,22 @@ export async function POST(request: NextRequest) {
     scenes.forEach((scene: any, index: number) => {
       // Use Chinese caption if generating Chinese audio, fallback to English
       const textContent = language === 'zh'
-        ? (scene.caption_chinese || scene.caption || scene.description)
-        : (scene.caption || scene.description);
+        ? (scene.caption_chinese || scene.caption || scene.description || `Scene ${index + 1}`)
+        : (scene.caption || scene.description || `Scene ${index + 1}`);
 
-      pages.push({
-        pageNumber: index + 2,
-        pageType: 'scene',
-        textContent,
-        sceneId: scene.id,
-      });
+      if (textContent && textContent.trim()) {
+        pages.push({
+          pageNumber: index + 2,
+          pageType: 'scene',
+          textContent,
+          sceneId: scene.id,
+        });
+      } else {
+        console.warn(`⚠️ Scene ${index + 1} has no text content, skipping`);
+      }
     });
+
+    console.log(`📖 Total pages to generate: ${pages.length} (1 cover + ${pages.length - 1} scenes)`);
 
     // Quiz pages (if quiz exists) - Only for English for now
     // TODO: Add Chinese quiz support in future
