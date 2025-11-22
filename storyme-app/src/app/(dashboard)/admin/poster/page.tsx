@@ -306,29 +306,23 @@ function EnglishPoster() {
               🌱 501(c)(3) Non-Profit Partner
             </div>
 
-            <div className="mt-4 flex items-start gap-4">
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-[#059669] mb-1">🤝 KindleWood Community</h2>
-                <p className="text-gray-600 mb-3 font-medium text-sm">
-                  Where young creators come together to tell their stories and inspire each other
-                </p>
+            <div className="mt-4">
+              <h2 className="text-2xl font-bold text-[#059669] mb-1">🤝 KindleWood Community</h2>
+              <p className="text-gray-600 mb-3 font-medium text-sm">
+                Where young creators come together to tell their stories and inspire each other
+              </p>
 
-                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm text-gray-600 mb-3">
-                  <p>📝 Story creation workshops</p>
-                  <p>🏆 Monthly Storyteller Challenge</p>
-                  <p>📚 Make physical books</p>
-                  <p>🎨 Little Artist Challenge</p>
-                  <p>🎤 Become confident storytellers</p>
-                </div>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm text-gray-600 mb-3">
+                <p>📝 Story creation workshops</p>
+                <p>🏆 Monthly Storyteller Challenge</p>
+                <p>📚 Make physical books</p>
+                <p>🎨 Little Artist Challenge</p>
+                <p>🎤 Become confident storytellers</p>
               </div>
 
-              {/* WeChat QR */}
-              <div className="flex-shrink-0 bg-white rounded-xl p-3 shadow-md border border-gray-200">
-                <div className="w-24 h-24 rounded flex items-center justify-center mb-2">
-                  <Image src="/images/qr-community.png" alt="WeChat QR" width={96} height={96} className="rounded" />
-                </div>
-                <p className="text-[10px] text-center font-medium text-gray-600 leading-tight">Scan WeChat QR<br/>to Join Community</p>
-                <p className="text-[9px] text-center text-gray-400 mt-1">More sign-up options<br/>coming soon</p>
+              <div className="pt-2 text-sm">
+                <p className="text-gray-600 mb-1">📍 Currently available in <span className="font-semibold">Seattle area</span> (in-person workshops)</p>
+                <p className="text-gray-500 text-xs">Contact: <span className="text-[#059669] font-medium">Admin@KindleWoodStudio.ai</span></p>
               </div>
             </div>
           </div>

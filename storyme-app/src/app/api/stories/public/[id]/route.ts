@@ -32,6 +32,9 @@ export async function GET(
         reading_level,
         story_tone,
         created_at,
+        cover_image_url,
+        author_name,
+        author_age,
         scenes (
           id,
           scene_number,
@@ -85,6 +88,9 @@ export async function GET(
       readingLevel: project.reading_level,
       storyTone: project.story_tone,
       createdAt: project.created_at,
+      coverImageUrl: project.cover_image_url,
+      authorName: project.author_name,
+      authorAge: project.author_age,
       scenes: project.scenes
         ?.sort((a: any, b: any) => a.scene_number - b.scene_number)
         .map((scene: any) => ({

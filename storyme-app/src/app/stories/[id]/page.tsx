@@ -14,6 +14,7 @@ import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeViewer';
 import AudioRecorder, { RecordingPage } from '@/components/story/AudioRecorder';
 import LandingNav from '@/components/navigation/LandingNav';
+import AppPromoBanner from '@/components/promotion/AppPromoBanner';
 
 function StoryViewer() {
   const router = useRouter();
@@ -54,6 +55,14 @@ function StoryViewer() {
   useEffect(() => {
     fetchStory();
   }, [storyId]);
+
+  // Auto-enter reading mode if URL has ?mode=reading
+  useEffect(() => {
+    const mode = searchParams.get('mode');
+    if (mode === 'reading' && story && story.scenes && story.scenes.length > 0 && !readingMode && !loadingAudio) {
+      handleEnterReadingMode();
+    }
+  }, [story, searchParams, readingMode, loadingAudio]);
 
   const fetchStory = async () => {
     try {
@@ -239,9 +248,16 @@ function StoryViewer() {
       // Build pages array
       const pages: ReadingPage[] = [];
 
-      // Page 1: Cover page (use first scene image as cover if no cover exists)
-      const coverImageUrl = story.scenes[0]?.imageUrl || '/api/placeholder/1024/1024';
-      const coverText = story.title;
+      // Page 1: Cover page (use actual cover image, fallback to first scene)
+      const coverImageUrl = story.coverImageUrl || story.scenes[0]?.imageUrl || '/api/placeholder/1024/1024';
+
+      // Build cover text with author info
+      let coverText = story.title;
+      if (story.authorName && story.authorAge) {
+        coverText = `${story.title}\n\nby ${story.authorName}, age ${story.authorAge}`;
+      } else if (story.authorName) {
+        coverText = `${story.title}\n\nby ${story.authorName}`;
+      }
 
       const coverAudioPage = audioData.pages?.find((ap: any) => ap.page_type === 'cover');
 
@@ -356,7 +372,24 @@ function StoryViewer() {
 
   // IMPORTANT: Sort scenes by sceneNumber to ensure correct page order
   const scenes = (story.scenes || []).sort((a: any, b: any) => a.sceneNumber - b.sceneNumber);
-  const currentScene = scenes[currentSceneIndex];
+
+  // Build pages array with cover page first
+  const allPages = [
+    {
+      type: 'cover',
+      imageUrl: story.coverImageUrl || scenes[0]?.imageUrl,
+      title: story.title,
+      authorName: story.authorName,
+      authorAge: story.authorAge,
+    },
+    ...scenes.map((scene: any) => ({
+      type: 'scene',
+      ...scene,
+    })),
+  ];
+
+  const currentPage = allPages[currentSceneIndex];
+  const isCoverPage = currentPage?.type === 'cover';
 
   // This page is for community/public stories only (route: /stories/[id])
   // My Stories use a different route (/projects/[id])
@@ -393,16 +426,16 @@ function StoryViewer() {
         </div>
 
         {/* Story Viewer */}
-        {scenes.length > 0 ? (
+        {allPages.length > 0 ? (
           <div className="space-y-6">
             {/* Scene Display with Overlay Controls */}
             <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
               {/* Image with Overlaid Navigation */}
-              {currentScene?.imageUrl ? (
+              {currentPage?.imageUrl ? (
                 <div className="relative aspect-video bg-gradient-to-br from-blue-100 to-purple-100">
                   <img
-                    src={currentScene.imageUrl}
-                    alt={`Scene ${currentSceneIndex + 1}`}
+                    src={currentPage.imageUrl}
+                    alt={isCoverPage ? 'Cover' : `Scene ${currentSceneIndex}`}
                     className="w-full h-full object-contain"
                   />
 
@@ -419,8 +452,8 @@ function StoryViewer() {
                     </button>
 
                     <button
-                      onClick={() => setCurrentSceneIndex(Math.min(scenes.length - 1, currentSceneIndex + 1))}
-                      disabled={currentSceneIndex === scenes.length - 1}
+                      onClick={() => setCurrentSceneIndex(Math.min(allPages.length - 1, currentSceneIndex + 1))}
+                      disabled={currentSceneIndex === allPages.length - 1}
                       className="bg-black bg-opacity-60 hover:bg-opacity-80 text-white p-4 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -431,7 +464,7 @@ function StoryViewer() {
 
                   {/* Page Indicator */}
                   <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-black bg-opacity-60 px-4 py-2 rounded-full">
-                    {scenes.map((_: any, index: number) => (
+                    {allPages.map((_: any, index: number) => (
                       <button
                         key={index}
                         onClick={() => setCurrentSceneIndex(index)}
@@ -444,9 +477,9 @@ function StoryViewer() {
                     ))}
                   </div>
 
-                  {/* Scene Counter */}
+                  {/* Page Counter */}
                   <div className="absolute top-4 right-4 bg-black bg-opacity-60 text-white px-4 py-2 rounded-full text-sm font-semibold">
-                    {currentSceneIndex + 1} / {scenes.length}
+                    {isCoverPage ? 'Cover' : `${currentSceneIndex} / ${scenes.length}`}
                   </div>
                 </div>
               ) : (
@@ -455,11 +488,23 @@ function StoryViewer() {
                 </div>
               )}
 
-              {/* Scene Text */}
+              {/* Page Text */}
               <div className="p-8">
-                <p className="text-gray-800 text-lg leading-relaxed">
-                  {currentScene?.caption || currentScene?.description || 'No description available'}
-                </p>
+                {isCoverPage ? (
+                  <div className="text-center">
+                    <h2 className="text-gray-900 text-2xl font-bold mb-2">{currentPage.title}</h2>
+                    {currentPage.authorName && (
+                      <p className="text-gray-600 text-lg">
+                        by {currentPage.authorName}
+                        {currentPage.authorAge && `, age ${currentPage.authorAge}`}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-gray-800 text-lg leading-relaxed">
+                    {currentPage?.caption || currentPage?.description || 'No description available'}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -546,6 +591,11 @@ function StoryViewer() {
             </p>
           </div>
         )}
+
+        {/* App Promotion Banner */}
+        <div className="mt-8">
+          <AppPromoBanner isLoggedIn={!!user} variant="inline" />
+        </div>
       </div>
 
       {/* Reading Mode Viewer */}
@@ -555,6 +605,7 @@ function StoryViewer() {
           projectTitle={story?.title || 'Storybook'}
           pages={readingPages}
           onExit={() => setReadingMode(false)}
+          autoPlayAudio={searchParams.get('mode') === 'reading'}
         />
       )}
 

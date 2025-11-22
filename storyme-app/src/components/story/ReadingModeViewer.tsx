@@ -32,6 +32,7 @@ interface ReadingModeViewerProps {
   projectTitle: string;
   pages: ReadingPage[];
   onExit: () => void;
+  autoPlayAudio?: boolean;
 }
 
 export default function ReadingModeViewer({
@@ -39,13 +40,18 @@ export default function ReadingModeViewer({
   projectTitle,
   pages,
   onExit,
+  autoPlayAudio = false,
 }: ReadingModeViewerProps) {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(autoPlayAudio);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [showCompletionScreen, setShowCompletionScreen] = useState(false);
+  const [audioBlocked, setAudioBlocked] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const KIDS_APP_URL = 'https://apps.apple.com/us/app/kindlewood-kids/id6755075039';
 
   const currentPage = pages[currentPageIndex];
   const totalPages = pages.length;
@@ -67,17 +73,34 @@ export default function ReadingModeViewer({
     };
   }, [showControls, currentPageIndex]);
 
-  // Play audio when page changes (if audio enabled)
+  // Play audio when page changes or on initial load (if audio enabled)
   useEffect(() => {
-    if (audioEnabled && currentPage?.audioUrl && audioRef.current) {
-      audioRef.current.src = currentPage.audioUrl;
-      audioRef.current.play().catch(err => {
-        console.error('Audio play error:', err);
-      });
-    } else if (audioRef.current) {
-      audioRef.current.pause();
-    }
-  }, [currentPageIndex, audioEnabled, currentPage]);
+    const playAudio = () => {
+      if (audioEnabled && currentPage?.audioUrl && audioRef.current) {
+        audioRef.current.src = currentPage.audioUrl;
+        audioRef.current.play().then(() => {
+          setAudioBlocked(false);
+        }).catch(err => {
+          // Browser autoplay policy blocks audio without user interaction
+          if (err.name === 'NotAllowedError') {
+            console.log('Audio autoplay blocked by browser policy - will play on user interaction');
+            setAudioBlocked(true);
+          } else if (err.name === 'AbortError') {
+            // Play was interrupted by a new load - this is normal when quickly changing pages
+            console.log('Audio play interrupted by new load');
+          } else {
+            console.error('Audio play error:', err);
+          }
+        });
+      } else if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+
+    // Small delay to ensure component is fully mounted
+    const timer = setTimeout(playAudio, 100);
+    return () => clearTimeout(timer);
+  }, [currentPageIndex, audioEnabled, currentPage?.audioUrl]);
 
   // Handle audio play/pause state
   useEffect(() => {
@@ -122,6 +145,9 @@ export default function ReadingModeViewer({
     if (currentPageIndex < totalPages - 1) {
       setCurrentPageIndex(currentPageIndex + 1);
       setShowControls(true);
+    } else {
+      // Show completion screen when user tries to go past last page
+      setShowCompletionScreen(true);
     }
   };
 
@@ -162,6 +188,14 @@ export default function ReadingModeViewer({
   });
 
   const handleScreenTap = (e: React.MouseEvent) => {
+    // If audio was blocked by browser policy, try to play on tap
+    if (audioBlocked && audioEnabled && currentPage?.audioUrl && audioRef.current) {
+      audioRef.current.play().then(() => {
+        setAudioBlocked(false);
+      }).catch(err => {
+        console.error('Audio play error on tap:', err);
+      });
+    }
     // Toggle controls on tap
     setShowControls(!showControls);
   };
@@ -315,11 +349,8 @@ export default function ReadingModeViewer({
               e.stopPropagation();
               goToNextPage();
             }}
-            disabled={currentPageIndex === totalPages - 1}
-            className={`pointer-events-auto bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all ${
-              currentPageIndex === totalPages - 1 ? 'opacity-30 cursor-not-allowed' : ''
-            }`}
-            aria-label="Next page"
+            className="pointer-events-auto bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all"
+            aria-label={currentPageIndex === totalPages - 1 ? "Finish story" : "Next page"}
           >
             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -371,6 +402,78 @@ export default function ReadingModeViewer({
             <div className="w-1 h-4 bg-white rounded-full animate-pulse delay-150"></div>
           </div>
           <span className="text-sm font-medium">Playing audio</span>
+        </div>
+      )}
+
+      {/* Tap to Start Audio Indicator */}
+      {audioEnabled && audioBlocked && !isPlaying && currentPage?.audioUrl && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-4 py-2 rounded-full flex items-center gap-2 shadow-lg animate-pulse">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+          </svg>
+          <span className="text-sm font-medium">Tap to start audio</span>
+        </div>
+      )}
+
+      {/* Completion Screen */}
+      {showCompletionScreen && (
+        <div className="absolute inset-0 bg-white flex items-center justify-center z-50 overflow-y-auto">
+          <div className="text-center p-6 max-w-lg w-full">
+            <div className="text-5xl mb-3">🎉</div>
+            <h2 className="text-gray-900 text-2xl font-bold mb-1">The End!</h2>
+            <p className="text-gray-600 text-sm mb-6">
+              You finished reading "{projectTitle}"
+            </p>
+
+            {/* App Download Section */}
+            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-4 mb-4 text-left">
+              <h3 className="text-gray-900 font-bold text-sm mb-2 flex items-center gap-2">
+                📱 Get KindleWood Kids App
+                <span className="bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full">FREE</span>
+              </h3>
+              <ul className="text-gray-600 text-xs space-y-1 mb-3">
+                <li>🎧 Listen to stories with audio narration</li>
+                <li>🔤 Tap any word to hear pronunciation</li>
+                <li>📊 Track reading progress & set goals</li>
+                <li>📚 Access Cool Jobs, Sports & Adventure stories</li>
+              </ul>
+              <a
+                href={KIDS_APP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full bg-blue-600 text-white px-4 py-2.5 rounded-lg font-semibold text-sm hover:bg-blue-700 transition-colors text-center"
+              >
+                Download Free App
+              </a>
+            </div>
+
+            {/* Create Story Section */}
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 mb-4 text-left">
+              <h3 className="text-gray-900 font-bold text-sm mb-2">
+                ✨ Create Your Own Story
+              </h3>
+              <ul className="text-gray-600 text-xs space-y-1 mb-3">
+                <li>✏️ Make your child the story character</li>
+                <li>🤖 Add AI voice narration</li>
+                <li>🎙️ Record your own voice to tell stories</li>
+                <li>📄 Export as PDF or physical book</li>
+              </ul>
+              <a
+                href="/signup"
+                className="block w-full bg-purple-600 text-white px-4 py-2.5 rounded-lg font-semibold text-sm hover:bg-purple-700 transition-colors text-center"
+              >
+                Start Creating Free
+              </a>
+            </div>
+
+            {/* Exit Button */}
+            <button
+              onClick={onExit}
+              className="text-gray-500 text-sm hover:text-gray-700 transition-colors"
+            >
+              ← Back to Story
+            </button>
+          </div>
         </div>
       )}
     </div>

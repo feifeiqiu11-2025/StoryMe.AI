@@ -6,7 +6,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 
 import type { StoryTag } from '@/lib/types/story';
 
@@ -40,6 +40,7 @@ export interface StoryCardProps {
   showAuthor?: boolean;
   showSceneCount?: boolean;
   showDate?: boolean;
+  showShareButton?: boolean;
   onPrivacyToggle?: (storyId: string, currentVisibility: 'public' | 'private') => void;
   onDelete?: (storyId: string) => void;
   isUpdatingPrivacy?: boolean;
@@ -55,10 +56,25 @@ export function StoryCard({
   showAuthor = variant === 'community',
   showSceneCount = variant === 'myStories',
   showDate = variant === 'myStories',
+  showShareButton = variant === 'community',
   onPrivacyToggle,
   onDelete,
   isUpdatingPrivacy = false,
 }: StoryCardProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}/stories/${story.id}?mode=reading`;
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  };
   // Get cover image with fallback
   const coverImage =
     story.coverImageUrl ||
@@ -124,6 +140,35 @@ export function StoryCard({
         {showViewCount && viewCount > 0 && (
           <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-xs font-medium">
             👁️ {viewCount}
+          </div>
+        )}
+
+        {/* Bottom Right - Share Button */}
+        {showShareButton && isPublic && (
+          <div className="absolute bottom-2 right-2">
+            {copied && (
+              <div className="absolute bottom-full right-0 mb-2 bg-gray-900 text-white text-xs px-3 py-2 rounded-lg shadow-lg whitespace-nowrap z-10">
+                <div className="font-medium mb-0.5">Link copied!</div>
+                <div className="text-gray-400 text-[10px] truncate max-w-[160px]">
+                  ...stories/{story.id}?mode=reading
+                </div>
+                <div className="absolute bottom-0 right-3 transform translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900"></div>
+              </div>
+            )}
+            <button
+              onClick={handleShare}
+              className={`${copied ? 'bg-green-500' : 'bg-black bg-opacity-50 hover:bg-opacity-70'} text-white p-2 rounded-full transition-all`}
+            >
+              {copied ? (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+              )}
+            </button>
           </div>
         )}
       </div>
