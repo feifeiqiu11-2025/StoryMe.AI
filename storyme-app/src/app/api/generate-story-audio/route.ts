@@ -38,7 +38,7 @@ interface AudioPage {
 
 export async function POST(request: NextRequest) {
   try {
-    const { projectId } = await request.json();
+    const { projectId, language = 'en' } = await request.json();
 
     if (!projectId) {
       return NextResponse.json(
@@ -47,7 +47,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`🎵 Starting audio generation for project: ${projectId}`);
+    // Validate language parameter
+    if (!['en', 'zh'].includes(language)) {
+      return NextResponse.json(
+        { error: 'Invalid language. Must be "en" or "zh"' },
+        { status: 400 }
+      );
+    }
+
+    console.log(`🎵 Starting ${language.toUpperCase()} audio generation for project: ${projectId}`);
 
     // Initialize Supabase client
     const supabase = await createClient();
@@ -61,7 +69,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch project with scenes
+    // Fetch project with scenes (including Chinese captions for bilingual support)
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select(`
@@ -70,7 +78,8 @@ export async function POST(request: NextRequest) {
           id,
           scene_number,
           description,
-          caption
+          caption,
+          caption_chinese
         )
       `)
       .eq('id', projectId)
@@ -103,6 +112,7 @@ export async function POST(request: NextRequest) {
     const pages: AudioPage[] = [];
 
     // Page 1: Cover page
+    // For Chinese, we keep the same cover text (title + author) as it's usually in the target language
     const coverText = project.author_name && project.author_age
       ? `${project.title}, by ${project.author_name}, age ${project.author_age}`
       : project.author_name
@@ -117,21 +127,39 @@ export async function POST(request: NextRequest) {
 
     // Pages 2+: Scene pages
     const scenes = (project.scenes || []).sort((a: any, b: any) => a.scene_number - b.scene_number);
+
+    // Check if story has Chinese captions
+    const hasBilingualContent = scenes.some((scene: any) => scene.caption_chinese);
+
+    if (language === 'zh' && !hasBilingualContent) {
+      return NextResponse.json(
+        { error: 'This story does not have Chinese captions. Please add Chinese captions first.' },
+        { status: 400 }
+      );
+    }
+
     scenes.forEach((scene: any, index: number) => {
+      // Use Chinese caption if generating Chinese audio, fallback to English
+      const textContent = language === 'zh'
+        ? (scene.caption_chinese || scene.caption || scene.description)
+        : (scene.caption || scene.description);
+
       pages.push({
         pageNumber: index + 2,
         pageType: 'scene',
-        textContent: scene.caption || scene.description,
+        textContent,
         sceneId: scene.id,
       });
     });
 
-    // Quiz pages (if quiz exists)
+    // Quiz pages (if quiz exists) - Only for English for now
+    // TODO: Add Chinese quiz support in future
     console.log('📊 Project quiz_questions data:', project.quiz_questions);
     const quizQuestions = (project.quiz_questions || []).sort((a: any, b: any) => a.question_order - b.question_order);
     console.log(`🧠 Quiz questions count: ${quizQuestions.length}`);
 
-    if (quizQuestions.length > 0) {
+    // Only add quiz pages for English audio
+    if (quizQuestions.length > 0 && language === 'en') {
       console.log(`🧠 Found ${quizQuestions.length} quiz questions, adding quiz audio pages`);
 
       // Add transition page
@@ -171,47 +199,91 @@ export async function POST(request: NextRequest) {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    // Delete existing audio pages for this project
-    await supabase
-      .from('story_audio_pages')
-      .delete()
-      .eq('project_id', projectId);
+    // For English: Delete existing audio pages and recreate
+    // For Chinese: Update existing rows with Chinese audio columns
+    if (language === 'en') {
+      await supabase
+        .from('story_audio_pages')
+        .delete()
+        .eq('project_id', projectId);
+    }
 
     // Generate audio for each page
     const generatedPages = [];
 
     for (const page of pages) {
       try {
-        console.log(`🎵 Generating audio for page ${page.pageNumber}: "${page.textContent.substring(0, 50)}..."`);
+        console.log(`🎵 Generating ${language.toUpperCase()} audio for page ${page.pageNumber}: "${page.textContent.substring(0, 50)}..."`);
 
-        // Update status to generating
-        const { data: audioPage, error: insertError } = await supabase
-          .from('story_audio_pages')
-          .insert({
-            project_id: projectId,
-            page_number: page.pageNumber,
-            page_type: page.pageType,
-            scene_id: page.sceneId,
-            quiz_question_id: page.quizQuestionId, // NEW: Link to quiz question if applicable
-            text_content: page.textContent,
-            voice_id: voiceConfig.voice,
-            tone: tone,
-            generation_status: 'generating',
-          })
-          .select()
-          .single();
+        let audioPageId: string;
 
-        if (insertError || !audioPage) {
-          console.error(`Failed to create audio page record for page ${page.pageNumber}`);
-          console.error('Insert error details:', insertError);
-          console.error('Page data being inserted:', {
-            project_id: projectId,
-            page_number: page.pageNumber,
-            page_type: page.pageType,
-            scene_id: page.sceneId,
-            quiz_question_id: page.quizQuestionId,
-          });
-          continue;
+        if (language === 'en') {
+          // English: Insert new row
+          const { data: audioPage, error: insertError } = await supabase
+            .from('story_audio_pages')
+            .insert({
+              project_id: projectId,
+              page_number: page.pageNumber,
+              page_type: page.pageType,
+              scene_id: page.sceneId,
+              quiz_question_id: page.quizQuestionId,
+              text_content: page.textContent,
+              voice_id: voiceConfig.voice,
+              tone: tone,
+              generation_status: 'generating',
+              language: 'en',
+              audio_source: 'ai',
+            })
+            .select()
+            .single();
+
+          if (insertError || !audioPage) {
+            console.error(`Failed to create audio page record for page ${page.pageNumber}`);
+            console.error('Insert error details:', insertError);
+            continue;
+          }
+          audioPageId = audioPage.id;
+        } else {
+          // Chinese: Find existing row or create one
+          const { data: existingPage } = await supabase
+            .from('story_audio_pages')
+            .select('id')
+            .eq('project_id', projectId)
+            .eq('page_number', page.pageNumber)
+            .single();
+
+          if (existingPage) {
+            audioPageId = existingPage.id;
+            // Update text_content_zh
+            await supabase
+              .from('story_audio_pages')
+              .update({ text_content_zh: page.textContent })
+              .eq('id', audioPageId);
+          } else {
+            // Create new row if English audio wasn't generated first
+            const { data: newPage, error: insertError } = await supabase
+              .from('story_audio_pages')
+              .insert({
+                project_id: projectId,
+                page_number: page.pageNumber,
+                page_type: page.pageType,
+                scene_id: page.sceneId,
+                quiz_question_id: page.quizQuestionId,
+                text_content_zh: page.textContent,
+                voice_id: voiceConfig.voice,
+                tone: tone,
+                generation_status: 'generating',
+                language: 'en', // Default, but we're adding Chinese audio
+              })
+              .select()
+              .single();
+
+            if (insertError || !newPage) {
+              console.error(`Failed to create audio page record for page ${page.pageNumber}`);
+              continue;
+            }
+            audioPageId = newPage.id;
+          }
         }
 
         // Generate audio with OpenAI TTS
@@ -225,9 +297,9 @@ export async function POST(request: NextRequest) {
         // Convert response to buffer
         const buffer = Buffer.from(await mp3Response.arrayBuffer());
 
-        // Upload to Supabase storage
-        const filename = `${projectId}/page-${page.pageNumber}-${Date.now()}.mp3`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        // Upload to Supabase storage with language suffix
+        const filename = `${projectId}/page-${page.pageNumber}-${language}-${Date.now()}.mp3`;
+        const { error: uploadError } = await supabase.storage
           .from('story-audio-files')
           .upload(filename, buffer, {
             contentType: 'audio/mpeg',
@@ -244,7 +316,7 @@ export async function POST(request: NextRequest) {
               generation_status: 'failed',
               error_message: uploadError.message,
             })
-            .eq('id', audioPage.id);
+            .eq('id', audioPageId);
 
           continue;
         }
@@ -254,24 +326,33 @@ export async function POST(request: NextRequest) {
           .from('story-audio-files')
           .getPublicUrl(filename);
 
-        // Update audio page with URL
+        // Update audio page with URL based on language
+        const updateData = language === 'en'
+          ? {
+              audio_url: publicUrl,
+              audio_filename: filename,
+              generation_status: 'completed',
+              audio_source: 'ai',
+            }
+          : {
+              audio_url_zh: publicUrl,
+              audio_source_zh: 'ai',
+              generation_status: 'completed',
+            };
+
         const { data: updatedPage } = await supabase
           .from('story_audio_pages')
-          .update({
-            audio_url: publicUrl,
-            audio_filename: filename,
-            generation_status: 'completed',
-          })
-          .eq('id', audioPage.id)
+          .update(updateData)
+          .eq('id', audioPageId)
           .select()
           .single();
 
         if (updatedPage) {
           generatedPages.push(updatedPage);
-          console.log(`✅ Page ${page.pageNumber} audio generated successfully`);
+          console.log(`✅ Page ${page.pageNumber} ${language.toUpperCase()} audio generated successfully`);
 
-          // If this is a quiz question page, also update the quiz_questions table
-          if (page.pageType === 'quiz_question' && page.quizQuestionId) {
+          // If this is a quiz question page, also update the quiz_questions table (English only)
+          if (language === 'en' && page.pageType === 'quiz_question' && page.quizQuestionId) {
             await supabase
               .from('quiz_questions')
               .update({
@@ -303,11 +384,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`🎉 Audio generation complete. ${generatedPages.length}/${pages.length} pages successful`);
+    console.log(`🎉 ${language.toUpperCase()} audio generation complete. ${generatedPages.length}/${pages.length} pages successful`);
 
     return NextResponse.json({
       success: true,
-      message: `Generated audio for ${generatedPages.length} pages`,
+      message: `Generated ${language.toUpperCase()} audio for ${generatedPages.length} pages`,
+      language,
       totalPages: pages.length,
       successfulPages: generatedPages.length,
       audioPages: generatedPages,

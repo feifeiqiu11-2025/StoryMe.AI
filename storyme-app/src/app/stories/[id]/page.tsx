@@ -167,6 +167,7 @@ function StoryViewer() {
         pageType: 'scene',
         imageUrl: scene.imageUrl || '/api/placeholder/1024/1024',
         textContent: scene.caption || scene.description,
+        textContentChinese: scene.captionChinese,
         sceneId: scene.id,
       });
     });
@@ -175,16 +176,16 @@ function StoryViewer() {
     setShowRecorder(true);
   };
 
-  const handleUploadRecordings = async (recordings: any[]) => {
+  const handleUploadRecordings = async (recordings: any[], language: 'en' | 'zh' = 'en') => {
     setUploadingAudio(true);
 
     try {
-      console.log(`🎙️ Uploading ${recordings.length} audio recordings...`);
+      console.log(`🎙️ Uploading ${recordings.length} ${language.toUpperCase()} audio recordings...`);
 
       // Prepare form data
       const formData = new FormData();
       formData.append('projectId', storyId);
-      formData.append('language', 'en'); // TODO: Support multi-language
+      formData.append('language', language);
       formData.append('voiceProfileName', `${displayName}'s Voice`);
 
       // Build metadata array
@@ -267,6 +268,7 @@ function StoryViewer() {
         imageUrl: coverImageUrl,
         textContent: coverText,
         audioUrl: coverAudioPage?.audio_url,
+        audioUrlZh: coverAudioPage?.audio_url_zh,
         audioDuration: coverAudioPage?.audio_duration_seconds,
       });
 
@@ -279,7 +281,9 @@ function StoryViewer() {
           pageType: 'scene',
           imageUrl: scene.imageUrl || '/api/placeholder/1024/1024',
           textContent: scene.caption || scene.description,
+          textContentChinese: scene.captionChinese,
           audioUrl: sceneAudioPage?.audio_url,
+          audioUrlZh: sceneAudioPage?.audio_url_zh,
           audioDuration: sceneAudioPage?.audio_duration_seconds,
         });
       });
@@ -501,9 +505,16 @@ function StoryViewer() {
                     )}
                   </div>
                 ) : (
-                  <p className="text-gray-800 text-lg leading-relaxed">
-                    {currentPage?.caption || currentPage?.description || 'No description available'}
-                  </p>
+                  <div>
+                    <p className="text-gray-800 text-lg leading-relaxed">
+                      {currentPage?.caption || currentPage?.description || 'No description available'}
+                    </p>
+                    {currentPage?.captionChinese && (
+                      <p className="text-gray-500 text-base leading-relaxed mt-2">
+                        {currentPage.captionChinese}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

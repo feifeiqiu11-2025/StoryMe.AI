@@ -13,6 +13,7 @@ export interface RecordingPage {
   pageType: 'cover' | 'scene' | 'quiz_transition' | 'quiz_question';
   imageUrl: string;
   textContent: string;
+  textContentChinese?: string;
   sceneId?: string;
   quizQuestionId?: string;
 }
@@ -28,8 +29,9 @@ interface AudioRecorderProps {
   projectId: string;
   projectTitle: string;
   pages: RecordingPage[];
-  onComplete: (recordings: AudioRecording[]) => Promise<void>;
+  onComplete: (recordings: AudioRecording[], language: 'en' | 'zh') => Promise<void>;
   onExit: () => void;
+  defaultLanguage?: 'en' | 'zh';
 }
 
 export default function AudioRecorder({
@@ -38,6 +40,7 @@ export default function AudioRecorder({
   pages,
   onComplete,
   onExit,
+  defaultLanguage = 'en',
 }: AudioRecorderProps) {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
@@ -47,6 +50,10 @@ export default function AudioRecorder({
   const [isPlaying, setIsPlaying] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [micPermissionDenied, setMicPermissionDenied] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'zh'>(defaultLanguage);
+
+  // Check if any page has Chinese content
+  const hasBilingualContent = pages.some(page => page.textContentChinese);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -311,7 +318,7 @@ export default function AudioRecorder({
     try {
       // Convert Map to Array
       const recordingsArray = Array.from(recordings.values());
-      await onComplete(recordingsArray);
+      await onComplete(recordingsArray, selectedLanguage);
     } catch (error) {
       console.error('Upload failed:', error);
       alert('Failed to save recordings. Please try again.');
@@ -540,16 +547,57 @@ export default function AudioRecorder({
 
             {/* Text to Read */}
             <div className="mb-8">
-              <div className="flex items-center gap-2 mb-3">
-                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <h3 className="text-lg font-semibold text-gray-900">Read this text:</h3>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <h3 className="text-lg font-semibold text-gray-900">Read this text:</h3>
+                </div>
+
+                {/* Language Selector */}
+                {hasBilingualContent && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Recording language:</span>
+                    <div className="flex rounded-lg overflow-hidden border border-gray-300">
+                      <button
+                        onClick={() => setSelectedLanguage('en')}
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                          selectedLanguage === 'en'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        EN
+                      </button>
+                      <button
+                        onClick={() => setSelectedLanguage('zh')}
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                          selectedLanguage === 'zh'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        中
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-6">
                 <p className="text-gray-800 text-xl leading-relaxed">
-                  {currentPage.textContent}
+                  {selectedLanguage === 'zh' && currentPage.textContentChinese
+                    ? currentPage.textContentChinese
+                    : currentPage.textContent}
                 </p>
+                {/* Show both languages if bilingual */}
+                {hasBilingualContent && currentPage.textContentChinese && (
+                  <p className="text-gray-500 text-base leading-relaxed mt-4 pt-4 border-t border-gray-200">
+                    {selectedLanguage === 'zh'
+                      ? currentPage.textContent
+                      : currentPage.textContentChinese}
+                  </p>
+                )}
               </div>
             </div>
 

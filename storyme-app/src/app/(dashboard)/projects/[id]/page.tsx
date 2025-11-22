@@ -30,6 +30,8 @@ export default function StoryViewerPage() {
   const [loadingAudio, setLoadingAudio] = useState(false);
   const [generatingAudio, setGeneratingAudio] = useState(false);
   const [hasAudio, setHasAudio] = useState(false);
+  const [hasEnglishAudio, setHasEnglishAudio] = useState(false);
+  const [hasChineseAudio, setHasChineseAudio] = useState(false);
   const [updatingVisibility, setUpdatingVisibility] = useState(false);
   const [showPublicConfirm, setShowPublicConfirm] = useState(false);
   const [spotifyStatus, setSpotifyStatus] = useState<string | null>(null);
@@ -56,6 +58,9 @@ export default function StoryViewerPage() {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const [recordingChunks, setRecordingChunks] = useState<Blob[]>([]);
+  const [recordingLanguage, setRecordingLanguage] = useState<'en' | 'zh'>('en');
+  const [showAudioDropdown, setShowAudioDropdown] = useState(false);
+  const audioDropdownRef = useRef<HTMLDivElement>(null);
   const audioPreviewRef = useRef<HTMLAudioElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -128,6 +133,23 @@ export default function StoryViewerPage() {
     };
   }, [showPdfDropdown]);
 
+  // Close Audio dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (audioDropdownRef.current && !audioDropdownRef.current.contains(event.target as Node)) {
+        setShowAudioDropdown(false);
+      }
+    };
+
+    if (showAudioDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showAudioDropdown]);
+
   const fetchProject = async () => {
     try {
       const response = await fetch(`/api/projects/${projectId}`);
@@ -158,9 +180,13 @@ export default function StoryViewerPage() {
       const response = await fetch(`/api/projects/${projectId}/audio-pages`);
       const data = await response.json();
       setHasAudio(data.hasAudio || false);
+      setHasEnglishAudio(data.hasEnglishAudio || false);
+      setHasChineseAudio(data.hasChineseAudio || false);
     } catch (error) {
       console.error('Error checking audio:', error);
       setHasAudio(false);
+      setHasEnglishAudio(false);
+      setHasChineseAudio(false);
     }
   };
 
@@ -176,27 +202,28 @@ export default function StoryViewerPage() {
     }
   };
 
-  const handleGenerateAudio = async () => {
+  const handleGenerateAudio = async (language: 'en' | 'zh' = 'en') => {
     if (!project) {
       alert('Project not loaded');
       return;
     }
 
     setGeneratingAudio(true);
+    setShowAudioDropdown(false);
 
     try {
-      console.log('🎵 Starting audio generation...');
+      console.log(`🎵 Starting ${language.toUpperCase()} audio generation...`);
 
       const response = await fetch('/api/generate-story-audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({ projectId, language }),
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        alert(`✅ Audio generated successfully!\n\n${data.successfulPages} of ${data.totalPages} pages have audio narration.`);
+        alert(`✅ ${language === 'zh' ? 'Chinese' : 'English'} audio generated successfully!\n\n${data.successfulPages} of ${data.totalPages} pages have audio narration.`);
         setHasAudio(true);
         await checkAudioExists();
       } else {
@@ -466,7 +493,7 @@ export default function StoryViewerPage() {
     try {
       const formData = new FormData();
       formData.append('projectId', projectId);
-      formData.append('language', 'en');
+      formData.append('language', recordingLanguage);
       formData.append('voiceProfileName', `${user?.name || 'User'}'s Voice`);
 
       const page = allPages[currentSceneIndex];
@@ -709,7 +736,9 @@ export default function StoryViewerPage() {
           pageType: 'scene',
           imageUrl: scene.images[0].imageUrl,
           textContent: scene.caption || scene.description,
+          textContentChinese: scene.captionChinese,
           audioUrl: sceneAudioPage?.audio_url,
+          audioUrlZh: sceneAudioPage?.audio_url_zh,
           audioDuration: sceneAudioPage?.audio_duration_seconds,
         });
       });
@@ -1093,6 +1122,9 @@ export default function StoryViewerPage() {
   // IMPORTANT: Sort scenes by sceneNumber to ensure correct page order
   const scenes = (project.scenes || []).sort((a: any, b: any) => a.sceneNumber - b.sceneNumber);
 
+  // Check if story has bilingual content (Chinese captions)
+  const hasBilingualContent = scenes.some((scene: any) => scene.captionChinese || scene.caption_chinese);
+
   // Build combined pages array: cover + scenes + quiz
   const allPages = [
     // Cover page (first page)
@@ -1278,8 +1310,13 @@ export default function StoryViewerPage() {
               {currentPage?.type === 'scene' && (
                 <div className="p-8">
                   <p className="text-gray-800 text-lg leading-relaxed">
-                    {currentPage.scene?.description || 'No description available'}
+                    {currentPage.scene?.caption || currentPage.scene?.description || 'No description available'}
                   </p>
+                  {currentPage.scene?.captionChinese && (
+                    <p className="text-gray-500 text-base leading-relaxed mt-2">
+                      {currentPage.scene.captionChinese}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -1323,30 +1360,57 @@ export default function StoryViewerPage() {
                     </button>
                   </Tooltip>
 
-                  {/* Generate Audio / Audio Ready */}
-                  <Tooltip text={hasAudio ? "Audio ready. Click to regenerate." : "Generate AI narration for this story"}>
-                    <button
-                      onClick={handleGenerateAudio}
-                      disabled={generatingAudio}
-                      className={`flex items-center gap-2 px-4 py-2 text-sm rounded-lg font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                        hasAudio
-                          ? 'bg-green-600 text-white hover:bg-green-700'
-                          : 'bg-gray-500 text-white hover:bg-gray-600'
-                      }`}
-                    >
-                      {generatingAudio ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          <span>Generating...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>🎵</span>
-                          <span>{hasAudio ? 'Audio Ready ✓' : 'Generate Audio'}</span>
-                        </>
-                      )}
-                    </button>
-                  </Tooltip>
+                  {/* Generate Audio with Dropdown */}
+                  <div className="relative" ref={audioDropdownRef}>
+                    <Tooltip text={hasAudio ? "Audio ready. Click to regenerate." : "Generate AI narration for this story"}>
+                      <button
+                        onClick={() => setShowAudioDropdown(!showAudioDropdown)}
+                        disabled={generatingAudio}
+                        className={`flex items-center gap-2 px-4 py-2 text-sm rounded-lg font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                          hasAudio
+                            ? 'bg-green-600 text-white hover:bg-green-700'
+                            : 'bg-gray-500 text-white hover:bg-gray-600'
+                        }`}
+                      >
+                        {generatingAudio ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            <span>Generating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>🎵</span>
+                            <span>{hasAudio ? 'Audio Ready ✓' : 'Generate Audio'}</span>
+                            <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </>
+                        )}
+                      </button>
+                    </Tooltip>
+
+                    {/* Audio Language Dropdown */}
+                    {showAudioDropdown && (
+                      <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50 min-w-[200px]">
+                        <button
+                          onClick={() => handleGenerateAudio('en')}
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
+                        >
+                          <span>English Narration</span>
+                          {hasEnglishAudio && <span className="text-green-600">✓</span>}
+                        </button>
+                        {hasBilingualContent && (
+                          <button
+                            onClick={() => handleGenerateAudio('zh')}
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
+                          >
+                            <span>Chinese Narration</span>
+                            {hasChineseAudio && <span className="text-green-600">✓</span>}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Record Your Voice */}
                   <Tooltip text="Record your own voice narration for this story">
@@ -1705,55 +1769,75 @@ export default function StoryViewerPage() {
               cursor: isDragging ? 'grabbing' : 'auto',
             }}
           >
-            <div className="bg-white rounded-2xl shadow-2xl p-6 border-2 border-purple-200">
-              {/* Drag Handle + Header */}
+            <div className="bg-white rounded-2xl shadow-2xl p-4 border-2 border-purple-200 w-80">
+              {/* Header Row - Title + Close */}
               <div
                 onMouseDown={handleMouseDown}
-                className="flex items-center justify-between mb-4 cursor-grab active:cursor-grabbing"
+                className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing"
               >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex flex-col gap-0.5">
-                      <div className="w-3 h-0.5 bg-gray-400 rounded"></div>
-                      <div className="w-3 h-0.5 bg-gray-400 rounded"></div>
-                      <div className="w-3 h-0.5 bg-gray-400 rounded"></div>
-                    </div>
-                    <h3 className="text-base font-bold text-gray-900">🎙️ Recording Mode</h3>
+                <h3 className="text-sm font-bold text-gray-900">🎙️ Recording Mode</h3>
+                <button
+                  onClick={handleExitRecordingMode}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Status + Language Row */}
+              <div className="flex items-center justify-between mb-3 px-1">
+                <p className="text-xs text-gray-600">
+                  <span className="text-green-600 font-semibold">{savedPages.size}</span>
+                  <span className="text-gray-500"> saved, </span>
+                  <span className="text-gray-500">{allPages.length - savedPages.size} left</span>
+                </p>
+                {/* Language Selector */}
+                {hasBilingualContent && (
+                  <div className="flex rounded-md overflow-hidden border border-gray-300">
+                    <button
+                      onClick={() => setRecordingLanguage('en')}
+                      className={`px-2 py-0.5 text-xs font-medium transition-colors ${
+                        recordingLanguage === 'en'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      EN
+                    </button>
+                    <button
+                      onClick={() => setRecordingLanguage('zh')}
+                      className={`px-2 py-0.5 text-xs font-medium transition-colors ${
+                        recordingLanguage === 'zh'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      中
+                    </button>
                   </div>
-                  <p className="text-xs text-gray-600 ml-5">
-                    <span className="text-green-600 font-semibold">{savedPages.size} saved</span>
-                    {pageRecordings.size > savedPages.size && (
-                      <span className="text-yellow-600 font-semibold">, {pageRecordings.size - savedPages.size} recorded</span>
-                    )}
-                    <span className="text-gray-500">, {allPages.length - pageRecordings.size} remaining</span>
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleSaveCurrentPage}
-                    disabled={uploadingAudio || !pageRecordings.has(currentSceneIndex)}
-                    className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-4 py-1.5 rounded-lg hover:from-green-700 hover:to-blue-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
-                  >
-                    {uploadingAudio ? (
-                      <span className="flex items-center gap-1.5">
-                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                        Saving...
-                      </span>
-                    ) : currentSceneIndex === allPages.length - 1 ? (
-                      'Save & Finish'
-                    ) : (
-                      'Save & Continue'
-                    )}
-                  </button>
-                  <button
-                    onClick={handleExitRecordingMode}
-                    className="text-gray-600 hover:text-gray-900 transition-colors"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+                )}
+              </div>
+
+              {/* Save Button Row */}
+              <div className="mb-3">
+                <button
+                  onClick={handleSaveCurrentPage}
+                  disabled={uploadingAudio || !pageRecordings.has(currentSceneIndex)}
+                  className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  {uploadingAudio ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Saving...
+                    </span>
+                  ) : currentSceneIndex === allPages.length - 1 ? (
+                    'Save & Finish'
+                  ) : (
+                    'Save & Continue'
+                  )}
+                </button>
               </div>
 
               {/* Recording Controls */}

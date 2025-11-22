@@ -52,11 +52,23 @@ export async function GET(
       return response;
     }
 
+    // Determine available languages based on audio URLs
+    const hasEnglishAudio = (audioPages || []).some((page: any) => page.audio_url);
+    const hasChineseAudio = (audioPages || []).some((page: any) => page.audio_url_zh);
+
+    const availableLanguages: string[] = [];
+    if (hasEnglishAudio) availableLanguages.push('en');
+    if (hasChineseAudio) availableLanguages.push('zh');
+
     // Format response for kids app
     // Includes: story pages, quiz_transition, and quiz_question pages
+    // Now also includes Chinese audio URLs and available languages
     const response = NextResponse.json({
       pages: audioPages || [],
       hasAudio: (audioPages || []).length > 0,
+      hasEnglishAudio,
+      hasChineseAudio,
+      availableLanguages,
     });
 
     // Add CORS headers for kids app

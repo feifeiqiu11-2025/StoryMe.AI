@@ -40,6 +40,7 @@ export async function GET(
           scene_number,
           description,
           caption,
+          caption_chinese,
           generated_images (
             id,
             image_url,
@@ -98,6 +99,7 @@ export async function GET(
           sceneNumber: scene.scene_number,
           description: scene.description,
           caption: scene.caption,
+          captionChinese: scene.caption_chinese,
           imageUrl: scene.generated_images?.[0]?.image_url || null,
           prompt: scene.generated_images?.[0]?.prompt || null,
         })) || [],

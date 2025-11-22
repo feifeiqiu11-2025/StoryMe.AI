@@ -13,7 +13,9 @@ export interface ReadingPage {
   pageType: 'cover' | 'scene' | 'quiz_transition' | 'quiz_question';
   imageUrl: string;
   textContent: string;
+  textContentChinese?: string;
   audioUrl?: string;
+  audioUrlZh?: string;
   audioDuration?: number;
   quizQuestion?: {
     id: string;
@@ -48,6 +50,7 @@ export default function ReadingModeViewer({
   const [showControls, setShowControls] = useState(true);
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
+  const [audioLanguage, setAudioLanguage] = useState<'en' | 'zh'>('en');
   const audioRef = useRef<HTMLAudioElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -55,6 +58,19 @@ export default function ReadingModeViewer({
 
   const currentPage = pages[currentPageIndex];
   const totalPages = pages.length;
+
+  // Check if bilingual audio is available
+  const hasEnglishAudio = pages.some(p => p.audioUrl);
+  const hasChineseAudio = pages.some(p => p.audioUrlZh);
+  const hasBilingualAudio = hasEnglishAudio && hasChineseAudio;
+
+  // Get current audio URL based on selected language
+  const getCurrentAudioUrl = (page: ReadingPage) => {
+    if (audioLanguage === 'zh' && page.audioUrlZh) {
+      return page.audioUrlZh;
+    }
+    return page.audioUrl;
+  };
 
   // Auto-hide controls after 3 seconds
   useEffect(() => {
@@ -76,8 +92,9 @@ export default function ReadingModeViewer({
   // Play audio when page changes or on initial load (if audio enabled)
   useEffect(() => {
     const playAudio = () => {
-      if (audioEnabled && currentPage?.audioUrl && audioRef.current) {
-        audioRef.current.src = currentPage.audioUrl;
+      const audioUrl = currentPage ? getCurrentAudioUrl(currentPage) : null;
+      if (audioEnabled && audioUrl && audioRef.current) {
+        audioRef.current.src = audioUrl;
         audioRef.current.play().then(() => {
           setAudioBlocked(false);
         }).catch(err => {
@@ -100,7 +117,7 @@ export default function ReadingModeViewer({
     // Small delay to ensure component is fully mounted
     const timer = setTimeout(playAudio, 100);
     return () => clearTimeout(timer);
-  }, [currentPageIndex, audioEnabled, currentPage?.audioUrl]);
+  }, [currentPageIndex, audioEnabled, audioLanguage, currentPage]);
 
   // Handle audio play/pause state
   useEffect(() => {
@@ -189,7 +206,8 @@ export default function ReadingModeViewer({
 
   const handleScreenTap = (e: React.MouseEvent) => {
     // If audio was blocked by browser policy, try to play on tap
-    if (audioBlocked && audioEnabled && currentPage?.audioUrl && audioRef.current) {
+    const audioUrl = currentPage ? getCurrentAudioUrl(currentPage) : null;
+    if (audioBlocked && audioEnabled && audioUrl && audioRef.current) {
       audioRef.current.play().then(() => {
         setAudioBlocked(false);
       }).catch(err => {
@@ -200,11 +218,15 @@ export default function ReadingModeViewer({
     setShowControls(!showControls);
   };
 
+  const toggleLanguage = () => {
+    setAudioLanguage(prev => prev === 'en' ? 'zh' : 'en');
+  };
+
   if (!currentPage) {
     return null;
   }
 
-  const hasAudio = pages.some(p => p.audioUrl);
+  const hasAudio = hasEnglishAudio || hasChineseAudio;
 
   return (
     <div
@@ -241,31 +263,48 @@ export default function ReadingModeViewer({
             {projectTitle}
           </h1>
 
-          {/* Audio Toggle */}
-          {hasAudio && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleAudioEnabled();
-              }}
-              className={`p-2 rounded-lg transition-all ${
-                audioEnabled
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300'
-              }`}
-              aria-label={audioEnabled ? 'Disable audio' : 'Enable audio'}
-            >
-              {audioEnabled ? (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                </svg>
-              ) : (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                </svg>
-              )}
-            </button>
-          )}
+          {/* Audio Controls */}
+          <div className="flex items-center gap-2">
+            {/* Language Toggle - only show if bilingual audio available */}
+            {hasBilingualAudio && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleLanguage();
+                }}
+                className="px-2 py-1 rounded-lg bg-gray-700 text-white text-sm font-medium transition-all hover:bg-gray-600"
+                aria-label={`Switch to ${audioLanguage === 'en' ? 'Chinese' : 'English'} audio`}
+              >
+                {audioLanguage === 'en' ? 'EN' : '中'}
+              </button>
+            )}
+
+            {/* Audio Toggle */}
+            {hasAudio && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleAudioEnabled();
+                }}
+                className={`p-2 rounded-lg transition-all ${
+                  audioEnabled
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300'
+                }`}
+                aria-label={audioEnabled ? 'Disable audio' : 'Enable audio'}
+              >
+                {audioEnabled ? (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                  </svg>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -313,9 +352,16 @@ export default function ReadingModeViewer({
                 </div>
               </div>
             ) : (
-              <p className="text-gray-800 text-xl md:text-2xl lg:text-3xl leading-relaxed text-center font-medium">
-                {currentPage.textContent}
-              </p>
+              <div className="text-center">
+                <p className="text-gray-800 text-xl md:text-2xl lg:text-3xl leading-relaxed font-medium">
+                  {currentPage.textContent}
+                </p>
+                {currentPage.textContentChinese && (
+                  <p className="text-gray-500 text-lg md:text-xl lg:text-2xl leading-relaxed mt-3">
+                    {currentPage.textContentChinese}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </div>
