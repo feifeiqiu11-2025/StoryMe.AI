@@ -238,7 +238,6 @@ export async function POST(request: NextRequest) {
               tone: tone,
               generation_status: 'generating',
               language: 'en',
-              audio_source: 'ai',
             })
             .select()
             .single();
@@ -338,11 +337,9 @@ export async function POST(request: NextRequest) {
               audio_url: publicUrl,
               audio_filename: filename,
               generation_status: 'completed',
-              audio_source: 'ai',
             }
           : {
               audio_url_zh: publicUrl,
-              audio_source_zh: 'ai',
               generation_status: 'completed',
             };
 
