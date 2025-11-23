@@ -52,15 +52,20 @@ export default function XmasPosterPage() {
     }
   };
 
+  const [downloading, setDownloading] = useState(false);
+
   const downloadAsPNG = async () => {
     if (!posterRef.current) return;
 
+    setDownloading(true);
     try {
       const canvas = await html2canvas(posterRef.current, {
-        scale: 2,
+        scale: 4, // Higher resolution for print clarity
         useCORS: true,
-        allowTaint: true,
-        backgroundColor: null,
+        allowTaint: false, // Must be false for toDataURL to work with CORS
+        backgroundColor: '#ffffff',
+        logging: true, // Enable logging for debugging
+        proxy: undefined, // No proxy needed if CORS headers are set
       });
 
       const link = document.createElement('a');
@@ -69,6 +74,9 @@ export default function XmasPosterPage() {
       link.click();
     } catch (error) {
       console.error('Error generating PNG:', error);
+      alert('Failed to generate PNG. Check browser console for details.');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -114,9 +122,10 @@ export default function XmasPosterPage() {
             </select>
             <button
               onClick={downloadAsPNG}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              disabled={downloading}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              Download PNG
+              {downloading ? 'Generating...' : 'Download PNG'}
             </button>
           </div>
         </div>
@@ -210,14 +219,14 @@ function EnglishPoster({ story, scene12, scene13, scene15, coverImageUrl, getChi
 
             {/* Scene 12 Card - booklet style */}
             {scene12?.imageUrl && (
-              <div className="flex-shrink-0 bg-white rounded-lg p-1.5 border border-gray-200">
-                <div className="flex gap-1">
-                  <div className="w-32 h-40 relative flex-shrink-0 rounded overflow-hidden">
+              <div className="flex-shrink-0 bg-white rounded-lg p-2 border border-gray-200 shadow-sm">
+                <div className="flex gap-2">
+                  <div className="w-36 h-44 relative flex-shrink-0 rounded overflow-hidden">
                     <Image src={scene12.imageUrl} alt="Scene 12" fill className="object-cover" />
                   </div>
-                  <div className="w-16 py-1">
-                    <p className="text-[8px] text-gray-700 leading-snug mb-1">{scene12.caption}</p>
-                    <p className="text-[7px] text-gray-500 leading-snug">{getChineseCaption(12, scene12.caption)}</p>
+                  <div className="w-20 py-1">
+                    <p className="text-[11px] text-gray-900 leading-snug mb-1.5 font-medium">{scene12.caption}</p>
+                    <p className="text-[10px] text-gray-700 leading-snug">{getChineseCaption(12, scene12.caption)}</p>
                   </div>
                 </div>
               </div>
@@ -225,14 +234,14 @@ function EnglishPoster({ story, scene12, scene13, scene15, coverImageUrl, getChi
 
             {/* Scene 13 Card - booklet style */}
             {scene13?.imageUrl && (
-              <div className="flex-shrink-0 bg-white rounded-lg p-1.5 border border-gray-200">
-                <div className="flex gap-1">
-                  <div className="w-32 h-40 relative flex-shrink-0 rounded overflow-hidden">
+              <div className="flex-shrink-0 bg-white rounded-lg p-2 border border-gray-200 shadow-sm">
+                <div className="flex gap-2">
+                  <div className="w-36 h-44 relative flex-shrink-0 rounded overflow-hidden">
                     <Image src={scene13.imageUrl} alt="Scene 13" fill className="object-cover" />
                   </div>
-                  <div className="w-16 py-1">
-                    <p className="text-[8px] text-gray-700 leading-snug mb-1">{scene13.caption}</p>
-                    <p className="text-[7px] text-gray-500 leading-snug">{getChineseCaption(13, scene13.caption)}</p>
+                  <div className="w-20 py-1">
+                    <p className="text-[11px] text-gray-900 leading-snug mb-1.5 font-medium">{scene13.caption}</p>
+                    <p className="text-[10px] text-gray-700 leading-snug">{getChineseCaption(13, scene13.caption)}</p>
                   </div>
                 </div>
               </div>
@@ -240,14 +249,14 @@ function EnglishPoster({ story, scene12, scene13, scene15, coverImageUrl, getChi
 
             {/* Scene 15 Card - booklet style */}
             {scene15?.imageUrl && (
-              <div className="flex-shrink-0 bg-white rounded-lg p-1.5 border border-gray-200">
-                <div className="flex gap-1">
-                  <div className="w-32 h-40 relative flex-shrink-0 rounded overflow-hidden">
+              <div className="flex-shrink-0 bg-white rounded-lg p-2 border border-gray-200 shadow-sm">
+                <div className="flex gap-2">
+                  <div className="w-36 h-44 relative flex-shrink-0 rounded overflow-hidden">
                     <Image src={scene15.imageUrl} alt="Scene 15" fill className="object-cover" />
                   </div>
-                  <div className="w-16 py-1">
-                    <p className="text-[8px] text-gray-700 leading-snug mb-1">{scene15.caption}</p>
-                    <p className="text-[7px] text-gray-500 leading-snug">{getChineseCaption(15, scene15.caption)}</p>
+                  <div className="w-20 py-1">
+                    <p className="text-[11px] text-gray-900 leading-snug mb-1.5 font-medium">{scene15.caption}</p>
+                    <p className="text-[10px] text-gray-700 leading-snug">{getChineseCaption(15, scene15.caption)}</p>
                   </div>
                 </div>
               </div>
@@ -278,23 +287,23 @@ function EnglishPoster({ story, scene12, scene13, scene15, coverImageUrl, getChi
             {/* Step Flow */}
             <div className="flex items-start justify-between px-1">
               <div className="flex flex-col items-center text-center flex-1">
-                <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center text-gray-900 font-bold text-xs mb-1">1</div>
-                <p className="text-[9px] text-gray-600 font-medium leading-tight">Create<br/>Story</p>
+                <div className="w-9 h-9 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center text-gray-900 font-bold text-sm mb-1">1</div>
+                <p className="text-[11px] text-gray-900 font-semibold leading-tight">Create<br/>Story</p>
               </div>
-              <div className="text-red-300 text-sm mt-2">→</div>
+              <div className="text-red-400 text-base mt-3 font-bold">→</div>
               <div className="flex flex-col items-center text-center flex-1">
-                <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-xs mb-1">2</div>
-                <p className="text-[9px] text-gray-600 font-medium leading-tight">Export PDF<br/>(Legal Size)</p>
+                <div className="w-9 h-9 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-sm mb-1">2</div>
+                <p className="text-[11px] text-gray-900 font-semibold leading-tight">Export PDF<br/>(Legal Size)</p>
               </div>
-              <div className="text-red-300 text-sm mt-2">→</div>
+              <div className="text-red-400 text-base mt-3 font-bold">→</div>
               <div className="flex flex-col items-center text-center flex-1">
-                <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold text-xs mb-1">3</div>
-                <p className="text-[9px] text-gray-600 font-medium leading-tight">Email PDF to<br/>Admin@KindleWoodStudio.ai</p>
+                <div className="w-9 h-9 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold text-sm mb-1">3</div>
+                <p className="text-[11px] text-gray-900 font-semibold leading-tight">Email PDF to<br/>Admin@KindleWoodStudio.ai</p>
               </div>
-              <div className="text-red-300 text-sm mt-2">→</div>
+              <div className="text-red-400 text-base mt-3 font-bold">→</div>
               <div className="flex flex-col items-center text-center flex-1">
-                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-xs mb-1">4</div>
-                <p className="text-[9px] text-gray-600 font-medium leading-tight">Pick Up<br/>Dec 6, 2025<br/>12-2pm<br/>Bellevue Square</p>
+                <div className="w-9 h-9 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-sm mb-1">4</div>
+                <p className="text-[11px] text-gray-900 font-semibold leading-tight">Pick Up<br/>Dec 6, 2025<br/>12-2pm<br/>Bellevue Square</p>
               </div>
             </div>
           </div>
@@ -322,11 +331,11 @@ function EnglishPoster({ story, scene12, scene13, scene15, coverImageUrl, getChi
         </div>
 
         {/* Footer */}
-        <div className="text-center pt-1">
-          <p className="text-gray-500 text-xs">
-            Questions? Contact: <span className="text-red-600 font-medium">Admin@KindleWoodStudio.ai</span>
+        <div className="text-center pt-2">
+          <p className="text-gray-600 text-sm">
+            Questions? Contact: <span className="text-red-600 font-semibold">Admin@KindleWoodStudio.ai</span>
           </p>
-          <p className="text-gray-400 text-[10px] mt-1">
+          <p className="text-gray-500 text-xs mt-1">
             🎄 Happy Holidays from KindleWood Studio! 🎄
           </p>
         </div>
@@ -389,14 +398,14 @@ function ChinesePoster({ story, scene12, scene13, scene15, coverImageUrl, getChi
 
             {/* Scene 12 Card - booklet style */}
             {scene12?.imageUrl && (
-              <div className="flex-shrink-0 bg-white rounded-lg p-1.5 border border-gray-200">
-                <div className="flex gap-1">
-                  <div className="w-32 h-40 relative flex-shrink-0 rounded overflow-hidden">
+              <div className="flex-shrink-0 bg-white rounded-lg p-2 border border-gray-200 shadow-sm">
+                <div className="flex gap-2">
+                  <div className="w-36 h-44 relative flex-shrink-0 rounded overflow-hidden">
                     <Image src={scene12.imageUrl} alt="第12页" fill className="object-cover" />
                   </div>
-                  <div className="w-16 py-1">
-                    <p className="text-[7px] text-gray-500 leading-snug mb-1">{scene12.caption}</p>
-                    <p className="text-[8px] text-gray-700 leading-snug">{getChineseCaption(12, scene12.caption)}</p>
+                  <div className="w-20 py-1">
+                    <p className="text-[10px] text-gray-700 leading-snug mb-1.5">{scene12.caption}</p>
+                    <p className="text-[11px] text-gray-900 leading-snug font-medium">{getChineseCaption(12, scene12.caption)}</p>
                   </div>
                 </div>
               </div>
@@ -404,14 +413,14 @@ function ChinesePoster({ story, scene12, scene13, scene15, coverImageUrl, getChi
 
             {/* Scene 13 Card - booklet style */}
             {scene13?.imageUrl && (
-              <div className="flex-shrink-0 bg-white rounded-lg p-1.5 border border-gray-200">
-                <div className="flex gap-1">
-                  <div className="w-32 h-40 relative flex-shrink-0 rounded overflow-hidden">
+              <div className="flex-shrink-0 bg-white rounded-lg p-2 border border-gray-200 shadow-sm">
+                <div className="flex gap-2">
+                  <div className="w-36 h-44 relative flex-shrink-0 rounded overflow-hidden">
                     <Image src={scene13.imageUrl} alt="第13页" fill className="object-cover" />
                   </div>
-                  <div className="w-16 py-1">
-                    <p className="text-[7px] text-gray-500 leading-snug mb-1">{scene13.caption}</p>
-                    <p className="text-[8px] text-gray-700 leading-snug">{getChineseCaption(13, scene13.caption)}</p>
+                  <div className="w-20 py-1">
+                    <p className="text-[10px] text-gray-700 leading-snug mb-1.5">{scene13.caption}</p>
+                    <p className="text-[11px] text-gray-900 leading-snug font-medium">{getChineseCaption(13, scene13.caption)}</p>
                   </div>
                 </div>
               </div>
@@ -419,14 +428,14 @@ function ChinesePoster({ story, scene12, scene13, scene15, coverImageUrl, getChi
 
             {/* Scene 15 Card - booklet style */}
             {scene15?.imageUrl && (
-              <div className="flex-shrink-0 bg-white rounded-lg p-1.5 border border-gray-200">
-                <div className="flex gap-1">
-                  <div className="w-32 h-40 relative flex-shrink-0 rounded overflow-hidden">
+              <div className="flex-shrink-0 bg-white rounded-lg p-2 border border-gray-200 shadow-sm">
+                <div className="flex gap-2">
+                  <div className="w-36 h-44 relative flex-shrink-0 rounded overflow-hidden">
                     <Image src={scene15.imageUrl} alt="第15页" fill className="object-cover" />
                   </div>
-                  <div className="w-16 py-1">
-                    <p className="text-[7px] text-gray-500 leading-snug mb-1">{scene15.caption}</p>
-                    <p className="text-[8px] text-gray-700 leading-snug">{getChineseCaption(15, scene15.caption)}</p>
+                  <div className="w-20 py-1">
+                    <p className="text-[10px] text-gray-700 leading-snug mb-1.5">{scene15.caption}</p>
+                    <p className="text-[11px] text-gray-900 leading-snug font-medium">{getChineseCaption(15, scene15.caption)}</p>
                   </div>
                 </div>
               </div>
@@ -457,23 +466,23 @@ function ChinesePoster({ story, scene12, scene13, scene15, coverImageUrl, getChi
             {/* Step Flow */}
             <div className="flex items-start justify-between px-1">
               <div className="flex flex-col items-center text-center flex-1">
-                <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center text-gray-900 font-bold text-xs mb-1">1</div>
-                <p className="text-[9px] text-gray-600 font-medium leading-tight">创作<br/>故事</p>
+                <div className="w-9 h-9 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center text-gray-900 font-bold text-sm mb-1">1</div>
+                <p className="text-[11px] text-gray-900 font-semibold leading-tight">创作<br/>故事</p>
               </div>
-              <div className="text-red-300 text-sm mt-2">→</div>
+              <div className="text-red-400 text-base mt-3 font-bold">→</div>
               <div className="flex flex-col items-center text-center flex-1">
-                <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-xs mb-1">2</div>
-                <p className="text-[9px] text-gray-600 font-medium leading-tight">导出PDF<br/>(Legal尺寸)</p>
+                <div className="w-9 h-9 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-sm mb-1">2</div>
+                <p className="text-[11px] text-gray-900 font-semibold leading-tight">导出PDF<br/>(Legal尺寸)</p>
               </div>
-              <div className="text-red-300 text-sm mt-2">→</div>
+              <div className="text-red-400 text-base mt-3 font-bold">→</div>
               <div className="flex flex-col items-center text-center flex-1">
-                <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold text-xs mb-1">3</div>
-                <p className="text-[9px] text-gray-600 font-medium leading-tight">发送PDF至<br/>Admin@KindleWoodStudio.ai</p>
+                <div className="w-9 h-9 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold text-sm mb-1">3</div>
+                <p className="text-[11px] text-gray-900 font-semibold leading-tight">发送PDF至<br/>Admin@KindleWoodStudio.ai</p>
               </div>
-              <div className="text-red-300 text-sm mt-2">→</div>
+              <div className="text-red-400 text-base mt-3 font-bold">→</div>
               <div className="flex flex-col items-center text-center flex-1">
-                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-xs mb-1">4</div>
-                <p className="text-[9px] text-gray-600 font-medium leading-tight">2025/12/6<br/>12-2pm<br/>Bellevue Square<br/>领取</p>
+                <div className="w-9 h-9 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-sm mb-1">4</div>
+                <p className="text-[11px] text-gray-900 font-semibold leading-tight">2025/12/6<br/>12-2pm<br/>Bellevue Square<br/>领取</p>
               </div>
             </div>
           </div>
@@ -501,11 +510,11 @@ function ChinesePoster({ story, scene12, scene13, scene15, coverImageUrl, getChi
         </div>
 
         {/* Footer */}
-        <div className="text-center pt-1">
-          <p className="text-gray-500 text-xs">
-            有问题? 联系: <span className="text-red-600 font-medium">Admin@KindleWoodStudio.ai</span>
+        <div className="text-center pt-2">
+          <p className="text-gray-600 text-sm">
+            有问题? 联系: <span className="text-red-600 font-semibold">Admin@KindleWoodStudio.ai</span>
           </p>
-          <p className="text-gray-400 text-[10px] mt-1">
+          <p className="text-gray-500 text-xs mt-1">
             🎄 KindleWood Studio 祝您节日快乐! 🎄
           </p>
         </div>

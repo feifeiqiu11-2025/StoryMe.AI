@@ -57,7 +57,7 @@ export default function AdminPosterPage() {
 
       // Capture using html2canvas
       const canvas = await html2canvas(posterRef.current, {
-        scale: 2,
+        scale: 4, // Higher resolution for print clarity
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#f3f4f6',
@@ -171,7 +171,7 @@ function EnglishPoster() {
           <h1 className="text-5xl md:text-6xl font-black bg-gradient-to-r from-[#3B5FFF] via-[#8B5CF6] to-[#EC4899] bg-clip-text text-transparent mb-2">
             KindleWood Families
           </h1>
-          <p className="text-base text-gray-500 mt-1 italic">
+          <p className="text-base text-gray-600 mt-1 italic">
             Where Imagination Grows into Learning — Read, Listen, and Learn Anywhere
           </p>
         </div>
@@ -180,7 +180,7 @@ function EnglishPoster() {
         <div className="relative mb-8">
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-200 transform -rotate-1 hover:rotate-0 transition-transform">
             {/* Highlight banner */}
-            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#3B5FFF] to-[#00C4A7] text-white px-4 py-1 rounded-full text-sm font-bold">
+            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#2563EB] to-[#0891B2] text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-md">
               📱 Free Mobile App for Kids
             </div>
 
@@ -192,13 +192,13 @@ function EnglishPoster() {
 
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-3">
-                  <h2 className="text-xl font-bold text-[#3B5FFF]">KindleWood Kids App</h2>
-                  <span className="bg-gradient-to-r from-[#00C4A7] to-[#10B981] text-white px-3 py-1 rounded-full text-xs font-bold ">
+                  <h2 className="text-xl font-bold text-[#1D4ED8]">KindleWood Kids App</h2>
+                  <span className="bg-gradient-to-r from-[#059669] to-[#047857] text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm">
                     FREE 6 months
                   </span>
                 </div>
 
-                <p className="text-sm text-gray-600 mb-2 font-medium">
+                <p className="text-sm text-gray-700 mb-2 font-medium">
                   Read and learn in the most fun, interactive way! <span className="text-xs text-purple-600">(Ages 3-12)</span>
                 </p>
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -208,7 +208,7 @@ function EnglishPoster() {
                   <span className="bg-yellow-100 px-2 py-1 rounded-full text-xs font-medium">Chinese Stories 😆</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm text-gray-700">
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm text-gray-800">
                   <span>🎧 Listen to stories</span>
                   <span>📖 Learn new facts</span>
                   <span>🔤 Tap-to-read words</span>
@@ -232,20 +232,20 @@ function EnglishPoster() {
         <div className="relative ml-4 md:ml-8 mb-8">
           <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl p-6 shadow-lg border border-purple-200 transform rotate-1 hover:rotate-0 transition-transform">
             {/* Highlight banner */}
-            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] text-white px-4 py-1 rounded-full text-sm font-bold ">
+            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#7C3AED] to-[#DB2777] text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-md">
               ✨ Turn Your Child into a Storyteller!
             </div>
 
             <div className="mt-4">
-              <h2 className="text-2xl font-bold text-[#8B5CF6] mb-1">🎨 KindleWood Studio</h2>
-              <p className="text-gray-600 mb-3 font-medium text-sm">
+              <h2 className="text-2xl font-bold text-[#6D28D9] mb-1">🎨 KindleWood Studio</h2>
+              <p className="text-gray-700 mb-3 font-medium text-sm">
                 Kids don't just read stories — they CREATE their own with imagination, their voice, and endless creativity!
               </p>
 
               <div className="grid md:grid-cols-2 gap-2 mb-4">
                 <div>
-                  <p className="font-semibold text-gray-700 text-sm mb-2">You can:</p>
-                  <div className="space-y-1 text-sm text-gray-600">
+                  <p className="font-semibold text-gray-800 text-sm mb-2">You can:</p>
+                  <div className="space-y-1 text-sm text-gray-700">
                     <p>✏️ Create custom storybooks</p>
                     <p>🤖 Add AI narration</p>
                     <p>🎙️ Record your own voice</p>
@@ -254,17 +254,17 @@ function EnglishPoster() {
                   </div>
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-700 text-sm mb-2">🎧 Highlights:</p>
-                  <div className="space-y-1 text-sm text-gray-600">
+                  <p className="font-semibold text-gray-800 text-sm mb-2">🎧 Highlights:</p>
+                  <div className="space-y-1 text-sm text-gray-700">
                     <p>📣 <strong>One-tap publish to Spotify</strong></p>
-                    <p className="text-xs text-gray-500 ml-4">Listen in the car, at bedtime ❤️</p>
+                    <p className="text-xs text-gray-600 ml-4">Listen in the car, at bedtime ❤️</p>
                     <p>📱 Sync to Kids App</p>
-                    <p className="text-xs text-gray-500 ml-4">Tap-to-read · Bilingual</p>
+                    <p className="text-xs text-gray-600 ml-4">Tap-to-read · Bilingual</p>
                   </div>
                 </div>
               </div>
 
-              <div className="inline-block bg-gradient-to-r from-[#FFCA5F] to-[#F59E0B] text-white px-4 py-2 rounded-full text-sm font-bold ">
+              <div className="inline-block bg-gradient-to-r from-[#F59E0B] to-[#D97706] text-white px-4 py-2 rounded-full text-sm font-bold shadow-md">
                 🎁 2 Free Stories per user
               </div>
             </div>
@@ -302,17 +302,17 @@ function EnglishPoster() {
         <div className="relative mb-8">
           <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-3xl p-6 shadow-lg border border-green-200 transform -rotate-1 hover:rotate-0 transition-transform">
             {/* Highlight banner */}
-            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#10B981] to-[#059669] text-white px-4 py-1 rounded-full text-sm font-bold">
+            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#059669] to-[#047857] text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-md">
               🌱 501(c)(3) Non-Profit Partner
             </div>
 
             <div className="mt-4">
-              <h2 className="text-2xl font-bold text-[#059669] mb-1">🤝 KindleWood Community</h2>
-              <p className="text-gray-600 mb-3 font-medium text-sm">
+              <h2 className="text-2xl font-bold text-[#047857] mb-1">🤝 KindleWood Community</h2>
+              <p className="text-gray-700 mb-3 font-medium text-sm">
                 Where young creators come together to tell their stories and inspire each other
               </p>
 
-              <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm text-gray-600 mb-3">
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm text-gray-700 mb-3">
                 <p>📝 Story creation workshops</p>
                 <p>🏆 Monthly Storyteller Challenge</p>
                 <p>📚 Make physical books</p>
@@ -321,8 +321,8 @@ function EnglishPoster() {
               </div>
 
               <div className="pt-2 text-sm">
-                <p className="text-gray-600 mb-1">📍 Currently available in <span className="font-semibold">Seattle area</span> (in-person workshops)</p>
-                <p className="text-gray-500 text-xs">Contact: <span className="text-[#059669] font-medium">Admin@KindleWoodStudio.ai</span></p>
+                <p className="text-gray-700 mb-1">📍 Currently available in <span className="font-semibold">Seattle area</span> (in-person workshops)</p>
+                <p className="text-gray-600 text-xs">Contact: <span className="text-[#059669] font-medium">Admin@KindleWoodStudio.ai</span></p>
               </div>
             </div>
           </div>
@@ -330,7 +330,7 @@ function EnglishPoster() {
 
         {/* Story Cards Section */}
         <div className="mb-6">
-          <p className="text-sm font-semibold text-gray-700 mb-3">📚 Popular Stories</p>
+          <p className="text-sm font-semibold text-gray-900 mb-3">📚 Popular Stories</p>
             <div className="grid grid-cols-3 gap-2">
               {/* Story Card 1 - Taekwondo */}
               <div className="bg-white rounded-lg overflow-hidden ">
@@ -379,17 +379,17 @@ function EnglishPoster() {
 
         {/* Pricing footer */}
         <div className="text-center pt-4 border-t border-gray-200/50">
-          <p className="text-sm font-semibold text-gray-700 mb-2">🔥 Pricing</p>
-          <div className="flex justify-center gap-6 text-xs text-gray-600">
+          <p className="text-sm font-semibold text-gray-800 mb-2">🔥 Pricing</p>
+          <div className="flex justify-center gap-6 text-xs text-gray-700">
             <div>
               <p className="font-medium">📱 KindleWood Kids App</p>
               <p>Completely free for 6 months</p>
-              <p className="text-gray-400">No subscription · No tricks</p>
+              <p className="text-gray-500">No subscription · No tricks</p>
             </div>
             <div>
               <p className="font-medium">🖥 KindleWood Studio</p>
               <p>2 free stories</p>
-              <p className="text-gray-400">Pay-as-you-go after</p>
+              <p className="text-gray-500">Pay-as-you-go after</p>
             </div>
           </div>
         </div>
@@ -415,7 +415,7 @@ function ChinesePoster() {
           <h1 className="text-5xl md:text-6xl font-black bg-gradient-to-r from-[#3B5FFF] via-[#8B5CF6] to-[#EC4899] bg-clip-text text-transparent mb-2">
             KindleWood Families
           </h1>
-          <p className="text-base text-gray-500 mt-1 italic">
+          <p className="text-base text-gray-600 mt-1 italic">
             让孩子在想象力和创造力中学习并成长
           </p>
         </div>
@@ -424,7 +424,7 @@ function ChinesePoster() {
         <div className="relative mb-8">
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-200 transform -rotate-1 hover:rotate-0 transition-transform">
             {/* Highlight banner */}
-            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#3B5FFF] to-[#00C4A7] text-white px-4 py-1 rounded-full text-sm font-bold">
+            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#2563EB] to-[#0891B2] text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-md">
               📱 免费儿童手机App
             </div>
 
@@ -436,13 +436,13 @@ function ChinesePoster() {
 
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-3">
-                  <h2 className="text-xl font-bold text-[#3B5FFF]">KindleWood Kids App</h2>
-                  <span className="bg-gradient-to-r from-[#00C4A7] to-[#10B981] text-white px-3 py-1 rounded-full text-xs font-bold ">
+                  <h2 className="text-xl font-bold text-[#1D4ED8]">KindleWood Kids App</h2>
+                  <span className="bg-gradient-to-r from-[#059669] to-[#047857] text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm">
                     半年免费
                   </span>
                 </div>
 
-                <p className="text-sm text-gray-600 mb-2 font-medium">
+                <p className="text-sm text-gray-700 mb-2 font-medium">
                   用最有趣、最互动的方式阅读和学习！<span className="text-xs text-purple-600">(3-12岁)</span>
                 </p>
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -452,7 +452,7 @@ function ChinesePoster() {
                   <span className="bg-yellow-100 px-2 py-1 rounded-full text-xs font-medium">中文故事 😆</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm text-gray-700">
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm text-gray-800">
                   <span>🎧 听故事</span>
                   <span>📖 学知识</span>
                   <span>🔤 点读学单词</span>
@@ -476,20 +476,20 @@ function ChinesePoster() {
         <div className="relative ml-4 md:ml-8 mb-8">
           <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl p-6 shadow-lg border border-purple-200 transform rotate-1 hover:rotate-0 transition-transform">
             {/* Highlight banner */}
-            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] text-white px-4 py-1 rounded-full text-sm font-bold ">
+            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#7C3AED] to-[#DB2777] text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-md">
               ✨ 想让孩子成为 Creator 和 Storyteller？
             </div>
 
             <div className="mt-4">
-              <h2 className="text-2xl font-bold text-[#8B5CF6] mb-1">🎨 KindleWood Studio</h2>
-              <p className="text-gray-600 mb-3 font-medium text-sm">
+              <h2 className="text-2xl font-bold text-[#6D28D9] mb-1">🎨 KindleWood Studio</h2>
+              <p className="text-gray-700 mb-3 font-medium text-sm">
                 孩子不只"读故事" — 还能用想象力、自己的声音，创造属于自己的故事！
               </p>
 
               <div className="grid md:grid-cols-2 gap-2 mb-4">
                 <div>
-                  <p className="font-semibold text-gray-700 text-sm mb-2">你可以：</p>
-                  <div className="space-y-1 text-sm text-gray-600">
+                  <p className="font-semibold text-gray-800 text-sm mb-2">你可以：</p>
+                  <div className="space-y-1 text-sm text-gray-700">
                     <p>✏️ 自由创作故事书</p>
                     <p>🤖 用 AI Audio 讲故事</p>
                     <p>🎙️ 录制孩子/父母声音</p>
@@ -498,12 +498,12 @@ function ChinesePoster() {
                   </div>
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-700 text-sm mb-2">🎧 亮点功能：</p>
-                  <div className="space-y-1 text-sm text-gray-600">
+                  <p className="font-semibold text-gray-800 text-sm mb-2">🎧 亮点功能：</p>
+                  <div className="space-y-1 text-sm text-gray-700">
                     <p>📣 <strong>一键发布到 Spotify</strong></p>
-                    <p className="text-xs text-gray-500 ml-4">上学路上、车里、睡前随时听 ❤️</p>
+                    <p className="text-xs text-gray-600 ml-4">上学路上、车里、睡前随时听 ❤️</p>
                     <p>📱 同步到 Kids App</p>
-                    <p className="text-xs text-gray-500 ml-4">点读学词 · 双语阅读</p>
+                    <p className="text-xs text-gray-600 ml-4">点读学词 · 双语阅读</p>
                   </div>
                 </div>
               </div>
@@ -546,18 +546,18 @@ function ChinesePoster() {
         <div className="relative mb-8">
           <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-3xl p-6 shadow-lg border border-green-200 transform -rotate-1 hover:rotate-0 transition-transform">
             {/* Highlight banner */}
-            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#10B981] to-[#059669] text-white px-4 py-1 rounded-full text-sm font-bold">
+            <div className="absolute -top-3 left-6 bg-gradient-to-r from-[#059669] to-[#047857] text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-md">
               🌱 501(c)(3) 非营利合作伙伴
             </div>
 
             <div className="mt-4 flex items-start gap-4">
               <div className="flex-1">
-                <h2 className="text-2xl font-bold text-[#059669] mb-1">🤝 KindleWood Community</h2>
-                <p className="text-gray-600 mb-3 font-medium text-sm">
+                <h2 className="text-2xl font-bold text-[#047857] mb-1">🤝 KindleWood Community</h2>
+                <p className="text-gray-700 mb-3 font-medium text-sm">
                   小小创作者们在这里讲述自己的故事，互相激励和成长
                 </p>
 
-                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm text-gray-600 mb-3">
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm text-gray-700 mb-3">
                   <p>📝 故事创作工作坊</p>
                   <p>🏆 月度故事家挑战赛</p>
                   <p>📚 制作实体书</p>
@@ -580,7 +580,7 @@ function ChinesePoster() {
 
         {/* Story Cards Section */}
         <div className="mb-6">
-          <p className="text-sm font-semibold text-gray-700 mb-3">📚 热门故事</p>
+          <p className="text-sm font-semibold text-gray-900 mb-3">📚 热门故事</p>
             <div className="grid grid-cols-3 gap-2">
               {/* Story Card 1 - Taekwondo */}
               <div className="bg-white rounded-lg overflow-hidden  ">
@@ -629,17 +629,17 @@ function ChinesePoster() {
 
         {/* Pricing footer */}
         <div className="text-center pt-4 border-t border-gray-200/50">
-          <p className="text-sm font-semibold text-gray-700 mb-2">🔥 价格说明</p>
-          <div className="flex justify-center gap-6 text-xs text-gray-600">
+          <p className="text-sm font-semibold text-gray-800 mb-2">🔥 价格说明</p>
+          <div className="flex justify-center gap-6 text-xs text-gray-700">
             <div>
               <p className="font-medium">📱 KindleWood Kids App</p>
               <p>半年内完全免费</p>
-              <p className="text-gray-400">无订阅 · 无套路</p>
+              <p className="text-gray-500">无订阅 · 无套路</p>
             </div>
             <div>
               <p className="font-medium">🖥 KindleWood Studio</p>
               <p>免费创作 2 本</p>
-              <p className="text-gray-400">超出按需付费</p>
+              <p className="text-gray-500">超出按需付费</p>
             </div>
           </div>
         </div>
