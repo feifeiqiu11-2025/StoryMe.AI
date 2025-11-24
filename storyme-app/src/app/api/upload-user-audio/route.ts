@@ -226,26 +226,69 @@ export async function POST(request: NextRequest) {
           .from('story-audio-files')
           .getPublicUrl(filename);
 
-        // Delete existing audio page for this page number and language (if any)
-        await supabase
+        // Check if page already exists
+        const { data: existingPage } = await supabase
           .from('story_audio_pages')
-          .delete()
+          .select('*')
           .eq('project_id', projectId)
           .eq('page_number', metadata.pageNumber)
-          .eq('language', language);
+          .single();
 
-        // Insert new audio page record
-        const { data: audioPage, error: insertError } = await supabase
-          .from('story_audio_pages')
-          .insert({
+        // Determine which field to update based on language
+        const audioUrlField = language === 'zh' ? 'audio_url_zh' : 'audio_url';
+        // Note: audio_filename column doesn't have a _zh variant, filename is shared
+
+        let audioPage;
+        let error: any;
+
+        if (existingPage) {
+          // UPDATE existing page - add bilingual audio without deleting the other language
+          const updateData: any = {
+            [audioUrlField]: publicUrl,
+            audio_source: 'user_recorded',
+            voice_profile_id: voiceProfile.id,
+            recorded_by_user_id: user.id,
+            // Keep original language if both languages exist
+            language: existingPage.audio_url && existingPage.audio_url_zh ? existingPage.language : language,
+            generation_status: 'completed',
+            recording_metadata: {
+              ...(existingPage.recording_metadata || {}),
+              [`${language}_recording`]: {
+                original_filename: audioFile.name,
+                file_size_bytes: audioFile.size,
+                mime_type: audioFile.type,
+                duration_seconds: metadata.duration,
+                uploaded_at: new Date().toISOString(),
+                browser: request.headers.get('user-agent')?.substring(0, 100),
+              },
+            },
+          };
+
+          // Only update audio_filename if recording in English (primary language)
+          if (language === 'en') {
+            updateData.audio_filename = filename;
+          }
+
+          const { data, error: updateError } = await supabase
+            .from('story_audio_pages')
+            .update(updateData)
+            .eq('project_id', projectId)
+            .eq('page_number', metadata.pageNumber)
+            .select()
+            .single();
+
+          audioPage = data;
+          error = updateError;
+        } else {
+          // INSERT new page
+          const insertData: any = {
             project_id: projectId,
             page_number: metadata.pageNumber,
             page_type: metadata.pageType,
             scene_id: metadata.sceneId || null,
             quiz_question_id: metadata.quizQuestionId || null,
             text_content: metadata.textContent,
-            audio_url: publicUrl,
-            audio_filename: filename,
+            [audioUrlField]: publicUrl,
             audio_source: 'user_recorded',
             voice_profile_id: voiceProfile.id,
             recorded_by_user_id: user.id,
@@ -259,9 +302,24 @@ export async function POST(request: NextRequest) {
               uploaded_at: new Date().toISOString(),
               browser: request.headers.get('user-agent')?.substring(0, 100),
             },
-          })
-          .select()
-          .single();
+          };
+
+          // Only set audio_filename if recording in English (primary language)
+          if (language === 'en') {
+            insertData.audio_filename = filename;
+          }
+
+          const { data, error: insertError } = await supabase
+            .from('story_audio_pages')
+            .insert(insertData)
+            .select()
+            .single();
+
+          audioPage = data;
+          error = insertError;
+        }
+
+        const insertError = error;
 
         if (insertError || !audioPage) {
           console.error(`Failed to create audio page record for page ${metadata.pageNumber}:`, insertError);

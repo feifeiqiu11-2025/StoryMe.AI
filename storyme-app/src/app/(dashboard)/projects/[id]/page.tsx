@@ -316,21 +316,65 @@ export default function StoryViewerPage() {
     }
 
     try {
-      const recorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus',
-        audioBitsPerSecond: 128000,
-      });
+      // Try multiple codec options in order of preference
+      let recorder: MediaRecorder | null = null;
+      const codecOptions = [
+        { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 128000 },
+        { mimeType: 'audio/webm', audioBitsPerSecond: 128000 },
+        { mimeType: 'audio/mp4', audioBitsPerSecond: 128000 },
+        { mimeType: 'audio/ogg;codecs=opus', audioBitsPerSecond: 128000 },
+        {}, // Fallback: Let browser choose default
+      ];
+
+      for (const options of codecOptions) {
+        try {
+          // Check if mime type is supported (if specified)
+          if (options.mimeType && !MediaRecorder.isTypeSupported(options.mimeType)) {
+            console.log(`❌ Codec not supported: ${options.mimeType}`);
+            continue;
+          }
+
+          // Try to create MediaRecorder with these options
+          recorder = new MediaRecorder(stream, options as MediaRecorderOptions);
+          console.log(`✅ Using codec: ${options.mimeType || 'browser default'}`);
+          break; // Success!
+        } catch (err) {
+          console.warn(`Failed to create MediaRecorder with ${options.mimeType || 'default'}:`, err);
+          continue; // Try next option
+        }
+      }
+
+      if (!recorder) {
+        throw new Error('No supported audio codec found');
+      }
 
       const chunks: Blob[] = [];
 
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
+          console.log(`📦 Audio chunk received: ${e.data.size} bytes, type: ${e.data.type}`);
           chunks.push(e.data);
         }
       };
 
       recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' });
+        console.log(`🛑 Recording stopped. Total chunks: ${chunks.length}, Recorder mimeType: ${recorder!.mimeType}`);
+
+        if (chunks.length === 0) {
+          console.error('❌ No audio chunks recorded!');
+          alert('Recording failed - no audio data captured. Please try again.');
+          return;
+        }
+
+        const blob = new Blob(chunks, { type: recorder!.mimeType });
+        console.log(`📝 Created blob: ${blob.size} bytes, type: ${blob.type}`);
+
+        if (blob.size === 0) {
+          console.error('❌ Empty audio blob!');
+          alert('Recording failed - empty audio. Please try again.');
+          return;
+        }
+
         const url = URL.createObjectURL(blob);
         const duration = recordingTime;
 
@@ -339,7 +383,7 @@ export default function StoryViewerPage() {
         newRecordings.set(currentSceneIndex, { blob, url, duration });
         setPageRecordings(newRecordings);
 
-        console.log(`✅ Recorded page ${currentSceneIndex + 1} - ${duration}s`);
+        console.log(`✅ Recorded page ${currentSceneIndex + 1} - ${duration}s, URL: ${url}`);
       };
 
       recorder.start();
@@ -418,10 +462,32 @@ export default function StoryViewerPage() {
 
   const playRecording = () => {
     const recording = pageRecordings.get(currentSceneIndex);
-    if (recording && audioPreviewRef.current) {
+    console.log(`🎵 Play requested for page ${currentSceneIndex}`, recording);
+
+    if (!recording) {
+      console.error('❌ No recording found for this page');
+      return;
+    }
+
+    if (!audioPreviewRef.current) {
+      console.error('❌ Audio element ref is null');
+      return;
+    }
+
+    console.log(`▶️ Playing audio: ${recording.url}, blob size: ${recording.blob.size}, duration: ${recording.duration}s`);
+
+    try {
       audioPreviewRef.current.src = recording.url;
-      audioPreviewRef.current.play();
-      setIsPlaying(true);
+      audioPreviewRef.current.play().then(() => {
+        console.log('✅ Playback started successfully');
+        setIsPlaying(true);
+      }).catch((err) => {
+        console.error('❌ Playback failed:', err);
+        alert(`Failed to play recording: ${err.message}`);
+      });
+    } catch (err: any) {
+      console.error('❌ Error setting up playback:', err);
+      alert(`Error playing recording: ${err.message}`);
     }
   };
 

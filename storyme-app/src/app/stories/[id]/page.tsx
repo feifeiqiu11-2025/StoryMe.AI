@@ -628,6 +628,11 @@ function StoryViewer() {
           pages={recordingPages}
           onComplete={handleUploadRecordings}
           onExit={() => setShowRecorder(false)}
+          defaultLanguage={
+            story?.scenes?.some((scene: any) => scene.captionChinese)
+              ? 'zh'
+              : 'en'
+          }
         />
       )}
     </div>

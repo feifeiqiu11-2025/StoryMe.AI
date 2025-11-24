@@ -147,17 +147,38 @@ export default function AudioRecorder({
     try {
       audioChunksRef.current = [];
 
-      // Use MP3 if supported, otherwise WebM/OGG (will convert server-side)
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/mp4')
-        ? 'audio/mp4'
-        : 'audio/webm';
+      // Try multiple codec options in order of preference
+      // Safari/macOS prefers audio/mp4, Chrome prefers webm
+      let mediaRecorder: MediaRecorder | null = null;
+      const codecOptions = [
+        { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 128000 },
+        { mimeType: 'audio/webm', audioBitsPerSecond: 128000 },
+        { mimeType: 'audio/mp4', audioBitsPerSecond: 128000 },
+        { mimeType: 'audio/ogg;codecs=opus', audioBitsPerSecond: 128000 },
+        {}, // Fallback: Let browser choose default
+      ];
 
-      const mediaRecorder = new MediaRecorder(streamRef.current, {
-        mimeType,
-        audioBitsPerSecond: 128000, // 128kbps for good quality
-      });
+      for (const options of codecOptions) {
+        try {
+          // Check if mime type is supported (if specified)
+          if (options.mimeType && !MediaRecorder.isTypeSupported(options.mimeType)) {
+            console.log(`❌ Codec not supported: ${options.mimeType}`);
+            continue;
+          }
+
+          // Try to create MediaRecorder with these options
+          mediaRecorder = new MediaRecorder(streamRef.current!, options as MediaRecorderOptions);
+          console.log(`✅ Using codec: ${options.mimeType || 'browser default'}`);
+          break; // Success!
+        } catch (err) {
+          console.warn(`Failed to create MediaRecorder with ${options.mimeType || 'default'}:`, err);
+          continue; // Try next option
+        }
+      }
+
+      if (!mediaRecorder) {
+        throw new Error('No supported audio codec found');
+      }
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -166,7 +187,7 @@ export default function AudioRecorder({
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType });
         const audioUrl = URL.createObjectURL(audioBlob);
         const duration = recordingTime;
 
