@@ -9,9 +9,11 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import CharacterManager from '@/components/story/CharacterManager';
+import CharacterFormModal from '@/components/story/CharacterFormModal';
 import ScriptInput from '@/components/story/ScriptInput';
 import StorySettingsPanel from '@/components/story/StorySettingsPanel';
 import ScenePreviewApproval from '@/components/story/ScenePreviewApproval';
+import { ArtStyleType } from '@/components/story/StyleSelector';
 import GenerationProgress from '@/components/story/GenerationProgress';
 import ImageGallery from '@/components/story/ImageGallery';
 import FeedbackModal from '@/components/feedback/FeedbackModal';
@@ -53,10 +55,15 @@ export default function CreateStoryPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [imageGenerationStatus, setImageGenerationStatus] = useState<GeneratedImage[]>([]);
+  const [imageProvider, setImageProvider] = useState<'flux' | 'gemini'>('gemini'); // Default to Gemini for better consistency
+
+  // Art style selection (NEW - Classic Storybook default)
+  const [artStyle, setArtStyle] = useState<ArtStyleType>('classic');
 
   // UI state
   const [session, setSession] = useState<StorySession | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showAddCharacterModal, setShowAddCharacterModal] = useState(false);
   const [libraryCharacters, setLibraryCharacters] = useState<Character[]>([]);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveTitle, setSaveTitle] = useState('');
@@ -205,6 +212,7 @@ export default function CreateStoryPage() {
           url: char.reference_image_url || '',
           fileName: char.reference_image_filename || '',
         },
+        animatedPreviewUrl: char.animated_preview_url || undefined,
         description: {
           hairColor: char.hair_color,
           skinTone: char.skin_tone,
@@ -214,6 +222,7 @@ export default function CreateStoryPage() {
         },
         isPrimary: false,
         order: 0,
+        isFromLibrary: true,
       }));
 
       setLibraryCharacters(transformedCharacters);
@@ -349,7 +358,14 @@ export default function CreateStoryPage() {
           generateChineseTranslation, // NEW: For bilingual English stories with Chinese captions
           characters: characters.map(c => ({
             name: c.name,
-            description: Object.values(c.description).filter(Boolean).join(', ')
+            // Exclude clothing from character description - let scene enhancer decide
+            // based on story theme (Christmas → pajamas, Beach → swimwear, etc.)
+            description: [
+              c.description.age ? `${c.description.age} years old` : '',
+              c.description.hairColor ? `${c.description.hairColor} hair` : '',
+              c.description.skinTone ? `${c.description.skinTone} skin` : '',
+              c.description.otherFeatures || ''
+            ].filter(Boolean).join(', ')
           }))
         })
       });
@@ -409,6 +425,17 @@ export default function CreateStoryPage() {
       prev.map(scene =>
         scene.sceneNumber === sceneNumber
           ? { ...scene, caption_chinese: newCaptionChinese }
+          : scene
+      )
+    );
+  };
+
+  // NEW: Handle image prompt editing
+  const handleImagePromptEdit = (sceneNumber: number, newPrompt: string) => {
+    setEnhancedScenes(prev =>
+      prev.map(scene =>
+        scene.sceneNumber === sceneNumber
+          ? { ...scene, enhanced_prompt: newPrompt }
           : scene
       )
     );
@@ -485,6 +512,7 @@ export default function CreateStoryPage() {
           age: authorAge || undefined,
           language: contentLanguage,
           characters: characters,
+          illustrationStyle: artStyle, // 'pixar' (3D) or 'classic' (2D storybook)
         }),
       });
 
@@ -850,6 +878,8 @@ export default function CreateStoryPage() {
           characters: characters,
           script: enhancedScript, // Use enhanced prompts, not raw script
           artStyle: ART_STYLE,
+          imageProvider: imageProvider, // Use selected image provider (gemini or flux)
+          illustrationStyle: artStyle, // 'pixar' (3D) or 'classic' (2D storybook)
         }),
       });
 
@@ -949,17 +979,7 @@ export default function CreateStoryPage() {
               </button>
               {characters.length < 5 && (
                 <button
-                  onClick={() => {
-                    const newCharacter = {
-                      id: `char-${Date.now()}`,
-                      name: '',
-                      referenceImage: { url: '', fileName: '' },
-                      description: {},
-                      isPrimary: characters.length === 0,
-                      order: characters.length + 1,
-                    };
-                    setCharacters([...characters, newCharacter]);
-                  }}
+                  onClick={() => setShowAddCharacterModal(true)}
                   className="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 font-semibold text-sm shadow-md transition-all"
                 >
                   + Add Character
@@ -1001,37 +1021,39 @@ export default function CreateStoryPage() {
                   </Link>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {libraryCharacters.map((character) => (
                     <div
                       key={character.id}
                       className="bg-white border-2 border-gray-200 rounded-xl overflow-hidden hover:border-blue-400 transition-all"
                     >
-                      {character.referenceImage.url ? (
-                        <div className="h-32 bg-gradient-to-br from-blue-100 to-purple-100">
+                      {/* Show animated preview if available, otherwise reference image */}
+                      {character.animatedPreviewUrl || character.referenceImage.url ? (
+                        <div className="h-40 bg-gradient-to-br from-blue-100 to-purple-100 relative">
                           <img
-                            src={character.referenceImage.url}
+                            src={character.animatedPreviewUrl || character.referenceImage.url}
                             alt={character.name}
                             className="w-full h-full object-cover"
                           />
+                          {character.animatedPreviewUrl && (
+                            <div className="absolute top-2 left-2 bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full">
+                              Preview
+                            </div>
+                          )}
                         </div>
                       ) : (
-                        <div className="h-32 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
+                        <div className="h-40 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
                           <div className="text-4xl">👤</div>
                         </div>
                       )}
-                      <div className="p-4">
-                        <h3 className="font-bold text-gray-900 mb-2">{character.name}</h3>
-                        <div className="text-xs text-gray-600 space-y-1 mb-3">
-                          {character.description.hairColor && <p>Hair: {character.description.hairColor}</p>}
-                          {character.description.age && <p>Age: {character.description.age}</p>}
-                        </div>
+                      <div className="p-2">
+                        <h3 className="font-bold text-gray-900 text-sm mb-2 truncate">{character.name}</h3>
                         <button
                           onClick={() => handleImportCharacter(character)}
                           disabled={characters.some(c => c.id === character.id)}
-                          className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium text-sm disabled:bg-gray-300 disabled:cursor-not-allowed transition-all"
+                          className="w-full bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium text-xs disabled:bg-gray-300 disabled:cursor-not-allowed transition-all"
                         >
-                          {characters.some(c => c.id === character.id) ? 'Already Added' : 'Import Character'}
+                          {characters.some(c => c.id === character.id) ? 'Added' : 'Import'}
                         </button>
                       </div>
                     </div>
@@ -1041,6 +1063,22 @@ export default function CreateStoryPage() {
             </div>
           </div>
         )}
+
+        {/* Add Character Modal */}
+        <CharacterFormModal
+          isOpen={showAddCharacterModal}
+          onClose={() => setShowAddCharacterModal(false)}
+          onSave={(character) => {
+            const newCharacter = {
+              ...character,
+              isPrimary: characters.length === 0,
+              order: characters.length + 1,
+              isFromLibrary: true, // Show compact view after save
+            };
+            setCharacters([...characters, newCharacter]);
+            setShowAddCharacterModal(false);
+          }}
+        />
 
         {/* Step 1.5: Language Selection (NEW - Bilingual Support) */}
         {characters.length > 0 && enhancedScenes.length === 0 && (
@@ -1257,6 +1295,7 @@ export default function CreateStoryPage() {
               onBack={handleRegenerateAll}
               onCaptionEdit={handleCaptionEdit}
               onCaptionChineseEdit={handleCaptionChineseEdit}
+              onImagePromptEdit={handleImagePromptEdit}
               onScenesUpdate={handleScenesUpdate}
               isGenerating={isGenerating}
               readingLevel={readingLevel}
@@ -1264,6 +1303,10 @@ export default function CreateStoryPage() {
               expansionLevel={expansionLevel}
               contentLanguage={contentLanguage}
               generateChineseTranslation={generateChineseTranslation}
+              artStyle={artStyle}
+              onArtStyleChange={setArtStyle}
+              imageProvider={imageProvider}
+              onImageProviderChange={setImageProvider}
             />
           </div>
         )}

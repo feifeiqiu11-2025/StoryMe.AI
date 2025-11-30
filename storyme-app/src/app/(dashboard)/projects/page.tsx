@@ -12,12 +12,17 @@ import Link from 'next/link';
 import type { StoryVisibility } from '@/lib/types/story';
 import { StoryCard, type StoryCardData } from '@/components/story/StoryCard';
 
+const PAGE_SIZE = 12;
+
 export default function ProjectsPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<any[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [total, setTotal] = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [privacyConfirm, setPrivacyConfirm] = useState<{ id: string; newVisibility: StoryVisibility } | null>(null);
@@ -67,14 +72,25 @@ export default function ProjectsPage() {
     loadUser();
   }, [router]);
 
-  const fetchProjects = async () => {
-    setLoadingProjects(true);
+  const fetchProjects = async (offset = 0, append = false) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoadingProjects(true);
+    }
+
     try {
-      const response = await fetch('/api/projects');
+      const response = await fetch(`/api/projects?limit=${PAGE_SIZE}&offset=${offset}`);
       const data = await response.json();
 
       if (response.ok) {
-        setProjects(data.projects || []);
+        if (append) {
+          setProjects(prev => [...prev, ...(data.projects || [])]);
+        } else {
+          setProjects(data.projects || []);
+        }
+        setHasMore(data.hasMore || false);
+        setTotal(data.total || 0);
       } else {
         console.error('Failed to fetch projects:', data.error);
       }
@@ -82,7 +98,12 @@ export default function ProjectsPage() {
       console.error('Error fetching projects:', error);
     } finally {
       setLoadingProjects(false);
+      setLoadingMore(false);
     }
+  };
+
+  const handleLoadMore = () => {
+    fetchProjects(projects.length, true);
   };
 
   const handlePrivacyToggle = (projectId: string, currentVisibility: StoryVisibility) => {
@@ -226,34 +247,66 @@ export default function ProjectsPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((project) => {
-              const storyData: StoryCardData = {
-                id: project.id,
-                title: project.title,
-                description: project.description,
-                coverImageUrl: project.coverImageUrl,
-                visibility: project.visibility,
-                viewCount: project.viewCount,
-                featured: project.featured,
-                sceneCount: project.scenes?.length || 0,
-                createdAt: project.createdAt,
-                scenes: project.scenes,
-              };
+          <>
+            {/* Story count */}
+            {total > 0 && (
+              <p className="text-sm text-gray-500 mb-4">
+                Showing {projects.length} of {total} stories
+              </p>
+            )}
 
-              return (
-                <StoryCard
-                  key={project.id}
-                  story={storyData}
-                  onClick={() => router.push(`/projects/${project.id}`)}
-                  variant="myStories"
-                  onPrivacyToggle={handlePrivacyToggle}
-                  onDelete={() => setDeleteConfirm(project.id)}
-                  isUpdatingPrivacy={updatingPrivacy === project.id}
-                />
-              );
-            })}
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {projects.map((project) => {
+                const storyData: StoryCardData = {
+                  id: project.id,
+                  title: project.title,
+                  description: project.description,
+                  coverImageUrl: project.coverImageUrl,
+                  visibility: project.visibility,
+                  viewCount: project.viewCount,
+                  featured: project.featured,
+                  sceneCount: project.scenes?.length || 0,
+                  createdAt: project.createdAt,
+                  scenes: project.scenes,
+                };
+
+                return (
+                  <StoryCard
+                    key={project.id}
+                    story={storyData}
+                    onClick={() => router.push(`/projects/${project.id}`)}
+                    variant="myStories"
+                    onPrivacyToggle={handlePrivacyToggle}
+                    onDelete={() => setDeleteConfirm(project.id)}
+                    isUpdatingPrivacy={updatingPrivacy === project.id}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="mt-8 text-center">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="inline-flex items-center gap-2 bg-white border-2 border-gray-200 text-gray-700 px-8 py-3 rounded-xl hover:border-blue-400 hover:text-blue-600 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loadingMore ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      Load More Stories
+                      <span className="text-sm text-gray-400">({total - projects.length} remaining)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {/* Privacy Confirmation Modal */}

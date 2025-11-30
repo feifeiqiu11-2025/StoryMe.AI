@@ -100,6 +100,64 @@ export class StorageService {
   }
 
   /**
+   * Upload generated image from base64 data URL (e.g., from Gemini)
+   * Converts base64 to blob and uploads to Supabase Storage
+   */
+  async uploadGeneratedImageFromBase64(
+    folderPath: string,
+    sceneId: string,
+    base64DataUrl: string
+  ): Promise<UploadResult> {
+    try {
+      // Parse base64 data URL: "data:image/png;base64,..."
+      const matches = base64DataUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!matches) {
+        throw new Error('Invalid base64 data URL format');
+      }
+
+      const mimeType = matches[1];
+      const base64Data = matches[2];
+
+      // Determine file extension from mime type
+      const extension = mimeType.split('/')[1] || 'png';
+
+      // Convert base64 to Buffer (works in Node.js)
+      const buffer = Buffer.from(base64Data, 'base64');
+
+      const filename = `scene-${sceneId}-${Date.now()}.${extension}`;
+      const path = `${folderPath}/${filename}`;
+
+      const { data, error } = await this.supabase.storage
+        .from(this.GENERATED_BUCKET)
+        .upload(path, buffer, {
+          contentType: mimeType,
+          cacheControl: '31536000', // 1 year cache for generated images
+          upsert: false,
+        });
+
+      if (error) {
+        console.error('Upload error:', error);
+        throw new Error(`Failed to upload generated image: ${error.message}`);
+      }
+
+      const { data: { publicUrl } } = this.supabase.storage
+        .from(this.GENERATED_BUCKET)
+        .getPublicUrl(path);
+
+      console.log(`[Storage] Uploaded base64 image to: ${publicUrl}`);
+
+      return {
+        url: publicUrl,
+        filename,
+        path: data.path,
+      };
+    } catch (error) {
+      console.error('Error uploading base64 image:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Upload PDF storybook
    */
   async uploadStorybook(

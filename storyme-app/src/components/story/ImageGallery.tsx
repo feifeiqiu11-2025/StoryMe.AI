@@ -163,32 +163,6 @@ export default function ImageGallery({
         </div>
       </div>
 
-      {/* Character References */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-6">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4">Character References</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {characters.map(char => (
-            <div key={char.id} className="text-center">
-              {char.referenceImage.url ? (
-                <img
-                  src={char.referenceImage.url}
-                  alt={char.name}
-                  className="w-24 h-24 object-cover rounded-lg shadow-md border-2 border-white mx-auto"
-                />
-              ) : (
-                <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg shadow-md border-2 border-white mx-auto flex items-center justify-center text-3xl">
-                  👤
-                </div>
-              )}
-              <p className="text-sm font-medium text-gray-900 mt-2">{char.name}</p>
-              {char.isPrimary && (
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Primary</span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Generated images grid */}
       <div className="space-y-6">
         {generatedImages.map((image) => (

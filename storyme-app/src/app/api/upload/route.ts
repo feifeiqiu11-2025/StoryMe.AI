@@ -16,10 +16,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file type
+    // Validate file type - must be image
     if (!file.type.startsWith('image/')) {
       return NextResponse.json(
         { error: 'File must be an image' },
+        { status: 400 }
+      );
+    }
+
+    // Validate supported formats for AI processing (OpenAI + Gemini)
+    // AVIF, HEIC, BMP, TIFF etc. are NOT supported by AI image APIs
+    const supportedFormats = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    if (!supportedFormats.includes(file.type)) {
+      return NextResponse.json(
+        {
+          error: `Unsupported image format: ${file.type}. Please upload PNG, JPEG, GIF, or WebP images.`,
+          supportedFormats: ['PNG', 'JPEG', 'GIF', 'WebP']
+        },
+        { status: 400 }
+      );
+    }
+
+    // Also check file extension as backup (some browsers report wrong MIME type for AVIF/HEIC)
+    const fileName = file.name.toLowerCase();
+    const unsupportedExtensions = ['.avif', '.heic', '.heif', '.bmp', '.tiff', '.tif', '.svg'];
+    const hasUnsupportedExt = unsupportedExtensions.some(ext => fileName.endsWith(ext));
+    if (hasUnsupportedExt) {
+      const ext = unsupportedExtensions.find(ext => fileName.endsWith(ext)) || 'unknown';
+      return NextResponse.json(
+        {
+          error: `Unsupported image format (${ext}). Please upload PNG, JPEG, GIF, or WebP images. AVIF and HEIC are not supported by AI image processing.`,
+          supportedFormats: ['PNG', 'JPEG', 'GIF', 'WebP']
+        },
         { status: 400 }
       );
     }

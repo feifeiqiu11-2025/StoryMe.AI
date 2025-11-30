@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Character, CharacterDescription } from '@/lib/types';
+import { Character, CharacterDescription } from '@/lib/types/story';
+import CharacterFormModal from './CharacterFormModal';
 
 interface CharacterManagerProps {
   characters: Character[];
@@ -25,23 +26,24 @@ export default function CharacterManager({
   const [uploadingCharacterId, setUploadingCharacterId] = useState<string | null>(null);
   const [analyzingCharacterId, setAnalyzingCharacterId] = useState<string | null>(null);
   const [analyzedCharacterId, setAnalyzedCharacterId] = useState<string | null>(null);
+  const [showCharacterModal, setShowCharacterModal] = useState(false);
 
   const addCharacter = () => {
     if (characters.length >= MAX_CHARACTERS) return;
+    // Open the modal instead of adding inline character
+    setShowCharacterModal(true);
+  };
 
-    const newCharacter: Character = {
-      id: `char-${Date.now()}`,
-      name: '',
-      referenceImage: {
-        url: '',
-        fileName: '',
-      },
-      description: {},
-      isPrimary: characters.length === 0, // First character is primary
+  const handleModalSave = (character: Character) => {
+    // Add the character from modal with isPrimary set if first character
+    const newCharacter = {
+      ...character,
+      isPrimary: characters.length === 0,
       order: characters.length + 1,
+      isFromLibrary: true, // Mark as modal-created so it shows compact view
     };
-
     onCharactersChange([...characters, newCharacter]);
+    setShowCharacterModal(false);
   };
 
   const removeCharacter = (characterId: string) => {
@@ -206,25 +208,59 @@ export default function CharacterManager({
         <span className="text-sm text-gray-500">{characters.length} / {MAX_CHARACTERS}</span>
       </div>
 
-      {/* Character Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {characters.map((character) => (
-          <CharacterCard
-            key={character.id}
-            character={character}
-            onRemove={() => removeCharacter(character.id)}
-            onUpdate={(updates) => updateCharacter(character.id, updates)}
-            onUpdateDescription={(field, value) => updateDescription(character.id, field, value)}
-            onSetPrimary={() => setPrimaryCharacter(character.id)}
-            onImageUpload={(file) => handleImageUpload(character.id, file)}
-            isUploading={uploadingCharacterId === character.id}
-            isAnalyzing={analyzingCharacterId === character.id}
-            showAnalyzedBadge={analyzedCharacterId === character.id}
-            disabled={disabled}
-            onSaveToLibrary={onSaveToLibrary}
-          />
-        ))}
-      </div>
+      {/* Character Cards - Separate library characters (compact) from new characters (full) */}
+      {(() => {
+        const libraryCharacters = characters.filter(c => c.isFromLibrary);
+        const newCharacters = characters.filter(c => !c.isFromLibrary);
+
+        return (
+          <div className="space-y-4">
+            {/* Library characters - compact horizontal list */}
+            {libraryCharacters.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {libraryCharacters.map((character) => (
+                  <CharacterCard
+                    key={character.id}
+                    character={character}
+                    onRemove={() => removeCharacter(character.id)}
+                    onUpdate={(updates) => updateCharacter(character.id, updates)}
+                    onUpdateDescription={(field, value) => updateDescription(character.id, field, value)}
+                    onSetPrimary={() => setPrimaryCharacter(character.id)}
+                    onImageUpload={(file) => handleImageUpload(character.id, file)}
+                    isUploading={uploadingCharacterId === character.id}
+                    isAnalyzing={analyzingCharacterId === character.id}
+                    showAnalyzedBadge={analyzedCharacterId === character.id}
+                    disabled={disabled}
+                    onSaveToLibrary={onSaveToLibrary}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* New characters - full editable cards */}
+            {newCharacters.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {newCharacters.map((character) => (
+                  <CharacterCard
+                    key={character.id}
+                    character={character}
+                    onRemove={() => removeCharacter(character.id)}
+                    onUpdate={(updates) => updateCharacter(character.id, updates)}
+                    onUpdateDescription={(field, value) => updateDescription(character.id, field, value)}
+                    onSetPrimary={() => setPrimaryCharacter(character.id)}
+                    onImageUpload={(file) => handleImageUpload(character.id, file)}
+                    isUploading={uploadingCharacterId === character.id}
+                    isAnalyzing={analyzingCharacterId === character.id}
+                    showAnalyzedBadge={analyzedCharacterId === character.id}
+                    disabled={disabled}
+                    onSaveToLibrary={onSaveToLibrary}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Add Character Button */}
       {showAddButton && characters.length < MAX_CHARACTERS && (
@@ -242,6 +278,13 @@ export default function CharacterManager({
           Add at least one character to start creating your story
         </p>
       )}
+
+      {/* Character Form Modal */}
+      <CharacterFormModal
+        isOpen={showCharacterModal}
+        onClose={() => setShowCharacterModal(false)}
+        onSave={handleModalSave}
+      />
     </div>
   );
 }
@@ -274,19 +317,92 @@ function CharacterCard({
   onSaveToLibrary,
 }: CharacterCardProps) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop: (acceptedFiles) => {
+    onDrop: (acceptedFiles, fileRejections) => {
+      // Check for rejected files (unsupported format)
+      if (fileRejections.length > 0) {
+        const rejection = fileRejections[0];
+        const errorMsg = rejection.errors[0]?.message || 'Unsupported file format';
+        alert(`Upload failed: ${errorMsg}\n\nPlease use PNG, JPG, or WebP images.`);
+        return;
+      }
       if (acceptedFiles.length > 0) {
-        onImageUpload(acceptedFiles[0]);
+        const file = acceptedFiles[0];
+        // Extra check for unsupported formats (AVIF, HEIC can slip through)
+        const supportedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+        if (!supportedTypes.includes(file.type)) {
+          alert(`Unsupported image format: ${file.type}\n\nPlease use PNG, JPG, GIF, or WebP images.\n\nNote: AVIF and HEIC formats are not supported by AI image processing.`);
+          return;
+        }
+        onImageUpload(file);
       }
     },
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.webp'],
+      'image/png': ['.png'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/gif': ['.gif'],
+      'image/webp': ['.webp'],
     },
     maxSize: MAX_FILE_SIZE,
     maxFiles: 1,
     disabled: disabled || isUploading,
   });
 
+  // Check if this is a library character (imported from character library)
+  const isLibraryCharacter = character.isFromLibrary;
+
+  // For library characters, use a compact card layout
+  if (isLibraryCharacter) {
+    return (
+      <div className="bg-white rounded-lg border-2 border-gray-200 p-3 hover:border-blue-300 transition-colors">
+        <div className="flex items-center gap-3">
+          {/* Character Avatar/Preview */}
+          <div className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+            {character.animatedPreviewUrl || character.referenceImage?.url ? (
+              <img
+                src={character.animatedPreviewUrl || character.referenceImage.url}
+                alt={character.name || 'Character'}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  if (character.animatedPreviewUrl && e.currentTarget.src === character.animatedPreviewUrl) {
+                    e.currentTarget.src = character.referenceImage.url;
+                  }
+                }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-2xl text-gray-400">
+                {character.name ? character.name[0].toUpperCase() : '?'}
+              </div>
+            )}
+          </div>
+
+          {/* Character Info */}
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-gray-900 truncate">{character.name || 'Unnamed'}</div>
+            <div className="text-xs text-gray-500 truncate">
+              {character.description.otherFeatures ||
+               character.description.hairColor ||
+               character.description.age ||
+               'From library'}
+            </div>
+          </div>
+
+          {/* Remove Button */}
+          <button
+            onClick={onRemove}
+            disabled={disabled}
+            className="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50"
+            title="Remove character"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // For non-library characters, use the full editable card
   return (
     <div className={`bg-white rounded-lg border-2 p-4 space-y-3 ${
       character.isPrimary ? 'border-blue-500 shadow-md' : 'border-gray-200'
@@ -302,9 +418,11 @@ function CharacterCard({
             disabled={disabled}
             className="font-semibold text-lg text-gray-900 placeholder:text-gray-400 border-b-2 border-transparent hover:border-gray-300 focus:border-blue-500 outline-none px-1 disabled:opacity-50"
           />
+          {/* Primary badge - commented out as Gemini API doesn't use it
           {character.isPrimary && (
             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Primary</span>
           )}
+          */}
         </div>
         <button
           onClick={onRemove}
@@ -337,18 +455,24 @@ function CharacterCard({
           ) : character.referenceImage?.url ? (
             <div className="space-y-2">
               <div className="relative group bg-gray-50 rounded overflow-hidden" style={{ height: '160px' }}>
+                {/* Show animated preview if available (for library characters), otherwise reference image */}
                 <img
-                  src={character.referenceImage.url}
+                  src={character.animatedPreviewUrl || character.referenceImage.url}
                   alt={character.name || 'Character'}
                   className="w-full h-full object-contain"
                   onError={(e) => {
-                    console.error('Image failed to load:', character.referenceImage.url);
-                  }}
-                  onLoad={(e) => {
-                    console.log('Image loaded successfully:', character.referenceImage.url);
-                    console.log('Image dimensions:', e.currentTarget.naturalWidth, 'x', e.currentTarget.naturalHeight);
+                    // Fallback to reference image if animated preview fails
+                    if (character.animatedPreviewUrl && e.currentTarget.src === character.animatedPreviewUrl) {
+                      e.currentTarget.src = character.referenceImage.url;
+                    }
                   }}
                 />
+                {/* Badge to indicate animated version */}
+                {character.animatedPreviewUrl && (
+                  <div className="absolute top-1 left-1 bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                    3D
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-transparent group-hover:bg-black group-hover:bg-opacity-20 transition-all rounded flex items-center justify-center pointer-events-none">
                   <span className="text-white opacity-0 group-hover:opacity-100 text-sm font-medium drop-shadow-lg transition-opacity">
                     Click to change
@@ -382,7 +506,7 @@ function CharacterCard({
         {/* AI Analyzed Badge */}
         {showAnalyzedBadge && (
           <div className="absolute -top-2 -right-2 bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full shadow-sm animate-bounce">
-            ✨ AI analyzed
+            AI analyzed
           </div>
         )}
       </div>
@@ -431,7 +555,7 @@ function CharacterCard({
         />
       </div>
 
-      {/* Set as Primary */}
+      {/* Set as Primary - commented out as Gemini API doesn't differentiate primary characters
       {!character.isPrimary && (
         <button
           onClick={onSetPrimary}
@@ -441,6 +565,7 @@ function CharacterCard({
           Set as Primary Character
         </button>
       )}
+      */}
 
       {/* Save to Library - only show if character is not already from library */}
       {onSaveToLibrary && !character.isFromLibrary && (
@@ -450,7 +575,7 @@ function CharacterCard({
           className="w-full text-sm bg-green-100 hover:bg-green-200 text-green-700 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title={!character.name || !character.referenceImage.url ? 'Add name and image to save' : 'Save character to library'}
         >
-          💾 Save to Library
+          Save to Library
         </button>
       )}
     </div>

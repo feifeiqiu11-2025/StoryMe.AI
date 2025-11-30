@@ -31,6 +31,110 @@ export interface MultiCharacterGenerateParams {
   artStyle?: string;
   sceneLocation?: string; // Consistent background setting
   emphasizeGenericCharacters?: boolean; // Boost generic character visibility
+  storySeed?: number; // Seed for consistency across story scenes
+}
+
+/**
+ * Build negative prompt to prevent common generation issues
+ * - Human-animal hybrids
+ * - Anatomical errors
+ * - Extra limbs/heads
+ */
+export function buildNegativePrompt(hasAnimals: boolean = false): string {
+  const baseNegatives = [
+    // Anatomical issues
+    'extra limbs', 'three legs', 'four legs on human', 'two heads', 'extra arms',
+    'extra fingers', 'missing limbs', 'deformed hands', 'deformed feet',
+    'malformed body', 'anatomical errors', 'bad anatomy', 'wrong proportions',
+    // Quality issues
+    'blurry', 'low quality', 'distorted face', 'ugly', 'disfigured',
+    'poorly drawn', 'bad art', 'amateur',
+  ];
+
+  // Add hybrid-specific negatives when animals are in the scene
+  const hybridNegatives = hasAnimals ? [
+    'human-animal hybrid', 'animal-human hybrid', 'furry', 'anthropomorphic animal',
+    'human with animal parts', 'animal with human face', 'centaur', 'minotaur',
+    'merged creature', 'fusion', 'chimera', 'half animal half human',
+    'human body with animal head', 'animal body with human head',
+    'person turning into animal', 'transformation', 'mutant',
+  ] : [];
+
+  return [...baseNegatives, ...hybridNegatives].join(', ');
+}
+
+/**
+ * Detect if scene description contains animals
+ */
+export function sceneContainsAnimals(description: string): boolean {
+  const animalKeywords = [
+    // Common animals
+    'dog', 'cat', 'bird', 'fish', 'rabbit', 'bunny', 'hamster', 'turtle',
+    'horse', 'pony', 'cow', 'pig', 'sheep', 'goat', 'chicken', 'duck',
+    // Wild animals
+    'lion', 'tiger', 'elephant', 'giraffe', 'zebra', 'monkey', 'bear',
+    'wolf', 'fox', 'deer', 'owl', 'eagle', 'snake', 'frog', 'butterfly',
+    // Zoo/farm context
+    'zoo', 'farm', 'barn', 'wildlife', 'safari', 'aquarium', 'pet',
+    // Generic
+    'animal', 'creature', 'beast',
+  ];
+
+  const lowerDesc = description.toLowerCase();
+  return animalKeywords.some(animal => lowerDesc.includes(animal));
+}
+
+/**
+ * Build enhanced character description with explicit human specification
+ */
+export function buildEnhancedCharacterDescription(
+  character: CharacterPromptInfo,
+  isHuman: boolean = true
+): string {
+  const parts: string[] = [];
+
+  // Explicitly state this is a human child
+  if (isHuman) {
+    parts.push(`${character.name} (HUMAN CHILD`);
+  } else {
+    parts.push(character.name);
+  }
+
+  if (character.description.age) {
+    parts[0] += `, ${character.description.age} years old)`;
+  } else {
+    parts[0] += ')';
+  }
+
+  // Physical features
+  if (character.description.skinTone) {
+    parts.push(`${character.description.skinTone} skin`);
+  }
+  if (character.description.hairColor) {
+    parts.push(`${character.description.hairColor} hair`);
+  }
+
+  // Clothing - be very specific
+  if (character.description.clothing) {
+    parts.push(`wearing ${character.description.clothing}`);
+  }
+
+  // Other features
+  if (character.description.otherFeatures) {
+    parts.push(character.description.otherFeatures);
+  }
+
+  // Add anatomical clarity for humans
+  if (isHuman) {
+    parts.push('normal human body with two arms and two legs');
+  }
+
+  // Fallback if minimal description
+  if (parts.length <= 2) {
+    parts.push('friendly child with bright eyes and cheerful smile');
+  }
+
+  return parts.join(', ');
 }
 
 export interface GenerateImageResult {
@@ -135,7 +239,7 @@ export async function generateImageWithCharacter({
 /**
  * Generate image with multiple characters
  * Uses primary character's reference image + text descriptions for all characters
- * Now with scene consistency and generic character support
+ * Now with scene consistency, generic character support, negative prompts, and seed locking
  */
 export async function generateImageWithMultipleCharacters({
   characters,
@@ -143,6 +247,7 @@ export async function generateImageWithMultipleCharacters({
   artStyle = "children's book illustration, colorful, whimsical",
   sceneLocation,
   emphasizeGenericCharacters = true,
+  storySeed,
 }: MultiCharacterGenerateParams): Promise<GenerateImageResult> {
   initializeFalClient();
 
@@ -152,10 +257,14 @@ export async function generateImageWithMultipleCharacters({
     // Import scene-parser functions dynamically to detect generic characters
     const { extractGenericCharacters } = await import('./scene-parser');
 
-    // Build character descriptions for all characters
+    // Detect if scene contains animals (for hybrid prevention)
+    const hasAnimals = sceneContainsAnimals(sceneDescription);
+
+    // Build enhanced character descriptions with explicit HUMAN specification
+    // This helps prevent human-animal hybrids when animals are in the scene
     const characterDescriptions = characters
-      .map(char => buildCharacterDescription(char))
-      .join(', and ');
+      .map(char => buildEnhancedCharacterDescription(char, true))
+      .join('; ');
 
     // Detect generic characters (policeman, teacher, etc.)
     const genericChars = extractGenericCharacters(sceneDescription);
@@ -163,32 +272,48 @@ export async function generateImageWithMultipleCharacters({
 
     if (emphasizeGenericCharacters && genericChars.length > 0) {
       // Emphasize generic characters but keep them secondary to main characters
-      genericCharPrompt = ', also include ' + genericChars
-        .map(char => `${char} in background`)
+      genericCharPrompt = '. ALSO SHOW: ' + genericChars
+        .map(char => `${char} (adult human) in background, SEPARATE from main characters`)
         .join(' and ');
     }
 
     // Build scene setting for consistency
     let sceneSettingPrompt = '';
     if (sceneLocation) {
-      sceneSettingPrompt = `, consistent ${sceneLocation} setting`;
+      sceneSettingPrompt = `. SETTING: ${sceneLocation}`;
     }
 
-    // Enhanced prompt with all elements - main characters emphasized first
-    const fullPrompt = `${sceneDescription}, MAIN FOCUS: ${characterDescriptions}${genericCharPrompt}${sceneSettingPrompt}, ${artStyle}, maintain consistent character appearance and scene background, detailed illustration`;
+    // Add animal separation instruction if animals present
+    let animalSeparationPrompt = '';
+    if (hasAnimals) {
+      animalSeparationPrompt = '. IMPORTANT: All human characters must be clearly SEPARATE from any animals. Humans and animals are distinct entities, not merged or combined in any way. Each character maintains their own complete body.';
+    }
+
+    // Build negative prompt
+    const negativePrompt = buildNegativePrompt(hasAnimals);
+
+    // Enhanced prompt with clear entity separation
+    // Structure: [SCENE] | [HUMAN CHARACTERS] | [ANIMALS/OBJECTS] | [STYLE]
+    const fullPrompt = `${sceneDescription}. MAIN HUMAN CHARACTERS: ${characterDescriptions}${genericCharPrompt}${animalSeparationPrompt}${sceneSettingPrompt}. STYLE: ${artStyle}, professional children's book illustration, each character clearly distinct and separate, maintain consistent character appearance`;
 
     console.log('Enhanced multi-character prompt:', fullPrompt);
+    console.log('Negative prompt:', negativePrompt);
+    if (storySeed) {
+      console.log('Using story seed for consistency:', storySeed);
+    }
 
-    // Using FLUX LoRA model - primary character's image influences generation
+    // Using FLUX LoRA model with negative prompt and optional seed
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result: any = await fal.subscribe("fal-ai/flux-lora", {
       input: {
         prompt: fullPrompt,
+        negative_prompt: negativePrompt,
         image_size: "square_hd",
         num_inference_steps: 28,
         guidance_scale: 3.5,
         num_images: 1,
         enable_safety_checker: true,
+        ...(storySeed && { seed: storySeed }), // Use consistent seed if provided
       },
       logs: true,
       onQueueUpdate: (update) => {

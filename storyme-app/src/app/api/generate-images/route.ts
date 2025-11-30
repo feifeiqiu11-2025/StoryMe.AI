@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
+import { generateImageWithGemini, generateImageWithGeminiClassic, isGeminiAvailable, GeminiCharacterInfo } from '@/lib/gemini-image-client';
 import { parseScriptIntoScenes, buildConsistentSceneSettings, extractSceneLocation } from '@/lib/scene-parser';
 import { GeneratedImage, Character, CharacterRating } from '@/lib/types/story';
 import { createClient } from '@/lib/supabase/server';
 import { checkImageGenerationLimit, logApiUsage } from '@/lib/utils/rate-limit';
+import { StorageService } from '@/lib/services/storage.service';
+
+// Image provider type
+type ImageProvider = 'flux' | 'gemini';
+
+// Illustration style type
+type IllustrationStyle = 'pixar' | 'classic';
 
 export const maxDuration = 300; // 5 minutes timeout for Vercel
 
@@ -13,7 +21,25 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { characters, script, artStyle } = body;
+    const { characters, script, artStyle, imageProvider: requestedProvider, illustrationStyle } = body;
+
+    // Determine illustration style (default to 'classic' for 2D storybook)
+    const selectedIllustrationStyle: IllustrationStyle = illustrationStyle || 'classic';
+    console.log(`🎨 Illustration style: ${selectedIllustrationStyle === 'pixar' ? '3D Pixar' : 'Classic Storybook 2D'}`);
+
+    // Determine which image provider to use
+    // Priority: request param > env var > default (flux)
+    const defaultProvider = (process.env.IMAGE_PROVIDER as ImageProvider) || 'flux';
+    const imageProvider: ImageProvider = requestedProvider || defaultProvider;
+
+    // Validate Gemini is available if requested
+    if (imageProvider === 'gemini' && !isGeminiAvailable()) {
+      console.warn('Gemini requested but not available, falling back to FLUX');
+    }
+
+    const useGemini = imageProvider === 'gemini' && isGeminiAvailable();
+    console.log(`🎨 Using image provider: ${useGemini ? 'Gemini' : 'FLUX'}`);
+
 
     // Validate inputs
     if (!characters || characters.length === 0) {
@@ -86,22 +112,53 @@ export async function POST(request: NextRequest) {
       : `http://localhost:${process.env.PORT || 3002}`;
 
     // Prepare character prompt info with absolute URLs
-    const characterPrompts: CharacterPromptInfo[] = characters.map((char: Character) => ({
-      name: char.name,
-      referenceImageUrl: char.referenceImage.url.startsWith('http')
-        ? char.referenceImage.url
-        : `${baseUrl}${char.referenceImage.url}`,
-      description: char.description,
-    }));
+    // For description-only characters (no reference photo), use animatedPreviewUrl instead
+    const characterPrompts: CharacterPromptInfo[] = characters.map((char: Character) => {
+      // Determine the best reference image URL
+      // Priority: reference photo > animated preview > null
+      let referenceUrl: string | undefined = undefined;
+
+      if (char.referenceImage.url && char.referenceImage.url.trim()) {
+        // Has a reference photo
+        referenceUrl = char.referenceImage.url.startsWith('http')
+          ? char.referenceImage.url
+          : `${baseUrl}${char.referenceImage.url}`;
+      } else if (char.animatedPreviewUrl && char.animatedPreviewUrl.trim()) {
+        // Description-only character - use animated preview as reference
+        referenceUrl = char.animatedPreviewUrl.startsWith('http')
+          ? char.animatedPreviewUrl
+          : `${baseUrl}${char.animatedPreviewUrl}`;
+      }
+      // If neither exists, referenceUrl stays undefined
+
+      return {
+        name: char.name,
+        referenceImageUrl: referenceUrl || '',
+        description: char.description,
+      };
+    });
 
     // Build consistent scene settings
     const sceneSettings = buildConsistentSceneSettings(scenes);
     console.log('Scene settings for consistency:', Array.from(sceneSettings.entries()));
 
-    // CHANGED: Generate all scenes in PARALLEL instead of sequential to avoid timeout
-    console.log(`🚀 Starting PARALLEL generation of ${scenes.length} scenes...`);
+    // Generate a story-wide seed for character consistency across all scenes
+    // Using a deterministic seed based on character names ensures same characters get similar treatment
+    const characterSeedBase = characters.map((c: Character) => c.name).join('').length;
+    const storySeed = Math.floor(Math.random() * 1000000) + characterSeedBase * 1000;
+    console.log(`🎲 Story seed for consistency: ${storySeed}`);
 
-    const generationPromises = scenes.map(async (scene) => {
+    // Generate scenes - use staggered parallel for Gemini to avoid rate limits
+    // For FLUX, full parallel is fine. For Gemini free tier, we stagger requests.
+    const staggerDelayMs = useGemini ? 3000 : 0; // 3 second delay between Gemini requests
+    console.log(`🚀 Starting ${useGemini ? 'STAGGERED' : 'PARALLEL'} generation of ${scenes.length} scenes...`);
+
+    const generationPromises = scenes.map(async (scene, index) => {
+      // Stagger start times for Gemini to avoid rate limits
+      if (staggerDelayMs > 0 && index > 0) {
+        await new Promise(resolve => setTimeout(resolve, index * staggerDelayMs));
+      }
+
       try {
         console.log(`Generating image for scene ${scene.sceneNumber}: ${scene.description}`);
 
@@ -119,13 +176,67 @@ export async function POST(request: NextRequest) {
           sceneCharacters.push(...characterPrompts);
         }
 
-        const result = await generateImageWithMultipleCharacters({
-          characters: sceneCharacters,
-          sceneDescription: scene.description,
-          artStyle: artStyle || "children's book illustration, colorful, whimsical",
-          sceneLocation: locationSetting,
-          emphasizeGenericCharacters: true,
-        });
+        // Generate image using selected provider
+        let result;
+
+        if (useGemini) {
+          // Use Gemini with actual reference images
+          const geminiCharacters: GeminiCharacterInfo[] = sceneCharacters.map(char => ({
+            name: char.name,
+            referenceImageUrl: char.referenceImageUrl,
+            description: char.description,
+          }));
+
+          // Choose generation function based on illustration style
+          if (selectedIllustrationStyle === 'classic') {
+            // Classic Storybook - 2D hand-drawn/watercolor style
+            result = await generateImageWithGeminiClassic({
+              characters: geminiCharacters,
+              sceneDescription: scene.description,
+              artStyle: artStyle || "children's book illustration, colorful, whimsical",
+            });
+          } else {
+            // 3D Pixar style (default Gemini behavior)
+            result = await generateImageWithGemini({
+              characters: geminiCharacters,
+              sceneDescription: scene.description,
+              artStyle: artStyle || "children's book illustration, colorful, whimsical",
+            });
+          }
+
+          // IMPORTANT: Upload Gemini base64 images to Supabase Storage
+          // This converts data:image/... URLs to proper CDN URLs for:
+          // 1. Better mobile app compatibility
+          // 2. Reduced database storage (no multi-MB base64 strings)
+          // 3. Faster page loads with CDN caching
+          if (result.imageUrl.startsWith('data:')) {
+            try {
+              const storageService = new StorageService(supabase);
+              // Use requestId as temporary folder path during generation
+              // The actual project folder will be created when story is saved
+              const uploaded = await storageService.uploadGeneratedImageFromBase64(
+                `temp-${requestId}`,
+                scene.id,
+                result.imageUrl
+              );
+              console.log(`[Storage] Uploaded Gemini image for scene ${scene.sceneNumber} to: ${uploaded.url}`);
+              result.imageUrl = uploaded.url;
+            } catch (uploadError) {
+              console.warn(`[Storage] Failed to upload Gemini image, keeping base64:`, uploadError);
+              // Keep the base64 data URL as fallback if upload fails
+            }
+          }
+        } else {
+          // Use FLUX LoRA (text-based prompts only)
+          result = await generateImageWithMultipleCharacters({
+            characters: sceneCharacters,
+            sceneDescription: scene.description,
+            artStyle: artStyle || "children's book illustration, colorful, whimsical",
+            sceneLocation: locationSetting,
+            emphasizeGenericCharacters: true,
+            storySeed: storySeed,
+          });
+        }
 
         // Create character ratings array for this scene
         const characterRatings: CharacterRating[] = sceneCharacters.map(char => ({
@@ -220,7 +331,8 @@ export async function POST(request: NextRequest) {
       errors: errors.length > 0 ? errors : undefined,
       totalScenes: scenes.length,
       successfulScenes: successfulCount,
-      limits: rateLimitCheck.limits, // Include current limits in response
+      limits: rateLimitCheck.limits,
+      imageProvider: useGemini ? 'gemini' : 'flux', // Report which provider was used
     });
   } catch (error) {
     console.error('Generate images error:', error);

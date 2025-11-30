@@ -63,8 +63,20 @@ export default function CharactersPage() {
     otherFeatures: '',
     imageUrl: '',
     imageFileName: '',
+    animatedPreviewUrl: '',
+    characterType: '', // For description-only mode: "baby eagle", "friendly dragon", etc.
   });
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [generatingPreview, setGeneratingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  // Character mode: 'photo' (upload reference) or 'description' (generate from text)
+  const [characterMode, setCharacterMode] = useState<'photo' | 'description'>('photo');
+  // Dual style previews
+  const [previewOptions, setPreviewOptions] = useState<{
+    pixar: string | null;
+    classic: string | null;
+  }>({ pixar: null, classic: null });
+  const [selectedStyle, setSelectedStyle] = useState<'pixar' | 'classic' | null>(null);
 
   // Load characters from database
   const loadCharacters = async (userId: string) => {
@@ -86,6 +98,7 @@ export default function CharactersPage() {
           url: char.reference_image_url || '',
           fileName: char.reference_image_filename || '',
         },
+        animatedPreviewUrl: char.animated_preview_url || undefined,
         description: {
           hairColor: char.hair_color,
           skinTone: char.skin_tone,
@@ -148,6 +161,9 @@ export default function CharactersPage() {
   const handleOpenForm = (character?: Character) => {
     if (character) {
       setEditingCharacter(character);
+      // Determine if this was a description-only character (no reference image)
+      const isDescriptionOnly = !character.referenceImage.url;
+      setCharacterMode(isDescriptionOnly ? 'description' : 'photo');
       setFormData({
         name: character.name,
         hairColor: character.description.hairColor || '',
@@ -157,9 +173,25 @@ export default function CharactersPage() {
         otherFeatures: character.description.otherFeatures || '',
         imageUrl: character.referenceImage.url,
         imageFileName: character.referenceImage.fileName,
+        animatedPreviewUrl: character.animatedPreviewUrl || '',
+        characterType: '', // Will be parsed from otherFeatures if needed
       });
+      // Restore preview if character has an animated preview URL
+      if (character.animatedPreviewUrl) {
+        // Show the saved preview in the appropriate style slot
+        // Since we don't store which style was selected, show it in both for now
+        setPreviewOptions({
+          pixar: character.animatedPreviewUrl,
+          classic: character.animatedPreviewUrl,
+        });
+        setSelectedStyle('pixar'); // Default to showing as selected
+      } else {
+        setPreviewOptions({ pixar: null, classic: null });
+        setSelectedStyle(null);
+      }
     } else {
       setEditingCharacter(null);
+      setCharacterMode('photo');
       setFormData({
         name: '',
         hairColor: '',
@@ -169,8 +201,13 @@ export default function CharactersPage() {
         otherFeatures: '',
         imageUrl: '',
         imageFileName: '',
+        animatedPreviewUrl: '',
+        characterType: '',
       });
+      setPreviewOptions({ pixar: null, classic: null });
+      setSelectedStyle(null);
     }
+    setPreviewError(null);
     setShowNewCharacterForm(true);
   };
 
@@ -178,6 +215,11 @@ export default function CharactersPage() {
     setShowNewCharacterForm(false);
     setEditingCharacter(null);
     setUploadingImage(false);
+    setGeneratingPreview(false);
+    setPreviewError(null);
+    setPreviewOptions({ pixar: null, classic: null });
+    setSelectedStyle(null);
+    setCharacterMode('photo');
     setFormData({
       name: '',
       hairColor: '',
@@ -187,10 +229,146 @@ export default function CharactersPage() {
       otherFeatures: '',
       imageUrl: '',
       imageFileName: '',
+      animatedPreviewUrl: '',
+      characterType: '',
     });
   };
 
+  // Generate animated preview (both styles in parallel)
+  const handleGeneratePreview = async () => {
+    // Validate based on mode
+    if (characterMode === 'photo') {
+      if (!formData.imageUrl || !formData.name) {
+        setPreviewError('Name and reference image are required');
+        return;
+      }
+    } else {
+      if (!formData.name || !formData.characterType) {
+        setPreviewError('Name and character type are required');
+        return;
+      }
+    }
+
+    setGeneratingPreview(true);
+    setPreviewError(null);
+    setPreviewOptions({ pixar: null, classic: null });
+    setSelectedStyle(null);
+
+    try {
+      // Build request based on mode
+      const requestBody = characterMode === 'photo'
+        ? {
+            name: formData.name,
+            referenceImageUrl: formData.imageUrl,
+            description: {
+              hairColor: formData.hairColor,
+              skinTone: formData.skinTone,
+              clothing: formData.clothing,
+              age: formData.age,
+              otherFeatures: formData.otherFeatures,
+            },
+          }
+        : {
+            name: formData.name,
+            characterType: formData.characterType,
+            description: {
+              hairColor: formData.hairColor,
+              age: formData.age,
+              otherFeatures: formData.otherFeatures,
+            },
+          };
+
+      const response = await fetch('/api/generate-character-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate preview');
+      }
+
+      const data = await response.json();
+      // API now returns { success, previews: { pixar, classic }, preview (backward compat) }
+      if (data.previews) {
+        setPreviewOptions({
+          pixar: data.previews.pixar?.imageUrl || null,
+          classic: data.previews.classic?.imageUrl || null,
+        });
+        // Auto-select first available style
+        if (data.previews.pixar?.imageUrl) {
+          setSelectedStyle('pixar');
+          setFormData((prev) => ({ ...prev, animatedPreviewUrl: data.previews.pixar.imageUrl }));
+        } else if (data.previews.classic?.imageUrl) {
+          setSelectedStyle('classic');
+          setFormData((prev) => ({ ...prev, animatedPreviewUrl: data.previews.classic.imageUrl }));
+        }
+      } else {
+        // Backward compatibility - single preview
+        const imageUrl = data.preview?.imageUrl || data.imageUrl;
+        setFormData((prev) => ({ ...prev, animatedPreviewUrl: imageUrl }));
+      }
+    } catch (err: any) {
+      console.error('Preview generation error:', err);
+      setPreviewError(err.message || 'Failed to generate preview');
+    } finally {
+      setGeneratingPreview(false);
+    }
+  };
+
+  // Handle style selection
+  const handleSelectStyle = (style: 'pixar' | 'classic') => {
+    const imageUrl = style === 'pixar' ? previewOptions.pixar : previewOptions.classic;
+    if (imageUrl) {
+      setSelectedStyle(style);
+      setFormData((prev) => ({ ...prev, animatedPreviewUrl: imageUrl }));
+    }
+  };
+
+  // Upload animated preview to Supabase storage
+  const uploadPreviewToStorage = async (dataUrl: string, userId: string): Promise<string> => {
+    const supabase = createClient();
+
+    // Convert data URL to blob
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+
+    // Create file path
+    const fileName = `${userId}/animated-preview-${Date.now()}.png`;
+
+    // Upload to Supabase storage
+    const { error: uploadError } = await supabase.storage
+      .from('character-images')
+      .upload(fileName, blob, {
+        contentType: 'image/png',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      throw new Error(`Failed to upload preview: ${uploadError.message}`);
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('character-images')
+      .getPublicUrl(fileName);
+
+    return urlData.publicUrl;
+  };
+
   const handleImageUpload = async (file: File) => {
+    // Client-side validation for supported formats
+    const supportedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    const fileName = file.name.toLowerCase();
+    const unsupportedExtensions = ['.avif', '.heic', '.heif', '.bmp', '.tiff', '.tif', '.svg'];
+    const hasUnsupportedExt = unsupportedExtensions.some(ext => fileName.endsWith(ext));
+
+    if (!supportedTypes.includes(file.type) || hasUnsupportedExt) {
+      alert('Unsupported image format. Please use PNG, JPG, GIF, or WebP images.\n\nAVIF and HEIC formats are not supported by AI image processing.');
+      return;
+    }
+
     setUploadingImage(true);
     try {
       const formDataUpload = new FormData();
@@ -267,6 +445,12 @@ export default function CharactersPage() {
       return;
     }
 
+    // Validation for description-only mode
+    if (characterMode === 'description' && !formData.characterType.trim()) {
+      alert('Please enter a character type (e.g., baby eagle, friendly dragon)');
+      return;
+    }
+
     if (!user?.id) {
       alert('User not found');
       return;
@@ -280,16 +464,28 @@ export default function CharactersPage() {
 
       const supabase = createClient();
 
+      // Upload animated preview if it's a data URL
+      let finalPreviewUrl = formData.animatedPreviewUrl || null;
+      if (formData.animatedPreviewUrl && formData.animatedPreviewUrl.startsWith('data:')) {
+        finalPreviewUrl = await uploadPreviewToStorage(formData.animatedPreviewUrl, user.id);
+      }
+
+      // For description-only mode, store character type in other_features
+      const otherFeatures = characterMode === 'description'
+        ? `${formData.characterType}${formData.otherFeatures ? ` - ${formData.otherFeatures}` : ''}`
+        : formData.otherFeatures || null;
+
       const characterData = {
         user_id: user.id,
         name: formData.name.trim(),
-        reference_image_url: formData.imageUrl || null,
-        reference_image_filename: formData.imageFileName || null,
+        reference_image_url: characterMode === 'photo' ? (formData.imageUrl || null) : null,
+        reference_image_filename: characterMode === 'photo' ? (formData.imageFileName || null) : null,
+        animated_preview_url: finalPreviewUrl,
         hair_color: formData.hairColor || null,
-        skin_tone: formData.skinTone || null,
-        clothing: formData.clothing || null,
+        skin_tone: characterMode === 'photo' ? (formData.skinTone || null) : null,
+        clothing: characterMode === 'photo' ? (formData.clothing || null) : null,
         age: formData.age || null,
-        other_features: formData.otherFeatures || null,
+        other_features: otherFeatures,
       };
 
       console.log('Saving character data:', characterData);
@@ -415,6 +611,76 @@ export default function CharactersPage() {
               </div>
 
               <div className="space-y-4">
+                {/* Character Mode Selection - Horizontal with radio circles on left */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    How do you want to create this character?
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* From Photo Option */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCharacterMode('photo');
+                        setPreviewOptions({ pixar: null, classic: null });
+                        setSelectedStyle(null);
+                        setFormData((prev) => ({ ...prev, animatedPreviewUrl: '', characterType: '' }));
+                      }}
+                      className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all text-left ${
+                        characterMode === 'photo'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {/* Radio circle on left */}
+                      <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        characterMode === 'photo'
+                          ? 'border-blue-500 bg-blue-500'
+                          : 'border-gray-300 bg-white'
+                      }`}>
+                        {characterMode === 'photo' && (
+                          <div className="w-2 h-2 rounded-full bg-white"></div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-900 text-sm">From Photo</div>
+                        <div className="text-xs text-gray-500">Upload reference image</div>
+                      </div>
+                    </button>
+
+                    {/* From Description Option */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCharacterMode('description');
+                        setPreviewOptions({ pixar: null, classic: null });
+                        setSelectedStyle(null);
+                        setFormData((prev) => ({ ...prev, animatedPreviewUrl: '', imageUrl: '', imageFileName: '' }));
+                      }}
+                      className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all text-left ${
+                        characterMode === 'description'
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-gray-200 hover:border-purple-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {/* Radio circle on left */}
+                      <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        characterMode === 'description'
+                          ? 'border-purple-500 bg-purple-500'
+                          : 'border-gray-300 bg-white'
+                      }`}>
+                        {characterMode === 'description' && (
+                          <div className="w-2 h-2 rounded-full bg-white"></div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-900 text-sm">From Description</div>
+                        <div className="text-xs text-gray-500">Animals, fantasy, no photo</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Character Name */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -424,32 +690,65 @@ export default function CharactersPage() {
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., Connor, Emma, Max"
+                    placeholder={characterMode === 'photo' ? 'e.g., Connor, Emma, Max' : 'e.g., Eddie the Eagle, Sparkle Dragon'}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   />
                 </div>
 
-                {/* Image Upload */}
+                {/* Character Type (Description mode only) */}
+                {characterMode === 'description' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Character Type *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.characterType}
+                      onChange={(e) => setFormData({ ...formData, characterType: e.target.value })}
+                      placeholder="e.g., baby eagle, friendly dragon, talking cat"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Describe what kind of character this is (species, type, etc.)
+                    </p>
+                  </div>
+                )}
+
+                {/* Image Upload (Photo mode only) */}
+                {characterMode === 'photo' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Reference Image (optional)
                   </label>
 
                   {formData.imageUrl ? (
-                    <div className="relative">
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                       <img
                         src={formData.imageUrl}
                         alt="Character preview"
-                        className="w-full h-48 object-cover rounded-lg border-2 border-gray-300"
+                        className="w-12 h-12 object-cover rounded-lg border border-gray-300 flex-shrink-0"
                       />
+                      <div className="flex-1 min-w-0">
+                        <a
+                          href={formData.imageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline truncate block"
+                        >
+                          {formData.imageFileName || 'View image'}
+                        </a>
+                        <p className="text-xs text-gray-400">Click to view full image</p>
+                      </div>
                       <button
                         type="button"
                         onClick={() => setFormData({ ...formData, imageUrl: '', imageFileName: '' })}
-                        className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 shadow-lg"
+                        className="text-red-500 hover:text-red-700 p-1"
+                        title="Remove image"
                       >
-                        ✕
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       </button>
-                      <p className="text-xs text-gray-600 mt-1">{formData.imageFileName}</p>
                     </div>
                   ) : (
                     <div
@@ -474,7 +773,7 @@ export default function CharactersPage() {
                       <input
                         id="image-upload-input"
                         type="file"
-                        accept="image/*"
+                        accept="image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp"
                         className="hidden"
                         onChange={(e) => {
                           const files = e.target.files;
@@ -492,80 +791,277 @@ export default function CharactersPage() {
                         <div>
                           <div className="text-4xl mb-2">📷</div>
                           <p className="text-sm text-gray-600 mb-1">Click to upload or drag and drop</p>
-                          <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                          <p className="text-xs text-gray-500">PNG, JPG, GIF, WebP up to 10MB</p>
+                          <p className="text-xs text-gray-400">(AVIF/HEIC not supported)</p>
                         </div>
                       )}
                     </div>
                   )}
                 </div>
+                )}
 
-                {/* Character Description Fields */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Character Description Fields - Different layout for each mode */}
+                {characterMode === 'photo' ? (
+                  /* Photo mode: Full description fields */
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Hair Color</label>
+                      <input
+                        type="text"
+                        value={formData.hairColor}
+                        onChange={(e) => setFormData({ ...formData, hairColor: e.target.value })}
+                        placeholder="brown, blonde..."
+                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Age</label>
+                      <input
+                        type="text"
+                        value={formData.age}
+                        onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                        placeholder="8 years old..."
+                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Skin Tone</label>
+                      <input
+                        type="text"
+                        value={formData.skinTone}
+                        onChange={(e) => setFormData({ ...formData, skinTone: e.target.value })}
+                        placeholder="light, tan, dark..."
+                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Clothing</label>
+                      <input
+                        type="text"
+                        value={formData.clothing}
+                        onChange={(e) => setFormData({ ...formData, clothing: e.target.value })}
+                        placeholder="blue shirt..."
+                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Other Features</label>
+                      <input
+                        type="text"
+                        value={formData.otherFeatures}
+                        onChange={(e) => setFormData({ ...formData, otherFeatures: e.target.value })}
+                        placeholder="glasses, freckles, curly hair..."
+                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* Description mode: Simplified fields */
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Hair Color
-                    </label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Additional Details (optional)</label>
                     <input
                       type="text"
-                      value={formData.hairColor}
-                      onChange={(e) => setFormData({ ...formData, hairColor: e.target.value })}
-                      placeholder="e.g., brown, blonde"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      value={formData.otherFeatures}
+                      onChange={(e) => setFormData({ ...formData, otherFeatures: e.target.value })}
+                      placeholder="fluffy golden feathers, big curious eyes, wearing a tiny red scarf..."
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
                     />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Add any specific features, colors, or accessories
+                    </p>
                   </div>
+                )}
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Age
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.age}
-                      onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                      placeholder="e.g., 8 years old"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    />
+                {/* Character Preview Section - Now supports both modes */}
+                {(characterMode === 'photo' ? formData.imageUrl : formData.characterType) && (
+                  <div className="border-t border-gray-200 pt-4 mt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-semibold text-gray-900">Character Preview</h3>
+                    </div>
+                    <p className="text-sm text-gray-500 mb-4">
+                      {formData.animatedPreviewUrl && previewOptions.pixar === previewOptions.classic
+                        ? 'Compare your reference photo with the saved animated preview.'
+                        : 'Generate preview styles to see how your character will appear in stories.'}
+                    </p>
+
+                    {/* Generating state */}
+                    {generatingPreview ? (
+                      <div className="bg-gray-50 rounded-lg p-8 text-center">
+                        <div className="w-10 h-10 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-3"></div>
+                        <p className="text-purple-600 font-medium">Generating 2 style options...</p>
+                        <p className="text-xs text-gray-400 mt-1">This takes 15-30 seconds</p>
+                      </div>
+                    ) : formData.animatedPreviewUrl && previewOptions.pixar === previewOptions.classic ? (
+                      /* Editing existing character - show Reference vs Saved Animated side by side */
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Reference Photo */}
+                        <div className="text-center">
+                          <p className="text-sm font-medium text-gray-700 mb-2">Reference Photo</p>
+                          <div className="bg-gray-50 rounded-xl overflow-hidden aspect-square border border-gray-200">
+                            <img
+                              src={formData.imageUrl}
+                              alt="Reference"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Saved Animated Preview */}
+                        <div className="text-center">
+                          <p className="text-sm font-medium text-gray-700 mb-2">Animated Preview</p>
+                          <div className="bg-purple-50 rounded-xl overflow-hidden aspect-square border-2 border-purple-300">
+                            <img
+                              src={formData.animatedPreviewUrl}
+                              alt="Animated Preview"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (previewOptions.pixar || previewOptions.classic) && previewOptions.pixar !== previewOptions.classic ? (
+                      /* Freshly generated - show both style options for selection */
+                      <div className="space-y-4">
+                        <p className="text-sm font-medium text-gray-700">Choose your preferred style:</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* 3D Pixar Option */}
+                          <div
+                            className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
+                              selectedStyle === 'pixar'
+                                ? 'border-purple-500 ring-2 ring-purple-200'
+                                : 'border-gray-200 hover:border-purple-300'
+                            } ${!previewOptions.pixar ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            onClick={() => previewOptions.pixar && handleSelectStyle('pixar')}
+                          >
+                            <div className="aspect-square bg-gray-50">
+                              {previewOptions.pixar ? (
+                                <img
+                                  src={previewOptions.pixar}
+                                  alt="3D Pixar Style"
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex items-center justify-center h-full text-gray-400">
+                                  <span className="text-sm">Failed to generate</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="p-2 bg-white border-t">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-sm text-gray-900">3D Pixar</span>
+                                {selectedStyle === 'pixar' && (
+                                  <span className="text-purple-600 text-xs">✓ Selected</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500">Disney/Pixar CGI style</p>
+                            </div>
+                            {selectedStyle === 'pixar' && (
+                              <div className="absolute top-2 right-2 bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                                ✓
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Classic Storybook Option */}
+                          <div
+                            className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
+                              selectedStyle === 'classic'
+                                ? 'border-amber-500 ring-2 ring-amber-200'
+                                : 'border-gray-200 hover:border-amber-300'
+                            } ${!previewOptions.classic ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            onClick={() => previewOptions.classic && handleSelectStyle('classic')}
+                          >
+                            <div className="aspect-square bg-gray-50">
+                              {previewOptions.classic ? (
+                                <img
+                                  src={previewOptions.classic}
+                                  alt="Classic Storybook Style"
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex items-center justify-center h-full text-gray-400">
+                                  <span className="text-sm">Failed to generate</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="p-2 bg-white border-t">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-sm text-gray-900">Classic Storybook</span>
+                                {selectedStyle === 'classic' && (
+                                  <span className="text-amber-600 text-xs">✓ Selected</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500">Warm 2D illustration</p>
+                            </div>
+                            {selectedStyle === 'classic' && (
+                              <div className="absolute top-2 right-2 bg-amber-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                                ✓
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Initial state - no previews yet, show reference or description placeholder */
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Reference Photo or Character Type */}
+                        <div className="text-center">
+                          <p className="text-sm font-medium text-gray-700 mb-2">
+                            {characterMode === 'photo' ? 'Reference Photo' : 'Character Type'}
+                          </p>
+                          {characterMode === 'photo' ? (
+                            <div className="bg-gray-50 rounded-xl overflow-hidden aspect-square border border-gray-200">
+                              <img
+                                src={formData.imageUrl}
+                                alt="Reference"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl aspect-square flex items-center justify-center border border-blue-200">
+                              <div className="text-center p-4">
+                                <div className="text-4xl mb-2">🦅</div>
+                                <p className="text-sm font-medium text-gray-700">{formData.characterType || 'Enter type above'}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Animated Preview placeholder */}
+                        <div className="text-center">
+                          <p className="text-sm font-medium text-gray-700 mb-2">Animated Preview</p>
+                          <div className="bg-gradient-to-br from-purple-50 to-amber-50 rounded-xl aspect-square flex items-center justify-center border-2 border-dashed border-purple-200">
+                            <div className="text-center text-gray-400">
+                              <div className="text-3xl mb-2">✨</div>
+                              <p className="text-xs">Click button below</p>
+                              <p className="text-xs">to generate</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Generate Button */}
+                    <button
+                      type="button"
+                      onClick={handleGeneratePreview}
+                      disabled={generatingPreview || !formData.name || (characterMode === 'photo' ? !formData.imageUrl : !formData.characterType)}
+                      className="mt-4 px-6 py-2 bg-gradient-to-r from-purple-600 to-amber-500 text-white rounded-lg hover:from-purple-700 hover:to-amber-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all"
+                    >
+                      {generatingPreview
+                        ? 'Generating 2 Styles...'
+                        : (previewOptions.pixar || previewOptions.classic)
+                          ? 'Regenerate Styles'
+                          : 'Generate Preview Styles'}
+                    </button>
+
+                    {/* Preview Error */}
+                    {previewError && (
+                      <div className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                        {previewError}
+                      </div>
+                    )}
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Skin Tone
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.skinTone}
-                    onChange={(e) => setFormData({ ...formData, skinTone: e.target.value })}
-                    placeholder="e.g., light, tan, dark"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Clothing
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.clothing}
-                    onChange={(e) => setFormData({ ...formData, clothing: e.target.value })}
-                    placeholder="e.g., blue shirt, red jacket"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Other Features
-                  </label>
-                  <textarea
-                    value={formData.otherFeatures}
-                    onChange={(e) => setFormData({ ...formData, otherFeatures: e.target.value })}
-                    placeholder="e.g., glasses, freckles, curly hair"
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  />
-                </div>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -611,42 +1107,31 @@ export default function CharactersPage() {
                 key={character.id}
                 className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all transform hover:-translate-y-1"
               >
-                {/* Character Image */}
-                {character.referenceImage.url ? (
-                  <div className="relative h-48 bg-gradient-to-br from-blue-100 to-purple-100">
+                {/* Character Image - show animated preview if available */}
+                {character.referenceImage.url || character.animatedPreviewUrl ? (
+                  <div className="relative h-56 bg-gradient-to-br from-blue-100 to-purple-100">
                     <img
-                      src={character.referenceImage.url}
+                      src={character.animatedPreviewUrl || character.referenceImage.url}
                       alt={character.name}
                       className="w-full h-full object-cover"
                     />
+                    {character.animatedPreviewUrl && (
+                      <div className="absolute top-2 left-2 bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full">
+                        Preview
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="h-48 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
+                  <div className="h-56 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
                     <div className="text-6xl">👤</div>
                   </div>
                 )}
 
                 {/* Character Info */}
-                <div className="p-4">
-                  <h3 className="text-lg font-bold text-gray-900 mb-1">
+                <div className="p-3">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">
                     {character.name}
                   </h3>
-
-                  {/* Character Details */}
-                  <div className="text-sm text-gray-600 space-y-1 mb-4">
-                    {character.description.hairColor && (
-                      <p>Hair: {character.description.hairColor}</p>
-                    )}
-                    {character.description.age && (
-                      <p>Age: {character.description.age}</p>
-                    )}
-                    {character.description.skinTone && (
-                      <p>Skin: {character.description.skinTone}</p>
-                    )}
-                    {character.description.clothing && (
-                      <p className="text-xs">Clothing: {character.description.clothing}</p>
-                    )}
-                  </div>
 
                   {/* Actions */}
                   <div className="flex gap-2">

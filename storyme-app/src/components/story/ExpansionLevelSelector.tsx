@@ -11,12 +11,14 @@ interface ExpansionLevelSelectorProps {
   value: ExpansionLevel;
   readingLevel: number;
   onChange: (level: ExpansionLevel) => void;
+  disabled?: boolean;
 }
 
 export default function ExpansionLevelSelector({
   value,
   readingLevel,
   onChange,
+  disabled = false,
 }: ExpansionLevelSelectorProps) {
   const getExpectedSceneCount = (level: ExpansionLevel): string => {
     if (level === 'minimal') return 'Same as your script';
@@ -31,118 +33,129 @@ export default function ExpansionLevelSelector({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <label className="block text-sm font-semibold text-gray-700">
-        ✨ AI Story Enhancement
+        AI Story Enhancement
       </label>
 
-      <div className="space-y-3">
+      {/* Horizontal 3-card layout */}
+      <div className="grid grid-cols-3 gap-3">
         {/* Minimal (Default) */}
-        <label className="flex items-start p-4 border-2 rounded-xl cursor-pointer transition-all hover:border-blue-300 hover:bg-blue-50/50 relative">
-          <input
-            type="radio"
-            name="expansionLevel"
-            value="minimal"
-            checked={value === 'minimal'}
-            onChange={(e) => onChange(e.target.value as ExpansionLevel)}
-            className="mt-1 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-          />
-          <div className="ml-3 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-gray-900">
-                Minimal - Keep My Story
-              </span>
-              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                Default
-              </span>
+        <button
+          type="button"
+          onClick={() => !disabled && onChange('minimal')}
+          disabled={disabled}
+          className={`relative flex flex-col p-3 border-2 rounded-xl cursor-pointer transition-all text-left ${
+            value === 'minimal'
+              ? 'border-blue-500 bg-blue-50'
+              : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/30'
+          } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          <div className="flex items-start gap-2.5 mb-2">
+            {/* Custom radio circle */}
+            <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+              value === 'minimal'
+                ? 'border-blue-500 bg-blue-500'
+                : 'border-gray-300 bg-white'
+            }`}>
+              {value === 'minimal' && (
+                <div className="w-2 h-2 rounded-full bg-white"></div>
+              )}
             </div>
-            <p className="text-sm text-gray-600 mt-1">
-              AI only improves captions for clarity and age-appropriateness. Your story structure stays exactly the same.
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Expected: {getExpectedSceneCount('minimal')}
-            </p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-semibold text-gray-900 text-sm">Minimal</span>
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium whitespace-nowrap">
+                  Default
+                </span>
+              </div>
+            </div>
           </div>
-          {value === 'minimal' && (
-            <div className="absolute -right-1 -top-1 bg-blue-600 text-white rounded-full p-1">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            </div>
-          )}
-        </label>
+          <p className="text-sm text-gray-600 leading-snug mb-1.5 pl-7">
+            AI only improves captions for clarity. Your story stays the same.
+          </p>
+          <p className="text-sm text-gray-400 mt-auto pl-7">
+            {getExpectedSceneCount('minimal')}
+          </p>
+        </button>
 
         {/* Smart Expansion */}
-        <label className="flex items-start p-4 border-2 rounded-xl cursor-pointer transition-all hover:border-purple-300 hover:bg-purple-50/50 relative">
-          <input
-            type="radio"
-            name="expansionLevel"
-            value="smart"
-            checked={value === 'smart'}
-            onChange={(e) => onChange(e.target.value as ExpansionLevel)}
-            className="mt-1 h-4 w-4 text-purple-600 border-gray-300 focus:ring-purple-500"
-          />
-          <div className="ml-3 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-gray-900">
-                Smart - Let AI Expand
-              </span>
-              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
-                Recommended
-              </span>
+        <button
+          type="button"
+          onClick={() => !disabled && onChange('smart')}
+          disabled={disabled}
+          className={`relative flex flex-col p-3 border-2 rounded-xl cursor-pointer transition-all text-left ${
+            value === 'smart'
+              ? 'border-purple-500 bg-purple-50'
+              : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50/30'
+          } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          <div className="flex items-start gap-2.5 mb-2">
+            {/* Custom radio circle */}
+            <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+              value === 'smart'
+                ? 'border-purple-500 bg-purple-500'
+                : 'border-gray-300 bg-white'
+            }`}>
+              {value === 'smart' && (
+                <div className="w-2 h-2 rounded-full bg-white"></div>
+              )}
             </div>
-            <p className="text-sm text-gray-600 mt-1">
-              AI expands your story with more scenes, transitions, and details based on reading level {readingLevel}.
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Expected: {getExpectedSceneCount('smart')}
-            </p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-semibold text-gray-900 text-sm">Smart</span>
+                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium whitespace-nowrap">
+                  Recommended
+                </span>
+              </div>
+            </div>
           </div>
-          {value === 'smart' && (
-            <div className="absolute -right-1 -top-1 bg-purple-600 text-white rounded-full p-1">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            </div>
-          )}
-        </label>
+          <p className="text-sm text-gray-600 leading-snug mb-1.5 pl-7">
+            AI expands with more scenes and transitions for age {readingLevel}.
+          </p>
+          <p className="text-sm text-gray-400 mt-auto pl-7">
+            {getExpectedSceneCount('smart')}
+          </p>
+        </button>
 
         {/* Rich Expansion */}
-        <label className="flex items-start p-4 border-2 rounded-xl cursor-pointer transition-all hover:border-orange-300 hover:bg-orange-50/50 relative">
-          <input
-            type="radio"
-            name="expansionLevel"
-            value="rich"
-            checked={value === 'rich'}
-            onChange={(e) => onChange(e.target.value as ExpansionLevel)}
-            className="mt-1 h-4 w-4 text-orange-600 border-gray-300 focus:ring-orange-500"
-          />
-          <div className="ml-3 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-gray-900">
-                Rich - Full Creative Expansion
-              </span>
+        <button
+          type="button"
+          onClick={() => !disabled && onChange('rich')}
+          disabled={disabled}
+          className={`relative flex flex-col p-3 border-2 rounded-xl cursor-pointer transition-all text-left ${
+            value === 'rich'
+              ? 'border-orange-500 bg-orange-50'
+              : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50/30'
+          } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          <div className="flex items-start gap-2.5 mb-2">
+            {/* Custom radio circle */}
+            <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+              value === 'rich'
+                ? 'border-orange-500 bg-orange-500'
+                : 'border-gray-300 bg-white'
+            }`}>
+              {value === 'rich' && (
+                <div className="w-2 h-2 rounded-full bg-white"></div>
+              )}
             </div>
-            <p className="text-sm text-gray-600 mt-1">
-              AI creates a fully developed narrative with dialogue, character development, and rich storytelling.
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Expected: {getExpectedSceneCount('rich')}
-            </p>
+            <div className="flex-1 min-w-0">
+              <span className="font-semibold text-gray-900 text-sm">Rich</span>
+            </div>
           </div>
-          {value === 'rich' && (
-            <div className="absolute -right-1 -top-1 bg-orange-600 text-white rounded-full p-1">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            </div>
-          )}
-        </label>
+          <p className="text-sm text-gray-600 leading-snug mb-1.5 pl-7">
+            Full narrative with dialogue and character development.
+          </p>
+          <p className="text-sm text-gray-400 mt-auto pl-7">
+            {getExpectedSceneCount('rich')}
+          </p>
+        </button>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <p className="text-xs text-blue-800">
-          <strong>💡 Tip:</strong> Start with "Minimal" to see how AI enhances your captions. You can always regenerate with more expansion later!
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+        <p className="text-sm text-blue-800">
+          <strong>Tip:</strong> Start with "Minimal" to see how AI enhances your captions. You can always regenerate with more expansion later!
         </p>
       </div>
     </div>

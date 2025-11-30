@@ -205,11 +205,17 @@ export class ProjectService {
   }
 
   /**
-   * Get all projects for a user
+   * Get all projects for a user (with optional pagination)
    */
-  async getUserProjects(userId: string): Promise<ProjectWithScenesDTO[]> {
-    const projects = await this.projectRepo.findByUserIdWithScenes(userId);
-    return projects.map(projectWithScenesToDTO);
+  async getUserProjects(
+    userId: string,
+    options?: { limit?: number; offset?: number }
+  ): Promise<{ projects: ProjectWithScenesDTO[]; total: number }> {
+    const result = await this.projectRepo.findByUserIdWithScenes(userId, options);
+    return {
+      projects: result.projects.map(projectWithScenesToDTO),
+      total: result.total,
+    };
   }
 
   /**

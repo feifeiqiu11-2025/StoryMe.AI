@@ -9,6 +9,9 @@
 import React, { useState } from 'react';
 import { EnhancedScene } from '@/lib/types/story';
 
+// Art style type
+type ArtStyleType = 'pixar' | 'classic';
+
 interface ScenePreviewApprovalProps {
   enhancedScenes: EnhancedScene[];
   originalSceneCount: number;
@@ -17,6 +20,7 @@ interface ScenePreviewApprovalProps {
   onBack: () => void;
   onCaptionEdit?: (sceneNumber: number, newCaption: string) => void;
   onCaptionChineseEdit?: (sceneNumber: number, newCaptionChinese: string) => void;  // NEW
+  onImagePromptEdit?: (sceneNumber: number, newPrompt: string) => void;  // NEW: For image prompt editing
   onScenesUpdate?: (updatedScenes: EnhancedScene[]) => void;
   isGenerating: boolean;
   // Settings for new scene enhancement
@@ -25,6 +29,11 @@ interface ScenePreviewApprovalProps {
   expansionLevel?: string;
   contentLanguage?: 'en' | 'zh';
   generateChineseTranslation?: boolean;  // NEW: For bilingual stories
+  // Art style and image provider settings
+  artStyle?: ArtStyleType;
+  onArtStyleChange?: (style: ArtStyleType) => void;
+  imageProvider?: 'flux' | 'gemini';
+  onImageProviderChange?: (provider: 'flux' | 'gemini') => void;
 }
 
 export default function ScenePreviewApproval({
@@ -35,6 +44,7 @@ export default function ScenePreviewApproval({
   onBack,
   onCaptionEdit,
   onCaptionChineseEdit,
+  onImagePromptEdit,
   onScenesUpdate,
   isGenerating,
   readingLevel = 5,
@@ -42,6 +52,10 @@ export default function ScenePreviewApproval({
   expansionLevel = 'minimal',
   contentLanguage = 'en',
   generateChineseTranslation = false,
+  artStyle = 'classic',
+  onArtStyleChange,
+  imageProvider = 'gemini',
+  onImageProviderChange,
 }: ScenePreviewApprovalProps) {
   // Add Scene Modal State
   const [showAddSceneModal, setShowAddSceneModal] = useState(false);
@@ -416,14 +430,35 @@ export default function ScenePreviewApproval({
                     </div>
                   )}
 
-                  {/* Image Prompt Preview */}
+                  {/* Image Prompt Preview - Editable */}
                   <details className="mt-2">
                     <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
-                      View image generation prompt
+                      View/Edit image generation prompt
                     </summary>
-                    <p className="text-xs text-gray-600 mt-1 p-2 bg-gray-50 rounded">
-                      {scene.enhanced_prompt}
-                    </p>
+                    {onImagePromptEdit ? (
+                      <textarea
+                        value={scene.enhanced_prompt}
+                        onChange={(e) => {
+                          onImagePromptEdit(scene.sceneNumber, e.target.value);
+                          // Auto-resize textarea based on content
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                        onFocus={(e) => {
+                          // Set initial height on focus
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                        disabled={isGenerating}
+                        className="w-full text-xs text-gray-600 mt-1 p-2 bg-gray-50 rounded border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed overflow-hidden"
+                        rows={3}
+                        style={{ minHeight: '3rem' }}
+                      />
+                    ) : (
+                      <p className="text-xs text-gray-600 mt-1 p-2 bg-gray-50 rounded">
+                        {scene.enhanced_prompt}
+                      </p>
+                    )}
                   </details>
                 </div>
               </div>
@@ -471,41 +506,141 @@ export default function ScenePreviewApproval({
           </div>
         )}
 
+        {/* Re-enhance All Scenes Section - Moved to right after scene review */}
+        {onScenesUpdate && (
+          <div className="mt-6 bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 text-2xl">✨</div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-gray-900 mb-1">
+                  Made changes to your scenes?
+                </h4>
+                <p className="text-sm text-gray-600 mb-3">
+                  Re-enhance all scenes to update captions and image prompts based on your edits. Scene count stays the same.
+                </p>
+                <button
+                  onClick={handleReEnhanceAll}
+                  disabled={isReEnhancing || isGenerating}
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2.5 rounded-lg hover:from-purple-700 hover:to-blue-700 font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isReEnhancing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Re-enhancing {enhancedScenes.length} scenes...
+                    </>
+                  ) : (
+                    <>
+                      <span>🔄</span>
+                      Re-enhance All {enhancedScenes.length} Scenes
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="mt-8 bg-white rounded-2xl shadow-xl p-6">
-          {/* Re-enhance All Scenes Section */}
-          {onScenesUpdate && (
-            <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-xl p-4 mb-6">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 text-2xl">✨</div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900 mb-1">
-                    Made changes to your scenes?
-                  </h4>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Re-enhance all scenes to update captions and image prompts based on your edits. Scene count stays the same.
-                  </p>
-                  <button
-                    onClick={handleReEnhanceAll}
-                    disabled={isReEnhancing || isGenerating}
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2.5 rounded-lg hover:from-purple-700 hover:to-blue-700 font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {isReEnhancing ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Re-enhancing {enhancedScenes.length} scenes...
-                      </>
-                    ) : (
-                      <>
-                        <span>🔄</span>
-                        Re-enhance All {enhancedScenes.length} Scenes
-                      </>
+          {/* Art Style Selection - Custom Radio Buttons */}
+          {onArtStyleChange && (
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-gray-900 mb-3">Art Style</h4>
+              <div className="flex gap-4">
+                {/* 3D Pixar Option */}
+                <button
+                  type="button"
+                  onClick={() => !isGenerating && onArtStyleChange('pixar')}
+                  disabled={isGenerating}
+                  className={`flex-1 flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all text-left ${
+                    artStyle === 'pixar'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
+                  } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {/* Custom radio circle */}
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    artStyle === 'pixar'
+                      ? 'border-blue-500 bg-blue-500'
+                      : 'border-gray-300 bg-white'
+                  }`}>
+                    {artStyle === 'pixar' && (
+                      <div className="w-2 h-2 rounded-full bg-white"></div>
                     )}
-                  </button>
-                </div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-900 text-sm">3D Pixar Style</div>
+                    <p className="text-sm text-gray-500">Modern 3D animation look</p>
+                  </div>
+                </button>
+
+                {/* Classic 2D Option */}
+                <button
+                  type="button"
+                  onClick={() => !isGenerating && onArtStyleChange('classic')}
+                  disabled={isGenerating}
+                  className={`flex-1 flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all text-left ${
+                    artStyle === 'classic'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
+                  } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {/* Custom radio circle */}
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    artStyle === 'classic'
+                      ? 'border-blue-500 bg-blue-500'
+                      : 'border-gray-300 bg-white'
+                  }`}>
+                    {artStyle === 'classic' && (
+                      <div className="w-2 h-2 rounded-full bg-white"></div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-900 text-sm">Classic Storybook 2D</div>
+                    <p className="text-sm text-gray-500">Traditional watercolor illustration</p>
+                  </div>
+                </button>
               </div>
             </div>
           )}
+
+          {/* Image Generation Engine Toggle - Hidden for now */}
+          {/* {onImageProviderChange && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900">Image Generation Engine</h4>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {imageProvider === 'gemini'
+                      ? 'Gemini: Uses your uploaded photos for better character consistency'
+                      : 'FLUX: Fast generation with text-based character descriptions'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-medium ${imageProvider === 'flux' ? 'text-purple-600' : 'text-gray-400'}`}>
+                    FLUX
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onImageProviderChange(imageProvider === 'gemini' ? 'flux' : 'gemini')}
+                    disabled={isGenerating}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 ${
+                      imageProvider === 'gemini' ? 'bg-purple-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        imageProvider === 'gemini' ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                  <span className={`text-xs font-medium ${imageProvider === 'gemini' ? 'text-purple-600' : 'text-gray-400'}`}>
+                    Gemini
+                  </span>
+                </div>
+              </div>
+            </div>
+          )} */}
 
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
             <button

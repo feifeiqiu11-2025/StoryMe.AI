@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
+import { generateImageWithGemini, generateImageWithGeminiClassic, GeminiCharacterInfo, isGeminiAvailable } from '@/lib/gemini-image-client';
 import { Character } from '@/lib/types/story';
 import { createClient } from '@/lib/supabase/server';
 
@@ -8,7 +8,11 @@ export const maxDuration = 300; // 5 minutes timeout for Vercel
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, description, author, age, language = 'en', characters } = body;
+    const { title, description, author, age, language = 'en', characters, illustrationStyle } = body;
+
+    // Determine illustration style (default to 'classic' for 2D storybook)
+    const selectedStyle = illustrationStyle || 'classic';
+    const is3DStyle = selectedStyle === 'pixar';
 
     // Validate inputs
     if (!title) {
@@ -22,6 +26,7 @@ export async function POST(request: NextRequest) {
     console.log(`Author: ${author || 'Unknown'}`);
     console.log(`Age: ${age || 'N/A'}`);
     console.log(`Language: ${language}`);
+    console.log(`Style: ${is3DStyle ? '3D Pixar' : 'Classic Storybook 2D'}`);
 
     // Build the cover prompt based on language
     let coverDescription: string;
@@ -29,19 +34,29 @@ export async function POST(request: NextRequest) {
     if (language === 'en') {
       // English: Include ONLY the title text in AI prompt
       // IMPORTANT: AI often generates gibberish text - be very explicit about what NOT to include
-      coverDescription = `Children's storybook cover illustration with ONLY the title "${title}" displayed at the top in clear English letters. ${description ? description + '. ' : ''}Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Clean composition focusing on the illustration and title. NO subtitles, NO taglines, NO author text, NO publisher text, NO random words or letters anywhere on the cover - ONLY the title "${title}" and the illustration. Book cover style with minimal text`;
+      // NOTE: Do NOT include story description - it often gets rendered as text on the cover
+      coverDescription = `Children's storybook cover illustration with ONLY the title "${title}" displayed at the top in clear English letters. Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Clean composition focusing on the illustration and title. NO subtitles, NO taglines, NO author text, NO publisher text, NO random words or letters anywhere on the cover - ONLY the title "${title}" and the illustration. Book cover style with minimal text`;
     } else {
       // Chinese: NO TEXT AT ALL (prevents random Chinese characters, we'll overlay programmatically)
-      coverDescription = `Children's storybook cover illustration WITHOUT ANY TEXT WHATSOEVER. ${description ? description + '. ' : ''}Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Clean composition with clear space at top for title and bottom for credits. Book cover style illustration. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO CHINESE CHARACTERS, NO NUMBERS, NO SYMBOLS on the image - ONLY pure visual illustration with NO text elements at all`;
+      // NOTE: Do NOT include story description - it often gets rendered as text on the cover
+      coverDescription = `Children's storybook cover illustration WITHOUT ANY TEXT WHATSOEVER. Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Clean composition with clear space at top for title and bottom for credits. Book cover style illustration. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO CHINESE CHARACTERS, NO NUMBERS, NO SYMBOLS on the image - ONLY pure visual illustration with NO text elements at all`;
     }
 
-    // Convert relative URLs to absolute URLs for Fal.ai
+    // Check if Gemini is available
+    if (!isGeminiAvailable()) {
+      return NextResponse.json(
+        { error: 'Gemini API is not configured' },
+        { status: 500 }
+      );
+    }
+
+    // Convert relative URLs to absolute URLs for Gemini
     const baseUrl = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
       : `http://localhost:${process.env.PORT || 3002}`;
 
-    // Prepare character prompt info with absolute URLs (if characters provided)
-    const characterPrompts: CharacterPromptInfo[] = characters && characters.length > 0
+    // Prepare character info with absolute URLs (if characters provided)
+    const geminiCharacters: GeminiCharacterInfo[] = characters && characters.length > 0
       ? characters.map((char: Character) => ({
           name: char.name,
           referenceImageUrl: char.referenceImage.url.startsWith('http')
@@ -51,18 +66,27 @@ export async function POST(request: NextRequest) {
         }))
       : [];
 
-    console.log(`Generating cover with ${characterPrompts.length} character(s)`);
+    console.log(`Generating cover with Gemini (${is3DStyle ? '3D' : '2D'}), ${geminiCharacters.length} character(s)`);
 
-    // Generate the cover image
-    const result = await generateImageWithMultipleCharacters({
-      characters: characterPrompts,
-      sceneDescription: coverDescription,
-      artStyle: "children's book cover, professional, whimsical, colorful, magical",
-      emphasizeGenericCharacters: true,
-    });
+    // Generate the cover image using Gemini with selected style
+    const artStylePrompt = is3DStyle
+      ? "children's book cover, professional, whimsical, colorful, magical, 3D Pixar style"
+      : "children's book cover, professional, whimsical, colorful, magical, classic 2D storybook illustration, watercolor feel";
+
+    const result = is3DStyle
+      ? await generateImageWithGemini({
+          characters: geminiCharacters,
+          sceneDescription: coverDescription,
+          artStyle: artStylePrompt,
+        })
+      : await generateImageWithGeminiClassic({
+          characters: geminiCharacters,
+          sceneDescription: coverDescription,
+          artStyle: artStylePrompt,
+        });
 
     console.log(`✅ Cover generated successfully in ${result.generationTime}s`);
-    console.log(`AI-generated cover URL: ${result.imageUrl}`);
+    console.log(`AI-generated cover (data URL): ${result.imageUrl.substring(0, 50)}...`);
 
     // Step 2: Upload the AI-generated cover directly to Supabase storage (no text overlay)
     // Note: Text overlay (author, copyright) will be added by PDF generation if needed
@@ -75,12 +99,20 @@ export async function POST(request: NextRequest) {
     // Use user ID if authenticated, otherwise use 'guest' folder
     const userId = user?.id || 'guest';
 
-    // Fetch the AI-generated image as a buffer
-    const imageResponse = await fetch(result.imageUrl);
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to fetch AI-generated image: ${imageResponse.statusText}`);
+    // Convert data URL to buffer (Gemini returns base64 data URL)
+    let imageBuffer: Buffer;
+    if (result.imageUrl.startsWith('data:')) {
+      // Extract base64 data from data URL
+      const base64Data = result.imageUrl.split(',')[1];
+      imageBuffer = Buffer.from(base64Data, 'base64');
+    } else {
+      // Fallback: fetch from URL if it's a regular URL
+      const imageResponse = await fetch(result.imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to fetch AI-generated image: ${imageResponse.statusText}`);
+      }
+      imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
     }
-    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
 
     const fileName = `${userId}/covers/${Date.now()}.png`;
     const { data: uploadData, error: uploadError } = await supabase.storage

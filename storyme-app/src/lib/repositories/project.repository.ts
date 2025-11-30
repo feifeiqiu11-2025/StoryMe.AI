@@ -117,10 +117,22 @@ export class ProjectRepository extends BaseRepository<Project> {
   }
 
   /**
-   * Find all projects by user with scenes
+   * Find all projects by user with scenes (with optional pagination)
    */
-  async findByUserIdWithScenes(userId: string): Promise<ProjectWithScenes[]> {
-    const { data, error } = await this.supabase
+  async findByUserIdWithScenes(
+    userId: string,
+    options?: { limit?: number; offset?: number }
+  ): Promise<{ projects: ProjectWithScenes[]; total: number }> {
+    // First, get total count for pagination (fast query)
+    const { count, error: countError } = await this.supabase
+      .from(this.tableName)
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    if (countError) throw countError;
+
+    // Build query with pagination
+    let query = this.supabase
       .from(this.tableName)
       .select(`
         *,
@@ -147,9 +159,21 @@ export class ProjectRepository extends BaseRepository<Project> {
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
+    // Apply pagination if provided
+    if (options?.limit !== undefined && options?.offset !== undefined) {
+      query = query.range(options.offset, options.offset + options.limit - 1);
+    } else if (options?.limit !== undefined) {
+      query = query.limit(options.limit);
+    }
+
+    const { data, error } = await query;
+
     if (error) throw error;
 
-    return (data || []) as ProjectWithScenes[];
+    return {
+      projects: (data || []) as ProjectWithScenes[],
+      total: count || 0,
+    };
   }
 
   /**

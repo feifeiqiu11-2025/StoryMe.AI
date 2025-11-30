@@ -10,10 +10,19 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
+import { generateImageWithMultipleCharacters, CharacterPromptInfo, sceneContainsAnimals } from '@/lib/fal-client';
+import { generateImageWithGemini, generateImageWithGeminiClassic, isGeminiAvailable, GeminiCharacterInfo } from '@/lib/gemini-image-client';
 import { extractSceneLocation } from '@/lib/scene-parser';
 import { Character } from '@/lib/types/story';
+import { createClient } from '@/lib/supabase/server';
+import { StorageService } from '@/lib/services/storage.service';
 import OpenAI from 'openai';
+
+// Image provider type
+type ImageProvider = 'flux' | 'gemini';
+
+// Illustration style type
+type IllustrationStyle = 'pixar' | 'classic';
 
 export const maxDuration = 300; // 5 minutes timeout
 
@@ -59,12 +68,19 @@ COMMON ISSUES AND HOW TO FIX THEM:
    - Fix: Be very specific about background, lighting, colors
    - Example: "bright sunny park, vibrant green grass, blue sky, well-lit scene"
 
+6. HUMAN-ANIMAL HYBRID/FUSION ISSUES:
+   - Feedback: "Character looks like animal" or "Half human half animal" or "Merged with animal"
+   - Fix: STRONGLY emphasize human characters are SEPARATE from animals
+   - Add: "[Name] is a HUMAN CHILD (completely human, NOT an animal), standing NEXT TO the [animal], two SEPARATE beings"
+   - Example: "Connor (HUMAN BOY, completely human body) standing BESIDE a lion (separate animal), human and animal are DISTINCT entities not merged"
+
 INSTRUCTIONS:
-- Keep the refined prompt under 500 characters
+- Keep the refined prompt under 600 characters
 - Maintain the original art style and core scene
 - Use UPPERCASE for emphasis on critical fixes
 - Be very specific about counts (ONLY ONE, TWO legs, etc.)
 - Always include character names if provided
+- If scene has animals, ALWAYS emphasize humans are SEPARATE from animals
 
 Original prompt: ${originalPrompt}
 Scene description: ${sceneDescription}
@@ -88,7 +104,8 @@ Generate a refined prompt that fixes the issues mentioned in the user feedback w
 
     if (!refinedPrompt) {
       console.warn('[Regenerate] AI returned empty prompt, using fallback');
-      return buildFallbackRefinedPrompt(originalPrompt, userFeedback);
+      const hasAnimals = sceneContainsAnimals(sceneDescription);
+      return buildFallbackRefinedPrompt(originalPrompt, userFeedback, hasAnimals);
     }
 
     console.log('[Regenerate] AI refined prompt:', refinedPrompt);
@@ -96,14 +113,15 @@ Generate a refined prompt that fixes the issues mentioned in the user feedback w
 
   } catch (error) {
     console.error('[Regenerate] AI refinement failed:', error);
-    return buildFallbackRefinedPrompt(originalPrompt, userFeedback);
+    const hasAnimals = sceneContainsAnimals(sceneDescription);
+    return buildFallbackRefinedPrompt(originalPrompt, userFeedback, hasAnimals);
   }
 }
 
 /**
  * Fallback prompt refinement without AI
  */
-function buildFallbackRefinedPrompt(originalPrompt: string, userFeedback: string): string {
+function buildFallbackRefinedPrompt(originalPrompt: string, userFeedback: string, hasAnimals: boolean = false): string {
   // Simple rule-based refinement
   const feedback = userFeedback.toLowerCase();
   let refinedPrompt = originalPrompt;
@@ -115,7 +133,7 @@ function buildFallbackRefinedPrompt(originalPrompt: string, userFeedback: string
 
   // Handle anatomy issues
   if (feedback.includes('leg') || feedback.includes('arm') || feedback.includes('hand') || feedback.includes('head')) {
-    refinedPrompt = `${refinedPrompt}, anatomically correct, realistic human proportions`;
+    refinedPrompt = `${refinedPrompt}, anatomically correct human proportions, normal human body`;
   }
 
   // Handle missing objects
@@ -123,22 +141,48 @@ function buildFallbackRefinedPrompt(originalPrompt: string, userFeedback: string
     refinedPrompt = `${refinedPrompt}, clearly showing all mentioned objects`;
   }
 
-  return refinedPrompt.substring(0, 500);
+  // Handle human-animal hybrid issues
+  if (feedback.includes('hybrid') || feedback.includes('animal') || feedback.includes('merged') ||
+      feedback.includes('fusion') || feedback.includes('mixed') || feedback.includes('half')) {
+    refinedPrompt = `${refinedPrompt}. IMPORTANT: Human characters are COMPLETELY HUMAN with normal human bodies, standing SEPARATE from any animals. Humans and animals are DISTINCT entities, not merged or combined.`;
+  }
+
+  // Always add separation warning if scene has animals
+  if (hasAnimals && !refinedPrompt.includes('SEPARATE')) {
+    refinedPrompt = `${refinedPrompt}. Human characters are SEPARATE from animals, distinct entities.`;
+  }
+
+  return refinedPrompt.substring(0, 600);
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = `regen-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
   try {
     const body = await request.json();
     const {
       sceneId,
       sceneNumber,
       userFeedback,
+      editedPrompt,
       originalPrompt,
       originalSceneDescription,
       characters,
       artStyle,
       sceneLocation,
+      imageProvider: requestedProvider,
+      illustrationStyle,
     } = body;
+
+    // Determine illustration style (default to 'classic' for 2D storybook)
+    const selectedIllustrationStyle: IllustrationStyle = illustrationStyle || 'classic';
+
+    // Determine which image provider to use
+    const defaultProvider = (process.env.IMAGE_PROVIDER as ImageProvider) || 'flux';
+    const imageProvider: ImageProvider = requestedProvider || defaultProvider;
+    const useGemini = imageProvider === 'gemini' && isGeminiAvailable();
+
+    console.log(`[Regenerate] Using provider: ${useGemini ? 'Gemini' : 'FLUX'}, style: ${selectedIllustrationStyle}`);
 
     // Validate inputs
     if (!sceneId || !sceneNumber) {
@@ -173,16 +217,24 @@ export async function POST(request: NextRequest) {
     console.log(`[Regenerate] User feedback: ${userFeedback}`);
     console.log(`[Regenerate] Original prompt: ${originalPrompt.substring(0, 100)}...`);
 
-    // Refine the prompt based on user feedback
-    const characterNames = characters.map((c: Character) => c.name);
-    const refinedPrompt = await refinePromptWithFeedback(
-      originalPrompt,
-      userFeedback,
-      originalSceneDescription,
-      characterNames
-    );
+    // Use edited prompt if provided, otherwise refine based on user feedback
+    let refinedPrompt: string;
 
-    console.log(`[Regenerate] Refined prompt: ${refinedPrompt.substring(0, 100)}...`);
+    if (editedPrompt && editedPrompt.trim() !== originalPrompt.trim()) {
+      // User manually edited the prompt - use it directly
+      refinedPrompt = editedPrompt.trim();
+      console.log(`[Regenerate] Using user-edited prompt: ${refinedPrompt.substring(0, 100)}...`);
+    } else {
+      // Refine the prompt based on user feedback using AI
+      const characterNames = characters.map((c: Character) => c.name);
+      refinedPrompt = await refinePromptWithFeedback(
+        originalPrompt,
+        userFeedback,
+        originalSceneDescription,
+        characterNames
+      );
+      console.log(`[Regenerate] AI refined prompt: ${refinedPrompt.substring(0, 100)}...`);
+    }
 
     // Convert relative URLs to absolute URLs for Fal.ai
     const baseUrl = process.env.VERCEL_URL
@@ -206,13 +258,58 @@ export async function POST(request: NextRequest) {
 
     // Generate the image with refined prompt
     const startTime = Date.now();
-    const result = await generateImageWithMultipleCharacters({
-      characters: characterPrompts,
-      sceneDescription: refinedPrompt, // Use the AI-refined prompt
-      artStyle: artStyle || "children's book illustration, colorful, whimsical",
-      sceneLocation: location,
-      emphasizeGenericCharacters: true,
-    });
+    let result;
+
+    if (useGemini) {
+      // Use Gemini with actual reference images
+      const geminiCharacters: GeminiCharacterInfo[] = characterPrompts.map(char => ({
+        name: char.name,
+        referenceImageUrl: char.referenceImageUrl,
+        description: char.description,
+      }));
+
+      // Choose generation function based on illustration style
+      if (selectedIllustrationStyle === 'classic') {
+        result = await generateImageWithGeminiClassic({
+          characters: geminiCharacters,
+          sceneDescription: refinedPrompt,
+          artStyle: artStyle || "children's book illustration, colorful, whimsical",
+        });
+      } else {
+        result = await generateImageWithGemini({
+          characters: geminiCharacters,
+          sceneDescription: refinedPrompt,
+          artStyle: artStyle || "children's book illustration, colorful, whimsical",
+        });
+      }
+
+      // Upload Gemini base64 images to Supabase Storage
+      if (result.imageUrl.startsWith('data:')) {
+        try {
+          const supabase = await createClient();
+          const storageService = new StorageService(supabase);
+          const uploaded = await storageService.uploadGeneratedImageFromBase64(
+            `temp-${requestId}`,
+            sceneId,
+            result.imageUrl
+          );
+          console.log(`[Regenerate] Uploaded Gemini image to: ${uploaded.url}`);
+          result.imageUrl = uploaded.url;
+        } catch (uploadError) {
+          console.warn(`[Regenerate] Failed to upload Gemini image, keeping base64:`, uploadError);
+        }
+      }
+    } else {
+      // Use FLUX LoRA (text-based prompts only)
+      result = await generateImageWithMultipleCharacters({
+        characters: characterPrompts,
+        sceneDescription: refinedPrompt,
+        artStyle: artStyle || "children's book illustration, colorful, whimsical",
+        sceneLocation: location,
+        emphasizeGenericCharacters: true,
+      });
+    }
+
     const generationTime = (Date.now() - startTime) / 1000;
 
     console.log(`[Regenerate] ✓ Scene ${sceneNumber} completed in ${generationTime}s`);
@@ -235,6 +332,7 @@ export async function POST(request: NextRequest) {
           characterName: char.name,
         })),
       },
+      imageProvider: useGemini ? 'gemini' : 'flux',
     });
 
   } catch (error) {

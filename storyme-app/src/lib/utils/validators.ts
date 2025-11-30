@@ -13,6 +13,9 @@ export const characterLibrarySchema = z.object({
   reference_image_url: z.string().url().optional(),
   reference_image_filename: z.string().optional(),
 
+  // Animated Preview (Gemini-generated 3D Pixar-style version)
+  animated_preview_url: z.string().url().optional(),
+
   // Description Fields - at least one should be filled
   hair_color: z.string().max(100).optional(),
   skin_tone: z.string().max(100).optional(),

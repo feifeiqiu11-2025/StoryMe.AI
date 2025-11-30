@@ -254,6 +254,15 @@ For each scene provided, you must create TWO different texts:
    - Specify setting details, weather, time of day if relevant
    - Keep it descriptive and visual (under 200 characters)
    - DO NOT include the caption text here - this is purely for image generation
+   - IMPORTANT: Dress characters in THEME-APPROPRIATE clothing:
+     * Christmas/Winter story → cozy winter clothes, Christmas sweaters, Santa hats, warm jackets
+     * Summer/Beach story → swimsuits, shorts, t-shirts, sun hats
+     * Halloween story → costumes (witch, superhero, princess, etc.)
+     * Birthday party → party clothes, birthday hats
+     * Bedtime story → pajamas, nightgowns
+     * School story → school uniforms or casual clothes
+     * Default → casual play clothes appropriate for the activity
+   - Be CONSISTENT with clothing across ALL scenes in the same story
 
 2. STORY CAPTION (for the storybook PDF):
    - Age-appropriate text for ${readingLevel}-year-olds

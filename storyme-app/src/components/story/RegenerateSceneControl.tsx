@@ -31,6 +31,7 @@ export default function RegenerateSceneControl({
 }: RegenerateSceneControlProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [userFeedback, setUserFeedback] = useState('');
+  const [editedPrompt, setEditedPrompt] = useState(originalPrompt);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +57,7 @@ export default function RegenerateSceneControl({
           sceneId,
           sceneNumber,
           userFeedback: userFeedback.trim(),
+          editedPrompt: editedPrompt.trim(),
           originalPrompt,
           originalSceneDescription: sceneDescription,
           characters,
@@ -125,6 +127,9 @@ export default function RegenerateSceneControl({
 
       {/* User Feedback Input */}
       <div>
+        <label htmlFor="user-feedback" className="text-xs font-medium text-gray-700 mb-1 block">
+          What to improve:
+        </label>
         <textarea
           id="user-feedback"
           value={userFeedback}
@@ -137,6 +142,35 @@ export default function RegenerateSceneControl({
         />
         <p className="text-xs text-gray-500 mt-1.5">
           💡 Describe what to fix: extra objects, wrong anatomy, missing items, expressions, etc.
+        </p>
+      </div>
+
+      {/* Image Prompt Editor */}
+      <div>
+        <label htmlFor="image-prompt" className="text-xs font-medium text-gray-700 mb-1 block">
+          Image generation prompt:
+        </label>
+        <textarea
+          id="image-prompt"
+          value={editedPrompt}
+          onChange={(e) => {
+            setEditedPrompt(e.target.value);
+            // Auto-resize textarea based on content
+            e.target.style.height = 'auto';
+            e.target.style.height = e.target.scrollHeight + 'px';
+          }}
+          onFocus={(e) => {
+            // Set initial height on focus
+            e.target.style.height = 'auto';
+            e.target.style.height = e.target.scrollHeight + 'px';
+          }}
+          disabled={isRegenerating}
+          rows={4}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed resize-none overflow-hidden"
+          style={{ minHeight: '4rem' }}
+        />
+        <p className="text-xs text-gray-500 mt-1.5">
+          ✏️ You can directly edit the AI prompt used for image generation
         </p>
       </div>
 

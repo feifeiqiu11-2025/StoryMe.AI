@@ -49,10 +49,33 @@ export default function ImageUpload({ onUploadComplete, disabled }: ImageUploadP
     }
   }, [onUploadComplete]);
 
+  const handleDrop = useCallback((acceptedFiles: File[], fileRejections: any[]) => {
+    // Check for rejected files
+    if (fileRejections.length > 0) {
+      const rejection = fileRejections[0];
+      const errorMsg = rejection.errors[0]?.message || 'Unsupported file format';
+      setError(`${errorMsg}. Please use PNG, JPG, GIF, or WebP images.`);
+      return;
+    }
+    if (acceptedFiles.length > 0) {
+      const file = acceptedFiles[0];
+      // Extra check for unsupported formats (AVIF, HEIC can slip through)
+      const supportedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+      if (!supportedTypes.includes(file.type)) {
+        setError(`Unsupported format: ${file.type}. Please use PNG, JPG, GIF, or WebP. AVIF/HEIC are not supported.`);
+        return;
+      }
+      onDrop([file]);
+    }
+  }, [onDrop]);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
+    onDrop: handleDrop,
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.webp']
+      'image/png': ['.png'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/gif': ['.gif'],
+      'image/webp': ['.webp'],
     },
     maxFiles: 1,
     maxSize: 10 * 1024 * 1024, // 10MB
@@ -110,7 +133,7 @@ export default function ImageUpload({ onUploadComplete, disabled }: ImageUploadP
             </div>
             <div className="text-sm text-gray-500">or click to browse</div>
             <div className="text-xs text-gray-400 mt-2">
-              Supports: JPG, PNG, WEBP (max 10MB)
+              Supports: JPG, PNG, GIF, WebP (max 10MB)
             </div>
           </div>
         )}

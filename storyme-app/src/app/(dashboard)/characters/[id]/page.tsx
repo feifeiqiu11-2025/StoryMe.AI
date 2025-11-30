@@ -63,8 +63,34 @@ export default async function CharacterDetailPage({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Image */}
-        <div className="lg:col-span-1">
+        {/* Left Column - Images */}
+        <div className="lg:col-span-1 space-y-4">
+          {/* 3D Preview (shown first if available) */}
+          {character.animated_preview_url && (
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <h2 className="text-lg font-semibold text-gray-900">3D Preview</h2>
+                <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full">
+                  Pixar Style
+                </span>
+              </div>
+              <div className="relative">
+                <img
+                  src={character.animated_preview_url}
+                  alt={`${character.name} 3D Preview`}
+                  className="w-full aspect-square object-contain rounded-lg bg-gray-50"
+                />
+                <div className="absolute top-2 left-2 bg-purple-500 text-white text-xs px-2 py-1 rounded-full">
+                  3D
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                AI-generated character for stories
+              </p>
+            </div>
+          )}
+
+          {/* Reference Photo */}
           <div className="bg-white rounded-lg shadow p-4">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">Reference Photo</h2>
             {character.reference_image_url ? (
@@ -96,7 +122,7 @@ export default async function CharacterDetailPage({
           </div>
 
           {/* Usage Stats */}
-          <div className="bg-white rounded-lg shadow p-4 mt-4">
+          <div className="bg-white rounded-lg shadow p-4">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">Usage</h2>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
