@@ -81,6 +81,8 @@ export default function CreateStoryPage() {
   // Cover preview state
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [coverImagePrompt, setCoverImagePrompt] = useState<string>('');
+  const [customCoverPrompt, setCustomCoverPrompt] = useState<string>('');
+  const [showPromptEditor, setShowPromptEditor] = useState(false);
   const [generatingCover, setGeneratingCover] = useState(false);
   const [coverApproved, setCoverApproved] = useState(false);
 
@@ -492,7 +494,7 @@ export default function CreateStoryPage() {
     }
   };
 
-  const generateCoverPreview = async () => {
+  const generateCoverPreview = async (useCustomPrompt: boolean = false) => {
     if (!saveTitle.trim()) {
       setSaveError('Please enter a title for your story');
       return;
@@ -513,6 +515,7 @@ export default function CreateStoryPage() {
           language: contentLanguage,
           characters: characters,
           illustrationStyle: artStyle, // 'pixar' (3D) or 'classic' (2D storybook)
+          customPrompt: useCustomPrompt ? customCoverPrompt : undefined,
         }),
       });
 
@@ -526,6 +529,10 @@ export default function CreateStoryPage() {
       if (data.imageUrl) {
         setCoverImageUrl(data.imageUrl);
         setCoverImagePrompt(data.prompt || '');
+        // Initialize custom prompt with the AI-generated prompt for user to edit
+        if (!customCoverPrompt) {
+          setCustomCoverPrompt(data.prompt || '');
+        }
         console.log('✓ Cover preview generated:', data.imageUrl);
       } else {
         throw new Error('No image URL in response');
@@ -1593,9 +1600,43 @@ export default function CreateStoryPage() {
                       alt="Generated cover"
                       className="w-full rounded-lg shadow-lg mb-3"
                     />
+
+                    {/* Collapsible AI Prompt Editor */}
+                    <div className="mb-3">
+                      <button
+                        onClick={() => setShowPromptEditor(!showPromptEditor)}
+                        className="flex items-center gap-2 text-sm text-purple-600 hover:text-purple-800 transition-colors"
+                      >
+                        <span className={`transform transition-transform ${showPromptEditor ? 'rotate-90' : ''}`}>▶</span>
+                        {showPromptEditor ? 'Hide' : 'Show'} AI Prompt
+                      </button>
+
+                      {showPromptEditor && (
+                        <div className="mt-2 space-y-2">
+                          <textarea
+                            value={customCoverPrompt}
+                            onChange={(e) => setCustomCoverPrompt(e.target.value)}
+                            placeholder="Edit the AI prompt to customize your cover..."
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                            rows={4}
+                          />
+                          <p className="text-xs text-gray-500">
+                            Tip: Describe what you want on the cover - characters, scene, mood, colors. The AI will generate a new image based on your description.
+                          </p>
+                          <button
+                            onClick={() => generateCoverPreview(true)}
+                            disabled={generatingCover || !customCoverPrompt.trim()}
+                            className="w-full bg-purple-600 text-white px-3 py-2 text-sm rounded-lg hover:bg-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {generatingCover ? 'Regenerating...' : '✨ Regenerate with Custom Prompt'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="flex gap-2">
                       <button
-                        onClick={regenerateCover}
+                        onClick={() => generateCoverPreview(false)}
                         disabled={generatingCover}
                         className="flex-1 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-all disabled:opacity-50"
                       >

@@ -8,7 +8,7 @@ export const maxDuration = 300; // 5 minutes timeout for Vercel
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, description, author, age, language = 'en', characters, illustrationStyle } = body;
+    const { title, description, author, age, language = 'en', characters, illustrationStyle, customPrompt } = body;
 
     // Determine illustration style (default to 'classic' for 2D storybook)
     const selectedStyle = illustrationStyle || 'classic';
@@ -27,11 +27,16 @@ export async function POST(request: NextRequest) {
     console.log(`Age: ${age || 'N/A'}`);
     console.log(`Language: ${language}`);
     console.log(`Style: ${is3DStyle ? '3D Pixar' : 'Classic Storybook 2D'}`);
+    console.log(`Custom Prompt: ${customPrompt ? 'Yes' : 'No (using default)'}`);
 
-    // Build the cover prompt based on language
+    // Build the cover prompt - use custom prompt if provided, otherwise generate default
     let coverDescription: string;
 
-    if (language === 'en') {
+    if (customPrompt && customPrompt.trim()) {
+      // User provided custom prompt
+      coverDescription = customPrompt.trim();
+      console.log('Using custom prompt:', coverDescription);
+    } else if (language === 'en') {
       // English: Include ONLY the title text in AI prompt
       // IMPORTANT: AI often generates gibberish text - be very explicit about what NOT to include
       // NOTE: Do NOT include story description - it often gets rendered as text on the cover
