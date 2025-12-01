@@ -263,133 +263,9 @@ function sceneContainsAnimals(description: string): boolean {
 // CHARACTER TYPE DETECTION & SMART PROMPT BUILDING
 // ============================================================================
 
-/**
- * Animal keywords for character type detection
- */
-const ANIMAL_KEYWORDS = [
-  // Common pets
-  'cat', 'kitten', 'kitty', 'dog', 'puppy', 'doggy', 'bird', 'parrot', 'fish', 'goldfish',
-  'rabbit', 'bunny', 'hamster', 'turtle', 'tortoise', 'guinea pig',
-  // Farm animals
-  'horse', 'pony', 'cow', 'pig', 'piglet', 'sheep', 'lamb', 'goat', 'chicken', 'hen',
-  'rooster', 'duck', 'duckling', 'goose', 'turkey', 'donkey',
-  // Wild animals
-  'lion', 'tiger', 'elephant', 'giraffe', 'zebra', 'monkey', 'ape', 'gorilla',
-  'bear', 'panda', 'koala', 'wolf', 'fox', 'deer', 'fawn', 'moose', 'elk',
-  'owl', 'eagle', 'hawk', 'penguin', 'flamingo', 'peacock',
-  'snake', 'frog', 'toad', 'lizard', 'crocodile', 'alligator',
-  'whale', 'dolphin', 'shark', 'octopus', 'seal', 'otter',
-  'butterfly', 'bee', 'ladybug', 'caterpillar', 'spider',
-  // Fantasy creatures
-  'dragon', 'unicorn', 'phoenix', 'griffin', 'pegasus', 'fairy', 'elf', 'dwarf',
-  'mermaid', 'dinosaur', 't-rex', 'triceratops',
-];
-
-/**
- * Human-indicator keywords - if present, the character is definitely human
- * These features are exclusive to humans and should prevent animal detection
- */
-const HUMAN_INDICATOR_KEYWORDS = [
-  'beard', 'mustache', 'moustache', 'goatee', 'sideburns',
-  'mother', 'father', 'mom', 'dad', 'grandma', 'grandpa', 'grandmother', 'grandfather',
-  'boy', 'girl', 'man', 'woman', 'child', 'kid', 'baby', 'toddler', 'teen', 'teenager',
-  'brother', 'sister', 'aunt', 'uncle', 'cousin',
-  'teacher', 'doctor', 'nurse', 'firefighter', 'police', 'chef',
-];
-
-/**
- * Check if character has human-indicator keywords in name or description
- */
-function hasHumanIndicators(name: string, description: CharacterDescription): boolean {
-  const lowerName = name.toLowerCase();
-  const charContext = (description.fullDescription || description.otherFeatures || '').toLowerCase();
-  const combinedText = `${lowerName} ${charContext}`;
-
-  for (const humanKeyword of HUMAN_INDICATOR_KEYWORDS) {
-    const wordPattern = new RegExp(`\\b${humanKeyword}\\b`, 'i');
-    if (wordPattern.test(combinedText)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Detect if a character is an animal/creature based on their fullDescription
- * Uses smart parsing to check if the animal keyword describes the character itself
- *
- * Examples:
- * - "Miaomiao is a yellow cat" → true (cat IS the character)
- * - "Henry loves his pet dog" → false (dog is not Henry)
- * - "Eddie the Eagle" → true (eagle IS the character)
- * - "The Father with beard" → false (human indicator present)
- */
-function detectIfAnimal(name: string, description: CharacterDescription): boolean {
-  // FIRST: Check for human indicators - if present, definitely NOT an animal
-  if (hasHumanIndicators(name, description)) {
-    return false;
-  }
-
-  // Use fullDescription if available, otherwise fall back to otherFeatures
-  const charContext = (description.fullDescription || description.otherFeatures || '').toLowerCase();
-  const lowerName = name.toLowerCase();
-
-  // Pattern 1: "[Name] is a [animal]" - most explicit
-  for (const animal of ANIMAL_KEYWORDS) {
-    // "Miaomiao is a cat", "Miaomiao is a fluffy yellow cat"
-    const isAPattern = new RegExp(`${lowerName}\\s+is\\s+(?:a|an)?\\s*(?:\\w+\\s+)*${animal}`, 'i');
-    if (isAPattern.test(charContext) || isAPattern.test(`${lowerName} is a ${charContext}`)) {
-      return true;
-    }
-
-    // "[Name] the [animal]" - e.g., "Eddie the Eagle"
-    const thePattern = new RegExp(`${lowerName}\\s+the\\s+${animal}`, 'i');
-    if (thePattern.test(charContext) || thePattern.test(lowerName)) {
-      return true;
-    }
-
-    // Direct match at start: "yellow cat who loves..."
-    const startsWithAnimal = new RegExp(`^(?:\\w+\\s+)*${animal}\\b`, 'i');
-    if (startsWithAnimal.test(charContext)) {
-      return true;
-    }
-  }
-
-  // Pattern 2: Check if otherFeatures contains animal type (legacy data)
-  // Use word boundary regex to avoid false positives (e.g., "elf" in "himself")
-  const otherFeatures = (description.otherFeatures || '').toLowerCase();
-  for (const animal of ANIMAL_KEYWORDS) {
-    // Use word boundary to match whole words only
-    const animalWordPattern = new RegExp(`\\b${animal}\\b`, 'i');
-    if (animalWordPattern.test(otherFeatures) && !otherFeatures.includes('pet') && !otherFeatures.includes('loves')) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
- * Extract animal type and features for prompt
- * Returns formatted string like "a fluffy yellow cat with green eyes"
- */
-function extractAnimalInfo(name: string, description: CharacterDescription): string {
-  const charContext = description.fullDescription || description.otherFeatures || '';
-
-  // Try to extract "[Name] is a [description]" part
-  const isAMatch = charContext.match(new RegExp(`${name}\\s+is\\s+(.+)`, 'i'));
-  if (isAMatch) {
-    return isAMatch[1].trim();
-  }
-
-  // If fullDescription exists, use it directly (removing the name if present)
-  if (description.fullDescription) {
-    return description.fullDescription.replace(new RegExp(`^${name}\\s*`, 'i'), '').trim();
-  }
-
-  // Fall back to otherFeatures
-  return description.otherFeatures || name;
-}
+// NOTE: Animal/human detection removed - we trust the AI model to understand
+// character descriptions naturally. "Miaomiao is a fluffy yellow cat" is clear
+// to Gemini without needing explicit "This is an ANIMAL" labels.
 
 /**
  * Detect role-specific clothing that should override base outfit
@@ -493,20 +369,25 @@ function buildSmartCharacterPrompt(
 ): { prompt: string; isAnimal: boolean } {
   const { name, description } = char;
 
-  // Check if this is an animal character
-  const isAnimal = detectIfAnimal(name, description);
+  // Get the character description - let AI understand context naturally
+  const charContext = description.fullDescription || buildMinimalCharacterDescription(name, description);
 
-  if (isAnimal) {
-    // For animals: Use full description, NEVER add clothing
-    const animalInfo = extractAnimalInfo(name, description);
+  // Check if character has a reference image (photo-based = human)
+  // Characters without reference images and with animal-like descriptions
+  // will be handled naturally by the AI based on the description
+  const hasReferenceImage = char.referenceImageUrl && char.referenceImageUrl.trim() !== '';
+
+  // For characters without reference images, just use the description as-is
+  // The AI will understand "Miaomiao is a fluffy yellow cat" without explicit labels
+  if (!hasReferenceImage) {
     return {
-      prompt: `${name} (${animalInfo}) - This is an ANIMAL character, do NOT add human clothing or accessories`,
-      isAnimal: true,
+      prompt: charContext,
+      isAnimal: false, // Don't flag - let AI figure it out from description
     };
   }
 
-  // For humans: Build description with proper clothing logic
-  const charContext = description.fullDescription || buildMinimalCharacterDescription(name, description);
+  // For characters WITH reference images (photo-based humans):
+  // Apply clothing logic for consistency
 
   // Check for scene-specific role clothing (highest priority)
   const roleClothing = detectRoleClothing(sceneDescription, name);
