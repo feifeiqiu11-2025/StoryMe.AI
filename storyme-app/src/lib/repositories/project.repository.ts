@@ -46,7 +46,10 @@ export class ProjectRepository extends BaseRepository<Project> {
   }
 
   /**
-   * Find project by ID with scenes and images
+   * Find single project by ID with ALL scenes and images (DETAIL VIEW)
+   *
+   * Use this for project detail page where full data is needed.
+   * For list view, use findByUserIdWithScenes() which is optimized.
    */
   async findByIdWithScenes(id: string): Promise<ProjectWithScenes | null> {
     const { data, error } = await this.supabase
@@ -117,7 +120,14 @@ export class ProjectRepository extends BaseRepository<Project> {
   }
 
   /**
-   * Find all projects by user with scenes (with optional pagination)
+   * Find all projects by user for LIST VIEW (with pagination)
+   *
+   * OPTIMIZATION: This query is intentionally lightweight for the /projects list page:
+   * - Only fetches essential fields (not all columns)
+   * - Only fetches first 2 scenes (for cover image preview)
+   * - Only fetches first image per scene (thumbnail)
+   *
+   * For full project data (detail page), use findByIdWithScenes() instead.
    */
   async findByUserIdWithScenes(
     userId: string,
