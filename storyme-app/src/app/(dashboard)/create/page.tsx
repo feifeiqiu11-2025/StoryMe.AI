@@ -655,24 +655,33 @@ export default function CreateStoryPage() {
               // Build character payload with only non-empty fields
               const characterPayload: Record<string, any> = {
                 name: character.name,
-                reference_image_url: character.referenceImage.url,
-                reference_image_filename: character.referenceImage.fileName,
               };
 
+              // Include reference image if available
+              if (character.referenceImage?.url) {
+                characterPayload.reference_image_url = character.referenceImage.url;
+                characterPayload.reference_image_filename = character.referenceImage.fileName;
+              }
+
+              // Include animated preview URL if available (from Gemini generation)
+              if (character.animatedPreviewUrl) {
+                characterPayload.animated_preview_url = character.animatedPreviewUrl;
+              }
+
               // Only include description fields if they have values
-              if (character.description.hairColor) {
+              if (character.description?.hairColor) {
                 characterPayload.hair_color = character.description.hairColor;
               }
-              if (character.description.skinTone) {
+              if (character.description?.skinTone) {
                 characterPayload.skin_tone = character.description.skinTone;
               }
-              if (character.description.clothing) {
+              if (character.description?.clothing) {
                 characterPayload.clothing = character.description.clothing;
               }
-              if (character.description.age) {
+              if (character.description?.age) {
                 characterPayload.age = character.description.age;
               }
-              if (character.description.otherFeatures) {
+              if (character.description?.otherFeatures) {
                 characterPayload.other_features = character.description.otherFeatures;
               }
 
