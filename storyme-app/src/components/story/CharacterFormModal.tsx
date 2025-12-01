@@ -250,6 +250,53 @@ export default function CharacterFormModal({
     }
   };
 
+  /**
+   * Build fullDescription from form data
+   * This is the source of truth for character identity across all scenes
+   */
+  const buildFullDescription = (): string => {
+    const name = formData.name.trim();
+
+    if (characterMode === 'description') {
+      // For "From Description" mode - character type is the core identity
+      // e.g., "Miaomiao is a fluffy yellow cat with green eyes"
+      const parts = [formData.characterType];
+      if (formData.otherFeatures) {
+        parts.push(formData.otherFeatures);
+      }
+      return `${name} is a ${parts.join(', ')}`;
+    } else {
+      // For "From Photo" mode - build from parsed fields
+      // e.g., "Henry is a 5-year-old boy with brown hair, light skin, wearing red t-shirt"
+      const parts: string[] = [];
+
+      if (formData.age) {
+        parts.push(formData.age);
+      }
+      if (formData.hairColor) {
+        parts.push(`${formData.hairColor} hair`);
+      }
+      if (formData.skinTone) {
+        parts.push(`${formData.skinTone} skin`);
+      }
+      if (formData.otherFeatures) {
+        parts.push(formData.otherFeatures);
+      }
+
+      let description = name;
+      if (parts.length > 0) {
+        description += ` (${parts.join(', ')})`;
+      }
+
+      // Add base outfit if specified
+      if (formData.clothing) {
+        description += `, wearing ${formData.clothing}`;
+      }
+
+      return description;
+    }
+  };
+
   const handleSave = () => {
     if (!formData.name.trim()) {
       alert('Please enter a character name');
@@ -266,6 +313,9 @@ export default function CharacterFormModal({
       ? `${formData.characterType}${formData.otherFeatures ? ` - ${formData.otherFeatures}` : ''}`
       : formData.otherFeatures;
 
+    // Build the full description - source of truth for all scene generation
+    const fullDescription = buildFullDescription();
+
     const character: Character = {
       id: editingCharacter?.id || `char-${Date.now()}`,
       name: formData.name.trim(),
@@ -280,6 +330,7 @@ export default function CharacterFormModal({
         clothing: characterMode === 'photo' ? formData.clothing : undefined,
         age: formData.age || undefined,
         otherFeatures: otherFeatures || undefined,
+        fullDescription: fullDescription, // NEW: Source of truth for character identity
       },
       isPrimary: false,
       order: 0,

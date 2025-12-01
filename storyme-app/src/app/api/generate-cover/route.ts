@@ -61,14 +61,23 @@ export async function POST(request: NextRequest) {
       : `http://localhost:${process.env.PORT || 3002}`;
 
     // Prepare character info with absolute URLs (if characters provided)
+    // Handle both "From Photo" and "From Description" characters
     const geminiCharacters: GeminiCharacterInfo[] = characters && characters.length > 0
-      ? characters.map((char: Character) => ({
-          name: char.name,
-          referenceImageUrl: char.referenceImage.url.startsWith('http')
-            ? char.referenceImage.url
-            : `${baseUrl}${char.referenceImage.url}`,
-          description: char.description,
-        }))
+      ? characters.map((char: Character) => {
+          // Handle reference image URL - may be empty for "From Description" characters
+          let referenceImageUrl = '';
+          if (char.referenceImage?.url) {
+            referenceImageUrl = char.referenceImage.url.startsWith('http')
+              ? char.referenceImage.url
+              : `${baseUrl}${char.referenceImage.url}`;
+          }
+
+          return {
+            name: char.name,
+            referenceImageUrl,
+            description: char.description, // Includes fullDescription for proper character context
+          };
+        })
       : [];
 
     console.log(`Generating cover with Gemini (${is3DStyle ? '3D' : '2D'}), ${geminiCharacters.length} character(s)`);

@@ -72,9 +72,14 @@ export type TagSlug = typeof PREDEFINED_TAG_SLUGS[keyof typeof PREDEFINED_TAG_SL
 export interface CharacterDescription {
   hairColor?: string;
   skinTone?: string;
-  clothing?: string;
+  clothing?: string;        // Base outfit for consistency across scenes
   age?: string;
   otherFeatures?: string;
+
+  // NEW: Full original description (source of truth for character identity)
+  // e.g., "Miaomiao is a fluffy yellow cat with green eyes"
+  // e.g., "Henry is a 5-year-old boy who loves soccer, wearing red t-shirt"
+  fullDescription?: string;
 }
 
 export interface Character {

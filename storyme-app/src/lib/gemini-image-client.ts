@@ -259,6 +259,257 @@ function sceneContainsAnimals(description: string): boolean {
   return animalKeywords.some(animal => lowerDesc.includes(animal));
 }
 
+// ============================================================================
+// CHARACTER TYPE DETECTION & SMART PROMPT BUILDING
+// ============================================================================
+
+/**
+ * Animal keywords for character type detection
+ */
+const ANIMAL_KEYWORDS = [
+  // Common pets
+  'cat', 'kitten', 'kitty', 'dog', 'puppy', 'doggy', 'bird', 'parrot', 'fish', 'goldfish',
+  'rabbit', 'bunny', 'hamster', 'turtle', 'tortoise', 'guinea pig',
+  // Farm animals
+  'horse', 'pony', 'cow', 'pig', 'piglet', 'sheep', 'lamb', 'goat', 'chicken', 'hen',
+  'rooster', 'duck', 'duckling', 'goose', 'turkey', 'donkey',
+  // Wild animals
+  'lion', 'tiger', 'elephant', 'giraffe', 'zebra', 'monkey', 'ape', 'gorilla',
+  'bear', 'panda', 'koala', 'wolf', 'fox', 'deer', 'fawn', 'moose', 'elk',
+  'owl', 'eagle', 'hawk', 'penguin', 'flamingo', 'peacock',
+  'snake', 'frog', 'toad', 'lizard', 'crocodile', 'alligator',
+  'whale', 'dolphin', 'shark', 'octopus', 'seal', 'otter',
+  'butterfly', 'bee', 'ladybug', 'caterpillar', 'spider',
+  // Fantasy creatures
+  'dragon', 'unicorn', 'phoenix', 'griffin', 'pegasus', 'fairy', 'elf', 'dwarf',
+  'mermaid', 'dinosaur', 't-rex', 'triceratops',
+];
+
+/**
+ * Detect if a character is an animal/creature based on their fullDescription
+ * Uses smart parsing to check if the animal keyword describes the character itself
+ *
+ * Examples:
+ * - "Miaomiao is a yellow cat" → true (cat IS the character)
+ * - "Henry loves his pet dog" → false (dog is not Henry)
+ * - "Eddie the Eagle" → true (eagle IS the character)
+ */
+function detectIfAnimal(name: string, description: CharacterDescription): boolean {
+  // Use fullDescription if available, otherwise fall back to otherFeatures
+  const charContext = (description.fullDescription || description.otherFeatures || '').toLowerCase();
+  const lowerName = name.toLowerCase();
+
+  // Pattern 1: "[Name] is a [animal]" - most explicit
+  for (const animal of ANIMAL_KEYWORDS) {
+    // "Miaomiao is a cat", "Miaomiao is a fluffy yellow cat"
+    const isAPattern = new RegExp(`${lowerName}\\s+is\\s+(?:a|an)?\\s*(?:\\w+\\s+)*${animal}`, 'i');
+    if (isAPattern.test(charContext) || isAPattern.test(`${lowerName} is a ${charContext}`)) {
+      return true;
+    }
+
+    // "[Name] the [animal]" - e.g., "Eddie the Eagle"
+    const thePattern = new RegExp(`${lowerName}\\s+the\\s+${animal}`, 'i');
+    if (thePattern.test(charContext) || thePattern.test(lowerName)) {
+      return true;
+    }
+
+    // Direct match at start: "yellow cat who loves..."
+    const startsWithAnimal = new RegExp(`^(?:\\w+\\s+)*${animal}\\b`, 'i');
+    if (startsWithAnimal.test(charContext)) {
+      return true;
+    }
+  }
+
+  // Pattern 2: Check if otherFeatures contains animal type (legacy data)
+  const otherFeatures = (description.otherFeatures || '').toLowerCase();
+  for (const animal of ANIMAL_KEYWORDS) {
+    // If otherFeatures starts with or contains "animal" pattern
+    if (otherFeatures.includes(animal) && !otherFeatures.includes('pet') && !otherFeatures.includes('loves')) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Extract animal type and features for prompt
+ * Returns formatted string like "a fluffy yellow cat with green eyes"
+ */
+function extractAnimalInfo(name: string, description: CharacterDescription): string {
+  const charContext = description.fullDescription || description.otherFeatures || '';
+
+  // Try to extract "[Name] is a [description]" part
+  const isAMatch = charContext.match(new RegExp(`${name}\\s+is\\s+(.+)`, 'i'));
+  if (isAMatch) {
+    return isAMatch[1].trim();
+  }
+
+  // If fullDescription exists, use it directly (removing the name if present)
+  if (description.fullDescription) {
+    return description.fullDescription.replace(new RegExp(`^${name}\\s*`, 'i'), '').trim();
+  }
+
+  // Fall back to otherFeatures
+  return description.otherFeatures || name;
+}
+
+/**
+ * Detect role-specific clothing that should override base outfit
+ * These are temporary costumes for specific scene activities
+ */
+function detectRoleClothing(sceneDescription: string, characterName: string): string | null {
+  const lowerScene = sceneDescription.toLowerCase();
+  const lowerName = characterName.toLowerCase();
+
+  // Only apply role clothing if character is mentioned in scene
+  if (!lowerScene.includes(lowerName)) {
+    return null;
+  }
+
+  const rolePatterns: { pattern: RegExp; clothing: string }[] = [
+    // Occupations/Pretend play
+    { pattern: /(?:pretend|play|dress).{0,20}(?:doctor|nurse)/i, clothing: 'white doctor coat with stethoscope' },
+    { pattern: /(?:pretend|play|dress).{0,20}(?:superhero|hero)/i, clothing: 'colorful superhero costume with cape' },
+    { pattern: /(?:pretend|play|dress).{0,20}(?:chef|cook)/i, clothing: 'chef hat and apron' },
+    { pattern: /(?:pretend|play|dress).{0,20}(?:pirate)/i, clothing: 'pirate costume with hat' },
+    { pattern: /(?:pretend|play|dress).{0,20}(?:princess|prince)/i, clothing: 'royal costume with crown' },
+    { pattern: /(?:pretend|play|dress).{0,20}(?:astronaut|space)/i, clothing: 'astronaut suit' },
+    { pattern: /(?:pretend|play|dress).{0,20}(?:firefighter)/i, clothing: 'firefighter uniform with helmet' },
+    { pattern: /(?:pretend|play|dress).{0,20}(?:police|cop)/i, clothing: 'police uniform' },
+    { pattern: /(?:pretend|play|dress).{0,20}(?:wizard|witch|magic)/i, clothing: 'wizard robe and hat' },
+    { pattern: /(?:pretend|play|dress).{0,20}(?:fairy)/i, clothing: 'sparkly fairy costume with wings' },
+
+    // Activity-specific clothing
+    { pattern: /(?:swim|pool|beach|ocean|water\s*park)/i, clothing: 'swimsuit' },
+    { pattern: /(?:bath|bathtub|shower)/i, clothing: 'nothing (bathing)' },
+    { pattern: /(?:sleep|bed|bedtime|dream|nap|pajama|pyjama)/i, clothing: 'cozy pajamas' },
+    { pattern: /(?:ballet|dance\s*class)/i, clothing: 'ballet outfit with tutu' },
+    { pattern: /(?:soccer|football\s*game)/i, clothing: 'soccer uniform' },
+    { pattern: /(?:karate|martial\s*art)/i, clothing: 'karate uniform (gi)' },
+    { pattern: /(?:rain|rainy|storm|puddle)/i, clothing: 'rain coat and rain boots' },
+    { pattern: /(?:snow|winter|cold|ice\s*skat)/i, clothing: 'warm winter jacket, scarf, and mittens' },
+  ];
+
+  for (const { pattern, clothing } of rolePatterns) {
+    if (pattern.test(lowerScene)) {
+      return clothing;
+    }
+  }
+
+  return null;
+}
+
+// In-memory cache for outfit consistency across scenes
+// Key: character ID or name, Value: outfit description
+const outfitCache = new Map<string, string>();
+
+/**
+ * Get or set outfit for a character (for consistency across scenes)
+ */
+function getOrCacheOutfit(characterKey: string, baseOutfit: string | undefined): string {
+  // If we already have a cached outfit for this character, use it
+  const cached = outfitCache.get(characterKey);
+  if (cached) {
+    return cached;
+  }
+
+  // If character has a base outfit defined, cache and use it
+  if (baseOutfit) {
+    outfitCache.set(characterKey, baseOutfit);
+    return baseOutfit;
+  }
+
+  // No outfit defined yet - return empty, AI will pick one
+  // The calling code should cache whatever AI generates
+  return '';
+}
+
+/**
+ * Cache an outfit for a character (called after first scene generation)
+ */
+export function cacheCharacterOutfit(characterKey: string, outfit: string): void {
+  outfitCache.set(characterKey, outfit);
+}
+
+/**
+ * Clear outfit cache (call when starting a new story)
+ */
+export function clearOutfitCache(): void {
+  outfitCache.clear();
+}
+
+/**
+ * Build smart character prompt with proper type detection and clothing logic
+ *
+ * Priority for clothing:
+ * 1. Scene-specific role (doctor, superhero, swimming) → temporary costume
+ * 2. Character's base outfit (from description.clothing) → consistent across scenes
+ * 3. Cached outfit from first scene → AI picked, maintain consistency
+ * 4. Theme clothing (Christmas, beach) → if no other outfit
+ * 5. Default: "casual play clothes" → let AI pick, but cache for later
+ */
+function buildSmartCharacterPrompt(
+  char: GeminiCharacterInfo,
+  sceneDescription: string,
+  storyTheme: string | null
+): { prompt: string; isAnimal: boolean } {
+  const { name, description } = char;
+
+  // Check if this is an animal character
+  const isAnimal = detectIfAnimal(name, description);
+
+  if (isAnimal) {
+    // For animals: Use full description, NEVER add clothing
+    const animalInfo = extractAnimalInfo(name, description);
+    return {
+      prompt: `${name} (${animalInfo}) - This is an ANIMAL character, do NOT add human clothing or accessories`,
+      isAnimal: true,
+    };
+  }
+
+  // For humans: Build description with proper clothing logic
+  const charContext = description.fullDescription || buildMinimalCharacterDescription(name, description);
+
+  // Check for scene-specific role clothing (highest priority)
+  const roleClothing = detectRoleClothing(sceneDescription, name);
+  if (roleClothing) {
+    return {
+      prompt: `${charContext}, wearing ${roleClothing} (scene-specific costume)`,
+      isAnimal: false,
+    };
+  }
+
+  // Check for cached or base outfit
+  const characterKey = name.toLowerCase();
+  const baseOutfit = description.clothing;
+  const cachedOutfit = getOrCacheOutfit(characterKey, baseOutfit);
+
+  if (cachedOutfit) {
+    return {
+      prompt: `${charContext}, wearing ${cachedOutfit} - IMPORTANT: Keep this EXACT outfit consistent across all scenes`,
+      isAnimal: false,
+    };
+  }
+
+  // Check for theme-specific clothing
+  const themeClothing = getThemeClothing(storyTheme);
+  if (themeClothing) {
+    // Cache the theme clothing for consistency
+    outfitCache.set(characterKey, themeClothing);
+    return {
+      prompt: `${charContext}, wearing ${themeClothing}`,
+      isAnimal: false,
+    };
+  }
+
+  // Default: Let AI pick casual clothes, but instruct to keep consistent
+  return {
+    prompt: `${charContext}, wearing casual play clothes - Pick a specific outfit and keep it EXACTLY the same in all scenes`,
+    isAnimal: false,
+  };
+}
+
 /**
  * Generate image with Gemini using actual character reference images
  * Uses new @google/genai SDK with imageConfig for proper 1:1 aspect ratio
@@ -280,34 +531,29 @@ export async function generateImageWithGemini({
 
   // Detect story theme for appropriate clothing
   const storyTheme = detectStoryTheme(sceneDescription);
-  const themeClothing = getThemeClothing(storyTheme);
 
   if (storyTheme) {
-    console.log(`[Gemini] Detected story theme: ${storyTheme} → clothing: ${themeClothing}`);
+    console.log(`[Gemini] Detected story theme: ${storyTheme}`);
   }
 
-  // Build character descriptions - minimal text, photo is primary source
-  // Clothing priority: 1) Scene-specific, 2) Theme-based, 3) Default casual
-  const characterDescriptions = characters
-    .map(c => {
-      // Minimal description - just name + key features as fallback
-      const charDesc = buildMinimalCharacterDescription(c.name, c.description);
-      const sceneClothing = detectSceneClothing(sceneDescription, c.name);
+  // Build character descriptions using smart prompt builder
+  // Handles: animal detection, clothing priority, outfit caching
+  const characterPrompts = characters.map(c => {
+    const result = buildSmartCharacterPrompt(c, sceneDescription, storyTheme);
+    console.log(`[Gemini] ${c.name}: ${result.isAnimal ? 'ANIMAL' : 'HUMAN'} - ${result.prompt.substring(0, 80)}...`);
+    return { char: c, ...result };
+  });
 
-      if (sceneClothing) {
-        // Scene explicitly specifies clothing for this character
-        return `- ${charDesc}, wearing ${sceneClothing}`;
-      } else if (themeClothing) {
-        // Use theme-appropriate clothing (Christmas pajamas, swimwear, etc.)
-        return `- ${charDesc}, wearing ${themeClothing}`;
-      }
-      // Default: casual clothes appropriate for the activity
-      return `- ${charDesc}, in casual play clothes`;
-    })
+  const characterDescriptions = characterPrompts
+    .map(cp => `- ${cp.prompt}`)
     .join('\n');
 
-  // Check for animals in scene
-  const hasAnimals = sceneContainsAnimals(sceneDescription);
+  // Check if any characters are animals (affects prompt structure)
+  const hasAnimalCharacters = characterPrompts.some(cp => cp.isAnimal);
+  const hasHumanCharacters = characterPrompts.some(cp => !cp.isAnimal);
+
+  // Check for animals in scene (separate from character animals)
+  const hasAnimalsInScene = sceneContainsAnimals(sceneDescription);
 
   // Build comprehensive prompt with strong illustration style instructions
   const fullPrompt = `Create a 3D animated children's book illustration showing: ${sceneDescription}
@@ -332,18 +578,17 @@ export async function generateImageWithGemini({
 - Large expressive eyes typical of animation
 - Professional quality suitable for a printed children's book
 
-=== CHARACTERS (use reference PHOTOS as primary source) ===
+=== CHARACTERS ===
 ${characterDescriptions}
-Note: Text descriptions above are FALLBACK only. Primary source is the reference photo for each character.
+${hasHumanCharacters ? 'Note: For HUMAN characters, use reference photo as primary source for face/skin/hair.' : ''}
+${hasAnimalCharacters ? 'Note: For ANIMAL characters, follow the description exactly - do NOT add human clothing.' : ''}
 
 === CHARACTER RULES ===
-1. PHOTO IS PRIMARY: Use the reference photo to capture the character's identity, face, skin tone, hair
-2. Text description is FALLBACK: Only use if photo fails to load or is unclear
-3. Skin tone: MUST match reference photo exactly
-4. Hair: Match color and general style from reference photo
-5. Face: Recognizable from photo but stylized for 3D animation
-6. CLOTHING: Use what's specified above (theme-appropriate), NOT what's in the reference photo
-${hasAnimals ? '7. Human characters must be COMPLETELY SEPARATE from any animals - distinct entities' : ''}
+${hasHumanCharacters ? `1. HUMAN CHARACTERS: Use reference photo for face, skin tone, hair. Clothing as specified above.
+2. Keep human clothing CONSISTENT across all scenes unless scene specifies a costume change.` : ''}
+${hasAnimalCharacters ? `${hasHumanCharacters ? '3' : '1'}. ANIMAL CHARACTERS: Render as cute illustrated animals. NO human clothing or accessories.
+${hasHumanCharacters ? '4' : '2'}. Animals should look like animals, not anthropomorphized humans in costumes.` : ''}
+${hasAnimalsInScene && hasHumanCharacters ? `${hasAnimalCharacters ? (hasHumanCharacters ? '5' : '3') : '3'}. Human characters must be COMPLETELY SEPARATE from any animals - distinct entities` : ''}
 
 === SCENE ===
 ${sceneDescription}`;
@@ -489,29 +734,29 @@ export async function generateImageWithGeminiClassic({
 
   // Detect story theme for appropriate clothing
   const storyTheme = detectStoryTheme(sceneDescription);
-  const themeClothing = getThemeClothing(storyTheme);
 
   if (storyTheme) {
-    console.log(`[Gemini Classic] Detected story theme: ${storyTheme} → clothing: ${themeClothing}`);
+    console.log(`[Gemini Classic] Detected story theme: ${storyTheme}`);
   }
 
-  // Build character descriptions - minimal text, photo is primary source
-  const characterDescriptions = characters
-    .map(c => {
-      const charDesc = buildMinimalCharacterDescription(c.name, c.description);
-      const sceneClothing = detectSceneClothing(sceneDescription, c.name);
+  // Build character descriptions using smart prompt builder
+  // Handles: animal detection, clothing priority, outfit caching
+  const characterPrompts = characters.map(c => {
+    const result = buildSmartCharacterPrompt(c, sceneDescription, storyTheme);
+    console.log(`[Gemini Classic] ${c.name}: ${result.isAnimal ? 'ANIMAL' : 'HUMAN'} - ${result.prompt.substring(0, 80)}...`);
+    return { char: c, ...result };
+  });
 
-      if (sceneClothing) {
-        return `- ${charDesc}, wearing ${sceneClothing}`;
-      } else if (themeClothing) {
-        return `- ${charDesc}, wearing ${themeClothing}`;
-      }
-      return `- ${charDesc}, in casual play clothes`;
-    })
+  const characterDescriptions = characterPrompts
+    .map(cp => `- ${cp.prompt}`)
     .join('\n');
 
-  // Check for animals in scene
-  const hasAnimals = sceneContainsAnimals(sceneDescription);
+  // Check if any characters are animals (affects prompt structure)
+  const hasAnimalCharacters = characterPrompts.some(cp => cp.isAnimal);
+  const hasHumanCharacters = characterPrompts.some(cp => !cp.isAnimal);
+
+  // Check for animals in scene (separate from character animals)
+  const hasAnimalsInScene = sceneContainsAnimals(sceneDescription);
 
   // Build Classic Storybook style prompt (2D illustration)
   const fullPrompt = `Create a 2D illustrated children's book scene showing: ${sceneDescription}
@@ -538,19 +783,18 @@ export async function generateImageWithGeminiClassic({
 - Nostalgic, cozy, heartwarming feeling
 - Professional quality suitable for a printed children's book
 
-=== CHARACTERS (use reference PHOTOS as primary source) ===
+=== CHARACTERS ===
 ${characterDescriptions}
-Note: Text descriptions above are FALLBACK only. Primary source is the reference photo for each character.
+${hasHumanCharacters ? 'Note: For HUMAN characters, use reference photo as primary source for face/skin/hair.' : ''}
+${hasAnimalCharacters ? 'Note: For ANIMAL characters, follow the description exactly - do NOT add human clothing.' : ''}
 
 === CHARACTER RULES ===
-1. PHOTO IS PRIMARY: Use the reference photo to capture the character's identity, face, skin tone, hair
-2. Text description is FALLBACK: Only use if photo fails to load or is unclear
-3. Skin tone: MUST match reference photo exactly (rendered in illustrated style)
-4. Hair: Match color and general style from reference photo
-5. Face: Recognizable from photo but stylized for 2D illustration
-6. CLOTHING: Use what's specified above (theme-appropriate), NOT what's in the reference photo
-7. MUST BE 2D ILLUSTRATED - absolutely no 3D rendering or CGI look
-${hasAnimals ? '8. Human characters must be COMPLETELY SEPARATE from any animals - distinct entities' : ''}
+${hasHumanCharacters ? `1. HUMAN CHARACTERS: Use reference photo for face, skin tone, hair. Clothing as specified above.
+2. Keep human clothing CONSISTENT across all scenes unless scene specifies a costume change.
+3. MUST BE 2D ILLUSTRATED - absolutely no 3D rendering or CGI look` : ''}
+${hasAnimalCharacters ? `${hasHumanCharacters ? '4' : '1'}. ANIMAL CHARACTERS: Render as cute 2D illustrated animals. NO human clothing or accessories.
+${hasHumanCharacters ? '5' : '2'}. Animals should look like hand-drawn animals, not anthropomorphized humans.` : ''}
+${hasAnimalsInScene && hasHumanCharacters ? `${hasAnimalCharacters ? (hasHumanCharacters ? '6' : '3') : '4'}. Human characters must be COMPLETELY SEPARATE from any animals - distinct entities` : ''}
 
 === SCENE ===
 ${sceneDescription}`;
