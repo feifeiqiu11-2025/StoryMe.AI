@@ -286,6 +286,35 @@ const ANIMAL_KEYWORDS = [
 ];
 
 /**
+ * Human-indicator keywords - if present, the character is definitely human
+ * These features are exclusive to humans and should prevent animal detection
+ */
+const HUMAN_INDICATOR_KEYWORDS = [
+  'beard', 'mustache', 'moustache', 'goatee', 'sideburns',
+  'mother', 'father', 'mom', 'dad', 'grandma', 'grandpa', 'grandmother', 'grandfather',
+  'boy', 'girl', 'man', 'woman', 'child', 'kid', 'baby', 'toddler', 'teen', 'teenager',
+  'brother', 'sister', 'aunt', 'uncle', 'cousin',
+  'teacher', 'doctor', 'nurse', 'firefighter', 'police', 'chef',
+];
+
+/**
+ * Check if character has human-indicator keywords in name or description
+ */
+function hasHumanIndicators(name: string, description: CharacterDescription): boolean {
+  const lowerName = name.toLowerCase();
+  const charContext = (description.fullDescription || description.otherFeatures || '').toLowerCase();
+  const combinedText = `${lowerName} ${charContext}`;
+
+  for (const humanKeyword of HUMAN_INDICATOR_KEYWORDS) {
+    const wordPattern = new RegExp(`\\b${humanKeyword}\\b`, 'i');
+    if (wordPattern.test(combinedText)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Detect if a character is an animal/creature based on their fullDescription
  * Uses smart parsing to check if the animal keyword describes the character itself
  *
@@ -293,8 +322,14 @@ const ANIMAL_KEYWORDS = [
  * - "Miaomiao is a yellow cat" → true (cat IS the character)
  * - "Henry loves his pet dog" → false (dog is not Henry)
  * - "Eddie the Eagle" → true (eagle IS the character)
+ * - "The Father with beard" → false (human indicator present)
  */
 function detectIfAnimal(name: string, description: CharacterDescription): boolean {
+  // FIRST: Check for human indicators - if present, definitely NOT an animal
+  if (hasHumanIndicators(name, description)) {
+    return false;
+  }
+
   // Use fullDescription if available, otherwise fall back to otherFeatures
   const charContext = (description.fullDescription || description.otherFeatures || '').toLowerCase();
   const lowerName = name.toLowerCase();
@@ -321,10 +356,12 @@ function detectIfAnimal(name: string, description: CharacterDescription): boolea
   }
 
   // Pattern 2: Check if otherFeatures contains animal type (legacy data)
+  // Use word boundary regex to avoid false positives (e.g., "elf" in "himself")
   const otherFeatures = (description.otherFeatures || '').toLowerCase();
   for (const animal of ANIMAL_KEYWORDS) {
-    // If otherFeatures starts with or contains "animal" pattern
-    if (otherFeatures.includes(animal) && !otherFeatures.includes('pet') && !otherFeatures.includes('loves')) {
+    // Use word boundary to match whole words only
+    const animalWordPattern = new RegExp(`\\b${animal}\\b`, 'i');
+    if (animalWordPattern.test(otherFeatures) && !otherFeatures.includes('pet') && !otherFeatures.includes('loves')) {
       return true;
     }
   }
