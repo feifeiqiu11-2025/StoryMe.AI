@@ -108,6 +108,12 @@ export interface Scene {
   characterNames?: string[]; // Extracted character names in this scene
 }
 
+// Character type detection from AI
+export interface CharacterType {
+  name: string;
+  isAnimal: boolean; // true for animals/creatures, false for humans
+}
+
 // Enhanced scene after AI processing
 export interface EnhancedScene {
   sceneNumber: number;
@@ -118,6 +124,7 @@ export interface EnhancedScene {
   caption_chinese?: string;      // Chinese translation of caption (NEW - Bilingual Support)
   characterNames: string[];      // Characters in this scene
   isNewCharacter?: boolean;      // Flag if AI added new minor character (NEW)
+  characterTypes?: CharacterType[]; // AI-detected character types (animal vs human)
 }
 
 // Enhanced scene with generated image

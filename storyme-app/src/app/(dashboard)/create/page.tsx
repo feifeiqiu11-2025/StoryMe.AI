@@ -887,11 +887,31 @@ export default function CreateStoryPage() {
         .map(s => s.enhanced_prompt)
         .join('\n');
 
+      // Extract character types from enhanced scenes (AI-detected animal vs human)
+      // Merge all characterTypes from all scenes, using the most recent detection for each character
+      const characterTypeMap = new Map<string, boolean>();
+      for (const scene of enhancedScenes) {
+        if (scene.characterTypes) {
+          for (const ct of scene.characterTypes) {
+            characterTypeMap.set(ct.name, ct.isAnimal);
+          }
+        }
+      }
+
+      // Update characters with AI-detected isAnimal flag
+      const charactersWithTypes = characters.map(c => ({
+        ...c,
+        description: {
+          ...c.description,
+          isAnimal: characterTypeMap.get(c.name) ?? c.description.isAnimal ?? false,
+        }
+      }));
+
       const response = await fetch('/api/generate-images', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          characters: characters,
+          characters: charactersWithTypes,
           script: enhancedScript, // Use enhanced prompts, not raw script
           artStyle: ART_STYLE,
           imageProvider: imageProvider, // Use selected image provider (gemini or flux)

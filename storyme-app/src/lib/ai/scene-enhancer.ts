@@ -6,6 +6,7 @@
  */
 
 import { StoryTone, ExpansionLevel } from '../types/story';
+import type { CharacterType } from '../types/story';
 
 export interface SceneToEnhance {
   sceneNumber: number;
@@ -16,6 +17,7 @@ export interface SceneToEnhance {
 export interface Character {
   name: string;
   description: string;
+  isAnimal?: boolean; // AI-detected: true for animals/creatures, false for humans
 }
 
 export interface EnhancedSceneResult {
@@ -27,6 +29,7 @@ export interface EnhancedSceneResult {
   caption_chinese?: string;      // Chinese translation (NEW - Bilingual Support)
   characterNames: string[];
   isNewCharacter?: boolean;      // Flag if AI added new character
+  characterTypes?: CharacterType[]; // AI-detected character types for this scene
 }
 
 /**
@@ -279,6 +282,12 @@ CRITICAL RULES:
 - The two outputs serve different purposes - keep them distinct
 - Maintain consistency across all scenes in the story
 
+3. CHARACTER TYPE DETECTION (for each character in the scene):
+   - Determine if each character is an ANIMAL or HUMAN based on their description
+   - ANIMAL = cats, dogs, birds, dragons, unicorns, bears, rabbits, etc.
+   - HUMAN = people, boys, girls, mothers, fathers, grandparents, etc.
+   - This is used to generate correct clothing in images (animals don't wear human clothes)
+
 INPUT SCENES:
 ${scenes.map((s, i) => `Scene ${s.sceneNumber}: "${s.rawDescription}" (Characters: ${s.characterNames.join(', ') || 'all'})`).join('\n')}
 
@@ -290,14 +299,16 @@ Return a valid JSON array with ${targetSceneCount} scenes in this exact structur
     "title": "Brief scene title (5-7 words)",
     "enhanced_prompt": "detailed visual description preserving character names",
     "caption": "age-appropriate story text with ${storyTone} tone",
-    "characterNames": ["Emma", "Mom"]
+    "characterNames": ["Emma", "Mom"],
+    "characterTypes": [{"name": "Emma", "isAnimal": false}, {"name": "Mom", "isAnimal": false}]
   },
   {
     "sceneNumber": 2,
     "title": "...",
     "enhanced_prompt": "...",
     "caption": "...",
-    "characterNames": ["Emma"]
+    "characterNames": ["Emma", "Miaomiao"],
+    "characterTypes": [{"name": "Emma", "isAnimal": false}, {"name": "Miaomiao", "isAnimal": true}]
   }
 ]
 
@@ -306,6 +317,7 @@ IMPORTANT:
 - Include "title" for each scene (helps users preview)
 - List all character names appearing in each scene
 - Mark new characters with "(NEW)" suffix if you added them
+- Include characterTypes for EVERY character in the scene (isAnimal: true for animals, false for humans)
 - Return ONLY the JSON array, no additional text.`;
 }
 
@@ -339,7 +351,8 @@ export function parseEnhancementResponse(
         enhanced_prompt: item.enhanced_prompt || item.caption,
         caption: item.caption || originalScene?.rawDescription || 'No description',
         characterNames: item.characterNames || originalScene?.characterNames || [],
-        isNewCharacter: item.characterNames?.some((name: string) => name.includes('(NEW)')) || false
+        isNewCharacter: item.characterNames?.some((name: string) => name.includes('(NEW)')) || false,
+        characterTypes: item.characterTypes || undefined // AI-detected animal vs human for each character
       };
     });
 
