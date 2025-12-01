@@ -30,21 +30,28 @@ export async function POST(request: NextRequest) {
     console.log(`Custom Prompt: ${customPrompt ? 'Yes' : 'No (using default)'}`);
 
     // Build the cover prompt - use custom prompt if provided, otherwise generate default
+    // IMPORTANT: Cover must use SAME art style as scene images for consistency
     let coverDescription: string;
 
+    // Base scene description for cover (characters in a cover-worthy pose)
+    const coverSceneBase = `A children's storybook COVER illustration featuring the main characters in an engaging, eye-catching pose. The composition should be suitable for a book cover with the main subject(s) prominently displayed.`;
+
+    // Text handling based on language
+    const textInstructions = language === 'en'
+      ? `Include ONLY the title "${title}" displayed at the top in clear, stylized letters that match the illustration style. NO subtitles, NO taglines, NO author text, NO publisher text, NO random words.`
+      : `ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO CHINESE CHARACTERS anywhere on the image. Leave clear space at top for title overlay.`;
+
     if (customPrompt && customPrompt.trim()) {
-      // User provided custom prompt
-      coverDescription = customPrompt.trim();
+      // User provided custom prompt - still add text instructions
+      coverDescription = `${customPrompt.trim()}
+
+TEXT RULES: ${textInstructions}`;
       console.log('Using custom prompt:', coverDescription);
-    } else if (language === 'en') {
-      // English: Include ONLY the title text in AI prompt
-      // IMPORTANT: AI often generates gibberish text - be very explicit about what NOT to include
-      // NOTE: Do NOT include story description - it often gets rendered as text on the cover
-      coverDescription = `Children's storybook cover illustration with ONLY the title "${title}" displayed at the top in clear English letters. Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Clean composition focusing on the illustration and title. NO subtitles, NO taglines, NO author text, NO publisher text, NO random words or letters anywhere on the cover - ONLY the title "${title}" and the illustration. Book cover style with minimal text`;
     } else {
-      // Chinese: NO TEXT AT ALL (prevents random Chinese characters, we'll overlay programmatically)
-      // NOTE: Do NOT include story description - it often gets rendered as text on the cover
-      coverDescription = `Children's storybook cover illustration WITHOUT ANY TEXT WHATSOEVER. Professional children's book cover design, colorful, whimsical, magical, appealing to 5-6 year olds, award-winning illustration style. Clean composition with clear space at top for title and bottom for credits. Book cover style illustration. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO CHINESE CHARACTERS, NO NUMBERS, NO SYMBOLS on the image - ONLY pure visual illustration with NO text elements at all`;
+      // Default cover description
+      coverDescription = `${coverSceneBase}
+
+${textInstructions}`;
     }
 
     // Check if Gemini is available
@@ -80,23 +87,18 @@ export async function POST(request: NextRequest) {
         })
       : [];
 
-    console.log(`Generating cover with Gemini (${is3DStyle ? '3D' : '2D'}), ${geminiCharacters.length} character(s)`);
+    console.log(`Generating cover with Gemini (${is3DStyle ? '3D Pixar' : '2D Classic'}), ${geminiCharacters.length} character(s)`);
 
-    // Generate the cover image using Gemini with selected style
-    const artStylePrompt = is3DStyle
-      ? "children's book cover, professional, whimsical, colorful, magical, 3D Pixar style"
-      : "children's book cover, professional, whimsical, colorful, magical, classic 2D storybook illustration, watercolor feel";
-
+    // Generate the cover image using the SAME Gemini functions as scene generation
+    // This ensures cover style matches scene style exactly
     const result = is3DStyle
       ? await generateImageWithGemini({
           characters: geminiCharacters,
           sceneDescription: coverDescription,
-          artStyle: artStylePrompt,
         })
       : await generateImageWithGeminiClassic({
           characters: geminiCharacters,
           sceneDescription: coverDescription,
-          artStyle: artStylePrompt,
         });
 
     console.log(`✅ Cover generated successfully in ${result.generationTime}s`);
