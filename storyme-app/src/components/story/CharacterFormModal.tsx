@@ -3,6 +3,31 @@
 import { useState } from 'react';
 import { Character } from '@/lib/types/story';
 
+/**
+ * Common animal types for detecting if character type is an animal
+ */
+const ANIMAL_KEYWORDS = [
+  'cat', 'kitten', 'kitty', 'dog', 'puppy', 'bird', 'parrot', 'rabbit', 'bunny',
+  'hamster', 'turtle', 'fish', 'horse', 'pony', 'cow', 'pig', 'piglet', 'sheep',
+  'lamb', 'goat', 'chicken', 'duck', 'goose', 'lion', 'tiger', 'elephant',
+  'giraffe', 'zebra', 'monkey', 'bear', 'panda', 'koala', 'wolf', 'fox', 'deer',
+  'owl', 'eagle', 'hawk', 'penguin', 'dolphin', 'whale', 'shark', 'octopus',
+  'dragon', 'unicorn', 'phoenix', 'dinosaur', 'frog', 'butterfly', 'bee',
+];
+
+/**
+ * Detect if character type describes an animal
+ * @param characterType - The character type entered by user (e.g., "fluffy yellow cat", "baby eagle")
+ */
+function detectIsAnimal(characterType: string): boolean {
+  const lowerType = characterType.toLowerCase();
+  return ANIMAL_KEYWORDS.some(animal => {
+    // Use word boundary to avoid partial matches
+    const pattern = new RegExp(`\\b${animal}\\b`, 'i');
+    return pattern.test(lowerType);
+  });
+}
+
 interface CharacterFormModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -316,6 +341,11 @@ export default function CharacterFormModal({
     // Build the full description - source of truth for all scene generation
     const fullDescription = buildFullDescription();
 
+    // Detect if this is an animal character based on the description mode and character type
+    // "From Description" mode with animal-like character types = animal
+    // "From Photo" mode = always human (they uploaded a photo of a person)
+    const isAnimal = characterMode === 'description' && detectIsAnimal(formData.characterType);
+
     const character: Character = {
       id: editingCharacter?.id || `char-${Date.now()}`,
       name: formData.name.trim(),
@@ -330,7 +360,8 @@ export default function CharacterFormModal({
         clothing: characterMode === 'photo' ? formData.clothing : undefined,
         age: formData.age || undefined,
         otherFeatures: otherFeatures || undefined,
-        fullDescription: fullDescription, // NEW: Source of truth for character identity
+        fullDescription: fullDescription,
+        isAnimal: isAnimal, // Flag for image generation
       },
       isPrimary: false,
       order: 0,

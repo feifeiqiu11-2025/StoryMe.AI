@@ -263,9 +263,9 @@ function sceneContainsAnimals(description: string): boolean {
 // CHARACTER TYPE DETECTION & SMART PROMPT BUILDING
 // ============================================================================
 
-// NOTE: Animal/human detection removed - we trust the AI model to understand
-// character descriptions naturally. "Miaomiao is a fluffy yellow cat" is clear
-// to Gemini without needing explicit "This is an ANIMAL" labels.
+// NOTE: Animal detection is now done during character creation (CharacterFormModal)
+// and stored in description.isAnimal. This ensures the user's intent is captured
+// at the source rather than trying to infer it from text patterns.
 
 /**
  * Detect role-specific clothing that should override base outfit
@@ -369,20 +369,30 @@ function buildSmartCharacterPrompt(
 ): { prompt: string; isAnimal: boolean } {
   const { name, description } = char;
 
-  // Get the character description - let AI understand context naturally
+  // Get the character description
   const charContext = description.fullDescription || buildMinimalCharacterDescription(name, description);
 
+  // Use isAnimal flag set during character creation
+  // This is the source of truth - user explicitly chose character type
+  const isAnimal = description.isAnimal === true;
+
+  if (isAnimal) {
+    // For animals: Use the description as-is, flag as animal for prompt rules
+    return {
+      prompt: charContext,
+      isAnimal: true,
+    };
+  }
+
   // Check if character has a reference image (photo-based = human)
-  // Characters without reference images and with animal-like descriptions
-  // will be handled naturally by the AI based on the description
   const hasReferenceImage = char.referenceImageUrl && char.referenceImageUrl.trim() !== '';
 
-  // For characters without reference images, just use the description as-is
-  // The AI will understand "Miaomiao is a fluffy yellow cat" without explicit labels
+  // For characters without reference images and not flagged as animals,
+  // just use the description as-is (likely a human described via text)
   if (!hasReferenceImage) {
     return {
       prompt: charContext,
-      isAnimal: false, // Don't flag - let AI figure it out from description
+      isAnimal: false,
     };
   }
 

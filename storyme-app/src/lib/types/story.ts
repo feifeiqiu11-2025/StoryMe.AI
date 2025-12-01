@@ -76,10 +76,15 @@ export interface CharacterDescription {
   age?: string;
   otherFeatures?: string;
 
-  // NEW: Full original description (source of truth for character identity)
+  // Full original description (source of truth for character identity)
   // e.g., "Miaomiao is a fluffy yellow cat with green eyes"
   // e.g., "Henry is a 5-year-old boy who loves soccer, wearing red t-shirt"
   fullDescription?: string;
+
+  // Character type - determined during character creation
+  // true = animal/creature (cat, dog, dragon, etc.) - no clothing needed
+  // false/undefined = human - apply clothing logic
+  isAnimal?: boolean;
 }
 
 export interface Character {
