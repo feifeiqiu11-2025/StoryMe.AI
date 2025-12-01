@@ -123,26 +123,40 @@ export class ProjectRepository extends BaseRepository<Project> {
     userId: string,
     options?: { limit?: number; offset?: number }
   ): Promise<{ projects: ProjectWithScenes[]; total: number }> {
-    // First, get total count for pagination (fast query)
+    // First, get total count for pagination (fast query with no data)
     const { count, error: countError } = await this.supabase
       .from(this.tableName)
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('user_id', userId);
 
     if (countError) throw countError;
 
-    // Build query with pagination
+    // Optimized query for list view:
+    // - Only fetch essential project fields
+    // - Only fetch first 2 scenes (for cover image preview)
+    // - Only fetch first image per scene (thumbnail)
+    // - Limit tags to avoid bloat
     let query = this.supabase
       .from(this.tableName)
       .select(`
-        *,
+        id,
+        user_id,
+        title,
+        description,
+        cover_image_url,
+        status,
+        visibility,
+        featured,
+        view_count,
+        created_at,
+        updated_at,
         scenes (
-          *,
+          id,
+          scene_number,
           images:generated_images (
             id,
             image_url,
-            thumbnail_url,
-            status
+            thumbnail_url
           )
         ),
         project_tags (
@@ -151,8 +165,7 @@ export class ProjectRepository extends BaseRepository<Project> {
             id,
             name,
             slug,
-            icon,
-            display_order
+            icon
           )
         )
       `)
@@ -170,8 +183,20 @@ export class ProjectRepository extends BaseRepository<Project> {
 
     if (error) throw error;
 
+    // Post-process: limit scenes to first 2 for list view (cover image)
+    const processedData = (data || []).map(project => ({
+      ...project,
+      scenes: (project.scenes || [])
+        .sort((a: any, b: any) => a.scene_number - b.scene_number)
+        .slice(0, 2) // Only keep first 2 scenes for cover
+        .map((scene: any) => ({
+          ...scene,
+          images: (scene.images || []).slice(0, 1) // Only first image per scene
+        }))
+    }));
+
     return {
-      projects: (data || []) as ProjectWithScenes[],
+      projects: processedData as ProjectWithScenes[],
       total: count || 0,
     };
   }

@@ -12,7 +12,7 @@ import Link from 'next/link';
 import type { StoryVisibility } from '@/lib/types/story';
 import { StoryCard, type StoryCardData } from '@/components/story/StoryCard';
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 10; // Reduced for faster initial load
 
 export default function ProjectsPage() {
   const router = useRouter();
