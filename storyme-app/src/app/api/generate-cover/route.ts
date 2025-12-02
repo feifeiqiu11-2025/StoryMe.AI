@@ -33,8 +33,20 @@ export async function POST(request: NextRequest) {
     // IMPORTANT: Cover must use SAME art style as scene images for consistency
     let coverDescription: string;
 
+    // Extract character names for default scene
+    const characterNames = characters?.map((c: Character) => c.name).join(' and ') || 'the main characters';
+
     // Base scene description for cover (characters in a cover-worthy pose)
-    const coverSceneBase = `A children's storybook COVER illustration featuring the main characters in an engaging, eye-catching pose. The composition should be suitable for a book cover with the main subject(s) prominently displayed.`;
+    // More specific to generate a good illustration, not just copy reference photos
+    const coverSceneBase = `Create an ILLUSTRATED children's book COVER showing ${characterNames} in a magical, eye-catching scene related to "${title}".
+
+The characters should be:
+- Smiling and looking happy/excited
+- In dynamic, engaging poses (waving, jumping, or adventure-ready)
+- Positioned prominently in the center or foreground
+- Surrounded by whimsical, colorful background elements that match the story theme
+
+CRITICAL: This must be a 2D ILLUSTRATED drawing in children's book style, NOT a photograph or realistic image. The reference photos are ONLY for understanding the characters' faces - transform them into cute illustrated characters.`;
 
     // Text handling based on language
     const textInstructions = language === 'en'
@@ -43,7 +55,10 @@ export async function POST(request: NextRequest) {
 
     if (customPrompt && customPrompt.trim()) {
       // User provided custom prompt - still add text instructions
+      // Also add reminder to illustrate, not copy photos
       coverDescription = `${customPrompt.trim()}
+
+CRITICAL STYLE REMINDER: Create a 2D ILLUSTRATED children's book image. Reference photos are ONLY for understanding faces - DO NOT reproduce the photos. Transform into cute cartoon-style illustration.
 
 TEXT RULES: ${textInstructions}`;
       console.log('Using custom prompt:', coverDescription);
