@@ -46,8 +46,9 @@ export async function POST(request: NextRequest) {
       coverDescription = `${customPrompt.trim()} ${textInstructions}`;
       console.log('Using custom prompt:', coverDescription);
     } else {
-      // Default cover description - concise
-      coverDescription = `Children's book COVER: ${characterNames} in an exciting scene for "${title}". Characters smiling, dynamic poses, colorful whimsical background. ${textInstructions}`;
+      // Default cover description - use story description for context
+      const storyContext = description ? `Theme: ${description}. ` : '';
+      coverDescription = `Children's book COVER for "${title}". ${storyContext}${characterNames} in an exciting scene, smiling, dynamic poses, colorful whimsical background. ${textInstructions}`;
     }
 
     // Check if Gemini is available
