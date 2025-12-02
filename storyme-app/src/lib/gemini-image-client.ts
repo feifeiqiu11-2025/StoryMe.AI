@@ -555,6 +555,9 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          imageConfig: {
+            aspectRatio: '1:1', // Square images for consistent display
+          },
         },
       });
 
@@ -755,6 +758,9 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          imageConfig: {
+            aspectRatio: '1:1', // Square images for consistent display
+          },
         },
       });
 
@@ -931,6 +937,9 @@ This is a CHARACTER PREVIEW for a children's storybook app. The character should
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          imageConfig: {
+            aspectRatio: '1:1', // Square portrait images
+          },
         },
       });
 
@@ -1088,6 +1097,9 @@ This is a CHARACTER PREVIEW for a children's storybook app. The style should fee
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          imageConfig: {
+            aspectRatio: '1:1', // Square portrait images
+          },
         },
       });
 
@@ -1233,6 +1245,9 @@ This is a CHARACTER PREVIEW for a children's storybook app. The character should
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          imageConfig: {
+            aspectRatio: '1:1', // Square portrait images
+          },
         },
       });
 
@@ -1363,6 +1378,9 @@ This is a CHARACTER PREVIEW for a children's storybook app. The style should fee
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          imageConfig: {
+            aspectRatio: '1:1', // Square portrait images
+          },
         },
       });
 
