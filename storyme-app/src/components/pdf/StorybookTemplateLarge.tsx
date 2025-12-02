@@ -113,14 +113,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFD700',
     marginVertical: 40,
   },
-  // Scene pages (70% image, 30% captions - optimized for less cropping)
+  // Scene pages (75% image, 25% captions - optimized for less cropping)
   scenePage: {
     flex: 1,
     flexDirection: 'column',
   },
   sceneImageContainer: {
     width: '100%',
-    height: '70%',  // Increased from 65% to reduce image cropping
+    height: '75%',  // Increased from 70% to further reduce image cropping
     backgroundColor: '#FFFFFF',
     display: 'flex',
     justifyContent: 'center',
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
   },
   sceneTextContainer: {
     position: 'relative',
-    height: '30%',  // Reduced from 35% to give more room to image
+    height: '25%',  // Reduced from 30% to give more room to image
     paddingTop: 20,
     paddingBottom: 20,
     paddingLeft: 35,
@@ -449,13 +449,13 @@ export const StorybookTemplateLarge: React.FC<StorybookTemplateLargeProps> = ({
       </Page>
 
       {/* Back Cover */}
-      <Page size={{ width: 504, height: 612 }} style={styles.page}>
+      <Page size={{ width: 504, height: 612 }} style={{ ...styles.page, backgroundColor: '#F9FAFB' }}>
         <Image
           src="/images/pdf-back-cover.png"
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'cover',
+            objectFit: 'contain',  // Use contain to prevent cropping
           }}
         />
       </Page>
