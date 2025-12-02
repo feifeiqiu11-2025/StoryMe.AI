@@ -220,27 +220,11 @@ function detectStoryTheme(description: string): string | null {
   return null;
 }
 
-/**
- * Get appropriate clothing based on story theme
- */
-function getThemeClothing(theme: string | null): string {
-  switch (theme) {
-    case 'christmas':
-      return 'cozy Christmas pajamas with festive patterns, Santa hats';
-    case 'halloween':
-      return 'fun Halloween costumes';
-    case 'beach':
-      return 'colorful swimwear and sun hats';
-    case 'bedtime':
-      return 'soft, cozy pajamas';
-    case 'birthday':
-      return 'festive party clothes with birthday hats';
-    case 'winter':
-      return 'warm winter jackets, scarves, and mittens';
-    default:
-      return ''; // No theme-specific clothing
-  }
-}
+// NOTE: getThemeClothing was removed - we no longer auto-add theme clothing
+// Clothing is now controlled by:
+// 1. User's explicit clothing mentions in scene script (e.g., "wearing Christmas pajamas")
+// 2. Character's base clothing from description.clothing
+// 3. If neither, AI picks appropriate casual clothing
 
 /**
  * Detect if scene contains animals (for prompt enhancement)
@@ -268,8 +252,12 @@ function sceneContainsAnimals(description: string): boolean {
 // at the source rather than trying to infer it from text patterns.
 
 /**
- * Detect role-specific clothing that should override base outfit
- * These are temporary costumes for specific scene activities
+ * Detect EXPLICIT clothing mentions in scene description
+ * Only triggers when user explicitly writes about specific costumes/outfits
+ *
+ * IMPORTANT: Does NOT auto-add clothing based on theme/setting
+ * e.g., "at the zoo in winter" does NOT add winter jacket
+ * e.g., "wearing Christmas pajamas" DOES add Christmas pajamas
  */
 function detectRoleClothing(sceneDescription: string, characterName: string): string | null {
   const lowerScene = sceneDescription.toLowerCase();
@@ -281,27 +269,33 @@ function detectRoleClothing(sceneDescription: string, characterName: string): st
   }
 
   const rolePatterns: { pattern: RegExp; clothing: string }[] = [
-    // Occupations/Pretend play
-    { pattern: /(?:pretend|play|dress).{0,20}(?:doctor|nurse)/i, clothing: 'white doctor coat with stethoscope' },
-    { pattern: /(?:pretend|play|dress).{0,20}(?:superhero|hero)/i, clothing: 'colorful superhero costume with cape' },
-    { pattern: /(?:pretend|play|dress).{0,20}(?:chef|cook)/i, clothing: 'chef hat and apron' },
-    { pattern: /(?:pretend|play|dress).{0,20}(?:pirate)/i, clothing: 'pirate costume with hat' },
-    { pattern: /(?:pretend|play|dress).{0,20}(?:princess|prince)/i, clothing: 'royal costume with crown' },
-    { pattern: /(?:pretend|play|dress).{0,20}(?:astronaut|space)/i, clothing: 'astronaut suit' },
-    { pattern: /(?:pretend|play|dress).{0,20}(?:firefighter)/i, clothing: 'firefighter uniform with helmet' },
-    { pattern: /(?:pretend|play|dress).{0,20}(?:police|cop)/i, clothing: 'police uniform' },
-    { pattern: /(?:pretend|play|dress).{0,20}(?:wizard|witch|magic)/i, clothing: 'wizard robe and hat' },
-    { pattern: /(?:pretend|play|dress).{0,20}(?:fairy)/i, clothing: 'sparkly fairy costume with wings' },
+    // EXPLICIT clothing mentions (user wrote about wearing something)
+    { pattern: /wear(?:ing|s)?\s+(?:a\s+)?(?:christmas|xmas|festive)\s*(?:pajama|pyjama|outfit)/i, clothing: 'cozy Christmas pajamas with festive patterns' },
+    { pattern: /wear(?:ing|s)?\s+(?:a\s+)?(?:halloween)\s*(?:costume|outfit)/i, clothing: 'fun Halloween costume' },
+    { pattern: /wear(?:ing|s)?\s+(?:a\s+)?(?:winter|warm)\s*(?:jacket|coat|clothes)/i, clothing: 'warm winter jacket, scarf, and mittens' },
+    { pattern: /wear(?:ing|s)?\s+(?:a\s+)?(?:rain\s*coat|raincoat)/i, clothing: 'rain coat and rain boots' },
+    { pattern: /wear(?:ing|s)?\s+(?:a\s+)?(?:swimsuit|bathing\s*suit|swim\s*wear)/i, clothing: 'colorful swimsuit' },
+    { pattern: /wear(?:ing|s)?\s+(?:a\s+)?(?:pajama|pyjama|pj)/i, clothing: 'cozy pajamas' },
 
-    // Activity-specific clothing
-    { pattern: /(?:swim|pool|beach|ocean|water\s*park)/i, clothing: 'swimsuit' },
-    { pattern: /(?:bath|bathtub|shower)/i, clothing: 'nothing (bathing)' },
-    { pattern: /(?:sleep|bed|bedtime|dream|nap|pajama|pyjama)/i, clothing: 'cozy pajamas' },
-    { pattern: /(?:ballet|dance\s*class)/i, clothing: 'ballet outfit with tutu' },
-    { pattern: /(?:soccer|football\s*game)/i, clothing: 'soccer uniform' },
-    { pattern: /(?:karate|martial\s*art)/i, clothing: 'karate uniform (gi)' },
-    { pattern: /(?:rain|rainy|storm|puddle)/i, clothing: 'rain coat and rain boots' },
-    { pattern: /(?:snow|winter|cold|ice\s*skat)/i, clothing: 'warm winter jacket, scarf, and mittens' },
+    // Occupations/Pretend play (explicit "pretend/dress up as")
+    { pattern: /(?:pretend|play|dress(?:ed)?(?:\s+up)?).{0,15}(?:as\s+)?(?:a\s+)?(?:doctor|nurse)/i, clothing: 'white doctor coat with stethoscope' },
+    { pattern: /(?:pretend|play|dress(?:ed)?(?:\s+up)?).{0,15}(?:as\s+)?(?:a\s+)?(?:superhero|hero)/i, clothing: 'colorful superhero costume with cape' },
+    { pattern: /(?:pretend|play|dress(?:ed)?(?:\s+up)?).{0,15}(?:as\s+)?(?:a\s+)?(?:chef|cook)/i, clothing: 'chef hat and apron' },
+    { pattern: /(?:pretend|play|dress(?:ed)?(?:\s+up)?).{0,15}(?:as\s+)?(?:a\s+)?(?:pirate)/i, clothing: 'pirate costume with hat' },
+    { pattern: /(?:pretend|play|dress(?:ed)?(?:\s+up)?).{0,15}(?:as\s+)?(?:a\s+)?(?:princess|prince)/i, clothing: 'royal costume with crown' },
+    { pattern: /(?:pretend|play|dress(?:ed)?(?:\s+up)?).{0,15}(?:as\s+)?(?:a\s+)?(?:astronaut)/i, clothing: 'astronaut suit' },
+    { pattern: /(?:pretend|play|dress(?:ed)?(?:\s+up)?).{0,15}(?:as\s+)?(?:a\s+)?(?:firefighter)/i, clothing: 'firefighter uniform with helmet' },
+    { pattern: /(?:pretend|play|dress(?:ed)?(?:\s+up)?).{0,15}(?:as\s+)?(?:a\s+)?(?:police|cop)/i, clothing: 'police uniform' },
+    { pattern: /(?:pretend|play|dress(?:ed)?(?:\s+up)?).{0,15}(?:as\s+)?(?:a\s+)?(?:wizard|witch)/i, clothing: 'wizard robe and hat' },
+    { pattern: /(?:pretend|play|dress(?:ed)?(?:\s+up)?).{0,15}(?:as\s+)?(?:a\s+)?(?:fairy)/i, clothing: 'sparkly fairy costume with wings' },
+
+    // Activity-specific (ONLY when activity requires special clothing)
+    { pattern: /(?:go(?:ing|es)?\s+)?swim(?:ming)?|in\s+(?:the\s+)?(?:pool|ocean)/i, clothing: 'swimsuit' },
+    { pattern: /(?:tak(?:ing|e)\s+)?(?:a\s+)?bath|in\s+(?:the\s+)?(?:bathtub|tub)/i, clothing: 'nothing (bathing)' },
+    { pattern: /(?:go(?:ing)?\s+to\s+)?(?:bed|sleep)|bedtime|ready\s+for\s+bed/i, clothing: 'cozy pajamas' },
+    { pattern: /(?:at\s+)?ballet\s*(?:class|lesson|practice)/i, clothing: 'ballet outfit with tutu' },
+    { pattern: /(?:play(?:ing)?\s+)?(?:soccer|football)\s*(?:game|match|practice)/i, clothing: 'soccer uniform' },
+    { pattern: /(?:at\s+)?(?:karate|martial\s*art|taekwondo)\s*(?:class|lesson|practice)/i, clothing: 'martial arts uniform (gi)' },
   ];
 
   for (const { pattern, clothing } of rolePatterns) {
@@ -356,16 +350,18 @@ export function clearOutfitCache(): void {
  * Build smart character prompt with proper type detection and clothing logic
  *
  * Priority for clothing:
- * 1. Scene-specific role (doctor, superhero, swimming) → temporary costume
- * 2. Character's base outfit (from description.clothing) → consistent across scenes
- * 3. Cached outfit from first scene → AI picked, maintain consistency
- * 4. Theme clothing (Christmas, beach) → if no other outfit
- * 5. Default: "casual play clothes" → let AI pick, but cache for later
+ * 1. Scene-specific explicit costume (user wrote "wearing X" or "dressed as X")
+ * 2. Character's base outfit (from description.clothing)
+ * 3. If no outfit specified, use character description as-is
+ *
+ * NOTE: Theme-based auto clothing was REMOVED
+ * We no longer auto-add "winter jacket" for snowy scenes or "pajamas" for Christmas
+ * Clothing changes only when user explicitly mentions it in the scene script
  */
 function buildSmartCharacterPrompt(
   char: GeminiCharacterInfo,
   sceneDescription: string,
-  storyTheme: string | null
+  _storyTheme: string | null  // kept for API compatibility, but no longer used for clothing
 ): { prompt: string; isAnimal: boolean } {
   const { name, description } = char;
 
@@ -408,32 +404,22 @@ function buildSmartCharacterPrompt(
     };
   }
 
-  // Check for cached or base outfit
+  // Use base outfit from character description (no auto theme clothing)
   const characterKey = name.toLowerCase();
   const baseOutfit = description.clothing;
   const cachedOutfit = getOrCacheOutfit(characterKey, baseOutfit);
 
   if (cachedOutfit) {
     return {
-      prompt: `${charContext}, wearing ${cachedOutfit} - IMPORTANT: Keep this EXACT outfit consistent across all scenes`,
+      prompt: `${charContext}, wearing ${cachedOutfit}`,
       isAnimal: false,
     };
   }
 
-  // Check for theme-specific clothing
-  const themeClothing = getThemeClothing(storyTheme);
-  if (themeClothing) {
-    // Cache the theme clothing for consistency
-    outfitCache.set(characterKey, themeClothing);
-    return {
-      prompt: `${charContext}, wearing ${themeClothing}`,
-      isAnimal: false,
-    };
-  }
-
-  // Default: Let AI pick casual clothes, but instruct to keep consistent
+  // No base outfit - use character description as-is
+  // AI will pick appropriate clothing based on context
   return {
-    prompt: `${charContext}, wearing casual play clothes - Pick a specific outfit and keep it EXACTLY the same in all scenes`,
+    prompt: charContext,
     isAnimal: false,
   };
 }
@@ -483,43 +469,41 @@ export async function generateImageWithGemini({
   // Check for animals in scene (separate from character animals)
   const hasAnimalsInScene = sceneContainsAnimals(sceneDescription);
 
-  // Build comprehensive prompt with strong illustration style instructions
-  const fullPrompt = `Create a 3D animated children's book illustration showing: ${sceneDescription}
+  // Build human and animal character sections separately for clearer separation
+  const humanCharacters = characterPrompts.filter(cp => !cp.isAnimal);
+  const animalCharacters = characterPrompts.filter(cp => cp.isAnimal);
 
-=== CRITICAL RENDERING STYLE (MANDATORY) ===
-- Render ALL characters as 3D ANIMATED/ILLUSTRATED characters (Pixar/Disney Junior style)
-- Do NOT paste, composite, or photoshop the reference photos into the image
-- Do NOT create realistic/photographic faces - everything must be stylized illustration
-- Use the reference photos ONLY to understand: face shape, skin tone, hair color/style, and key features
-- Then DRAW the character in 3D animated style with those features
-- Output should look like a frame from an animated movie, NOT a photo edit
+  const humanCharacterSection = humanCharacters.length > 0
+    ? `HUMAN CHARACTERS (from reference photos):\n${humanCharacters.map(cp => `- ${cp.char.name} (human child) - ${cp.prompt}`).join('\n')}`
+    : '';
 
-=== IMAGE FORMAT (CRITICAL) ===
-- MUST generate a SQUARE image (1:1 aspect ratio)
-- Image dimensions should be equal width and height
+  const animalCharacterSection = animalCharacters.length > 0
+    ? `ANIMAL CHARACTERS:\n${animalCharacters.map(cp => `- ${cp.prompt} (cute animated animal, animal face, NO human features)`).join('\n')}`
+    : '';
 
-=== ART STYLE (APPLY TO ENTIRE IMAGE) ===
-- 3D rendered children's book illustration (like Pixar, Disney Junior, Cocomelon)
-- Soft, rounded features with warm, flattering lighting
-- Vibrant, saturated colors throughout
-- Smooth skin textures (not photorealistic)
-- Large expressive eyes typical of animation
-- Professional quality suitable for a printed children's book
+  // Detect if scene mentions animals not in character list
+  const sceneAnimalSection = hasAnimalsInScene && !hasAnimalCharacters
+    ? `ANIMALS IN SCENE:\n- Any animals mentioned in scene: cute cartoon animals with ANIMAL faces, NOT humanoid, NO human clothing`
+    : '';
 
-=== CHARACTERS ===
-${characterDescriptions}
-${hasHumanCharacters ? 'Note: For HUMAN characters, use reference photo as primary source for face/skin/hair.' : ''}
-${hasAnimalCharacters ? 'Note: For ANIMAL characters, follow the description exactly - do NOT add human clothing.' : ''}
+  // Build prompt with clear separation between humans and animals
+  const fullPrompt = `Create a 3D children's book illustration: ${sceneDescription}
 
-=== CHARACTER RULES ===
-${hasHumanCharacters ? `1. HUMAN CHARACTERS: Use reference photo for face, skin tone, hair. Clothing as specified above.
-2. Keep human clothing CONSISTENT across all scenes unless scene specifies a costume change.` : ''}
-${hasAnimalCharacters ? `${hasHumanCharacters ? '3' : '1'}. ANIMAL CHARACTERS: Render as cute illustrated animals. NO human clothing or accessories.
-${hasHumanCharacters ? '4' : '2'}. Animals should look like animals, not anthropomorphized humans in costumes.` : ''}
-${hasAnimalsInScene && hasHumanCharacters ? `${hasAnimalCharacters ? (hasHumanCharacters ? '5' : '3') : '3'}. Human characters must be COMPLETELY SEPARATE from any animals - distinct entities` : ''}
+STYLE: 3D animated Pixar/Disney style, soft rounded features, vibrant colors, large expressive eyes. Square 1:1.
 
-=== SCENE ===
-${sceneDescription}`;
+IMPORTANT:
+- Generate an ILLUSTRATED 3D animated image, NOT a photograph
+- Reference photos show face/hair features only - transform into cute 3D animated characters
+- NO religious figures (Jesus, Buddha, etc.)
+${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? `- CRITICAL: Human children have HUMAN faces. Animals have ANIMAL faces. NEVER mix - no human-animal hybrids, no human body with animal head, no animal body with human face.` : ''}
+
+${humanCharacterSection}
+${animalCharacterSection}
+${sceneAnimalSection}
+
+RULES:
+- Keep clothing consistent with character description unless scene specifies costume/role/holiday attire
+${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans and animals are COMPLETELY SEPARATE entities - each has their own distinct body' : ''}`;
 
   // Build content parts with images for the new SDK format
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -565,10 +549,9 @@ ${sceneDescription}`;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Use new SDK - note: imageConfig.aspectRatio is NOT supported on gemini-2.0-flash-exp
-      // Square aspect ratio is requested in the prompt instead
+      // Use Gemini 2.5 Flash Image model (Nano Banana) - better quality and character consistency
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.5-flash-image',
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -686,16 +669,42 @@ export async function generateImageWithGeminiClassic({
   // Check for animals in scene (separate from character animals)
   const hasAnimalsInScene = sceneContainsAnimals(sceneDescription);
 
-  // Build Classic Storybook style prompt (2D illustration) - SIMPLIFIED for better results
+  // Build human and animal character sections separately for clearer separation
+  const humanCharacters = characterPrompts.filter(cp => !cp.isAnimal);
+  const animalCharacters = characterPrompts.filter(cp => cp.isAnimal);
+
+  const humanCharacterSection = humanCharacters.length > 0
+    ? `HUMAN CHARACTERS (from reference photos):\n${humanCharacters.map(cp => `- ${cp.char.name} (human child) - ${cp.prompt}`).join('\n')}`
+    : '';
+
+  const animalCharacterSection = animalCharacters.length > 0
+    ? `ANIMAL CHARACTERS:\n${animalCharacters.map(cp => `- ${cp.prompt} (cute 2D illustrated animal, animal face, NO human features)`).join('\n')}`
+    : '';
+
+  // Detect if scene mentions animals not in character list
+  const sceneAnimalSection = hasAnimalsInScene && !hasAnimalCharacters
+    ? `ANIMALS IN SCENE:\n- Any animals mentioned in scene: cute cartoon animals with ANIMAL faces, NOT humanoid, NO human clothing`
+    : '';
+
+  // Build Classic Storybook style prompt (2D illustration) - Modern vibrant digital style
   const fullPrompt = `Create a 2D children's book illustration: ${sceneDescription}
 
-STYLE: Hand-drawn 2D cartoon illustration, soft watercolor/gouache, warm pastel colors, large expressive eyes. Square 1:1.
+STYLE: Modern 2D digital cartoon, vibrant saturated colors, smooth cel-shading, large glossy expressive eyes, soft warm lighting, clean polished style. Square 1:1.
 
-IMPORTANT: Generate an ILLUSTRATED cartoon image, NOT a photograph. Reference photos show face/hair features only - transform into cute 2D illustrated characters.
+IMPORTANT:
+- Generate a DIGITAL ILLUSTRATION, NOT a photograph, NOT watercolor
+- Characters MUST closely match reference photos (face shape, skin tone, hair color/style)
+- Transform into cute cartoon style while keeping recognizable likeness
+- NO religious figures (Jesus, Buddha, etc.)
+${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? `- CRITICAL: Human children have HUMAN faces. Animals have ANIMAL faces. NEVER mix - no human-animal hybrids, no human body with animal head, no animal body with human face.` : ''}
 
-CHARACTERS:
-${characterDescriptions}
-${hasAnimalCharacters ? '- Animals: cute 2D illustrated style, NO human clothing.' : ''}`;
+${humanCharacterSection}
+${animalCharacterSection}
+${sceneAnimalSection}
+
+RULES:
+- Keep clothing consistent with character description unless scene specifies costume/role/holiday attire
+${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans and animals are COMPLETELY SEPARATE entities - each has their own distinct body' : ''}`;
 
   // Build content parts with images for the new SDK format
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -740,10 +749,9 @@ ${hasAnimalCharacters ? '- Animals: cute 2D illustrated style, NO human clothing
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Use new SDK - note: imageConfig.aspectRatio is NOT supported on gemini-2.0-flash-exp
-      // Square aspect ratio is requested in the prompt instead
+      // Use Gemini 2.5 Flash Image model (Nano Banana) - better quality and character consistency
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.5-flash-image',
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -917,9 +925,9 @@ This is a CHARACTER PREVIEW for a children's storybook app. The character should
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Use new SDK - note: imageConfig.aspectRatio is NOT supported on gemini-2.0-flash-exp
+      // Use Gemini 2.5 Flash Image model (Nano Banana) - better quality and character consistency
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.5-flash-image',
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -1074,9 +1082,9 @@ This is a CHARACTER PREVIEW for a children's storybook app. The style should fee
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Use new SDK - note: imageConfig.aspectRatio is NOT supported on gemini-2.0-flash-exp
+      // Use Gemini 2.5 Flash Image model (Nano Banana) - better quality and character consistency
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.5-flash-image',
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -1221,7 +1229,7 @@ This is a CHARACTER PREVIEW for a children's storybook app. The character should
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.5-flash-image',
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -1351,7 +1359,7 @@ This is a CHARACTER PREVIEW for a children's storybook app. The style should fee
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.5-flash-image',
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],

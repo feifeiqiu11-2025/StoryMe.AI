@@ -604,21 +604,21 @@ export default function ScenePreviewApproval({
             </div>
           )}
 
-          {/* Image Generation Engine Toggle - Hidden for now */}
-          {/* {onImageProviderChange && (
+          {/* Image Generation Engine Toggle - For comparing Fal.ai vs Gemini */}
+          {onImageProviderChange && (
             <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="text-sm font-medium text-gray-900">Image Generation Engine</h4>
                   <p className="text-xs text-gray-500 mt-1">
                     {imageProvider === 'gemini'
-                      ? 'Gemini: Uses your uploaded photos for better character consistency'
-                      : 'FLUX: Fast generation with text-based character descriptions'}
+                      ? 'Gemini Nano Banana: Better quality and character consistency from photos'
+                      : 'Fal.ai FLUX: Fast generation with text-based character descriptions'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`text-xs font-medium ${imageProvider === 'flux' ? 'text-purple-600' : 'text-gray-400'}`}>
-                    FLUX
+                    Fal.ai
                   </span>
                   <button
                     type="button"
@@ -640,7 +640,7 @@ export default function ScenePreviewApproval({
                 </div>
               </div>
             </div>
-          )} */}
+          )}
 
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
             <button

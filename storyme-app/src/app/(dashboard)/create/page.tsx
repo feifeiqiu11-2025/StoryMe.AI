@@ -57,8 +57,8 @@ export default function CreateStoryPage() {
   const [imageGenerationStatus, setImageGenerationStatus] = useState<GeneratedImage[]>([]);
   const [imageProvider, setImageProvider] = useState<'flux' | 'gemini'>('gemini'); // Default to Gemini for better consistency
 
-  // Art style selection (NEW - Classic Storybook default)
-  const [artStyle, setArtStyle] = useState<ArtStyleType>('classic');
+  // Art style selection (3D Pixar default for better quality)
+  const [artStyle, setArtStyle] = useState<ArtStyleType>('pixar');
 
   // UI state
   const [session, setSession] = useState<StorySession | null>(null);
@@ -515,6 +515,7 @@ export default function CreateStoryPage() {
           language: contentLanguage,
           characters: characters,
           illustrationStyle: artStyle, // 'pixar' (3D) or 'classic' (2D storybook)
+          imageProvider: imageProvider, // 'gemini' or 'flux' - same as scenes for consistency
           customPrompt: useCustomPrompt ? customCoverPrompt : undefined,
         }),
       });
