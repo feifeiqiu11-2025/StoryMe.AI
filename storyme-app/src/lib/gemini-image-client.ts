@@ -689,11 +689,12 @@ export async function generateImageWithGeminiClassic({
   // Build Classic Storybook style prompt (2D illustration) - SIMPLIFIED for better results
   const fullPrompt = `Create a 2D children's book illustration: ${sceneDescription}
 
-STYLE: Soft watercolor/gouache, hand-drawn quality, warm pastel colors, large expressive eyes. Square 1:1 format.
+STYLE: Hand-drawn 2D cartoon illustration, soft watercolor/gouache, warm pastel colors, large expressive eyes. Square 1:1.
+
+IMPORTANT: Generate an ILLUSTRATED cartoon image, NOT a photograph. Reference photos show face/hair features only - transform into cute 2D illustrated characters.
 
 CHARACTERS:
 ${characterDescriptions}
-${hasHumanCharacters ? '- Use reference photos for face/hair features only, then ILLUSTRATE in 2D cartoon style.' : ''}
 ${hasAnimalCharacters ? '- Animals: cute 2D illustrated style, NO human clothing.' : ''}`;
 
   // Build content parts with images for the new SDK format
