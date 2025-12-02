@@ -686,46 +686,15 @@ export async function generateImageWithGeminiClassic({
   // Check for animals in scene (separate from character animals)
   const hasAnimalsInScene = sceneContainsAnimals(sceneDescription);
 
-  // Build Classic Storybook style prompt (2D illustration)
-  const fullPrompt = `Create a 2D illustrated children's book scene showing: ${sceneDescription}
+  // Build Classic Storybook style prompt (2D illustration) - SIMPLIFIED for better results
+  const fullPrompt = `Create a 2D children's book illustration: ${sceneDescription}
 
-=== CRITICAL RENDERING STYLE (MANDATORY) ===
-- Render ALL characters as 2D HAND-DRAWN/DIGITAL ILLUSTRATIONS (NOT 3D CGI)
-- Style: Classic children's storybook illustration with soft watercolor/painted feel
-- Do NOT create 3D rendered, CGI, or Pixar style - this must look hand-drawn/painted
-- Use the reference photos ONLY to understand: face shape, skin tone, hair color/style, and key features
-- Then ILLUSTRATE the characters in 2D storybook style with those features
-- Output should look like a page from a classic children's picture book
+STYLE: Soft watercolor/gouache, hand-drawn quality, warm pastel colors, large expressive eyes. Square 1:1 format.
 
-=== IMAGE FORMAT (CRITICAL) ===
-- MUST generate a SQUARE image (1:1 aspect ratio)
-- Image dimensions should be equal width and height
-
-=== ART STYLE (APPLY TO ENTIRE IMAGE) ===
-- 2D digital illustration with soft watercolor/gouache painted feel
-- Warm, golden hour lighting throughout
-- Pastel and muted color palette with gentle saturation
-- Soft edges, dreamy atmosphere
-- Hand-drawn/painted quality, NOT computer generated look
-- Large expressive eyes (anime/chibi inspired proportions)
-- Nostalgic, cozy, heartwarming feeling
-- Professional quality suitable for a printed children's book
-
-=== CHARACTERS ===
+CHARACTERS:
 ${characterDescriptions}
-${hasHumanCharacters ? 'Note: For HUMAN characters, use reference photo as primary source for face/skin/hair.' : ''}
-${hasAnimalCharacters ? 'Note: For ANIMAL characters, follow the description exactly - do NOT add human clothing.' : ''}
-
-=== CHARACTER RULES ===
-${hasHumanCharacters ? `1. HUMAN CHARACTERS: Use reference photo for face, skin tone, hair. Clothing as specified above.
-2. Keep human clothing CONSISTENT across all scenes unless scene specifies a costume change.
-3. MUST BE 2D ILLUSTRATED - absolutely no 3D rendering or CGI look` : ''}
-${hasAnimalCharacters ? `${hasHumanCharacters ? '4' : '1'}. ANIMAL CHARACTERS: Render as cute 2D illustrated animals. NO human clothing or accessories.
-${hasHumanCharacters ? '5' : '2'}. Animals should look like hand-drawn animals, not anthropomorphized humans.` : ''}
-${hasAnimalsInScene && hasHumanCharacters ? `${hasAnimalCharacters ? (hasHumanCharacters ? '6' : '3') : '4'}. Human characters must be COMPLETELY SEPARATE from any animals - distinct entities` : ''}
-
-=== SCENE ===
-${sceneDescription}`;
+${hasHumanCharacters ? '- Use reference photos for face/hair features only, then ILLUSTRATE in 2D cartoon style.' : ''}
+${hasAnimalCharacters ? '- Animals: cute 2D illustrated style, NO human clothing.' : ''}`;
 
   // Build content parts with images for the new SDK format
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

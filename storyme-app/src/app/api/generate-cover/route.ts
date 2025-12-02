@@ -36,37 +36,18 @@ export async function POST(request: NextRequest) {
     // Extract character names for default scene
     const characterNames = characters?.map((c: Character) => c.name).join(' and ') || 'the main characters';
 
-    // Base scene description for cover (characters in a cover-worthy pose)
-    // More specific to generate a good illustration, not just copy reference photos
-    const coverSceneBase = `Create an ILLUSTRATED children's book COVER showing ${characterNames} in a magical, eye-catching scene related to "${title}".
-
-The characters should be:
-- Smiling and looking happy/excited
-- In dynamic, engaging poses (waving, jumping, or adventure-ready)
-- Positioned prominently in the center or foreground
-- Surrounded by whimsical, colorful background elements that match the story theme
-
-CRITICAL: This must be a 2D ILLUSTRATED drawing in children's book style, NOT a photograph or realistic image. The reference photos are ONLY for understanding the characters' faces - transform them into cute illustrated characters.`;
-
-    // Text handling based on language
+    // Text handling based on language - simplified
     const textInstructions = language === 'en'
-      ? `Include ONLY the title "${title}" displayed at the top in clear, stylized letters that match the illustration style. NO subtitles, NO taglines, NO author text, NO publisher text, NO random words.`
-      : `ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO CHINESE CHARACTERS anywhere on the image. Leave clear space at top for title overlay.`;
+      ? `Add title "${title}" at top in stylized letters. No other text.`
+      : `NO TEXT on image. Leave space at top for title.`;
 
     if (customPrompt && customPrompt.trim()) {
-      // User provided custom prompt - still add text instructions
-      // Also add reminder to illustrate, not copy photos
-      coverDescription = `${customPrompt.trim()}
-
-CRITICAL STYLE REMINDER: Create a 2D ILLUSTRATED children's book image. Reference photos are ONLY for understanding faces - DO NOT reproduce the photos. Transform into cute cartoon-style illustration.
-
-TEXT RULES: ${textInstructions}`;
+      // User provided custom prompt - keep it simple
+      coverDescription = `${customPrompt.trim()} ${textInstructions}`;
       console.log('Using custom prompt:', coverDescription);
     } else {
-      // Default cover description
-      coverDescription = `${coverSceneBase}
-
-${textInstructions}`;
+      // Default cover description - concise
+      coverDescription = `Children's book COVER: ${characterNames} in an exciting scene for "${title}". Characters smiling, dynamic poses, colorful whimsical background. ${textInstructions}`;
     }
 
     // Check if Gemini is available
