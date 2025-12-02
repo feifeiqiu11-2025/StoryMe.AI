@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   },
   sceneImageContainer: {
     width: '100%',
-    height: '65%',
+    height: '70%',  // Increased from 65% to reduce image cropping
     backgroundColor: '#F3F4F6',
     display: 'flex',
     justifyContent: 'center',
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   },
   sceneTextContainer: {
     position: 'relative',
-    height: '35%',
+    height: '30%',  // Reduced from 35% to give more room to image
     paddingTop: 15,
     paddingBottom: 20,
     paddingLeft: 25,
