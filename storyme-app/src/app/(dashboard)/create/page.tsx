@@ -22,6 +22,7 @@ import { parseScriptIntoScenes } from '@/lib/scene-parser';
 import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import { getGuestStory, clearGuestStory } from '@/lib/utils/guest-story-storage';
+import EditImageControl from '@/components/story/EditImageControl';
 
 const CHARACTERS_STORAGE_KEY = 'storyme_character_library';
 const ART_STYLE = "children's book illustration, colorful, whimsical";
@@ -1622,7 +1623,38 @@ export default function CreateStoryPage() {
                       className="w-full rounded-lg shadow-lg mb-3"
                     />
 
-                    {/* Collapsible AI Prompt Editor */}
+                    {/* Edit Image Control - Uses Qwen Image Edit */}
+                    <div className="mb-3">
+                      <EditImageControl
+                        currentImageUrl={coverImageUrl}
+                        imageType="cover"
+                        imageId="cover"
+                        onEditComplete={(newUrl) => setCoverImageUrl(newUrl)}
+                      />
+                    </div>
+
+                    {/* Approve Button */}
+                    <button
+                      onClick={approveCover}
+                      className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-all"
+                    >
+                      ✓ Use This Cover
+                    </button>
+                  </div>
+                )}
+
+                {/* ============================================================
+                // DEPRECATED: Old cover editing UI - kept for reference
+                // Replaced by EditImageControl + Qwen Image Edit API
+                {coverImageUrl && !coverApproved && (
+                  <div className="border-2 border-purple-200 rounded-xl p-4 bg-purple-50">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Cover Preview:</p>
+                    <img
+                      src={coverImageUrl}
+                      alt="Generated cover"
+                      className="w-full rounded-lg shadow-lg mb-3"
+                    />
+
                     <div className="mb-3">
                       <button
                         onClick={() => setShowPromptEditor(!showPromptEditor)}
@@ -1642,7 +1674,7 @@ export default function CreateStoryPage() {
                             rows={4}
                           />
                           <p className="text-xs text-gray-500">
-                            Tip: Describe what you want on the cover - characters, scene, mood, colors. The AI will generate a new image based on your description.
+                            Tip: Describe what you want on the cover - characters, scene, mood, colors.
                           </p>
                           <button
                             onClick={() => generateCoverPreview(true)}
@@ -1672,6 +1704,7 @@ export default function CreateStoryPage() {
                     </div>
                   </div>
                 )}
+                ============================================================ */}
 
                 {coverApproved && (
                   <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">

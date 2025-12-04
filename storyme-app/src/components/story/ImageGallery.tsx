@@ -3,7 +3,11 @@
 import { useState } from 'react';
 import { GeneratedImage, Character } from '@/lib/types/story';
 import SceneRatingCard from './SceneRatingCard';
-import RegenerateSceneControl from './RegenerateSceneControl';
+import EditImageControl from './EditImageControl';
+// ============================================================
+// DEPRECATED: Old regeneration import - kept for reference
+// import RegenerateSceneControl from './RegenerateSceneControl';
+// ============================================================
 
 interface ImageGalleryProps {
   characters: Character[];
@@ -245,7 +249,22 @@ export default function ImageGallery({
                     </p>
                   )}
 
-                  {/* Regenerate Button - Below characters, left-aligned, smaller */}
+                  {/* Edit Image Button - Uses Qwen Image Edit for precise modifications */}
+                  {image.status === 'completed' && image.imageUrl && onRegenerateScene && (
+                    <div className="mt-3">
+                      <EditImageControl
+                        currentImageUrl={image.imageUrl}
+                        imageType="scene"
+                        imageId={image.id}
+                        onEditComplete={(newImageUrl) => onRegenerateScene(image.id, {
+                          ...image,
+                          imageUrl: newImageUrl,
+                        })}
+                      />
+                    </div>
+                  )}
+                  {/* ============================================================
+                  // DEPRECATED: Old RegenerateSceneControl - kept for reference
                   {image.status === 'completed' && onRegenerateScene && (
                     <div className="mt-3">
                       <RegenerateSceneControl
@@ -259,6 +278,7 @@ export default function ImageGallery({
                       />
                     </div>
                   )}
+                  ============================================================ */}
                 </div>
 
                 {image.status === 'completed' && (

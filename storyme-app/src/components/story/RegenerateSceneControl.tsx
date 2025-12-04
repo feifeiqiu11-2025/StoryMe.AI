@@ -1,6 +1,15 @@
 /**
  * Regenerate Scene Control Component
  *
+ * @deprecated This component has been replaced by EditImageControl which uses
+ * Qwen-Image-Edit API for more precise image editing. Kept for reference.
+ *
+ * Replacement: src/components/story/EditImageControl.tsx
+ * New flow: User provides simple edit instruction → Qwen edits existing image
+ * Old flow: User edits prompt → System regenerates entire image from scratch
+ *
+ * To restore: Uncomment RegenerateSceneControl usage in ImageGallery.tsx
+ *
  * Allows users to view and edit the AI prompt for a scene,
  * then regenerate the image with the modified prompt.
  */
