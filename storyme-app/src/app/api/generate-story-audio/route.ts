@@ -1,11 +1,14 @@
 /**
  * Generate Story Audio API
- * Generates audio narration for all pages of a story using OpenAI TTS
+ * Generates audio narration for all pages of a story
+ * - English: Uses OpenAI TTS (nova, shimmer voices)
+ * - Chinese: Uses Azure TTS with native Chinese voices (晓晓, etc.)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
+import { getAzureTTSClient, isAzureTTSAvailable } from '@/lib/azure-tts-client';
 
 // Maximum duration for this API route (5 minutes)
 export const maxDuration = 300;
@@ -198,12 +201,27 @@ export async function POST(request: NextRequest) {
     // Get voice configuration based on story tone
     const tone = project.story_tone || 'default';
     const voiceConfig = VOICE_CONFIG[tone] || VOICE_CONFIG.default;
-    console.log(`🎤 Using voice: ${voiceConfig.voice}, speed: ${voiceConfig.speed}`);
 
-    // Initialize OpenAI client
+    // For Chinese, use Azure TTS with native Chinese voices
+    const useAzureForChinese = language === 'zh' && isAzureTTSAvailable();
+
+    if (language === 'zh') {
+      if (useAzureForChinese) {
+        console.log(`🎤 Using Azure TTS for Chinese with native voice (tone: ${tone})`);
+      } else {
+        console.log(`⚠️ Azure TTS not available, falling back to OpenAI for Chinese`);
+      }
+    } else {
+      console.log(`🎤 Using OpenAI TTS voice: ${voiceConfig.voice}, speed: ${voiceConfig.speed}`);
+    }
+
+    // Initialize OpenAI client (used for English, and Chinese fallback if Azure unavailable)
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
+
+    // Initialize Azure TTS client for Chinese
+    const azureTTS = useAzureForChinese ? getAzureTTSClient() : null;
 
     // For English: Delete existing audio pages and recreate
     // For Chinese: Update existing rows with Chinese audio columns
@@ -223,6 +241,11 @@ export async function POST(request: NextRequest) {
 
         let audioPageId: string;
 
+        // Determine voice ID based on language and provider
+        const voiceId = (azureTTS && language === 'zh')
+          ? 'zh-CN-XiaoxiaoNeural'  // Azure Chinese voice
+          : voiceConfig.voice;       // OpenAI voice
+
         if (language === 'en') {
           // English: Insert new row
           const { data: audioPage, error: insertError } = await supabase
@@ -234,7 +257,7 @@ export async function POST(request: NextRequest) {
               scene_id: page.sceneId,
               quiz_question_id: page.quizQuestionId,
               text_content: page.textContent,
-              voice_id: voiceConfig.voice,
+              voice_id: voiceId,
               tone: tone,
               generation_status: 'generating',
               language: 'en',
@@ -275,7 +298,7 @@ export async function POST(request: NextRequest) {
                 scene_id: page.sceneId,
                 quiz_question_id: page.quizQuestionId,
                 text_content_zh: page.textContent,
-                voice_id: voiceConfig.voice,
+                voice_id: voiceId,
                 tone: tone,
                 generation_status: 'generating',
                 language: 'en', // Default, but we're adding Chinese audio
@@ -291,16 +314,24 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Generate audio with OpenAI TTS
-        const mp3Response = await openai.audio.speech.create({
-          model: 'tts-1',
-          voice: voiceConfig.voice,
-          input: page.textContent,
-          speed: voiceConfig.speed,
-        });
+        // Generate audio - use Azure TTS for Chinese, OpenAI for English
+        let buffer: Buffer;
 
-        // Convert response to buffer
-        const buffer = Buffer.from(await mp3Response.arrayBuffer());
+        if (azureTTS && language === 'zh') {
+          // Use Azure TTS for Chinese with native Chinese voice
+          const azureResult = await azureTTS.synthesize(page.textContent, tone);
+          buffer = azureResult.audioBuffer;
+          console.log(`[Azure TTS] Generated ${buffer.length} bytes for page ${page.pageNumber}`);
+        } else {
+          // Use OpenAI TTS for English (or fallback for Chinese if Azure unavailable)
+          const mp3Response = await openai.audio.speech.create({
+            model: 'tts-1',
+            voice: voiceConfig.voice,
+            input: page.textContent,
+            speed: voiceConfig.speed,
+          });
+          buffer = Buffer.from(await mp3Response.arrayBuffer());
+        }
 
         // Upload to Supabase storage with language suffix
         const filename = `${projectId}/page-${page.pageNumber}-${language}-${Date.now()}.mp3`;
