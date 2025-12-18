@@ -157,10 +157,14 @@ export class AzureTTSClient {
     const styleOpen = voiceConfig.style ? `<mstts:express-as style="${voiceConfig.style}">` : '';
     const styleClose = voiceConfig.style ? '</mstts:express-as>' : '';
 
+    // Volume boost for louder, clearer audio output
+    // Azure SSML supports: silent, x-soft, soft, medium, loud, x-loud, or percentage like +20%
+    const volume = '+30%';
+
     return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis"${msttsNs} xml:lang="${xmlLang}">
   <voice name="${voiceConfig.voice}">
     ${styleOpen}
-    <prosody rate="${voiceConfig.rate}" pitch="${voiceConfig.pitch}">
+    <prosody rate="${voiceConfig.rate}" pitch="${voiceConfig.pitch}" volume="${volume}">
       ${cleanText}
     </prosody>
     ${styleClose}
