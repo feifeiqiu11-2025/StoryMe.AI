@@ -1,8 +1,9 @@
 /**
  * Azure Text-to-Speech Client for StoryMe.AI
  *
- * Used specifically for Chinese audio generation with native Chinese voices.
- * English audio continues to use OpenAI TTS.
+ * Generates audio narration for children's stories using Azure Neural TTS.
+ * - English: Uses en-US-AnaNeural (child voice) for authentic kid storytelling
+ * - Chinese: Uses zh-CN-XiaoxiaoNeural (晓晓) and other kid-friendly voices
  *
  * Uses REST API instead of SDK for serverless compatibility (Vercel).
  * Reference: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/rest-text-to-speech
@@ -18,9 +19,29 @@ interface AzureTTSConfig {
   region: string;
 }
 
+type VoiceConfig = { voice: string; rate: string; pitch: string };
+
+// English voice configuration based on story tone
+// Using en-US-AnaNeural (child voice) as primary for authentic kid storytelling
+// Fallback to JennyNeural for certain tones that need more expressiveness
+const ENGLISH_VOICE_CONFIG: Record<string, VoiceConfig> = {
+  playful: { voice: 'en-US-AnaNeural', rate: '-10%', pitch: '+5%' },       // Child voice - cheerful
+  educational: { voice: 'en-US-AnaNeural', rate: '-15%', pitch: '0%' },    // Child voice - clear for learning
+  adventurous: { voice: 'en-US-AnaNeural', rate: '-5%', pitch: '+3%' },    // Child voice - excited
+  adventure: { voice: 'en-US-AnaNeural', rate: '-5%', pitch: '+3%' },      // Alias
+  calming: { voice: 'en-US-AnaNeural', rate: '-20%', pitch: '-5%' },       // Child voice - soft, bedtime
+  gentle: { voice: 'en-US-AnaNeural', rate: '-20%', pitch: '-5%' },        // Alias
+  mysterious: { voice: 'en-US-AnaNeural', rate: '-15%', pitch: '-3%' },    // Child voice - whispery
+  mystery: { voice: 'en-US-AnaNeural', rate: '-15%', pitch: '-3%' },       // Alias
+  silly: { voice: 'en-US-AnaNeural', rate: '0%', pitch: '+8%' },           // Child voice - fun, animated
+  brave: { voice: 'en-US-AnaNeural', rate: '-10%', pitch: '0%' },          // Child voice - confident
+  friendly: { voice: 'en-US-AnaNeural', rate: '-10%', pitch: '+3%' },      // Child voice - warm
+  default: { voice: 'en-US-AnaNeural', rate: '-15%', pitch: '0%' },        // Default: Child voice at slower pace
+};
+
 // Chinese voice configuration based on story tone
 // Using kid-friendly neural voices for children's stories
-const CHINESE_VOICE_CONFIG: Record<string, { voice: string; rate: string; pitch: string }> = {
+const CHINESE_VOICE_CONFIG: Record<string, VoiceConfig> = {
   playful: { voice: 'zh-CN-XiaoxiaoNeural', rate: '-10%', pitch: '+5%' },      // 晓晓 - Cheerful, kid-friendly
   educational: { voice: 'zh-CN-XiaoyiNeural', rate: '-15%', pitch: '0%' },     // 晓伊 - Clear, warm
   adventurous: { voice: 'zh-CN-XiaoxiaoNeural', rate: '-5%', pitch: '+3%' },   // 晓晓 - Energetic
@@ -36,8 +57,8 @@ const CHINESE_VOICE_CONFIG: Record<string, { voice: string; rate: string; pitch:
 };
 
 /**
- * Azure TTS Client for Chinese audio generation
- * Uses REST API for serverless compatibility
+ * Azure TTS Client for story audio generation
+ * Uses REST API for serverless compatibility (Vercel)
  */
 export class AzureTTSClient {
   private config: AzureTTSConfig;
@@ -54,21 +75,26 @@ export class AzureTTSClient {
   }
 
   /**
-   * Synthesize Chinese text to speech using Azure REST API
-   * @param text - Chinese text to synthesize
+   * Synthesize text to speech using Azure REST API
+   * @param text - Text to synthesize
    * @param tone - Story tone for voice selection
+   * @param language - Language code: 'en' for English, 'zh' for Chinese
    * @returns Audio buffer (MP3 format)
    */
-  async synthesize(text: string, tone: string = 'default'): Promise<AzureTTSResult> {
+  async synthesize(text: string, tone: string = 'default', language: 'en' | 'zh' = 'zh'): Promise<AzureTTSResult> {
     if (!this.isAvailable()) {
       throw new Error('Azure TTS is not configured. Please set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION.');
     }
 
-    const voiceConfig = CHINESE_VOICE_CONFIG[tone] || CHINESE_VOICE_CONFIG.default;
-    const ssml = this.buildSSML(text, voiceConfig);
+    const voiceConfig = language === 'en'
+      ? (ENGLISH_VOICE_CONFIG[tone] || ENGLISH_VOICE_CONFIG.default)
+      : (CHINESE_VOICE_CONFIG[tone] || CHINESE_VOICE_CONFIG.default);
 
-    console.log(`[Azure TTS REST] Synthesizing Chinese audio with voice: ${voiceConfig.voice}`);
-    console.log(`[Azure TTS REST] Region: ${this.config.region}, Text length: ${text.length}`);
+    const xmlLang = language === 'en' ? 'en-US' : 'zh-CN';
+    const ssml = this.buildSSML(text, voiceConfig, xmlLang);
+
+    console.log(`[Azure TTS REST] Synthesizing ${language.toUpperCase()} audio with voice: ${voiceConfig.voice}`);
+    console.log(`[Azure TTS REST] Region: ${this.config.region}, Text length: ${text.length}, Tone: ${tone}`);
 
     const endpoint = `https://${this.config.region}.tts.speech.microsoft.com/cognitiveservices/v1`;
 
@@ -110,9 +136,9 @@ export class AzureTTSClient {
   }
 
   /**
-   * Build SSML for Chinese speech synthesis
+   * Build SSML for speech synthesis
    */
-  private buildSSML(text: string, voiceConfig: { voice: string; rate: string; pitch: string }): string {
+  private buildSSML(text: string, voiceConfig: VoiceConfig, xmlLang: string): string {
     // Escape XML special characters
     const cleanText = text
       .replace(/&/g, '&amp;')
@@ -121,7 +147,7 @@ export class AzureTTSClient {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
 
-    return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">
+    return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${xmlLang}">
   <voice name="${voiceConfig.voice}">
     <prosody rate="${voiceConfig.rate}" pitch="${voiceConfig.pitch}">
       ${cleanText}

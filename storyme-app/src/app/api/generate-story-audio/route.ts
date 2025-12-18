@@ -1,35 +1,16 @@
 /**
  * Generate Story Audio API
- * Generates audio narration for all pages of a story
- * - English: Uses OpenAI TTS (nova, shimmer voices)
- * - Chinese: Uses Azure TTS with native Chinese voices (晓晓, etc.)
+ * Generates audio narration for all pages of a story using Azure Neural TTS
+ * - English: Uses en-US-AnaNeural (child voice) for authentic kid storytelling
+ * - Chinese: Uses zh-CN-XiaoxiaoNeural (晓晓) and other kid-friendly voices
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import OpenAI from 'openai';
 import { getAzureTTSClient, isAzureTTSAvailable } from '@/lib/azure-tts-client';
 
 // Maximum duration for this API route (5 minutes)
 export const maxDuration = 300;
-
-// Voice configuration based on story tone
-// Using slower speeds (0.75-0.9) for better comprehension and learning
-// Nova and Shimmer are the most kid-friendly voices from OpenAI
-const VOICE_CONFIG: Record<string, { voice: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer', speed: number }> = {
-  playful: { voice: 'nova', speed: 0.85 },       // Kid-friendly, clear, slightly energetic
-  educational: { voice: 'nova', speed: 0.80 },   // Clear enunciation for learning
-  adventurous: { voice: 'nova', speed: 0.85 },   // Exciting but not too fast
-  adventure: { voice: 'nova', speed: 0.85 },     // Alias
-  calming: { voice: 'shimmer', speed: 0.75 },    // Soft, very slow for bedtime
-  gentle: { voice: 'shimmer', speed: 0.75 },     // Alias
-  mysterious: { voice: 'shimmer', speed: 0.80 }, // Gentle and mysterious
-  mystery: { voice: 'shimmer', speed: 0.80 },    // Alias
-  silly: { voice: 'nova', speed: 0.90 },         // Fun but comprehensible
-  brave: { voice: 'nova', speed: 0.85 },         // Confident and clear
-  friendly: { voice: 'nova', speed: 0.85 },      // Warm, kid-friendly
-  default: { voice: 'nova', speed: 0.85 },       // Default: Nova at 0.85x speed for learning
-};
 
 interface AudioPage {
   pageNumber: number;
@@ -198,30 +179,21 @@ export async function POST(request: NextRequest) {
 
     console.log(`📖 Generating audio for ${pages.length} pages (${scenes.length} scenes${quizQuestions.length > 0 ? ` + ${quizQuestions.length} quiz questions` : ''})`);
 
-    // Get voice configuration based on story tone
+    // Get story tone for voice selection
     const tone = project.story_tone || 'default';
-    const voiceConfig = VOICE_CONFIG[tone] || VOICE_CONFIG.default;
 
-    // For Chinese, use Azure TTS with native Chinese voices
-    const useAzureForChinese = language === 'zh' && isAzureTTSAvailable();
-
-    if (language === 'zh') {
-      if (useAzureForChinese) {
-        console.log(`🎤 Using Azure TTS for Chinese with native voice (tone: ${tone})`);
-      } else {
-        console.log(`⚠️ Azure TTS not available, falling back to OpenAI for Chinese`);
-      }
-    } else {
-      console.log(`🎤 Using OpenAI TTS voice: ${voiceConfig.voice}, speed: ${voiceConfig.speed}`);
+    // Check if Azure TTS is available
+    if (!isAzureTTSAvailable()) {
+      console.error('❌ Azure TTS not configured');
+      return NextResponse.json(
+        { error: 'Audio generation service not available. Please contact support.' },
+        { status: 503 }
+      );
     }
 
-    // Initialize OpenAI client (used for English, and Chinese fallback if Azure unavailable)
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-
-    // Initialize Azure TTS client for Chinese
-    const azureTTS = useAzureForChinese ? getAzureTTSClient() : null;
+    // Initialize Azure TTS client (used for both English and Chinese)
+    const azureTTS = getAzureTTSClient();
+    console.log(`🎤 Using Azure TTS for ${language.toUpperCase()} with kid-friendly voice (tone: ${tone})`);
 
     // For English: Delete existing audio pages and recreate
     // For Chinese: Update existing rows with Chinese audio columns
@@ -241,10 +213,8 @@ export async function POST(request: NextRequest) {
 
         let audioPageId: string;
 
-        // Determine voice ID based on language and provider
-        const voiceId = (azureTTS && language === 'zh')
-          ? 'zh-CN-XiaoxiaoNeural'  // Azure Chinese voice
-          : voiceConfig.voice;       // OpenAI voice
+        // Determine voice ID based on language
+        const voiceId = language === 'en' ? 'en-US-AnaNeural' : 'zh-CN-XiaoxiaoNeural';
 
         if (language === 'en') {
           // English: Insert new row
@@ -314,24 +284,11 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Generate audio - use Azure TTS for Chinese, OpenAI for English
-        let buffer: Buffer;
-
-        if (azureTTS && language === 'zh') {
-          // Use Azure TTS for Chinese with native Chinese voice
-          const azureResult = await azureTTS.synthesize(page.textContent, tone);
-          buffer = azureResult.audioBuffer;
-          console.log(`[Azure TTS] Generated ${buffer.length} bytes for page ${page.pageNumber}`);
-        } else {
-          // Use OpenAI TTS for English (or fallback for Chinese if Azure unavailable)
-          const mp3Response = await openai.audio.speech.create({
-            model: 'tts-1',
-            voice: voiceConfig.voice,
-            input: page.textContent,
-            speed: voiceConfig.speed,
-          });
-          buffer = Buffer.from(await mp3Response.arrayBuffer());
-        }
+        // Generate audio using Azure TTS (for both English and Chinese)
+        const langCode = language as 'en' | 'zh';
+        const azureResult = await azureTTS.synthesize(page.textContent, tone, langCode);
+        const buffer = azureResult.audioBuffer;
+        console.log(`[Azure TTS] Generated ${buffer.length} bytes for page ${page.pageNumber}`);
 
         // Upload to Supabase storage with language suffix
         const filename = `${projectId}/page-${page.pageNumber}-${language}-${Date.now()}.mp3`;
