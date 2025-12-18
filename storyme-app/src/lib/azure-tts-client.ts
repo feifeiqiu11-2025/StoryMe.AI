@@ -2,7 +2,7 @@
  * Azure Text-to-Speech Client for StoryMe.AI
  *
  * Generates audio narration for children's stories using Azure Neural TTS.
- * - English: Uses en-US-AnaNeural (child voice) for authentic kid storytelling
+ * - English: Uses en-US-Emma:DragonHDLatestNeural (HD voice with clear pronunciation & expressive rhythm)
  * - Chinese: Uses zh-CN-XiaoxiaoNeural (晓晓) and other kid-friendly voices
  *
  * Uses REST API instead of SDK for serverless compatibility (Vercel).
@@ -19,41 +19,46 @@ interface AzureTTSConfig {
   region: string;
 }
 
-type VoiceConfig = { voice: string; rate: string; pitch: string };
+type VoiceConfig = { voice: string; rate: string; pitch: string; style?: string };
 
 // English voice configuration based on story tone
-// Using en-US-AnaNeural (child voice) as primary for authentic kid storytelling
-// Fallback to JennyNeural for certain tones that need more expressiveness
+// Using en-US-Emma:DragonHDLatestNeural - HD quality voice with:
+// - Clear pronunciation
+// - Natural rhythm with ups and downs
+// - Expressive storytelling
 const ENGLISH_VOICE_CONFIG: Record<string, VoiceConfig> = {
-  playful: { voice: 'en-US-AnaNeural', rate: '-10%', pitch: '+5%' },       // Child voice - cheerful
-  educational: { voice: 'en-US-AnaNeural', rate: '-15%', pitch: '0%' },    // Child voice - clear for learning
-  adventurous: { voice: 'en-US-AnaNeural', rate: '-5%', pitch: '+3%' },    // Child voice - excited
-  adventure: { voice: 'en-US-AnaNeural', rate: '-5%', pitch: '+3%' },      // Alias
-  calming: { voice: 'en-US-AnaNeural', rate: '-20%', pitch: '-5%' },       // Child voice - soft, bedtime
-  gentle: { voice: 'en-US-AnaNeural', rate: '-20%', pitch: '-5%' },        // Alias
-  mysterious: { voice: 'en-US-AnaNeural', rate: '-15%', pitch: '-3%' },    // Child voice - whispery
-  mystery: { voice: 'en-US-AnaNeural', rate: '-15%', pitch: '-3%' },       // Alias
-  silly: { voice: 'en-US-AnaNeural', rate: '0%', pitch: '+8%' },           // Child voice - fun, animated
-  brave: { voice: 'en-US-AnaNeural', rate: '-10%', pitch: '0%' },          // Child voice - confident
-  friendly: { voice: 'en-US-AnaNeural', rate: '-10%', pitch: '+3%' },      // Child voice - warm
-  default: { voice: 'en-US-AnaNeural', rate: '-15%', pitch: '0%' },        // Default: Child voice at slower pace
+  playful: { voice: 'en-US-Emma:DragonHDLatestNeural', rate: '-5%', pitch: '+3%' },       // HD - cheerful
+  educational: { voice: 'en-US-Emma:DragonHDLatestNeural', rate: '-10%', pitch: '0%' },   // HD - clear for learning
+  adventurous: { voice: 'en-US-Emma:DragonHDLatestNeural', rate: '0%', pitch: '+2%' },    // HD - excited
+  adventure: { voice: 'en-US-Emma:DragonHDLatestNeural', rate: '0%', pitch: '+2%' },      // Alias
+  calming: { voice: 'en-US-Emma:DragonHDLatestNeural', rate: '-15%', pitch: '-3%' },      // HD - soft, bedtime
+  gentle: { voice: 'en-US-Emma:DragonHDLatestNeural', rate: '-15%', pitch: '-3%' },       // Alias
+  mysterious: { voice: 'en-US-Emma:DragonHDLatestNeural', rate: '-10%', pitch: '-2%' },   // HD - intriguing
+  mystery: { voice: 'en-US-Emma:DragonHDLatestNeural', rate: '-10%', pitch: '-2%' },      // Alias
+  silly: { voice: 'en-US-Emma:DragonHDLatestNeural', rate: '+5%', pitch: '+5%' },         // HD - fun, animated
+  brave: { voice: 'en-US-Emma:DragonHDLatestNeural', rate: '-5%', pitch: '0%' },          // HD - confident
+  friendly: { voice: 'en-US-Emma:DragonHDLatestNeural', rate: '-5%', pitch: '+2%' },      // HD - warm
+  default: { voice: 'en-US-Emma:DragonHDLatestNeural', rate: '-10%', pitch: '0%' },       // Default: HD at comfortable pace
 };
 
 // Chinese voice configuration based on story tone
-// Using kid-friendly neural voices for children's stories
+// Using zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural - HD voice with "story" style:
+// - Expressive storytelling with natural rhythm
+// - Clear pronunciation
+// - Authentic Chinese voice
 const CHINESE_VOICE_CONFIG: Record<string, VoiceConfig> = {
-  playful: { voice: 'zh-CN-XiaoxiaoNeural', rate: '-10%', pitch: '+5%' },      // 晓晓 - Cheerful, kid-friendly
-  educational: { voice: 'zh-CN-XiaoyiNeural', rate: '-15%', pitch: '0%' },     // 晓伊 - Clear, warm
-  adventurous: { voice: 'zh-CN-XiaoxiaoNeural', rate: '-5%', pitch: '+3%' },   // 晓晓 - Energetic
-  adventure: { voice: 'zh-CN-XiaoxiaoNeural', rate: '-5%', pitch: '+3%' },     // Alias
-  calming: { voice: 'zh-CN-XiaohanNeural', rate: '-20%', pitch: '-5%' },       // 晓涵 - Soft, gentle
-  gentle: { voice: 'zh-CN-XiaohanNeural', rate: '-20%', pitch: '-5%' },        // Alias
-  mysterious: { voice: 'zh-CN-XiaochenNeural', rate: '-15%', pitch: '-3%' },   // 晓辰 - Calm, storytelling
-  mystery: { voice: 'zh-CN-XiaochenNeural', rate: '-15%', pitch: '-3%' },      // Alias
-  silly: { voice: 'zh-CN-XiaoxiaoNeural', rate: '0%', pitch: '+8%' },          // 晓晓 - Fun, animated
-  brave: { voice: 'zh-CN-YunxiNeural', rate: '-10%', pitch: '0%' },            // 云希 - Confident male voice
-  friendly: { voice: 'zh-CN-XiaoxiaoNeural', rate: '-10%', pitch: '+3%' },     // 晓晓 - Warm, friendly
-  default: { voice: 'zh-CN-XiaoxiaoNeural', rate: '-10%', pitch: '0%' },       // Default: 晓晓 (most kid-friendly)
+  playful: { voice: 'zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural', rate: '-5%', pitch: '+3%', style: 'cheerful' },    // HD - cheerful
+  educational: { voice: 'zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural', rate: '-10%', pitch: '0%', style: 'story' },   // HD - story mode
+  adventurous: { voice: 'zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural', rate: '0%', pitch: '+2%', style: 'excited' },  // HD - excited
+  adventure: { voice: 'zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural', rate: '0%', pitch: '+2%', style: 'excited' },    // Alias
+  calming: { voice: 'zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural', rate: '-15%', pitch: '-3%', style: 'affectionate' }, // HD - gentle
+  gentle: { voice: 'zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural', rate: '-15%', pitch: '-3%', style: 'affectionate' },  // Alias
+  mysterious: { voice: 'zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural', rate: '-10%', pitch: '-2%', style: 'whisper' },   // HD - whisper
+  mystery: { voice: 'zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural', rate: '-10%', pitch: '-2%', style: 'whisper' },      // Alias
+  silly: { voice: 'zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural', rate: '+5%', pitch: '+5%', style: 'cheerful' },        // HD - fun
+  brave: { voice: 'zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural', rate: '-5%', pitch: '0%', style: 'story' },            // HD - confident
+  friendly: { voice: 'zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural', rate: '-5%', pitch: '+2%', style: 'affectionate' }, // HD - warm
+  default: { voice: 'zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural', rate: '-10%', pitch: '0%', style: 'story' },         // Default: HD story mode
 };
 
 /**
@@ -147,11 +152,18 @@ export class AzureTTSClient {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
 
-    return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${xmlLang}">
+    // Add mstts namespace if using style
+    const msttsNs = voiceConfig.style ? ' xmlns:mstts="http://www.w3.org/2001/mstts"' : '';
+    const styleOpen = voiceConfig.style ? `<mstts:express-as style="${voiceConfig.style}">` : '';
+    const styleClose = voiceConfig.style ? '</mstts:express-as>' : '';
+
+    return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis"${msttsNs} xml:lang="${xmlLang}">
   <voice name="${voiceConfig.voice}">
+    ${styleOpen}
     <prosody rate="${voiceConfig.rate}" pitch="${voiceConfig.pitch}">
       ${cleanText}
     </prosody>
+    ${styleClose}
   </voice>
 </speak>`;
   }
