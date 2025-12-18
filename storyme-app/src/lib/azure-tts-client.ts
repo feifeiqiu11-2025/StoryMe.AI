@@ -3,9 +3,10 @@
  *
  * Used specifically for Chinese audio generation with native Chinese voices.
  * English audio continues to use OpenAI TTS.
+ *
+ * Uses REST API instead of SDK for serverless compatibility (Vercel).
+ * Reference: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/rest-text-to-speech
  */
-
-import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
 
 export interface AzureTTSResult {
   audioBuffer: Buffer;
@@ -36,6 +37,7 @@ const CHINESE_VOICE_CONFIG: Record<string, { voice: string; rate: string; pitch:
 
 /**
  * Azure TTS Client for Chinese audio generation
+ * Uses REST API for serverless compatibility
  */
 export class AzureTTSClient {
   private config: AzureTTSConfig;
@@ -52,7 +54,7 @@ export class AzureTTSClient {
   }
 
   /**
-   * Synthesize Chinese text to speech
+   * Synthesize Chinese text to speech using Azure REST API
    * @param text - Chinese text to synthesize
    * @param tone - Story tone for voice selection
    * @returns Audio buffer (MP3 format)
@@ -63,54 +65,48 @@ export class AzureTTSClient {
     }
 
     const voiceConfig = CHINESE_VOICE_CONFIG[tone] || CHINESE_VOICE_CONFIG.default;
+    const ssml = this.buildSSML(text, voiceConfig);
 
-    return new Promise((resolve, reject) => {
-      try {
-        const speechConfig = sdk.SpeechConfig.fromSubscription(
-          this.config.subscriptionKey,
-          this.config.region
-        );
+    console.log(`[Azure TTS REST] Synthesizing Chinese audio with voice: ${voiceConfig.voice}`);
+    console.log(`[Azure TTS REST] Region: ${this.config.region}, Text length: ${text.length}`);
 
-        // Use MP3 format: 16kHz, 128kbps, Mono - compatible with mobile apps
-        speechConfig.speechSynthesisOutputFormat =
-          sdk.SpeechSynthesisOutputFormat.Audio16Khz128KBitRateMonoMp3;
+    const endpoint = `https://${this.config.region}.tts.speech.microsoft.com/cognitiveservices/v1`;
 
-        // Create synthesizer without audio output (we capture the buffer)
-        const synthesizer = new sdk.SpeechSynthesizer(speechConfig, undefined);
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': this.config.subscriptionKey,
+          'Content-Type': 'application/ssml+xml',
+          // MP3 format: 16kHz, 128kbps - compatible with mobile apps
+          'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+          'User-Agent': 'StoryMeAI-TTS',
+        },
+        body: ssml,
+      });
 
-        // Build SSML for better control of voice, rate, and pitch
-        const ssml = this.buildSSML(text, voiceConfig);
-
-        console.log(`[Azure TTS] Synthesizing Chinese audio with voice: ${voiceConfig.voice}`);
-
-        synthesizer.speakSsmlAsync(
-          ssml,
-          (result) => {
-            if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
-              const audioBuffer = Buffer.from(result.audioData);
-              const durationMs = result.audioDuration / 10000; // Convert from 100ns to ms
-
-              console.log(`[Azure TTS] Successfully generated ${audioBuffer.length} bytes, duration: ${Math.round(durationMs)}ms`);
-
-              synthesizer.close();
-              resolve({
-                audioBuffer,
-                durationMs,
-              });
-            } else {
-              synthesizer.close();
-              reject(new Error(`Azure TTS synthesis failed: ${result.errorDetails || 'Unknown error'}`));
-            }
-          },
-          (error) => {
-            synthesizer.close();
-            reject(new Error(`Azure TTS error: ${error}`));
-          }
-        );
-      } catch (error) {
-        reject(error);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[Azure TTS REST] API error: ${response.status} - ${errorText}`);
+        throw new Error(`Azure TTS API error: ${response.status} - ${errorText}`);
       }
-    });
+
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = Buffer.from(arrayBuffer);
+
+      // Estimate duration based on MP3 bitrate (128kbps = 16KB/s)
+      const estimatedDurationMs = (audioBuffer.length / 16000) * 1000;
+
+      console.log(`[Azure TTS REST] Successfully generated ${audioBuffer.length} bytes, estimated duration: ${Math.round(estimatedDurationMs)}ms`);
+
+      return {
+        audioBuffer,
+        durationMs: estimatedDurationMs,
+      };
+    } catch (error: any) {
+      console.error(`[Azure TTS REST] Error: ${error.message}`);
+      throw error;
+    }
   }
 
   /**
@@ -125,15 +121,13 @@ export class AzureTTSClient {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
 
-    return `
-      <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">
-        <voice name="${voiceConfig.voice}">
-          <prosody rate="${voiceConfig.rate}" pitch="${voiceConfig.pitch}">
-            ${cleanText}
-          </prosody>
-        </voice>
-      </speak>
-    `.trim();
+    return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">
+  <voice name="${voiceConfig.voice}">
+    <prosody rate="${voiceConfig.rate}" pitch="${voiceConfig.pitch}">
+      ${cleanText}
+    </prosody>
+  </voice>
+</speak>`;
   }
 }
 
