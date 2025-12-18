@@ -249,13 +249,15 @@ export default function ImageGallery({
                     </p>
                   )}
 
-                  {/* Edit Image Button - Uses Qwen Image Edit for precise modifications */}
+                  {/* Edit Image Button - Uses Gemini for text-guided image editing */}
                   {image.status === 'completed' && image.imageUrl && onRegenerateScene && (
                     <div className="mt-3">
                       <EditImageControl
                         currentImageUrl={image.imageUrl}
                         imageType="scene"
                         imageId={image.id}
+                        illustrationStyle={artStyle === 'classic' ? 'classic' : 'pixar'}
+                        sceneDescription={image.sceneDescription}
                         onEditComplete={(newImageUrl) => onRegenerateScene(image.id, {
                           ...image,
                           imageUrl: newImageUrl,

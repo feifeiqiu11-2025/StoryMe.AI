@@ -1,7 +1,8 @@
 /**
  * Edit Image Control Component
  *
- * Reusable component for editing scene images and cover images using Qwen-Image-Edit.
+ * Reusable component for editing scene images and cover images.
+ * Uses Gemini for text-guided image editing (primary), with Segmind as fallback.
  * Provides a simple UI for entering edit instructions and applying changes.
  */
 
@@ -15,6 +16,10 @@ interface EditImageControlProps {
   imageId: string;
   onEditComplete: (newImageUrl: string) => void;
   buttonLabel?: string;
+  /** Illustration style to maintain during edit (defaults to 'pixar') */
+  illustrationStyle?: 'pixar' | 'classic';
+  /** Original scene description for context */
+  sceneDescription?: string;
 }
 
 export default function EditImageControl({
@@ -23,6 +28,8 @@ export default function EditImageControl({
   imageId,
   onEditComplete,
   buttonLabel = 'Edit Image',
+  illustrationStyle = 'pixar',
+  sceneDescription,
 }: EditImageControlProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [instruction, setInstruction] = useState('');
@@ -52,6 +59,8 @@ export default function EditImageControl({
           instruction: instruction.trim(),
           imageType,
           imageId,
+          illustrationStyle,
+          sceneDescription,
         }),
       });
 
@@ -167,7 +176,7 @@ export default function EditImageControl({
       {isEditing && (
         <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
           <p className="text-xs text-blue-700">
-            ⏳ Editing image... This may take 10-30 seconds.
+            ⏳ Editing image... This may take 5-15 seconds.
           </p>
         </div>
       )}

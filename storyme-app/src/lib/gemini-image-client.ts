@@ -1439,3 +1439,201 @@ This is a CHARACTER PREVIEW for a children's storybook app. The style should fee
 
   throw lastError || new Error('Gemini classic description-only preview generation failed after all retries');
 }
+
+// ============================================================================
+// IMAGE EDITING
+// ============================================================================
+
+/**
+ * Parameters for editing an existing image with Gemini
+ */
+export interface GeminiEditParams {
+  /** URL of the current image to edit */
+  currentImageUrl: string;
+  /** Natural language instruction for the edit (e.g., "remove the cat", "add a tree") */
+  editInstruction: string;
+  /** Original scene description for context */
+  sceneDescription?: string;
+  /** Illustration style to maintain */
+  illustrationStyle?: 'pixar' | 'classic';
+}
+
+/**
+ * Result from image editing
+ */
+export interface GeminiEditResult {
+  imageUrl: string; // data URL (base64)
+  generationTime: number;
+  editInstruction: string;
+}
+
+/**
+ * Edit an existing image using Gemini's text-guided image editing
+ *
+ * Gemini can modify an existing image based on natural language instructions
+ * while maintaining the overall style and character consistency.
+ *
+ * @example
+ * ```typescript
+ * const result = await editImageWithGemini({
+ *   currentImageUrl: 'https://...',
+ *   editInstruction: 'remove the cat in the background',
+ *   sceneDescription: 'A child playing in a garden',
+ *   illustrationStyle: 'pixar',
+ * });
+ * ```
+ */
+export async function editImageWithGemini({
+  currentImageUrl,
+  editInstruction,
+  sceneDescription,
+  illustrationStyle = 'pixar',
+}: GeminiEditParams): Promise<GeminiEditResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+
+  if (!currentImageUrl) {
+    throw new Error('Current image URL is required for editing');
+  }
+
+  if (!editInstruction || editInstruction.trim().length < 3) {
+    throw new Error('Edit instruction must be at least 3 characters');
+  }
+
+  const startTime = Date.now();
+  const genAI = new GoogleGenAI({ apiKey });
+
+  // Build the edit prompt based on illustration style
+  const styleDescription = illustrationStyle === 'pixar'
+    ? '3D animated Pixar/Disney style with soft rounded features, vibrant colors, large expressive eyes'
+    : 'Modern 2D digital cartoon with vibrant saturated colors, smooth cel-shading, large glossy expressive eyes';
+
+  // Construct the edit prompt
+  const editPrompt = `Edit this children's book illustration with the following change:
+
+EDIT REQUEST: ${editInstruction}
+
+${sceneDescription ? `SCENE CONTEXT: ${sceneDescription}` : ''}
+
+STYLE TO MAINTAIN: ${styleDescription}
+
+IMPORTANT RULES:
+- Apply ONLY the requested edit
+- Keep the same illustration style (${illustrationStyle === 'pixar' ? '3D Pixar' : '2D cartoon'})
+- Preserve character appearances and expressions unless specifically asked to change them
+- Maintain the same color palette and lighting
+- Keep the same background unless specifically asked to change it
+- Output must be a children's book illustration, NOT a photograph
+- Square 1:1 aspect ratio`;
+
+  console.log(`[Gemini Edit] Editing image with instruction: "${editInstruction}"`);
+  console.log(`[Gemini Edit] Style: ${illustrationStyle}, Scene: ${sceneDescription?.substring(0, 50) || 'N/A'}...`);
+
+  // Fetch the current image as base64
+  let imageData: { base64: string; mimeType: string };
+  try {
+    imageData = await fetchImageAsBase64(currentImageUrl);
+    console.log(`[Gemini Edit] Fetched current image (${imageData.mimeType})`);
+  } catch (fetchError) {
+    console.error('[Gemini Edit] Failed to fetch current image:', fetchError);
+    throw new Error(`Failed to fetch current image for editing: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
+  }
+
+  // Build content parts: text prompt + current image
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contentParts: any[] = [
+    { text: editPrompt },
+    {
+      inlineData: {
+        mimeType: imageData.mimeType,
+        data: imageData.base64,
+      },
+    },
+    { text: '[Image to edit - apply the requested changes while maintaining style]' },
+  ];
+
+  // Retry logic for rate limits
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await genAI.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: contentParts,
+        config: {
+          responseModalities: [Modality.TEXT, Modality.IMAGE],
+          imageConfig: {
+            aspectRatio: '1:1', // Square images for consistent display
+          },
+        },
+      });
+
+      // Extract image from response
+      const candidates = result.candidates;
+      if (!candidates || candidates.length === 0) {
+        throw new Error('No candidates in Gemini edit response');
+      }
+
+      const parts = candidates[0].content?.parts;
+      if (!parts) {
+        throw new Error('No parts in Gemini edit response');
+      }
+
+      // Find the image part
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const imagePart = parts.find((p: any) => p.inlineData);
+      if (!imagePart || !imagePart.inlineData) {
+        // Check for text response explaining why no image
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const textPart = parts.find((p: any) => p.text);
+        throw new Error(`Gemini edit failed: ${textPart?.text || 'No edited image generated'}`);
+      }
+
+      const generationTime = (Date.now() - startTime) / 1000;
+      console.log(`[Gemini Edit] Edited image in ${generationTime.toFixed(1)}s`);
+
+      // Return as data URL
+      const imageDataUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+
+      return {
+        imageUrl: imageDataUrl,
+        generationTime,
+        editInstruction,
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const errorMessage = lastError.message;
+
+      // Check if it's a rate limit error (429)
+      if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate')) {
+        const retryMatch = errorMessage.match(/retry in (\d+)/i);
+        const retryDelay = retryMatch ? parseInt(retryMatch[1], 10) * 1000 : 60000; // Default 60s
+        const waitTime = Math.min(retryDelay, 120000); // Cap at 2 minutes
+
+        if (attempt < maxRetries) {
+          console.warn(`[Gemini Edit] Rate limited (attempt ${attempt}/${maxRetries}). Waiting ${waitTime / 1000}s...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+      }
+
+      // For non-rate-limit errors or final attempt, throw
+      console.error(`[Gemini Edit] Error (attempt ${attempt}/${maxRetries}):`, error);
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError || new Error('Gemini image edit failed after all retries');
+}
+
+/**
+ * Check if Gemini image editing is available
+ */
+export function isGeminiEditAvailable(): boolean {
+  return !!process.env.GEMINI_API_KEY;
+}

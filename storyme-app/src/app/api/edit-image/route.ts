@@ -1,8 +1,8 @@
 /**
  * Edit Image API Endpoint
  *
- * Unified endpoint for editing both scene images and cover images using Qwen-Image-Edit.
- * Takes the current image URL and a natural language instruction, returns the edited image.
+ * Unified endpoint for editing both scene images and cover images.
+ * Uses Gemini for text-guided image editing (primary), with Segmind as fallback.
  *
  * POST /api/edit-image
  *
@@ -11,27 +11,52 @@
  *   - instruction: string (what to change, e.g., "remove the cat")
  *   - imageType: 'scene' | 'cover'
  *   - imageId: string (sceneId for scenes, or 'cover' for cover image)
+ *   - illustrationStyle?: 'pixar' | 'classic' (optional, defaults to 'pixar')
+ *   - sceneDescription?: string (optional, helps maintain context)
+ *   - useProvider?: 'gemini' | 'segmind' (optional, defaults to 'gemini')
  *
  * Response:
  *   - success: boolean
  *   - imageUrl: string (new Supabase URL after upload)
  *   - editInstruction: string (stored for reference)
  *   - generationTime: number
+ *   - provider: 'gemini' | 'segmind' (which provider was used)
  *   - error?: string (if failed)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { editImageWithGemini, isGeminiEditAvailable } from '@/lib/gemini-image-client';
 import { editImageWithQwen, isQwenAvailable } from '@/lib/qwen-image-client';
 import { createClient } from '@/lib/supabase/server';
 
 export const maxDuration = 300; // 5 minutes timeout for Vercel
 
+type ImageProvider = 'gemini' | 'segmind';
+
+interface EditImageRequest {
+  imageUrl: string;
+  instruction: string;
+  imageType: 'scene' | 'cover';
+  imageId: string;
+  illustrationStyle?: 'pixar' | 'classic';
+  sceneDescription?: string;
+  useProvider?: ImageProvider;
+}
+
 export async function POST(request: NextRequest) {
   const requestId = `edit-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
   try {
-    const body = await request.json();
-    const { imageUrl, instruction, imageType, imageId } = body;
+    const body: EditImageRequest = await request.json();
+    const {
+      imageUrl,
+      instruction,
+      imageType,
+      imageId,
+      illustrationStyle = 'pixar',
+      sceneDescription,
+      useProvider,
+    } = body;
 
     // Validate inputs
     if (!imageUrl) {
@@ -62,21 +87,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if Qwen is available
-    if (!isQwenAvailable()) {
+    console.log(`[Edit Image] ${requestId} - Type: ${imageType}, ID: ${imageId}`);
+    console.log(`[Edit Image] Instruction: "${instruction}"`);
+    console.log(`[Edit Image] Style: ${illustrationStyle}, Provider preference: ${useProvider || 'auto'}`);
+
+    // Determine which provider to use
+    // Priority: explicit preference > Gemini (if available) > Segmind (fallback)
+    let provider: ImageProvider;
+    if (useProvider === 'segmind' && isQwenAvailable()) {
+      provider = 'segmind';
+    } else if (isGeminiEditAvailable()) {
+      provider = 'gemini';
+    } else if (isQwenAvailable()) {
+      provider = 'segmind';
+    } else {
       return NextResponse.json(
         { success: false, error: 'Image editing is not configured. Please contact support.' },
         { status: 503 }
       );
     }
 
-    console.log(`[Edit Image] ${requestId} - Type: ${imageType}, ID: ${imageId}`);
-    console.log(`[Edit Image] Instruction: "${instruction}"`);
+    console.log(`[Edit Image] Using provider: ${provider}`);
 
-    // Call Qwen to edit the image
-    const result = await editImageWithQwen(imageUrl, instruction.trim());
+    // Call the appropriate provider
+    let resultImageUrl: string;
+    let generationTime: number;
 
-    console.log(`[Edit Image] Qwen returned image in ${result.generationTime}s`);
+    if (provider === 'gemini') {
+      // Use Gemini for text-guided image editing
+      const result = await editImageWithGemini({
+        currentImageUrl: imageUrl,
+        editInstruction: instruction.trim(),
+        sceneDescription,
+        illustrationStyle,
+      });
+      resultImageUrl = result.imageUrl;
+      generationTime = result.generationTime;
+    } else {
+      // Use Segmind/Qwen as fallback
+      const result = await editImageWithQwen(imageUrl, instruction.trim());
+      resultImageUrl = result.imageUrl;
+      generationTime = result.generationTime;
+    }
+
+    console.log(`[Edit Image] ${provider} returned image in ${generationTime.toFixed(1)}s`);
 
     // Upload the edited image to Supabase Storage
     const supabase = await createClient();
@@ -87,12 +141,12 @@ export async function POST(request: NextRequest) {
 
     // Convert base64 data URL to buffer
     let imageBuffer: Buffer;
-    if (result.imageUrl.startsWith('data:')) {
-      const base64Data = result.imageUrl.split(',')[1];
+    if (resultImageUrl.startsWith('data:')) {
+      const base64Data = resultImageUrl.split(',')[1];
       imageBuffer = Buffer.from(base64Data, 'base64');
     } else {
       // Fallback: fetch from URL
-      const imageResponse = await fetch(result.imageUrl);
+      const imageResponse = await fetch(resultImageUrl);
       if (!imageResponse.ok) {
         throw new Error(`Failed to fetch edited image: ${imageResponse.statusText}`);
       }
@@ -118,9 +172,10 @@ export async function POST(request: NextRequest) {
       console.log(`[Edit Image] Returning base64 image as fallback`);
       return NextResponse.json({
         success: true,
-        imageUrl: result.imageUrl, // Base64 data URL
+        imageUrl: resultImageUrl, // Base64 data URL
         editInstruction: instruction,
-        generationTime: result.generationTime,
+        generationTime,
+        provider,
         uploadFailed: true,
       });
     }
@@ -137,7 +192,8 @@ export async function POST(request: NextRequest) {
       success: true,
       imageUrl: finalImageUrl,
       editInstruction: instruction,
-      generationTime: result.generationTime,
+      generationTime,
+      provider,
     });
 
   } catch (error) {
@@ -149,8 +205,10 @@ export async function POST(request: NextRequest) {
     let userMessage = 'Failed to edit image. Please try again.';
     if (errorMessage.includes('rate') || errorMessage.includes('429')) {
       userMessage = 'Too many requests. Please wait a moment and try again.';
-    } else if (errorMessage.includes('DASHSCOPE_API_KEY')) {
+    } else if (errorMessage.includes('GEMINI_API_KEY') || errorMessage.includes('SEGMIND_API_KEY')) {
       userMessage = 'Image editing is not configured.';
+    } else if (errorMessage.includes('Failed to fetch current image')) {
+      userMessage = 'Could not access the image. Please try again.';
     }
 
     return NextResponse.json(
