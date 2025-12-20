@@ -117,17 +117,20 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Upload scene images and create scenes
-    // Filter to only scene pages with captions (exclude cover-only pages without story text)
-    const scenePages = pages.filter(p => p.isScenePage && p.captionEnglish);
+    // Filter to only scene pages with captions (English OR Chinese)
+    // Supports bilingual PDFs where some pages may only have Chinese captions
+    const scenePages = pages.filter(p => p.isScenePage && (p.captionEnglish || p.captionChinese));
 
     // Log page details for debugging
     console.log(`  Total pages received: ${pages.length}`);
     console.log(`  Pages with isScenePage=true: ${pages.filter(p => p.isScenePage).length}`);
     console.log(`  Pages with captionEnglish: ${pages.filter(p => p.captionEnglish).length}`);
+    console.log(`  Pages with captionChinese: ${pages.filter(p => p.captionChinese).length}`);
     console.log(`  Scene pages to process: ${scenePages.length}`);
 
     if (scenePages.length > 0) {
-      console.log(`  First scene: page ${scenePages[0].pageNumber}, type: ${scenePages[0].pageType}, caption: "${scenePages[0].captionEnglish.substring(0, 50)}..."`);
+      const firstCaption = scenePages[0].captionEnglish || scenePages[0].captionChinese || '';
+      console.log(`  First scene: page ${scenePages[0].pageNumber}, type: ${scenePages[0].pageType}, caption: "${firstCaption.substring(0, 50)}..."`);
     }
 
     for (let i = 0; i < scenePages.length; i++) {
@@ -147,13 +150,15 @@ export async function POST(request: NextRequest) {
         console.log(`    Uploaded image: ${uploadResult.filename}`);
 
         // Create scene record first to get scene ID
+        // Use English caption if available, otherwise fall back to Chinese for description
+        const primaryCaption = page.captionEnglish || page.captionChinese || '';
         const scene = await sceneRepo.create({
           project_id: project.id,
           scene_number: sceneNumber,
-          description: page.captionEnglish,
-          caption: page.captionEnglish,
+          description: primaryCaption,
+          caption: page.captionEnglish || '',
           caption_chinese: page.captionChinese,
-          raw_description: page.captionEnglish,
+          raw_description: primaryCaption,
         });
 
         console.log(`    Created scene: ${scene.id}`);

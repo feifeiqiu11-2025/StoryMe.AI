@@ -31,7 +31,7 @@ interface PDFImportReviewProps {
   extractionResult: PDFExtractionResult;
   onPagesUpdate: (pages: ExtractedPage[]) => void;
   onTitleUpdate: (title: string) => void;
-  onTranslate: () => void;
+  onTranslate: (direction: 'en-to-zh' | 'zh-to-en') => void;
   onFinalize: () => void;
   onBack: () => void;
   error?: string | null;
@@ -51,6 +51,7 @@ export default function PDFImportReview({
 
   const scenePages = extractionResult.pages.filter(p => p.isScenePage);
   const hasChineseTranslations = scenePages.some(p => p.captionChinese);
+  const hasEnglishCaptions = scenePages.some(p => p.captionEnglish);
 
   // Toggle page inclusion
   const togglePageInclusion = (pageNumber: number) => {
@@ -185,25 +186,35 @@ export default function PDFImportReview({
                 </div>
 
                 {/* Caption - English */}
-                <textarea
-                  value={page.captionEnglish}
-                  onChange={(e) => updateCaption(page.pageNumber, 'captionEnglish', e.target.value)}
-                  disabled={!page.isScenePage}
-                  rows={2}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none disabled:bg-gray-50 disabled:text-gray-400"
-                  placeholder="No caption..."
-                />
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    English Caption
+                  </label>
+                  <textarea
+                    value={page.captionEnglish}
+                    onChange={(e) => updateCaption(page.pageNumber, 'captionEnglish', e.target.value)}
+                    disabled={!page.isScenePage}
+                    rows={2}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none disabled:bg-gray-50 disabled:text-gray-400"
+                    placeholder="No caption..."
+                  />
+                </div>
 
                 {/* Caption - Chinese (if available) */}
                 {(page.captionChinese || hasChineseTranslations) && (
-                  <textarea
-                    value={page.captionChinese || ''}
-                    onChange={(e) => updateCaption(page.pageNumber, 'captionChinese', e.target.value)}
-                    disabled={!page.isScenePage}
-                    rows={2}
-                    className="w-full px-2 py-1.5 text-sm border border-purple-200 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500 resize-none disabled:bg-gray-50 disabled:text-gray-400 mt-2"
-                    placeholder="中文翻译..."
-                  />
+                  <div className="mt-2">
+                    <label className="block text-xs font-medium text-purple-600 mb-1">
+                      Chinese Caption 中文
+                    </label>
+                    <textarea
+                      value={page.captionChinese || ''}
+                      onChange={(e) => updateCaption(page.pageNumber, 'captionChinese', e.target.value)}
+                      disabled={!page.isScenePage}
+                      rows={2}
+                      className="w-full px-2 py-1.5 text-sm border border-purple-200 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500 resize-none disabled:bg-gray-50 disabled:text-gray-400"
+                      placeholder="中文翻译..."
+                    />
+                  </div>
                 )}
               </div>
             </div>
@@ -233,14 +244,22 @@ export default function PDFImportReview({
         </button>
 
         <div className="flex items-center gap-3">
-          {/* Generate Chinese Caption - simple button */}
-          {!hasChineseTranslations && scenePages.length > 0 && (
-            <button
-              onClick={onTranslate}
-              className="px-4 py-2 border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50 font-medium text-sm"
-            >
-              Generate Chinese Captions
-            </button>
+          {/* Always show both translation buttons - user picks which one to use */}
+          {scenePages.length > 0 && (
+            <>
+              <button
+                onClick={() => onTranslate('zh-to-en')}
+                className="px-4 py-2 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 font-medium text-sm"
+              >
+                Generate English Captions
+              </button>
+              <button
+                onClick={() => onTranslate('en-to-zh')}
+                className="px-4 py-2 border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50 font-medium text-sm"
+              >
+                Generate Chinese Captions
+              </button>
+            </>
           )}
 
           {scenePages.length === 0 ? (

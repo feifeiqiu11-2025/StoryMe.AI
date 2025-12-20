@@ -119,6 +119,7 @@ export default function ImportPage() {
   };
 
   // Render PDF pages to images using PDF.js (client-side)
+  // Uses JPEG compression to reduce payload size for API calls
   const renderPDFPages = async (pdfFile: File): Promise<{ pageNumber: number; imageBase64: string }[]> => {
     // Load PDF.js from CDN
     const pdfjsLib = await loadPdfJs();
@@ -139,25 +140,37 @@ export default function ImportPage() {
       setProgress(Math.round((pageNum / totalPages) * 30)); // 0-30% for rendering
 
       const page = await pdf.getPage(pageNum);
-      const scale = 2; // Good quality for AI vision
+      // Use scale 1.5 instead of 2 to reduce image size while maintaining readability
+      // This is sufficient for AI vision analysis
+      const scale = 1.5;
       const viewport = page.getViewport({ scale });
+
+      // Cap maximum dimensions to prevent huge images
+      const maxDimension = 1500;
+      let finalScale = scale;
+      if (viewport.width > maxDimension || viewport.height > maxDimension) {
+        const scaleDown = maxDimension / Math.max(viewport.width, viewport.height);
+        finalScale = scale * scaleDown;
+      }
+      const finalViewport = page.getViewport({ scale: finalScale });
 
       // Create canvas
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       if (!context) throw new Error('Failed to get canvas context');
 
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
+      canvas.height = finalViewport.height;
+      canvas.width = finalViewport.width;
 
       // Render page to canvas
       await page.render({
         canvasContext: context,
-        viewport: viewport,
+        viewport: finalViewport,
       }).promise;
 
-      // Convert to base64 (without data URL prefix)
-      const dataUrl = canvas.toDataURL('image/png');
+      // Convert to JPEG with quality 0.8 to significantly reduce size
+      // JPEG is typically 5-10x smaller than PNG for photos/illustrations
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
       const base64 = dataUrl.split(',')[1];
 
       pages.push({
@@ -173,6 +186,7 @@ export default function ImportPage() {
   };
 
   // Start extraction process
+  // Uses batch processing to avoid 413 Content Too Large errors on Vercel (4.5MB limit)
   const handleExtract = async () => {
     if (!file) return;
 
@@ -188,33 +202,69 @@ export default function ImportPage() {
       setProgress(35);
       setProgressMessage(`Analyzing ${pageImages.length} pages with AI...`);
 
-      // Step 2: Send page images to extraction API
-      const response = await fetch('/api/import-pdf/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pageImages,
-          fileName: file.name,
-        }),
-      });
+      // Step 2: Send page images in batches to avoid payload size limits
+      // Vercel has a 4.5MB request body limit
+      // With JPEG compression, each page is roughly 100-300KB
+      // Use batch size of 5 pages to stay safely under limit (~1.5MB per batch)
+      const BATCH_SIZE = 5;
+      const allExtractedPages: ExtractedPage[] = [];
+      let storyTitle = file.name.replace(/\.pdf$/i, '') || 'Imported Story';
 
-      setProgress(85);
-      setProgressMessage('Processing extracted content...');
+      for (let batchStart = 0; batchStart < pageImages.length; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, pageImages.length);
+        const batch = pageImages.slice(batchStart, batchEnd);
+        const batchNumber = Math.floor(batchStart / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(pageImages.length / BATCH_SIZE);
 
-      const data = await response.json();
+        setProgressMessage(`Analyzing pages ${batchStart + 1}-${batchEnd} of ${pageImages.length} (batch ${batchNumber}/${totalBatches})...`);
+        // Progress from 35% to 85% during extraction
+        const batchProgress = 35 + ((batchEnd / pageImages.length) * 50);
+        setProgress(Math.round(batchProgress));
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to extract PDF content');
+        const response = await fetch('/api/import-pdf/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pageImages: batch,
+            fileName: file.name,
+            batchInfo: {
+              batchNumber,
+              totalBatches,
+              startPage: batchStart + 1,
+              endPage: batchEnd,
+            },
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || `Failed to extract batch ${batchNumber}`);
+        }
+
+        // Collect extracted pages from this batch
+        // Adjust page numbers to be sequential
+        const batchPages: ExtractedPage[] = data.result.pages.map((page: ExtractedPage, idx: number) => ({
+          ...page,
+          pageNumber: batchStart + idx + 1,
+        }));
+        allExtractedPages.push(...batchPages);
+
+        // Capture title from first batch if found
+        if (batchNumber === 1 && data.result.title) {
+          storyTitle = data.result.title;
+        }
       }
 
-      // Transform result to match component interface
-      // The API returns imageBase64, but the component expects imageBase64 (same field)
+      setProgress(90);
+      setProgressMessage('Processing extracted content...');
+
+      // Build final result
       const transformedResult: PDFExtractionResult = {
-        ...data.result,
-        pages: data.result.pages.map((page: ExtractedPage & { imageBase64?: string }) => ({
-          ...page,
-          // Keep imageBase64 for storage, but no imageUrl needed for review component
-        })),
+        title: storyTitle,
+        totalPages: allExtractedPages.length,
+        pages: allExtractedPages,
+        extractionTime: 0, // We don't track total time for batched processing
       };
 
       setProgress(100);
@@ -248,17 +298,24 @@ export default function ImportPage() {
     }
   };
 
-  // Handle translation
-  const handleTranslate = async () => {
+  // Handle translation (bidirectional: English↔Chinese)
+  // Direction is now passed explicitly from the UI button click
+  const handleTranslate = async (direction: 'en-to-zh' | 'zh-to-en') => {
     if (!extractionResult) return;
+
+    const isChineseToEnglish = direction === 'zh-to-en';
 
     setStep('translating');
     setProgress(0);
-    setProgressMessage('Translating captions to Chinese...');
+    setProgressMessage(isChineseToEnglish
+      ? 'Translating captions to English...'
+      : 'Translating captions to Chinese...');
 
     try {
-      const pagesToTranslate = extractionResult.pages
-        .filter(p => p.isScenePage && p.captionEnglish && !p.captionChinese);
+      // Filter pages that need translation
+      const pagesToTranslate = isChineseToEnglish
+        ? extractionResult.pages.filter(p => p.isScenePage && p.captionChinese && !p.captionEnglish)
+        : extractionResult.pages.filter(p => p.isScenePage && p.captionEnglish && !p.captionChinese);
 
       if (pagesToTranslate.length === 0) {
         // All pages already have translations
@@ -270,9 +327,11 @@ export default function ImportPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          direction,
           pages: pagesToTranslate.map(p => ({
             pageNumber: p.pageNumber,
             captionEnglish: p.captionEnglish,
+            captionChinese: p.captionChinese,
           })),
         }),
       });
@@ -284,21 +343,39 @@ export default function ImportPage() {
       }
 
       // Update pages with translations
-      const translationMap = new Map<number, string>(
-        data.translations.map((t: { pageNumber: number; captionChinese: string }) =>
-          [t.pageNumber, t.captionChinese] as [number, string]
-        )
-      );
+      if (isChineseToEnglish) {
+        const translationMap = new Map<number, string>(
+          data.translations.map((t: { pageNumber: number; captionEnglish?: string }) =>
+            [t.pageNumber, t.captionEnglish || ''] as [number, string]
+          )
+        );
 
-      const updatedPages: ExtractedPage[] = extractionResult.pages.map(page => ({
-        ...page,
-        captionChinese: translationMap.get(page.pageNumber) || page.captionChinese,
-      }));
+        const updatedPages: ExtractedPage[] = extractionResult.pages.map(page => ({
+          ...page,
+          captionEnglish: translationMap.get(page.pageNumber) || page.captionEnglish,
+        }));
 
-      setExtractionResult({
-        ...extractionResult,
-        pages: updatedPages,
-      });
+        setExtractionResult({
+          ...extractionResult,
+          pages: updatedPages,
+        });
+      } else {
+        const translationMap = new Map<number, string>(
+          data.translations.map((t: { pageNumber: number; captionChinese?: string }) =>
+            [t.pageNumber, t.captionChinese || ''] as [number, string]
+          )
+        );
+
+        const updatedPages: ExtractedPage[] = extractionResult.pages.map(page => ({
+          ...page,
+          captionChinese: translationMap.get(page.pageNumber) || page.captionChinese,
+        }));
+
+        setExtractionResult({
+          ...extractionResult,
+          pages: updatedPages,
+        });
+      }
 
       setStep('review');
 

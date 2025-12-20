@@ -30,6 +30,7 @@ interface ExtractionResult {
 }
 
 // Gemini extraction prompt - flexible for various PDF formats
+// Supports bilingual storybooks (English and Chinese)
 const EXTRACTION_PROMPT = `You are analyzing a storybook page image. Extract the story content from this page.
 
 IMPORTANT RULES:
@@ -39,19 +40,39 @@ IMPORTANT RULES:
    - "Parent Panel", "Learning Corner", "Did You Know?" sections
    - Author credits, copyright notices, page numbers
    - Any text that is clearly supplementary and not part of the story narrative
-3. For COVER pages: Extract the story title as captionEnglish (this will be narrated)
+3. For COVER pages: Extract the story title (this will be narrated)
 4. For CREDITS pages or pages with no story content: mark isScenePage as false
+
+LANGUAGE DETECTION - CRITICAL:
+- If text is in ENGLISH, put it in "captionEnglish"
+- If text is in CHINESE (including Chinese characters 汉字 or Pinyin with tone marks like māma, bàba), put it in "captionChinese"
+- If the page has BOTH English AND Chinese text, extract both separately
+- Pinyin (romanized Chinese like "Māma ài nǐ") should go in "captionChinese", NOT "captionEnglish"
 
 Respond in JSON format:
 {
   "pageType": "cover" | "scene" | "credits" | "other",
   "isScenePage": boolean (true for cover and scene pages, false for credits/other),
   "title": string (the story title if this is a cover page, otherwise null),
-  "captionEnglish": string (the text to be narrated - for cover pages use the title, for scenes use the story text),
+  "captionEnglish": string (English text to be narrated, empty string if no English),
+  "captionChinese": string (Chinese text including Pinyin to be narrated, empty string if no Chinese),
   "hasImage": boolean (does this page have a story illustration?)
 }
 
 Be concise - extract only the essential story narration text, not descriptions of the image.`;
+
+/**
+ * Check if a string contains Chinese characters
+ */
+function containsChineseCharacters(text: string): boolean {
+  // Unicode ranges for Chinese characters:
+  // CJK Unified Ideographs: \u4E00-\u9FFF
+  // CJK Unified Ideographs Extension A: \u3400-\u4DBF
+  // Also check for common Pinyin tone marks
+  const chineseCharRegex = /[\u4E00-\u9FFF\u3400-\u4DBF]/;
+  const pinyinToneRegex = /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/i;
+  return chineseCharRegex.test(text) || pinyinToneRegex.test(text);
+}
 
 /**
  * Extract content from a single PDF page using Gemini Vision
@@ -65,9 +86,8 @@ async function extractPageContent(
   isScenePage: boolean;
   title: string | null;
   captionEnglish: string;
+  captionChinese: string;
 }> {
-  const model = genai.models.generateContent;
-
   const response = await genai.models.generateContent({
     model: 'gemini-2.0-flash',
     contents: [
@@ -76,7 +96,8 @@ async function extractPageContent(
         parts: [
           {
             inlineData: {
-              mimeType: 'image/png',
+              // Client now sends JPEG for smaller payload size
+              mimeType: 'image/jpeg',
               data: imageBase64,
             },
           },
@@ -112,12 +133,31 @@ async function extractPageContent(
 
     const pageType = parsed.pageType || 'scene';
     let captionEnglish = parsed.captionEnglish || '';
+    let captionChinese = parsed.captionChinese || '';
+
+    // Safety check: If Gemini put Chinese in captionEnglish, ALWAYS clear it
+    // This prevents Chinese text from being stored in the English field
+    // which would cause TTS to use the wrong voice
+    if (captionEnglish && containsChineseCharacters(captionEnglish)) {
+      // If captionChinese is empty, move the content there
+      if (!captionChinese) {
+        captionChinese = captionEnglish;
+      }
+      // Always clear captionEnglish if it contains Chinese
+      captionEnglish = '';
+    }
 
     // For cover pages, ensure we have the title as caption (use title if caption is empty)
     if (pageType === 'cover') {
-      if (!captionEnglish && parsed.title) {
-        captionEnglish = parsed.title;
-      } else if (!captionEnglish) {
+      const title = parsed.title || '';
+      if (!captionEnglish && !captionChinese && title) {
+        // Detect language of title
+        if (containsChineseCharacters(title)) {
+          captionChinese = title;
+        } else {
+          captionEnglish = title;
+        }
+      } else if (!captionEnglish && !captionChinese) {
         // If no title either, use a default
         captionEnglish = 'Story Cover';
       }
@@ -133,11 +173,12 @@ async function extractPageContent(
       isScenePage,
       title: parsed.title || null,
       captionEnglish,
+      captionChinese,
     };
   } catch (parseError) {
     console.error(`Failed to parse Gemini response for page ${pageNumber}:`, responseText);
 
-    // Try to extract captionEnglish from raw text if it looks like JSON
+    // Try to extract captions from raw text if it looks like JSON
     let fallbackCaption = responseText.substring(0, 500);
     const captionMatch = responseText.match(/"captionEnglish"\s*:\s*"([^"]+)"/);
     if (captionMatch) {
@@ -146,12 +187,16 @@ async function extractPageContent(
         .replace(/\\"/g, '"');
     }
 
+    // Check if fallback is actually Chinese
+    const isChinese = containsChineseCharacters(fallbackCaption);
+
     // Fallback - treat as scene with extracted or raw text
     return {
       pageType: 'scene',
       isScenePage: true,
       title: null,
-      captionEnglish: fallbackCaption,
+      captionEnglish: isChinese ? '' : fallbackCaption,
+      captionChinese: isChinese ? fallbackCaption : '',
     };
   }
 }
@@ -220,6 +265,7 @@ export async function POST(request: NextRequest) {
           pageNumber: i + 1,
           imageBase64: pageImage.imageBase64,
           captionEnglish: extracted.captionEnglish,
+          captionChinese: extracted.captionChinese,
           isScenePage: extracted.isScenePage,
           pageType: extracted.pageType,
         });
@@ -231,6 +277,7 @@ export async function POST(request: NextRequest) {
           pageNumber: i + 1,
           imageBase64: pageImage.imageBase64,
           captionEnglish: '',
+          captionChinese: undefined,
           isScenePage: false,
           pageType: 'other',
         });
