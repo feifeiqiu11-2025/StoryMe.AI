@@ -50,6 +50,12 @@ export default function DashboardNav() {
       >
         My Stories
       </Link>
+      <Link
+        href="/import"
+        className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+      >
+        Import PDF
+      </Link>
 
       {/* Community Dropdown */}
       <div className="relative" ref={communityRef}>

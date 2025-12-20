@@ -254,6 +254,8 @@ export class ProjectService {
    * Delete project
    */
   async deleteProject(projectId: string, userId: string): Promise<void> {
+    const supabase = this.projectRepo['supabase'];
+
     // Verify ownership
     const project = await this.projectRepo.findById(projectId);
     if (!project) {
@@ -269,6 +271,17 @@ export class ProjectService {
     } catch (error) {
       console.error('Failed to delete project images:', error);
       // Continue with deletion even if storage cleanup fails
+    }
+
+    // Delete reading_sessions first (not cascaded)
+    const { error: sessionError } = await supabase
+      .from('reading_sessions')
+      .delete()
+      .eq('project_id', projectId);
+
+    if (sessionError) {
+      console.error('Failed to delete reading sessions:', sessionError);
+      // Continue with deletion
     }
 
     // Delete project (cascades to scenes, images, etc.)

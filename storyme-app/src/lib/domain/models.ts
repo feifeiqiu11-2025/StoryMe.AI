@@ -110,6 +110,15 @@ export interface Project {
   view_count?: number;
   share_count?: number;
 
+  // Import tracking (for PDF imports)
+  source_type?: 'created' | 'imported_pdf';
+  import_metadata?: {
+    original_filename?: string;
+    extraction_time?: number;
+    total_pages?: number;
+    gemini_model_used?: string;
+  };
+
   created_at: string;
   updated_at: string;
 }

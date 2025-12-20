@@ -120,8 +120,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Quick Actions Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Quick Actions Grid - Row 1 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
           {/* Create Story */}
           <button
             onClick={handleCreateStoryClick}
@@ -156,6 +156,26 @@ export default function DashboardPage() {
             </div>
           </Link>
 
+          {/* Import PDF */}
+          <Link
+            href="/import"
+            className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-2xl shadow-lg p-8 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-teal-200 hover:border-teal-300"
+          >
+            <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform shadow-md">
+              📄
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Import PDF</h3>
+            <p className="text-gray-700 text-sm mb-4">
+              Convert PDF storybooks to interactive stories with audio
+            </p>
+            <div className="flex items-center gap-2 text-teal-600 font-semibold group-hover:gap-3 transition-all text-sm">
+              Import PDF →
+            </div>
+          </Link>
+        </div>
+
+        {/* Quick Actions Grid - Row 2 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {/* My Stories */}
           <Link
             href="/projects"
