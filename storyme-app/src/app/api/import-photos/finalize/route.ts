@@ -14,6 +14,9 @@ import { SceneRepository } from '@/lib/repositories/scene.repository';
 
 export const maxDuration = 120; // 2 minute timeout
 
+// Note: For App Router, body size is handled via middleware or request streaming
+// The default limit should be sufficient as images are uploaded to Supabase storage
+
 interface PhotoPage {
   pageNumber: number;
   imageBase64: string; // Transformed illustration
@@ -38,7 +41,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    // Handle request body parsing with better error handling
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      return NextResponse.json(
+        { error: 'Invalid request body. The payload may be too large or malformed.' },
+        { status: 400 }
+      );
+    }
     const { title, storyContext, pages, illustrationStyle } = body as {
       title: string;
       storyContext?: string;
@@ -61,7 +74,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`📚 Creating photo storybook with ${pages.length} scenes: "${title}"`);
+    // Filter to only valid pages with actual image data
+    const validPages = pages.filter(p =>
+      p.imageBase64 &&
+      typeof p.imageBase64 === 'string' &&
+      p.imageBase64.length > 100 // Minimum reasonable base64 length
+    );
+
+    if (validPages.length === 0) {
+      return NextResponse.json(
+        { error: 'No valid photos with image data to import' },
+        { status: 400 }
+      );
+    }
+
+    console.log(`📚 Creating photo storybook with ${validPages.length} valid scenes (of ${pages.length} submitted): "${title}"`);
+
+    // Use validPages for the rest of the processing
+    const pagesToProcess = validPages;
     if (storyContext) {
       console.log(`  Story context: ${storyContext.substring(0, 50)}...`);
     }
@@ -81,7 +111,7 @@ export async function POST(request: NextRequest) {
       source_type: 'imported_photos',
       import_metadata: {
         story_context: storyContext,
-        total_photos: pages.length,
+        total_photos: pagesToProcess.length,
         illustration_style: illustrationStyle || 'pixar',
         model_used: 'gpt-image-1.5', // OpenAI for image transform, Gemini for captions
       },
@@ -92,7 +122,7 @@ export async function POST(request: NextRequest) {
     // 2. Upload cover image from first page
     // Store in same pattern as regular stories: {user_id}/covers/{timestamp}.png
     let coverImageUrl: string | null = null;
-    const firstPage = pages[0];
+    const firstPage = pagesToProcess[0];
     if (firstPage) {
       try {
         const coverBuffer = Buffer.from(firstPage.imageBase64, 'base64');
@@ -122,9 +152,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Upload scene images and create scenes
-    const scenePages = pages.filter(p => p.isScenePage && p.captionEnglish);
+    const scenePages = pagesToProcess.filter(p => p.isScenePage && p.captionEnglish);
 
-    console.log(`  Total pages received: ${pages.length}`);
+    console.log(`  Total pages received: ${pagesToProcess.length}`);
     console.log(`  Scene pages to process: ${scenePages.length}`);
 
     for (let i = 0; i < scenePages.length; i++) {

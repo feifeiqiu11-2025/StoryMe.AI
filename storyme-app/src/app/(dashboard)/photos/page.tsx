@@ -375,16 +375,21 @@ export default function PhotosPage() {
     setProgressMessage('Creating your storybook...');
 
     try {
-      const completedPhotos = photos.filter(p => p.status === 'completed');
+      // Filter to only completed photos that have valid transformed images
+      const completedPhotos = photos.filter(p =>
+        p.status === 'completed' &&
+        p.transformedImageBase64 &&
+        p.transformedImageBase64.length > 0
+      );
 
       if (completedPhotos.length === 0) {
-        throw new Error('No photos to create storybook');
+        throw new Error('No valid photos to create storybook. Please ensure at least one photo was successfully transformed.');
       }
 
       // Prepare pages for finalize API (reuse PDF import finalize)
       const pages = completedPhotos.map((photo, idx) => ({
         pageNumber: idx + 1,
-        imageBase64: photo.transformedImageBase64!,
+        imageBase64: photo.transformedImageBase64!, // Safe now since we validated above
         captionEnglish: photo.caption || '',
         captionChinese: photo.captionChinese,
         isScenePage: true,
@@ -408,7 +413,15 @@ export default function PhotosPage() {
       setProgress(80);
       setProgressMessage('Saving storybook...');
 
-      const data = await response.json();
+      // Handle potential non-JSON response
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse response:', responseText.substring(0, 200));
+        throw new Error('Server returned an invalid response. Please try again.');
+      }
 
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to create storybook');
