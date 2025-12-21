@@ -1695,201 +1695,176 @@ export async function transformPhotoToIllustration({
   photoIndex,
   totalPhotos,
 }: PhotoTransformParams): Promise<PhotoTransformResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not configured');
+  // Use OpenAI's gpt-image-1 for superior photo-to-illustration transformation
+  const openaiKey = process.env.OPENAI_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
+
+  if (!openaiKey) {
+    throw new Error('OPENAI_API_KEY is not configured');
+  }
+  if (!geminiKey) {
+    throw new Error('GEMINI_API_KEY is not configured (needed for caption generation)');
   }
 
   const startTime = Date.now();
-  const genAI = new GoogleGenAI({ apiKey });
 
-  // Build style instructions based on selected style - CRITICAL to avoid photo-like results
-  const styleInstructions = illustrationStyle === 'pixar'
-    ? `3D ANIMATED PIXAR/DISNEY STYLE (MANDATORY):
-       - COMPLETELY REDRAWN as 3D animated cartoon characters
-       - Faces MUST have stylized cartoon features: BIG round expressive eyes (2-3x larger than real), small simplified nose, smooth skin with NO pores/wrinkles/texture
-       - Body proportions exaggerated: larger heads, rounder shapes, simplified hands
-       - Smooth plastic-like rendered skin (like a Pixar character)
-       - Vibrant saturated colors, soft ambient lighting
-       - Characters should look EXACTLY like they're from Pixar, Disney Junior, or Cocomelon movies
-       - NEVER use the original photo's texture or face - completely redraw as cartoon
-       - Zero photographic elements - everything must be 3D CGI animated style`
-    : `2D ILLUSTRATED STORYBOOK STYLE (MANDATORY):
-       - COMPLETELY REDRAWN as 2D cartoon illustration
-       - Faces MUST be stylized: BIG round cartoon eyes, simplified features, smooth cel-shaded skin
-       - Hand-drawn/digital cartoon appearance with clean outlines
-       - Vibrant saturated colors with flat cel-shading
-       - Large glossy expressive cartoon eyes (anime/chibi inspired proportions)
-       - Clean polished illustration style like a page from a classic children's picture book
-       - NEVER preserve photo textures - everything must look hand-drawn/painted
-       - 100% ILLUSTRATED - must look like an artist drew it, NOT a photo filter`;
+  // Build the transformation prompt - simple and direct like ChatGPT UI
+  const stylePrompt = illustrationStyle === 'pixar'
+    ? 'Change this photo to animated version, Pixar style. Make it look like a frame from a Pixar movie like Toy Story, Coco, or Inside Out.'
+    : 'Change this photo to animated version, classic Disney 2D illustration style. Make it look like a frame from a Disney animated classic.';
 
-  // Build context instructions
-  const contextInstructions = storyContext
-    ? `STORY CONTEXT: ${storyContext}
-       Use the names and theme from this context when generating the caption.
-       For example, if the context mentions "Connor", use "Connor" in the caption instead of "a boy".`
-    : `Generate a generic but engaging caption suitable for a children's storybook.`;
+  console.log(`[OpenAI Transform] Transforming photo to ${illustrationStyle} style...`);
 
-  // Position context for caption continuity
-  const positionContext = photoIndex && totalPhotos
-    ? `This is photo ${photoIndex} of ${totalPhotos} in a story sequence.`
-    : '';
-
-  // Build the transformation prompt - CRITICAL: Emphasize creating NEW art, not photo manipulation
-  const transformPrompt = `IMPORTANT: Create a COMPLETELY NEW ${illustrationStyle === 'pixar' ? '3D animated' : '2D illustrated'} artwork inspired by this reference photo.
-
-=== CRITICAL RULES (MUST FOLLOW) ===
-1. DO NOT EDIT THE PHOTO - Create brand new artwork from scratch
-2. DO NOT APPLY FILTERS - No photo filters, no AI enhancement, no stylization of the photo
-3. DO NOT PRESERVE FACES - Redraw all people as cute cartoon characters with big eyes
-4. DO NOT KEEP TEXTURES - Replace all real-world textures with illustrated/rendered ones
-5. The output MUST be 100% animated/illustrated with ZERO photographic elements
-
-=== ILLUSTRATION STYLE ===
-${styleInstructions}
-
-=== TRANSFORMATION STEPS ===
-1. ANALYZE the photo: Who is in it? What are they doing? What's the setting? What's the mood?
-2. REIMAGINE as animation: How would this scene look in a Pixar/Disney movie?
-3. DRAW from scratch: Create new artwork with cartoon characters, animated backgrounds, rendered props
-4. STYLIZE everything: Big expressive eyes, smooth skin, vibrant colors, clean shapes
-5. OUTPUT: A single square (1:1) illustration that looks like a frame from an animated movie
-
-=== CHARACTER RENDERING (CRITICAL) ===
-- Faces: LARGE round cartoon eyes (2-3x normal size), simplified nose, smooth skin
-- Bodies: Rounded proportions, slightly exaggerated features
-- Skin: Smooth, uniform color with soft shading - NO pores, NO wrinkles, NO photo texture
-- Hair: Stylized cartoon hair with simple shapes and smooth gradients
-- Clothes: Colorful, clean shapes with illustrated fabric textures
-
-=== QUALITY CHECK ===
-Before finalizing, verify:
-- Does this look like a frame from Pixar/Disney? If not, it's not cartoon enough
-- Can you see any photographic textures? If yes, it needs more stylization
-- Are the eyes big and expressive? If not, make them larger
-- Is the skin smooth and uniform? If not, remove realistic details
-
-=== CAPTION GENERATION ===
-${contextInstructions}
-${positionContext}
-
-Generate a SHORT caption (1-2 sentences max) that:
-- Describes what's happening in the scene
-- Uses character names from the story context if provided
-- Is suitable for reading aloud to children
-- Is engaging and descriptive
-
-=== OUTPUT FORMAT ===
-After generating the illustration, provide the caption as plain text (not JSON).
-The caption should be the ONLY text in your response after the image.`;
-
-  console.log(`[Gemini Transform] Generating NEW ${illustrationStyle} illustration from photo reference`);
-  if (storyContext) {
-    console.log(`[Gemini Transform] Story context: ${storyContext.substring(0, 50)}...`);
-  }
-
-  // Build content parts
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const contentParts: any[] = [
-    { text: transformPrompt },
-    {
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: imageBase64,
-      },
-    },
-    { text: '[Photo to transform into illustration]' },
-  ];
+  // Convert base64 to buffer for OpenAI API
+  const imageBuffer = Buffer.from(imageBase64, 'base64');
 
   // Retry logic for rate limits
   const maxRetries = 3;
   let lastError: Error | null = null;
+  let transformedImageBase64 = '';
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: contentParts,
-        config: {
-          responseModalities: [Modality.TEXT, Modality.IMAGE],
-          imageConfig: {
-            aspectRatio: '1:1', // Square images for consistent display
-          },
-        },
-      });
+  // Try gpt-image-1.5 first, fallback to gpt-image-1 if not available
+  const modelsToTry = ['gpt-image-1.5', 'gpt-image-1'];
 
-      // Extract results
-      const candidates = result.candidates;
-      if (!candidates || candidates.length === 0) {
-        throw new Error('No candidates in Gemini response');
-      }
+  for (const modelName of modelsToTry) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Use OpenAI SDK directly (simpler and more reliable)
+        const openaiModule = await import('openai');
+        const OpenAI = openaiModule.default;
+        const { toFile } = openaiModule;
+        const openai = new OpenAI({ apiKey: openaiKey });
 
-      const parts = candidates[0].content?.parts;
-      if (!parts) {
-        throw new Error('No parts in Gemini response');
-      }
+        // Create file using OpenAI's toFile helper
+        const imageFile = await toFile(imageBuffer, 'photo.png', { type: 'image/png' });
 
-      // Find the image part
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const imagePart = parts.find((p: any) => p.inlineData);
-      if (!imagePart || !imagePart.inlineData) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const textPart = parts.find((p: any) => p.text);
-        throw new Error(`Gemini transform failed: ${textPart?.text || 'No image generated'}`);
-      }
+        console.log(`[OpenAI Transform] Trying model: ${modelName} (attempt ${attempt}/${maxRetries})`);
 
-      // Find the text/caption part
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const textPart = parts.find((p: any) => p.text);
-      let caption = textPart?.text?.trim() || '';
+        const response = await openai.images.edit({
+          model: modelName as any, // Cast to any to bypass SDK type restrictions
+          image: imageFile,
+          prompt: stylePrompt,
+          size: '1024x1024',
+          quality: 'high',
+        });
 
-      // Clean up caption - remove any markdown or extra formatting
-      caption = caption
-        .replace(/^#+\s*/gm, '') // Remove markdown headers
-        .replace(/^\*+\s*/gm, '') // Remove bullet points
-        .replace(/\n+/g, ' ') // Replace newlines with spaces
-        .trim();
+        const imageData = response.data?.[0]?.b64_json;
+        if (!imageData) {
+          throw new Error('No image returned from OpenAI');
+        }
 
-      // If caption is too long, truncate to 2 sentences
-      if (caption.length > 200) {
-        const sentences = caption.match(/[^.!?]+[.!?]+/g) || [caption];
-        caption = sentences.slice(0, 2).join(' ').trim();
-      }
+        transformedImageBase64 = imageData;
+        console.log(`[OpenAI Transform] Success with model: ${modelName}`);
+        break; // Success, exit retry loop
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        const errorMessage = lastError.message;
 
-      const generationTime = (Date.now() - startTime) / 1000;
-      console.log(`[Gemini Transform] Transformed in ${generationTime.toFixed(1)}s`);
-      console.log(`[Gemini Transform] Caption: ${caption.substring(0, 80)}...`);
+        console.error(`[OpenAI Transform] Error with ${modelName} (attempt ${attempt}/${maxRetries}):`, errorMessage);
 
-      return {
-        transformedImageBase64: imagePart.inlineData.data,
-        caption,
-        generationTime,
-      };
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      const errorMessage = lastError.message;
+        // Check if it's a model not found error - try next model
+        if (errorMessage.includes('model') && (errorMessage.includes('not found') || errorMessage.includes('does not exist') || errorMessage.includes('invalid'))) {
+          console.log(`[OpenAI Transform] Model ${modelName} not available, trying next...`);
+          break; // Break inner loop, try next model
+        }
 
-      // Check if it's a rate limit error (429)
-      if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate')) {
-        const retryMatch = errorMessage.match(/retry in (\d+)/i);
-        const retryDelay = retryMatch ? parseInt(retryMatch[1], 10) * 1000 : 60000;
-        const waitTime = Math.min(retryDelay, 120000); // Cap at 2 minutes
+        // Check if it's a rate limit error
+        if (errorMessage.includes('429') || errorMessage.includes('rate') || errorMessage.includes('quota')) {
+          if (attempt < maxRetries) {
+            const waitTime = Math.min(30000 * attempt, 120000); // Exponential backoff
+            console.warn(`[OpenAI Transform] Rate limited (attempt ${attempt}/${maxRetries}). Waiting ${waitTime / 1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            continue;
+          }
+        }
 
-        if (attempt < maxRetries) {
-          console.warn(`[Gemini Transform] Rate limited (attempt ${attempt}/${maxRetries}). Waiting ${waitTime / 1000}s...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-          continue;
+        if (attempt === maxRetries) {
+          // If this is the last model and last attempt, throw
+          if (modelName === modelsToTry[modelsToTry.length - 1]) {
+            throw lastError;
+          }
         }
       }
-
-      // For non-rate-limit errors or final attempt, throw
-      console.error(`[Gemini Transform] Error (attempt ${attempt}/${maxRetries}):`, error);
-      if (attempt === maxRetries) {
-        throw lastError;
-      }
     }
+
+    // If we got a result, break out of model loop
+    if (transformedImageBase64) break;
   }
 
-  throw lastError || new Error('Photo transformation failed after all retries');
+  if (!transformedImageBase64) {
+    throw lastError || new Error('Photo transformation failed after all retries');
+  }
+
+  const transformTime = (Date.now() - startTime) / 1000;
+  console.log(`[OpenAI Transform] Image transformed in ${transformTime.toFixed(1)}s`);
+
+  // Now generate caption using Gemini (it's good at this)
+  const genAI = new GoogleGenAI({ apiKey: geminiKey });
+
+  const contextInstructions = storyContext
+    ? `Story context: ${storyContext}. Use character names from this context if applicable.`
+    : '';
+  const positionContext = photoIndex && totalPhotos
+    ? `This is scene ${photoIndex} of ${totalPhotos}.`
+    : '';
+
+  const captionPrompt = `Look at this children's book illustration and write a SHORT caption (1-2 sentences max) for it.
+
+${contextInstructions}
+${positionContext}
+
+The caption should:
+- Describe what's happening in the scene
+- Be suitable for reading aloud to children
+- Be engaging and fun
+
+Return ONLY the caption text, nothing else.`;
+
+  let caption = '';
+  try {
+    const captionResult = await genAI.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: [
+        { text: captionPrompt },
+        {
+          inlineData: {
+            mimeType: 'image/png',
+            data: transformedImageBase64,
+          },
+        },
+      ],
+    });
+
+    const textPart = captionResult.candidates?.[0]?.content?.parts?.[0];
+    if (textPart && 'text' in textPart) {
+      caption = textPart.text?.trim() || '';
+    }
+
+    // Clean up caption
+    caption = caption
+      .replace(/^["']|["']$/g, '') // Remove quotes
+      .replace(/^#+\s*/gm, '') // Remove markdown headers
+      .replace(/^\*+\s*/gm, '') // Remove bullet points
+      .replace(/\n+/g, ' ') // Replace newlines with spaces
+      .trim();
+
+    // If caption is too long, truncate to 2 sentences
+    if (caption.length > 200) {
+      const sentences = caption.match(/[^.!?]+[.!?]+/g) || [caption];
+      caption = sentences.slice(0, 2).join(' ').trim();
+    }
+  } catch (error) {
+    console.warn('[Gemini Caption] Failed to generate caption:', error);
+    caption = 'A magical moment captured in time.'; // Fallback caption
+  }
+
+  const generationTime = (Date.now() - startTime) / 1000;
+  console.log(`[OpenAI Transform] Complete in ${generationTime.toFixed(1)}s`);
+  console.log(`[OpenAI Transform] Caption: ${caption.substring(0, 80)}...`);
+
+  return {
+    transformedImageBase64,
+    caption,
+    generationTime,
+  };
 }

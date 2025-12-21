@@ -26,32 +26,32 @@ function ImageModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
       onClick={onClose}
     >
       <div
-        className="relative max-w-4xl max-h-[90vh] bg-white rounded-xl overflow-hidden shadow-2xl"
+        className="relative w-[90vw] h-[90vh] max-w-6xl bg-white rounded-xl overflow-hidden shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
           <h3 className="font-semibold text-gray-900">{title}</h3>
           <button
             onClick={onClose}
-            className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
-        {/* Image */}
-        <div className="relative aspect-square max-h-[calc(90vh-60px)]">
+        {/* Image - fills remaining space */}
+        <div className="relative flex-1 bg-gray-100">
           <Image
             src={imageUrl}
             alt={title}
             fill
-            className="object-contain"
+            className="object-contain p-4"
             unoptimized
           />
         </div>

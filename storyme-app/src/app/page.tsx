@@ -28,37 +28,37 @@ export default function HomePage() {
       {/* Navigation */}
       <LandingNav />
 
-      <div className="max-w-6xl mx-auto px-4 py-6 sm:py-10">
+      <div className="max-w-6xl mx-auto px-4 -mt-4 pb-2">
         {/* Hero Section - Two Column Layout */}
-        <div className="grid lg:grid-cols-2 gap-6 lg:gap-10 items-center mb-12">
+        <div className="grid lg:grid-cols-2 gap-6 lg:gap-10 items-end mb-12">
           {/* Left Column - Content (50%) */}
-          <div className="space-y-5">
-            {/* Brand Logo/Title */}
-            <div className="mb-6">
-              <h1 className="text-3xl sm:text-4xl font-bold mb-2 text-gray-900 leading-tight">
-                📚 Kindle<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-600">Wood</span> Studio ✨
-              </h1>
-              <div className="h-1 w-20 bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-600 rounded-full"></div>
-            </div>
-
-            {/* Tagline */}
+          <div className="flex flex-col">
+            {/* Brand Logo with Tagline */}
             <div>
-              <h2 className="text-base sm:text-lg lg:text-xl text-gray-700 leading-relaxed">
+              <Image
+                src="/KindleWoodLogo.png"
+                alt="KindleWood Studio"
+                width={320}
+                height={320}
+                className="w-60 h-60 sm:w-72 sm:h-72 object-contain mix-blend-multiply -ml-4 -mb-12"
+                priority
+              />
+              <p className="text-base sm:text-lg text-gray-600 leading-relaxed max-w-md">
                 Where Imagination Grows into Learning — Read, Listen, and Learn Anywhere
-              </h2>
+              </p>
             </div>
 
-            {/* CTA Buttons - Side by Side */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            {/* CTA Buttons - Side by Side, Same Width */}
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
               <Link
                 href="/signup"
-                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-7 py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 font-semibold text-sm text-center shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 font-semibold text-base text-center shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 w-full sm:w-36"
               >
-                🎁 Start Free Trial
+                Start Trial
               </Link>
               <Link
                 href="/login"
-                className="bg-white text-gray-700 px-7 py-3 rounded-lg hover:bg-gray-50 font-medium text-sm text-center shadow-md hover:shadow-lg transition-all border border-gray-300 transform hover:-translate-y-0.5"
+                className="bg-white text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-50 font-semibold text-base text-center shadow-md hover:shadow-lg transition-all border border-gray-300 transform hover:-translate-y-0.5 w-full sm:w-36"
               >
                 Sign In
               </Link>

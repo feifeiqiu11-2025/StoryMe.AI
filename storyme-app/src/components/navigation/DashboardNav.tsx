@@ -28,40 +28,34 @@ export default function DashboardNav() {
     <nav className="hidden md:flex space-x-6">
       <Link
         href="/dashboard"
-        className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+        className="text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors"
       >
         Dashboard
       </Link>
       <Link
         href="/create"
-        className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+        className="text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors"
       >
         Create Story
       </Link>
       <Link
         href="/characters"
-        className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+        className="text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors"
       >
         Characters
       </Link>
       <Link
         href="/projects"
-        className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+        className="text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors"
       >
         My Stories
-      </Link>
-      <Link
-        href="/import"
-        className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
-      >
-        Import PDF
       </Link>
 
       {/* Community Dropdown */}
       <div className="relative" ref={communityRef}>
         <button
           onClick={() => setCommunityDropdownOpen(!communityDropdownOpen)}
-          className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors flex items-center gap-1"
+          className="text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors flex items-center gap-1"
         >
           Communities
           <svg

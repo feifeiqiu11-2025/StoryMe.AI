@@ -125,14 +125,14 @@ export default function DashboardPage() {
           {/* Create Story */}
           <button
             onClick={handleCreateStoryClick}
-            className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-8 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-blue-200 hover:border-blue-300 text-left"
+            className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-blue-200 hover:border-blue-300 text-left"
           >
-            <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform shadow-md">
-              ✨
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-3xl group-hover:scale-110 transition-transform">✨</span>
+              <h3 className="text-xl font-bold text-gray-900">Create Story</h3>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Create Story</h3>
-            <p className="text-gray-700 text-sm mb-4">
-              Start a new personalized storybook with AI illustrations
+            <p className="text-gray-600 text-sm mb-4">
+              Make your child the hero of their own adventure with AI-generated illustrations
             </p>
             <div className="flex items-center gap-2 text-blue-600 font-semibold group-hover:gap-3 transition-all text-sm">
               Start Creating →
@@ -142,51 +142,68 @@ export default function DashboardPage() {
           {/* Character Library */}
           <Link
             href="/characters"
-            className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl shadow-lg p-8 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-purple-200 hover:border-purple-300"
+            className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-purple-200 hover:border-purple-300"
           >
-            <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform shadow-md">
-              👦👧
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-3xl group-hover:scale-110 transition-transform">👦👧</span>
+              <h3 className="text-xl font-bold text-gray-900">Characters</h3>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Characters</h3>
-            <p className="text-gray-700 text-sm mb-4">
-              Manage your character library for reuse
+            <p className="text-gray-600 text-sm mb-4">
+              Create and save characters — kids, animals, or fantasy creatures — for your stories
             </p>
             <div className="flex items-center gap-2 text-purple-600 font-semibold group-hover:gap-3 transition-all text-sm">
               Manage Characters →
             </div>
           </Link>
 
-          {/* Import PDF */}
+          {/* Photos to Storybook */}
           <Link
-            href="/import"
-            className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-2xl shadow-lg p-8 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-teal-200 hover:border-teal-300"
+            href="/photos"
+            className="bg-gradient-to-br from-orange-50 to-pink-50 rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-orange-200 hover:border-orange-300"
           >
-            <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform shadow-md">
-              📄
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-3xl group-hover:scale-110 transition-transform">📸</span>
+              <h3 className="text-xl font-bold text-gray-900">Photos to Storybook</h3>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Import PDF</h3>
-            <p className="text-gray-700 text-sm mb-4">
-              Convert PDF storybooks to interactive stories with audio
+            <p className="text-gray-600 text-sm mb-4">
+              Turn family photos into enchanting Pixar-style storybooks
             </p>
-            <div className="flex items-center gap-2 text-teal-600 font-semibold group-hover:gap-3 transition-all text-sm">
-              Import PDF →
+            <div className="flex items-center gap-2 text-orange-600 font-semibold group-hover:gap-3 transition-all text-sm">
+              Upload Photos →
             </div>
           </Link>
         </div>
 
         {/* Quick Actions Grid - Row 2 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {/* Import PDF */}
+          <Link
+            href="/import"
+            className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-teal-200 hover:border-teal-300"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-3xl group-hover:scale-110 transition-transform">📄</span>
+              <h3 className="text-xl font-bold text-gray-900">Import PDF</h3>
+            </div>
+            <p className="text-gray-600 text-sm mb-4">
+              Bring any PDF storybook to life with voice narration
+            </p>
+            <div className="flex items-center gap-2 text-teal-600 font-semibold group-hover:gap-3 transition-all text-sm">
+              Import PDF →
+            </div>
+          </Link>
+
           {/* My Stories */}
           <Link
             href="/projects"
-            className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-8 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-indigo-200 hover:border-indigo-300"
+            className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-indigo-200 hover:border-indigo-300"
           >
-            <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform shadow-md">
-              📚
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-3xl group-hover:scale-110 transition-transform">📚</span>
+              <h3 className="text-xl font-bold text-gray-900">My Stories</h3>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">My Stories</h3>
-            <p className="text-gray-700 text-sm mb-4">
-              Browse and manage all your storybooks
+            <p className="text-gray-600 text-sm mb-4">
+              All your storybooks in one place — created, imported, or from photos
             </p>
             <div className="flex items-center gap-2 text-indigo-600 font-semibold group-hover:gap-3 transition-all text-sm">
               View Stories →
@@ -196,14 +213,14 @@ export default function DashboardPage() {
           {/* Community Gallery */}
           <Link
             href="/community-stories"
-            className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl shadow-lg p-8 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-pink-200 hover:border-pink-300"
+            className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-pink-200 hover:border-pink-300"
           >
-            <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform shadow-md">
-              🌟
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-3xl group-hover:scale-110 transition-transform">🌟</span>
+              <h3 className="text-xl font-bold text-gray-900">Community Stories</h3>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Community Stories</h3>
-            <p className="text-gray-700 text-sm mb-4">
-              Explore stories from our community
+            <p className="text-gray-600 text-sm mb-4">
+              Discover inspiring tales shared by other families
             </p>
             <div className="flex items-center gap-2 text-pink-600 font-semibold group-hover:gap-3 transition-all text-sm">
               Browse Stories →

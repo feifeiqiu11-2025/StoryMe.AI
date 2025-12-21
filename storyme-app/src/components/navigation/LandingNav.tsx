@@ -62,12 +62,12 @@ export default function LandingNav() {
 
   return (
     <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center gap-3">
             <Link href="/" className="text-xl sm:text-2xl font-bold hover:opacity-80 transition-opacity text-gray-900">
-              📚 Kindle<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-600">Wood</span> Studio ✨
+              KindleWood <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Studio</span>
             </Link>
           </div>
 
@@ -75,7 +75,7 @@ export default function LandingNav() {
           <nav className="hidden lg:flex items-center space-x-6">
             <Link
               href="/"
-              className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors ${
+              className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors ${
                 isActive('/') ? 'text-blue-600 border-b-2 border-blue-600' : ''
               }`}
             >
@@ -86,7 +86,7 @@ export default function LandingNav() {
             <div className="relative" ref={productsRef}>
               <button
                 onClick={() => setProductsDropdownOpen(!productsDropdownOpen)}
-                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors flex items-center gap-1 ${
+                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors flex items-center gap-1 ${
                   isActive('/products') ? 'text-blue-600 border-b-2 border-blue-600' : ''
                 }`}
               >
@@ -116,7 +116,7 @@ export default function LandingNav() {
 
             <Link
               href="/pricing"
-              className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors ${
+              className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors ${
                 isActive('/pricing') ? 'text-blue-600 border-b-2 border-blue-600' : ''
               }`}
             >
@@ -127,7 +127,7 @@ export default function LandingNav() {
             <div className="relative" ref={founderRef}>
               <button
                 onClick={() => setFounderDropdownOpen(!founderDropdownOpen)}
-                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors flex items-center gap-1 ${
+                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors flex items-center gap-1 ${
                   isActive('/founder-letter') || isActive('/founder-journal') ? 'text-blue-600 border-b-2 border-blue-600' : ''
                 }`}
               >
@@ -165,7 +165,7 @@ export default function LandingNav() {
             <div className="relative" ref={communityRef}>
               <button
                 onClick={() => setCommunityDropdownOpen(!communityDropdownOpen)}
-                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors flex items-center gap-1 ${
+                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors flex items-center gap-1 ${
                   isActive('/stories') || isActive('/little-artists') || isActive('/community-stories') ? 'text-blue-600 border-b-2 border-blue-600' : ''
                 }`}
               >
@@ -210,14 +210,14 @@ export default function LandingNav() {
             ) : isLoggedIn ? (
               <Link
                 href="/dashboard"
-                className="text-gray-700 hover:text-blue-600 font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all text-sm"
+                className="text-gray-700 hover:text-blue-600 font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all text-base"
               >
                 Dashboard
               </Link>
             ) : (
               <Link
                 href="/login"
-                className="text-gray-700 hover:text-gray-900 font-medium px-6 py-2 rounded-lg hover:bg-gray-100 transition-all"
+                className="text-gray-700 hover:text-gray-900 font-medium px-6 py-2 rounded-lg hover:bg-gray-100 transition-all text-base"
               >
                 Sign In
               </Link>

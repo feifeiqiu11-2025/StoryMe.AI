@@ -72,7 +72,7 @@ export default function HamburgerMenu() {
           <div className="py-2">
             <Link
               href="/"
-              className={`flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors ${
+              className={`flex items-center gap-3 px-4 py-2.5 text-base text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors ${
                 isActive('/') ? 'bg-blue-50 text-blue-600 font-semibold' : ''
               }`}
             >
@@ -82,7 +82,7 @@ export default function HamburgerMenu() {
 
             <Link
               href="/products"
-              className={`flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors ${
+              className={`flex items-center gap-3 px-4 py-2.5 text-base text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors ${
                 isActive('/products') ? 'bg-blue-50 text-blue-600 font-semibold' : ''
               }`}
             >
@@ -92,7 +92,7 @@ export default function HamburgerMenu() {
 
             <Link
               href="/pricing"
-              className={`flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors ${
+              className={`flex items-center gap-3 px-4 py-2.5 text-base text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors ${
                 isActive('/pricing') ? 'bg-blue-50 text-blue-600 font-semibold' : ''
               }`}
             >
@@ -104,7 +104,7 @@ export default function HamburgerMenu() {
             <div>
               <button
                 onClick={() => setFounderDropdownOpen(!founderDropdownOpen)}
-                className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                className="w-full flex items-center justify-between px-4 py-2.5 text-base text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <span className="text-lg">✍️</span>
@@ -124,7 +124,7 @@ export default function HamburgerMenu() {
                 <div className="ml-8 mr-4 mt-1 space-y-1 border-l-2 border-gray-200 pl-4">
                   <Link
                     href="/founder-letter"
-                    className={`block py-2 text-sm text-gray-600 hover:text-blue-600 transition-colors ${
+                    className={`block py-2 text-base text-gray-600 hover:text-blue-600 transition-colors ${
                       isActive('/founder-letter') ? 'text-blue-600 font-semibold' : ''
                     }`}
                   >
@@ -132,7 +132,7 @@ export default function HamburgerMenu() {
                   </Link>
                   <Link
                     href="/founder-journal"
-                    className={`block py-2 text-sm text-gray-600 hover:text-blue-600 transition-colors ${
+                    className={`block py-2 text-base text-gray-600 hover:text-blue-600 transition-colors ${
                       isActive('/founder-journal') ? 'text-blue-600 font-semibold' : ''
                     }`}
                   >

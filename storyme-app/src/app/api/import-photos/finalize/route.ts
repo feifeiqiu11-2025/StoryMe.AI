@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
         story_context: storyContext,
         total_photos: pages.length,
         illustration_style: illustrationStyle || 'pixar',
-        gemini_model_used: 'gemini-2.5-flash-image',
+        model_used: 'gpt-image-1.5', // OpenAI for image transform, Gemini for captions
       },
     } as any);
 

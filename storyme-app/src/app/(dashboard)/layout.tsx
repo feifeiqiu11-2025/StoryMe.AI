@@ -36,8 +36,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
               <HamburgerMenu />
 
               {/* Logo */}
-              <Link href="/dashboard" className="text-xl sm:text-2xl font-bold hover:opacity-80 transition-opacity">
-                📚 Kindle<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Wood</span> Studio ✨
+              <Link href="/dashboard" className="text-xl sm:text-2xl font-bold hover:opacity-80 transition-opacity text-gray-900">
+                KindleWood <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Studio</span>
               </Link>
             </div>
             <DashboardNav />
