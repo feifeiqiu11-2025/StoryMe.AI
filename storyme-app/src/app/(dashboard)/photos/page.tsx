@@ -386,52 +386,75 @@ export default function PhotosPage() {
         throw new Error('No valid photos to create storybook. Please ensure at least one photo was successfully transformed.');
       }
 
-      // Prepare pages for finalize API (reuse PDF import finalize)
-      const pages = completedPhotos.map((photo, idx) => ({
-        pageNumber: idx + 1,
-        imageBase64: photo.transformedImageBase64!, // Safe now since we validated above
-        captionEnglish: photo.caption || '',
-        captionChinese: photo.captionChinese,
-        isScenePage: true,
-        pageType: idx === 0 ? 'cover' : 'scene' as const,
-      }));
+      // Step 1: Create project first (without images)
+      setProgress(10);
+      setProgressMessage('Creating storybook...');
 
-      setProgress(30);
-      setProgressMessage('Uploading images...');
-
-      const response = await fetch('/api/import-photos/finalize', {
+      const createResponse = await fetch('/api/import-photos/create-project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: storyTitle.trim() || 'My Photo Storybook',
           storyContext: storyContext.trim(),
-          pages,
+          totalPages: completedPhotos.length,
           illustrationStyle,
         }),
       });
 
-      setProgress(80);
-      setProgressMessage('Saving storybook...');
-
-      // Handle potential non-JSON response
-      const responseText = await response.text();
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('Failed to parse response:', responseText.substring(0, 200));
-        throw new Error('Server returned an invalid response. Please try again.');
+      const createData = await createResponse.json();
+      if (!createResponse.ok || !createData.success) {
+        throw new Error(createData.error || 'Failed to create storybook');
       }
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to create storybook');
+      const projectId = createData.projectId;
+
+      // Step 2: Upload each image one at a time
+      for (let i = 0; i < completedPhotos.length; i++) {
+        const photo = completedPhotos[i];
+        const progress = 10 + Math.round((i / completedPhotos.length) * 80);
+        setProgress(progress);
+        setProgressMessage(`Uploading image ${i + 1} of ${completedPhotos.length}...`);
+
+        const uploadResponse = await fetch('/api/import-photos/upload-scene', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId,
+            sceneNumber: i + 1,
+            imageBase64: photo.transformedImageBase64,
+            captionEnglish: photo.caption || '',
+            captionChinese: photo.captionChinese,
+            isCover: i === 0,
+          }),
+        });
+
+        const uploadData = await uploadResponse.json();
+        if (!uploadResponse.ok || !uploadData.success) {
+          console.error(`Failed to upload image ${i + 1}:`, uploadData.error);
+          // Continue with other images instead of failing completely
+        }
+      }
+
+      // Step 3: Finalize project
+      setProgress(95);
+      setProgressMessage('Finalizing storybook...');
+
+      const finalizeResponse = await fetch('/api/import-photos/finalize-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+
+      const finalizeData = await finalizeResponse.json();
+      if (!finalizeResponse.ok || !finalizeData.success) {
+        throw new Error(finalizeData.error || 'Failed to finalize storybook');
       }
 
       setProgress(100);
       setProgressMessage('Success! Redirecting...');
 
       // Redirect to project page
-      router.push(`/projects/${data.projectId}`);
+      router.push(`/projects/${projectId}`);
     } catch (err) {
       console.error('Finalization error:', err);
       setError(err instanceof Error ? err.message : 'Failed to create storybook');
