@@ -1118,7 +1118,7 @@ export default function CreateStoryPage() {
           }}
         />
 
-        {/* Step 1.5: Language Selection (NEW - Bilingual Support) */}
+        {/* Step 1.5: Language Selection - COMMENTED OUT (English is now default)
         {characters.length > 0 && enhancedScenes.length === 0 && (
           <div className="mb-8">
             <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl shadow-md p-6 border-2 border-purple-200">
@@ -1133,7 +1133,6 @@ export default function CreateStoryPage() {
               </p>
 
               <div className="ml-11 flex gap-4">
-                {/* English Option */}
                 <label
                   className={`flex-1 cursor-pointer transition-all ${
                     contentLanguage === 'en'
@@ -1162,7 +1161,6 @@ export default function CreateStoryPage() {
                   </div>
                 </label>
 
-                {/* Chinese Option */}
                 <label
                   className={`flex-1 cursor-pointer transition-all ${
                     contentLanguage === 'zh'
@@ -1192,7 +1190,6 @@ export default function CreateStoryPage() {
                 </label>
               </div>
 
-              {/* Helpful hint based on selection */}
               <div className="ml-11 mt-4 p-3 bg-white rounded-lg border border-gray-200">
                 <p className="text-sm text-gray-700">
                   <span className="font-medium">💡 Tip:</span>{' '}
@@ -1207,6 +1204,7 @@ export default function CreateStoryPage() {
             </div>
           </div>
         )}
+        */}
 
         {/* Step 2: Script Input */}
         {characters.length > 0 && enhancedScenes.length === 0 && (
@@ -1281,8 +1279,8 @@ export default function CreateStoryPage() {
                     <polyline points="20 6 9 17 4 12"></polyline>
                   </svg>
                 </div>
-                <label htmlFor="bilingual-checkbox" className="text-sm text-gray-700 cursor-pointer select-none">
-                  Generate bilingual PDF with Chinese translations
+                <label htmlFor="bilingual-checkbox" className="text-sm font-semibold text-gray-700 cursor-pointer select-none">
+                  Generate Chinese Captions for Bilingual Book
                 </label>
               </div>
             )}
@@ -1298,7 +1296,7 @@ export default function CreateStoryPage() {
               <button
                 onClick={handleEnhanceScenes}
                 disabled={isEnhancing}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-4 rounded-xl hover:from-purple-700 hover:to-pink-700 font-semibold text-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isEnhancing ? (
                   <>
@@ -1306,7 +1304,7 @@ export default function CreateStoryPage() {
                     Enhancing Scenes...
                   </>
                 ) : (
-                  '✨ Enhance Scenes & Captions'
+                  'Enhance Scenes & Captions'
                 )}
               </button>
             </div>

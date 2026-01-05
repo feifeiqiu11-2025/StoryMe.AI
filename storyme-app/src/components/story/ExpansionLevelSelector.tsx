@@ -38,8 +38,8 @@ export default function ExpansionLevelSelector({
         AI Story Enhancement
       </label>
 
-      {/* Horizontal 3-card layout */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* Responsive 3-card layout - stacks on mobile */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Minimal (Default) */}
         <button
           type="button"

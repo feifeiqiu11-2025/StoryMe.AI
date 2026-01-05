@@ -174,21 +174,6 @@ export default function StorySettingsPanel({
         readingLevel={readingLevel}
         onChange={onExpansionLevelChange}
       />
-
-      {/* Summary */}
-      <div className="pt-4 border-t border-gray-200">
-        <div className="text-sm text-gray-600">
-          Your story will be created for{' '}
-          <span className="font-semibold text-gray-900">
-            {readingLevel}-year-olds
-          </span>{' '}
-          with a{' '}
-          <span className="font-semibold text-gray-900">
-            {storyTone}
-          </span>{' '}
-          tone.
-        </div>
-      </div>
     </div>
   );
 }
