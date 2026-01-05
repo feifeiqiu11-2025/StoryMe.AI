@@ -44,7 +44,7 @@ export default function HomePage() {
                 priority
               />
               <p className="text-base sm:text-lg text-gray-600 leading-relaxed max-w-md">
-                Where Imagination Grows into Learning — Read, Listen, and Learn Anywhere
+                A creativity-based learning platform where kids imagine, create, learn, and grow into confident thinkers
               </p>
             </div>
 
@@ -52,9 +52,9 @@ export default function HomePage() {
             <div className="flex flex-col sm:flex-row gap-3 mt-4">
               <Link
                 href="/signup"
-                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 font-semibold text-base text-center shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 w-full sm:w-36"
+                className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 font-semibold text-base text-center shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 w-full sm:w-auto sm:whitespace-nowrap"
               >
-                Start Trial
+                Start Your Free Trial
               </Link>
               <Link
                 href="/login"
@@ -88,50 +88,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Personal Story Section */}
-        <div className="bg-gradient-to-br from-white to-yellow-50 rounded-2xl shadow-xl p-5 sm:p-6 mb-8 sm:mb-10 border border-yellow-100">
-          <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
-            <div className="flex-shrink-0 mx-auto sm:mx-0">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg transform rotate-3">
-                <span className="text-2xl sm:text-3xl">💡</span>
-              </div>
-            </div>
-            <div className="flex-1">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 flex items-center gap-2">
-                What Sparked KindleWood 🌟
-              </h2>
-              <div className="text-sm sm:text-base text-gray-700 space-y-3 leading-relaxed">
-                <p>
-                  One evening, my 4-year-old came running to me, eyes sparkling with excitement.
-                  He had just made up a wild story about how his friend got eaten by a dragon 🐉 — and how he and his superhero squad saved the day! 🦸‍♂️
-                </p>
-                <p>
-                  As he told me every detail with so much imagination and joy, I realized these moments are priceless. When I printed his story as a real book, he couldn't stop reading — because this time, he was the hero.
-                </p>
-                <p>
-                  Then something magical happened: his little brother and their friends started creating their own dragon stories. A viral loop of imagination had begun.
-                </p>
-                <p className="italic text-gray-600 bg-white/50 p-4 rounded-lg border-l-4 border-orange-400 text-sm">
-                  <span className="text-xl mr-1">✨</span>
-                  That's when KindleWood Studio was born.
-                </p>
-                <p className="font-medium text-gray-800">
-                  My dream isn't just to help kids read — it's to help them become storytellers and creators who develop confidence, empathy, and resilience: the superpowers AI will never have.
-                </p>
-                <div className="mt-6 text-center sm:text-left">
-                  <a
-                    href="/founder-letter"
-                    className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold transition-colors group"
-                  >
-                    Read the Founder's Letter
-                    <span className="transform group-hover:translate-x-1 transition-transform">→</span>
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* KindleWood Principles - Visual Journey Section */}
         <div id="founder-letter" className="mb-12 sm:mb-16">
           {/* Section Title */}
@@ -140,22 +96,17 @@ export default function HomePage() {
               Our Principles
             </h2>
             <p className="text-base sm:text-lg text-gray-700 leading-relaxed max-w-3xl mx-auto">
-              At <strong className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">KindleWood</strong>, we believe every child carries something extraordinary—a spark of pure imagination waiting to ignite.
+              At <strong className="text-blue-600">KindleWood</strong>, we believe every child is born creative. Our role is not to teach creativity—but to protect and amplify it.
             </p>
           </div>
 
           {/* Clean Journey Flow - Inspired by Slides */}
           <div className="mb-12">
-            {/* Title with arrows */}
-            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 text-center mb-10">
-              Spark → Create → Grow
-            </h3>
-
-            {/* Three Column Grid */}
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
+            {/* Three Column Grid with Arrows */}
+            <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-2 mb-8">
 
               {/* Column 1: Spark */}
-              <div className="bg-white rounded-xl p-6 shadow-md border border-yellow-200">
+              <div className="bg-white rounded-xl p-6 shadow-md border border-yellow-200 flex-1 max-w-sm">
                 {/* Image */}
                 <div className="mb-4 rounded-lg overflow-hidden">
                   <img
@@ -190,8 +141,16 @@ export default function HomePage() {
                 </ul>
               </div>
 
+              {/* Arrow 1 */}
+              <div className="hidden md:flex items-center justify-center px-2">
+                <span className="text-2xl text-gray-400">→</span>
+              </div>
+              <div className="md:hidden flex items-center justify-center py-2">
+                <span className="text-2xl text-gray-400">↓</span>
+              </div>
+
               {/* Column 2: Create */}
-              <div className="bg-white rounded-xl p-6 shadow-md border border-pink-200">
+              <div className="bg-white rounded-xl p-6 shadow-md border border-pink-200 flex-1 max-w-sm">
                 {/* Image */}
                 <div className="mb-4 rounded-lg overflow-hidden">
                   <img
@@ -226,8 +185,16 @@ export default function HomePage() {
                 </ul>
               </div>
 
+              {/* Arrow 2 */}
+              <div className="hidden md:flex items-center justify-center px-2">
+                <span className="text-2xl text-gray-400">→</span>
+              </div>
+              <div className="md:hidden flex items-center justify-center py-2">
+                <span className="text-2xl text-gray-400">↓</span>
+              </div>
+
               {/* Column 3: Grow */}
-              <div className="bg-white rounded-xl p-6 shadow-md border border-green-200">
+              <div className="bg-white rounded-xl p-6 shadow-md border border-green-200 flex-1 max-w-sm">
                 {/* Image */}
                 <div className="mb-4 rounded-lg overflow-hidden">
                   <img
@@ -264,22 +231,6 @@ export default function HomePage() {
 
             </div>
           </div>
-
-          {/* Final Statement */}
-          <div className="text-center mt-12 max-w-3xl mx-auto space-y-4">
-            <p className="text-xl sm:text-2xl font-bold text-gray-900">
-              A spark becomes a story.
-            </p>
-            <p className="text-xl sm:text-2xl font-bold text-gray-900">
-              A story becomes confidence.
-            </p>
-            <p className="text-base sm:text-lg text-gray-700 leading-relaxed mt-6">
-              With every page they create and every tale they share, children discover something remarkable—their own power.
-            </p>
-            <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
-              They become empathetic friends, confident thinkers, and resilient creators who know they can imagine, try, fail, and try again.
-            </p>
-          </div>
         </div>
 
         {/* Community Stories Carousel - Netflix Style */}
@@ -288,7 +239,7 @@ export default function HomePage() {
         {/* Why Kids, Families & Educators Love KindleWood Studio */}
         <div className="mb-10 sm:mb-12">
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-6 sm:mb-8">
-            🎯 Why Kids, Families & Educators Love KindleWood Studio
+            Why Kids, Families & Educators Love KindleWood Studio
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
             {/* Card 1: Your Child Is the Story */}
@@ -443,15 +394,12 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-          <p className="text-center text-lg text-gray-700 mt-8">
-            💫 <em>Because the best way to learn to love reading is to see yourself inside the story.</em>
-          </p>
         </div>
 
         {/* How the KindleWood Ecosystem Works */}
         <div className="mb-12 sm:mb-16">
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-8">
-            🔮 How the KindleWood Ecosystem Works
+            How the KindleWood Ecosystem Works
           </h2>
 
           {/* Product Cards */}
@@ -507,12 +455,14 @@ export default function HomePage() {
                 </li>
               </ul>
 
-              <Link
-                href="/signup"
-                className="block w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg hover:from-purple-700 hover:to-pink-700 font-semibold text-center shadow-md hover:shadow-lg transition-all text-sm sm:text-base"
-              >
-                Start Creating Stories
-              </Link>
+              <div className="mt-auto pt-4">
+                <Link
+                  href="/signup"
+                  className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold text-center shadow-md hover:shadow-lg transition-all text-sm sm:text-base whitespace-nowrap"
+                >
+                  Start Creating Stories
+                </Link>
+              </div>
             </div>
 
             {/* KindleWood Kids */}
@@ -558,47 +508,29 @@ export default function HomePage() {
                 </li>
               </ul>
 
-              {/* QR Code Section */}
-              <div className="flex items-center justify-center gap-4 mb-4 sm:mb-6 p-4">
-                <div className="flex-shrink-0">
-                  <Image
-                    src="/images/qr-kindlewood-ios.png"
-                    alt="Download from App Store"
-                    width={100}
-                    height={100}
-                    className="rounded-lg"
-                  />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-gray-700">Scan to Download</p>
-                  <p className="text-xs text-gray-500">from App Store</p>
-                </div>
+              <div className="mt-auto pt-4">
+                <a
+                  href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold text-center transition-colors text-sm sm:text-base whitespace-nowrap"
+                >
+                  Download the Free Kids App
+                </a>
               </div>
-
-              <a
-                href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-semibold text-center transition-colors text-sm sm:text-base"
-              >
-                FREE for All Users
-              </a>
             </div>
           </div>
 
           {/* How They Work Together */}
-          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl shadow-xl p-6 sm:p-8 border border-amber-200">
+          <div>
             <div className="text-center mb-6 sm:mb-8">
-              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">
-                🌟 How They Work Together
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
+                How They Work Together
               </h3>
-              <p className="text-base sm:text-lg text-gray-700">
-                A seamless creative ecosystem from imagination to learning
-              </p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-4 sm:gap-6">
-              <div className="bg-white rounded-xl p-5 sm:p-6 shadow-md">
+              <div className="bg-white rounded-xl p-5 sm:p-6 shadow-md border border-gray-200">
                 <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-xl sm:text-2xl mb-4 mx-auto">
                   1
                 </div>
@@ -608,7 +540,7 @@ export default function HomePage() {
                 </p>
               </div>
 
-              <div className="bg-white rounded-xl p-5 sm:p-6 shadow-md">
+              <div className="bg-white rounded-xl p-5 sm:p-6 shadow-md border border-gray-200">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-xl sm:text-2xl mb-4 mx-auto">
                   2
                 </div>
@@ -618,7 +550,7 @@ export default function HomePage() {
                 </p>
               </div>
 
-              <div className="bg-white rounded-xl p-5 sm:p-6 shadow-md">
+              <div className="bg-white rounded-xl p-5 sm:p-6 shadow-md border border-gray-200">
                 <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center text-xl sm:text-2xl mb-4 mx-auto">
                   3
                 </div>
@@ -628,10 +560,50 @@ export default function HomePage() {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
 
-            <p className="text-center text-gray-700 mt-6 sm:mt-8 text-sm sm:text-base italic">
-              💫 From creation to confidence — a complete storytelling and learning journey
-            </p>
+        {/* Personal Story Section - What Sparked KindleWood */}
+        <div className="bg-gradient-to-br from-white to-yellow-50 rounded-2xl shadow-xl p-5 sm:p-6 mb-8 sm:mb-10 border border-yellow-100">
+          <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+            <div className="flex-shrink-0 mx-auto sm:mx-0">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg transform rotate-3">
+                <span className="text-2xl sm:text-3xl">💡</span>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 flex items-center gap-2">
+                What Sparked KindleWood 🌟
+              </h2>
+              <div className="text-sm sm:text-base text-gray-700 space-y-3 leading-relaxed">
+                <p>
+                  One evening, my 4-year-old came running to me, eyes sparkling with excitement.
+                  He had just made up a wild story about how his friend got eaten by a dragon 🐉 — and how he and his superhero squad saved the day! 🦸‍♂️
+                </p>
+                <p>
+                  As he told me every detail with so much imagination and joy, I realized these moments are priceless. When I printed his story as a real book, he couldn't stop reading — because this time, he was the hero.
+                </p>
+                <p>
+                  Then something magical happened: his little brother and their friends started creating their own dragon stories. A viral loop of imagination had begun.
+                </p>
+                <p className="italic text-gray-600 bg-white/50 p-4 rounded-lg border-l-4 border-orange-400 text-sm">
+                  <span className="text-xl mr-1">✨</span>
+                  That's when KindleWood Studio was born.
+                </p>
+                <p className="font-medium text-gray-800">
+                  My dream isn't just to help kids read — it's to help them become storytellers and creators who develop confidence, empathy, and resilience: the superpowers AI will never have.
+                </p>
+                <div className="mt-6 text-center sm:text-left">
+                  <a
+                    href="/founder-letter"
+                    className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold transition-colors group"
+                  >
+                    Read the Founder's Letter
+                    <span className="transform group-hover:translate-x-1 transition-transform">→</span>
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -186,7 +186,7 @@ export default function CommunityStoriesCarousel() {
     return (
       <div className="mb-10 sm:mb-12">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">
-          ✨ Stories from Our Community
+          Stories from Our Community
         </h2>
         <div className="animate-pulse flex gap-4 overflow-hidden">
           {[...Array(5)].map((_, i) => (
@@ -202,7 +202,7 @@ export default function CommunityStoriesCarousel() {
       {/* Section Title */}
       <div className="text-center mb-6">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-          ✨ Stories from Our Community
+          Stories from Our Community
         </h2>
         <a
           href="/stories"
