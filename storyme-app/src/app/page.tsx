@@ -32,10 +32,10 @@ export default function HomePage() {
           {/* Hero Carousel */}
           <HeroCarousel className="mb-6" />
 
-          {/* Tagline - Larger font like Figma */}
+          {/* Tagline - Figma style */}
           <div className="text-center">
-            <p className="text-xl sm:text-2xl md:text-3xl text-gray-600 leading-relaxed max-w-3xl mx-auto italic">
-              A creativity-based learning platform where kids imagine, create, learn, and grow into confident thinkers
+            <p className="text-base sm:text-lg text-gray-500 max-w-2xl mx-auto">
+              A creativity-based learning platform where kids imagine, create, learn, and grow into confident thinkers.
             </p>
           </div>
         </div>

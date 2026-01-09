@@ -9,7 +9,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
+import { createClient } from '@/lib/supabase/client';
 import type { ProjectWithScenesDTO } from '@/lib/domain/dtos';
 
 // Mock story type for fallback
@@ -36,12 +38,81 @@ interface HeroCarouselProps {
   className?: string;
 }
 
+// Messages for typing effect
+const MAIN_MESSAGE = "Turn Your Child's Ideas Into Creations They Can Learn From";
+const SUB_MESSAGE = "A wild story, a drawing, and more—brought to life by their imagination.";
+
 export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
   const router = useRouter();
   const [stories, setStories] = useState<ProjectWithScenesDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+
+  // Auth state for CTA button
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Typing effect state
+  const [displayedText, setDisplayedText] = useState('');
+  const [typingComplete, setTypingComplete] = useState(false);
+  const [subDisplayedText, setSubDisplayedText] = useState('');
+  const [subTypingComplete, setSubTypingComplete] = useState(false);
+
+  // Check if user is logged in
+  useEffect(() => {
+    setIsMounted(true);
+    const checkAuth = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsLoggedIn(!!user);
+    };
+    checkAuth();
+  }, []);
+
+  // Main message typing effect - complete in ~2 seconds
+  useEffect(() => {
+    if (typingComplete) return;
+
+    const totalChars = MAIN_MESSAGE.length;
+    // ~2 seconds to type main message
+    const intervalTime = Math.floor(2000 / totalChars);
+
+    const timer = setInterval(() => {
+      setDisplayedText(prev => {
+        if (prev.length >= MAIN_MESSAGE.length) {
+          clearInterval(timer);
+          setTypingComplete(true);
+          return MAIN_MESSAGE;
+        }
+        return MAIN_MESSAGE.slice(0, prev.length + 1);
+      });
+    }, intervalTime);
+
+    return () => clearInterval(timer);
+  }, [typingComplete]);
+
+  // Sub message typing effect - starts after main message, complete in ~1.5 seconds
+  useEffect(() => {
+    if (!typingComplete || subTypingComplete) return;
+
+    const totalChars = SUB_MESSAGE.length;
+    // ~1.5 seconds to type sub message
+    const intervalTime = Math.floor(1500 / totalChars);
+
+    const timer = setInterval(() => {
+      setSubDisplayedText(prev => {
+        if (prev.length >= SUB_MESSAGE.length) {
+          clearInterval(timer);
+          setSubTypingComplete(true);
+          return SUB_MESSAGE;
+        }
+        return SUB_MESSAGE.slice(0, prev.length + 1);
+      });
+    }, intervalTime);
+
+    return () => clearInterval(timer);
+  }, [typingComplete, subTypingComplete]);
 
   // Fetch featured stories
   useEffect(() => {
@@ -258,8 +329,41 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
           {displayStories.map((story, index) => renderCard(story, index, isMock))}
         </div>
 
+        {/* Overlay with Typing Effect */}
+        <div className="absolute inset-0 flex items-end justify-center z-20 pointer-events-none pb-16">
+          <div className="bg-white/65 backdrop-blur-sm rounded-xl px-5 py-3 max-w-3xl mx-4 text-center shadow-lg pointer-events-auto">
+            {/* Main Message with Typing Effect */}
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-0.5 whitespace-nowrap">
+              {displayedText}
+              {!typingComplete && (
+                <span className="inline-block w-0.5 h-5 bg-blue-600 ml-1 animate-pulse" />
+              )}
+            </h2>
+
+            {/* Sub Message with Typing Effect */}
+            <p className="text-gray-600 text-sm sm:text-base mb-2 whitespace-nowrap">
+              {subDisplayedText}
+              {typingComplete && !subTypingComplete && (
+                <span className="inline-block w-0.5 h-4 bg-blue-600 ml-1 animate-pulse" />
+              )}
+            </p>
+
+            {/* CTA Button */}
+            {!isMounted ? (
+              <div className="inline-block px-5 py-2 opacity-0">Start to Create</div>
+            ) : (
+              <Link
+                href={isLoggedIn ? '/dashboard' : '/signup'}
+                className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-lg transition-all shadow-md hover:shadow-lg"
+              >
+                Start to Create
+              </Link>
+            )}
+          </div>
+        </div>
+
         {/* Figma-style Navigation Controls - Bottom right, aligned with right edge */}
-        <div className="absolute bottom-4 right-8 flex items-center gap-2">
+        <div className="absolute bottom-4 right-8 flex items-center gap-2 z-30">
           {/* Previous Button */}
           <button
             onClick={goToPrev}
