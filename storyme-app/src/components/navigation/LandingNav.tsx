@@ -208,7 +208,7 @@ export default function LandingNav() {
           </div>
 
           {/* Auth Buttons - Desktop */}
-          <div className="hidden lg:flex items-center gap-4">
+          <div className="hidden lg:flex items-center gap-3">
             {!isMounted ? (
               // Placeholder to prevent layout shift
               <div className="px-6 py-2 opacity-0">Sign In</div>
@@ -220,12 +220,20 @@ export default function LandingNav() {
                 Dashboard
               </Link>
             ) : (
-              <Link
-                href="/login"
-                className="text-gray-700 hover:text-gray-900 font-medium px-6 py-2 rounded-lg hover:bg-gray-100 transition-all text-base"
-              >
-                Sign In
-              </Link>
+              <>
+                <Link
+                  href="/login"
+                  className="text-gray-700 hover:text-gray-900 font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all text-sm"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/signup"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg transition-all text-sm shadow-sm"
+                >
+                  Start Free Trial
+                </Link>
+              </>
             )}
           </div>
 
@@ -372,7 +380,7 @@ export default function LandingNav() {
               )}
             </div>
 
-            {/* Auth Button - Mobile */}
+            {/* Auth Buttons - Mobile */}
             {isMounted && (
               isLoggedIn ? (
                 <Link
@@ -382,12 +390,20 @@ export default function LandingNav() {
                   Dashboard
                 </Link>
               ) : (
-                <Link
-                  href="/login"
-                  className="block mx-4 mt-4 text-center bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 font-semibold transition-all shadow-md"
-                >
-                  Sign In
-                </Link>
+                <div className="space-y-2 mt-4 px-4">
+                  <Link
+                    href="/signup"
+                    className="block text-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all shadow-md"
+                  >
+                    Start Free Trial
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="block text-center text-gray-700 hover:text-gray-900 px-6 py-2 rounded-lg font-medium transition-all"
+                  >
+                    Sign In
+                  </Link>
+                </div>
               )
             )}
           </div>

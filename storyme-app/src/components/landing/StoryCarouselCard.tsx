@@ -65,7 +65,8 @@ export default function StoryCarouselCard({
 
   // Handle real stories
   const realStory = story as ProjectWithScenesDTO;
-  const coverImage = realStory?.scenes?.[0]?.imageUrl;
+  // Use coverImageUrl first, fall back to first scene image
+  const coverImage = realStory?.coverImageUrl || realStory?.scenes?.[0]?.imageUrl;
   const sceneCount = realStory?.scenes?.length || 0;
 
   // Build author string

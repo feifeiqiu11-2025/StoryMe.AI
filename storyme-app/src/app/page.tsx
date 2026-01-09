@@ -1,6 +1,6 @@
 /**
  * Landing page / Home page
- * Modern, appealing design with emojis
+ * Figma-inspired design with hero carousel
  * Updated with KindleWood branding and ecosystem messaging
  */
 
@@ -8,15 +8,13 @@
 
 import { Suspense } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import Testimonials from '@/components/landing/Testimonials';
 import ErrorHandler from '@/components/ErrorHandler';
 import PricingCards from '@/components/pricing/PricingCards';
 import LandingNav from '@/components/navigation/LandingNav';
-import CommunityStoriesCarousel from '@/components/landing/CommunityStoriesCarousel';
+import HeroCarousel from '@/components/landing/HeroCarousel';
 
 export default function HomePage() {
-  // Show landing page (removed auth redirect - dashboard handles auth now)
   return (
     <>
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
@@ -28,68 +26,22 @@ export default function HomePage() {
       {/* Navigation */}
       <LandingNav />
 
-      <div className="max-w-6xl mx-auto px-4 -mt-4 pb-2">
-        {/* Hero Section - Two Column Layout */}
-        <div className="grid lg:grid-cols-2 gap-6 lg:gap-10 items-end mb-12">
-          {/* Left Column - Content (50%) */}
-          <div className="flex flex-col">
-            {/* Brand Logo with Tagline */}
-            <div>
-              <Image
-                src="/KindleWoodLogo.png"
-                alt="KindleWood Studio"
-                width={320}
-                height={320}
-                className="w-60 h-60 sm:w-72 sm:h-72 object-contain mix-blend-multiply -ml-4 -mb-12"
-                priority
-              />
-              <p className="text-base sm:text-lg text-gray-600 leading-relaxed max-w-md">
-                A creativity-based learning platform where kids imagine, create, learn, and grow into confident thinkers
-              </p>
-            </div>
+      <div className="max-w-6xl mx-auto px-4 pt-8 pb-2">
+        {/* Hero Section - Carousel + Tagline */}
+        <div className="mb-16">
+          {/* Hero Carousel */}
+          <HeroCarousel className="mb-6" />
 
-            {/* CTA Buttons - Side by Side, Same Width */}
-            <div className="flex flex-col sm:flex-row gap-3 mt-4">
-              <Link
-                href="/signup"
-                className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 font-semibold text-base text-center shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 w-full sm:w-auto sm:whitespace-nowrap"
-              >
-                Start Your Free Trial
-              </Link>
-              <Link
-                href="/login"
-                className="bg-white text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-50 font-semibold text-base text-center shadow-md hover:shadow-lg transition-all border border-gray-300 transform hover:-translate-y-0.5 w-full sm:w-36"
-              >
-                Sign In
-              </Link>
-            </div>
-          </div>
-
-          {/* Right Column - Product Demo Video (50%) */}
-          <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl lg:block hidden">
-            <iframe
-              src="https://www.youtube.com/embed/7ISlDfVdTdk"
-              title="KindleWood Studio Product Demo"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="w-full h-full border-0"
-            />
-          </div>
-
-          {/* Mobile Video - Full Width Below Text */}
-          <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl lg:hidden mt-6">
-            <iframe
-              src="https://www.youtube.com/embed/7ISlDfVdTdk"
-              title="KindleWood Studio Product Demo"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="w-full h-full border-0"
-            />
+          {/* Tagline - Larger font like Figma */}
+          <div className="text-center">
+            <p className="text-xl sm:text-2xl md:text-3xl text-gray-600 leading-relaxed max-w-3xl mx-auto italic">
+              A creativity-based learning platform where kids imagine, create, learn, and grow into confident thinkers
+            </p>
           </div>
         </div>
 
         {/* KindleWood Principles - Visual Journey Section */}
-        <div id="founder-letter" className="mb-12 sm:mb-16">
+        <div className="mb-12 sm:mb-16">
           {/* Section Title */}
           <div className="text-center mb-8 sm:mb-12">
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
@@ -233,8 +185,62 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Community Stories Carousel - Netflix Style */}
-        <CommunityStoriesCarousel />
+        {/* Founder Stories & KindleWood Vision Section */}
+        <div className="mb-12 sm:mb-16">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
+              The KindleWood Story
+            </h2>
+            <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto">
+              See how we're helping families create magical stories together
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-8 items-start">
+            {/* Video */}
+            <div className="relative aspect-video rounded-2xl overflow-hidden shadow-xl">
+              <iframe
+                src="https://www.youtube.com/embed/7ISlDfVdTdk"
+                title="KindleWood Studio Product Demo"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="w-full h-full border-0"
+              />
+            </div>
+
+            {/* Brief Story + Link to Founder Letter */}
+            <div className="bg-gradient-to-br from-white to-yellow-50 rounded-2xl shadow-lg p-6 border border-yellow-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center shadow-md">
+                  <span className="text-2xl">💡</span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">What Sparked KindleWood</h3>
+              </div>
+
+              <div className="text-gray-700 space-y-3 text-sm sm:text-base leading-relaxed">
+                <p>
+                  One evening, my 4-year-old came running to me with eyes sparkling. He had made up a wild story about his friend getting eaten by a dragon — and how his superhero squad saved the day!
+                </p>
+                <p>
+                  When I printed his story as a real book, he couldn't stop reading — because this time, <em>he</em> was the hero.
+                </p>
+                <p className="font-medium text-gray-800">
+                  My dream is to help kids become storytellers who develop confidence, empathy, and resilience: the superpowers AI will never have.
+                </p>
+              </div>
+
+              <div className="mt-6">
+                <Link
+                  href="/founder-letter"
+                  className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold transition-colors group"
+                >
+                  Read the Full Founder's Letter
+                  <span className="transform group-hover:translate-x-1 transition-transform">→</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Why Kids, Families & Educators Love KindleWood Studio */}
         <div className="mb-10 sm:mb-12">
@@ -274,7 +280,7 @@ export default function HomePage() {
                     Real Voices, Real Connection
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    Record your own voice — or a teacher's — to narrate each story. Kids light up hearing familiar voices tell their adventures. Because no AI voice can replace the comfort of a parent's "once upon a time." (AI narration also available for convenience in multiple languages.)
+                    Record your own voice — or a teacher's — to narrate each story. Kids light up hearing familiar voices tell their adventures. Because no AI voice can replace the comfort of a parent's "once upon a time."
                   </p>
                 </div>
               </div>
@@ -293,7 +299,7 @@ export default function HomePage() {
                     Fun, Bilingual Learning That Feels Like Play
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    Stories sync with the <Link href="https://kindle-wood-kids.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700 underline font-medium">KindleWood Kids</Link> app for interactive reading in English and Chinese. Kids tap words to hear pronunciation, take fun quizzes, and get AI-powered explanations. Learning feels like play — and every story teaches something new.
+                    Stories sync with the KindleWood Kids app for interactive reading in English and Chinese. Kids tap words to hear pronunciation, take fun quizzes, and get AI-powered explanations.
                   </p>
                 </div>
               </div>
@@ -337,26 +343,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Card 6: Set Goals Together, Celebrate Progress */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-orange-100">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center shadow-md">
-                    <span className="text-2xl">🏆</span>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900 mb-2 text-lg">
-                    Set Goals Together, Celebrate Progress
-                  </h3>
-                  <p className="text-gray-600 text-sm leading-relaxed">
-                    Set reading or learning goals, earn badges, and celebrate milestones. Parents and teachers can track progress and celebrate small wins together.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Card 7: Stories Everywhere They Go */}
+            {/* Card 6: Stories Everywhere They Go */}
             <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-indigo-100">
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
@@ -370,25 +357,6 @@ export default function HomePage() {
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
                     Read at home, listen on Spotify, or print as keepsake books. Every story can travel from bedtime to car rides — helping kids stay curious and connected.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Card 8: Partner to Empower Every Young Author */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all transform hover:-translate-y-1 border-2 border-violet-100">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-gradient-to-br from-violet-400 to-purple-500 rounded-xl flex items-center justify-center shadow-md">
-                    <span className="text-2xl">🌟</span>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900 mb-2 text-lg">
-                    Partner to Empower Every Young Author
-                  </h3>
-                  <p className="text-gray-600 text-sm leading-relaxed">
-                    Schools and educators can publish classroom story collections and inspire confident storytellers in both languages.
                   </p>
                 </div>
               </div>
@@ -423,35 +391,23 @@ export default function HomePage() {
               <ul className="space-y-2 sm:space-y-3 mb-4 sm:mb-6 flex-grow text-xs sm:text-sm">
                 <li className="flex items-start gap-2 sm:gap-3">
                   <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>AI-Powered Story Creation</strong> — Record voice, upload videos, type ideas, or snap photos of drawings</span>
+                  <span className="text-gray-700"><strong>AI-Powered Story Creation</strong> — Record voice, upload videos, type ideas, or snap photos</span>
                 </li>
                 <li className="flex items-start gap-2 sm:gap-3">
                   <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Consistent Characters</strong> — Upload a photo once, your child becomes the hero of every story</span>
+                  <span className="text-gray-700"><strong>Consistent Characters</strong> — Upload a photo once, your child becomes the hero</span>
                 </li>
                 <li className="flex items-start gap-2 sm:gap-3">
                   <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Bilingual Support</strong> — Stories in both English and Chinese with professional-quality illustrations</span>
+                  <span className="text-gray-700"><strong>Bilingual Support</strong> — Stories in both English and Chinese</span>
                 </li>
                 <li className="flex items-start gap-2 sm:gap-3">
                   <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Voice Narration</strong> — Use AI generated voice or record Mom's, Dad's, or a teacher's voice to bring stories to life. Kids feel connected when they hear familiar voices — building emotional bonds and bilingual learning confidence</span>
+                  <span className="text-gray-700"><strong>Voice Narration</strong> — Record your own voice or use AI narration</span>
                 </li>
                 <li className="flex items-start gap-2 sm:gap-3">
                   <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Publish to Spotify</strong> — Share your stories as audio podcasts on Spotify for listening anywhere</span>
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Selective Publishing</strong> — Pick and choose which stories to publish to the KindleWood Kids app</span>
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Export & Print</strong> — Download high-quality PDFs ready for printing as keepsake books</span>
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Educator Tools</strong> — Create and share educational content with families and classrooms</span>
+                  <span className="text-gray-700"><strong>Export & Print</strong> — Download PDFs ready for printing</span>
                 </li>
               </ul>
 
@@ -484,27 +440,23 @@ export default function HomePage() {
               <ul className="space-y-2 sm:space-y-3 mb-4 sm:mb-6 flex-grow text-xs sm:text-sm">
                 <li className="flex items-start gap-2 sm:gap-3">
                   <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Multiple Child Profiles</strong> — Create separate profiles for each child to track reading and learning independently</span>
+                  <span className="text-gray-700"><strong>Multiple Child Profiles</strong> — Separate profiles for each child</span>
                 </li>
                 <li className="flex items-start gap-2 sm:gap-3">
                   <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Interactive Reading & Vocabulary Building</strong> — Tap words to hear pronunciation in English or Chinese, and automatically build personalized vocabulary lists for unfamiliar words</span>
+                  <span className="text-gray-700"><strong>Interactive Reading</strong> — Tap words to hear pronunciation</span>
                 </li>
                 <li className="flex items-start gap-2 sm:gap-3">
                   <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Audio Narration</strong> — Listen to stories anywhere — perfect for car rides and bedtime</span>
+                  <span className="text-gray-700"><strong>Audio Narration</strong> — Listen to stories anywhere</span>
                 </li>
                 <li className="flex items-start gap-2 sm:gap-3">
                   <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Fun Quizzes & Learning</strong> — AI-powered questions that adapt to reading level</span>
+                  <span className="text-gray-700"><strong>Fun Quizzes</strong> — AI-powered questions that adapt</span>
                 </li>
                 <li className="flex items-start gap-2 sm:gap-3">
                   <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Goal Setting & Progress Tracking</strong> — Parents and kids define goals together, earn badges, celebrate milestones, and track reading progress</span>
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>100% Safe</strong> — No ads, no in-app purchases, no external links</span>
+                  <span className="text-gray-700"><strong>100% Safe</strong> — No ads, no in-app purchases</span>
                 </li>
               </ul>
 
@@ -531,7 +483,7 @@ export default function HomePage() {
 
             <div className="grid md:grid-cols-3 gap-4 sm:gap-6">
               <div className="bg-white rounded-xl p-5 sm:p-6 shadow-md border border-gray-200">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-xl sm:text-2xl mb-4 mx-auto">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-xl sm:text-2xl mb-4 mx-auto text-white font-bold">
                   1
                 </div>
                 <h3 className="font-bold text-gray-900 mb-2 text-center">Create in Studio</h3>
@@ -541,7 +493,7 @@ export default function HomePage() {
               </div>
 
               <div className="bg-white rounded-xl p-5 sm:p-6 shadow-md border border-gray-200">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-xl sm:text-2xl mb-4 mx-auto">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-xl sm:text-2xl mb-4 mx-auto text-white font-bold">
                   2
                 </div>
                 <h3 className="font-bold text-gray-900 mb-2 text-center">Publish to Kids</h3>
@@ -551,57 +503,13 @@ export default function HomePage() {
               </div>
 
               <div className="bg-white rounded-xl p-5 sm:p-6 shadow-md border border-gray-200">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center text-xl sm:text-2xl mb-4 mx-auto">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center text-xl sm:text-2xl mb-4 mx-auto text-white font-bold">
                   3
                 </div>
                 <h3 className="font-bold text-gray-900 mb-2 text-center">Learn Everywhere</h3>
                 <p className="text-xs sm:text-sm text-gray-600 text-center">
                   Children read, listen, and learn at home, in the car, or at school — their stories follow them everywhere
                 </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Personal Story Section - What Sparked KindleWood */}
-        <div className="bg-gradient-to-br from-white to-yellow-50 rounded-2xl shadow-xl p-5 sm:p-6 mb-8 sm:mb-10 border border-yellow-100">
-          <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
-            <div className="flex-shrink-0 mx-auto sm:mx-0">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg transform rotate-3">
-                <span className="text-2xl sm:text-3xl">💡</span>
-              </div>
-            </div>
-            <div className="flex-1">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 flex items-center gap-2">
-                What Sparked KindleWood 🌟
-              </h2>
-              <div className="text-sm sm:text-base text-gray-700 space-y-3 leading-relaxed">
-                <p>
-                  One evening, my 4-year-old came running to me, eyes sparkling with excitement.
-                  He had just made up a wild story about how his friend got eaten by a dragon 🐉 — and how he and his superhero squad saved the day! 🦸‍♂️
-                </p>
-                <p>
-                  As he told me every detail with so much imagination and joy, I realized these moments are priceless. When I printed his story as a real book, he couldn't stop reading — because this time, he was the hero.
-                </p>
-                <p>
-                  Then something magical happened: his little brother and their friends started creating their own dragon stories. A viral loop of imagination had begun.
-                </p>
-                <p className="italic text-gray-600 bg-white/50 p-4 rounded-lg border-l-4 border-orange-400 text-sm">
-                  <span className="text-xl mr-1">✨</span>
-                  That's when KindleWood Studio was born.
-                </p>
-                <p className="font-medium text-gray-800">
-                  My dream isn't just to help kids read — it's to help them become storytellers and creators who develop confidence, empathy, and resilience: the superpowers AI will never have.
-                </p>
-                <div className="mt-6 text-center sm:text-left">
-                  <a
-                    href="/founder-letter"
-                    className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold transition-colors group"
-                  >
-                    Read the Founder's Letter
-                    <span className="transform group-hover:translate-x-1 transition-transform">→</span>
-                  </a>
-                </div>
               </div>
             </div>
           </div>
