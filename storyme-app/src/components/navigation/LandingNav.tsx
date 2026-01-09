@@ -64,15 +64,19 @@ export default function LandingNav() {
     <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-xl sm:text-2xl font-bold hover:opacity-80 transition-opacity text-gray-900">
-              KindleWood <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Studio</span>
+          {/* Logo + Navigation */}
+          <div className="flex items-center">
+            {/* Logo */}
+            <Link href="/" className="hover:opacity-80 transition-opacity mr-6">
+              <img
+                src="/Logo_New.png"
+                alt="KindleWood Studio"
+                className="h-10 sm:h-12 w-auto"
+              />
             </Link>
-          </div>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center space-x-6">
+            {/* Desktop Navigation */}
+            <nav className="hidden lg:flex items-center space-x-4">
             <Link
               href="/"
               className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors ${
@@ -201,6 +205,7 @@ export default function LandingNav() {
               )}
             </div>
           </nav>
+          </div>
 
           {/* Auth Buttons - Desktop */}
           <div className="hidden lg:flex items-center gap-4">

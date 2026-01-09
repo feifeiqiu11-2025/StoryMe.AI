@@ -31,16 +31,22 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center">
               {/* Hamburger Menu */}
               <HamburgerMenu />
 
               {/* Logo */}
-              <Link href="/dashboard" className="text-xl sm:text-2xl font-bold hover:opacity-80 transition-opacity text-gray-900">
-                KindleWood <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Studio</span>
+              <Link href="/dashboard" className="hover:opacity-80 transition-opacity mr-6">
+                <img
+                  src="/Logo_New.png"
+                  alt="KindleWood Studio"
+                  className="h-10 sm:h-12 w-auto"
+                />
               </Link>
+
+              {/* Navigation */}
+              <DashboardNav />
             </div>
-            <DashboardNav />
             <div className="flex items-center">
               <ProfileMenu displayName={displayName} />
             </div>
