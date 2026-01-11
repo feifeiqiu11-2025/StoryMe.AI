@@ -132,7 +132,7 @@ export default function LandingNav() {
               <button
                 onClick={() => setFounderDropdownOpen(!founderDropdownOpen)}
                 className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors flex items-center gap-1 ${
-                  isActive('/founder-letter') || isActive('/founder-journal') ? 'text-blue-600 border-b-2 border-blue-600' : ''
+                  isActive('/founder-letter') || isActive('/founder-journal') || isActive('/what-sparked-kindlewood') ? 'text-blue-600 border-b-2 border-blue-600' : ''
                 }`}
               >
                 Founder Stories
@@ -147,6 +147,14 @@ export default function LandingNav() {
               </button>
               {founderDropdownOpen && (
                 <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
+                  <Link
+                    href="/what-sparked-kindlewood"
+                    onClick={() => setFounderDropdownOpen(false)}
+                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 transition-colors"
+                  >
+                    <div className="font-semibold text-gray-900">What Sparked KindleWood</div>
+                    <div className="text-xs text-gray-500 mt-0.5">The origin story</div>
+                  </Link>
                   <Link
                     href="/founder-letter"
                     onClick={() => setFounderDropdownOpen(false)}
@@ -326,6 +334,13 @@ export default function LandingNav() {
               </button>
               {founderDropdownOpen && (
                 <div className="ml-4 mt-2 space-y-1">
+                  <Link
+                    href="/what-sparked-kindlewood"
+                    className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
+                    style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
+                  >
+                    What Sparked KindleWood
+                  </Link>
                   <Link
                     href="/founder-letter"
                     className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
