@@ -1,6 +1,6 @@
 'use client';
 
-import { StoryTone, ExpansionLevel } from '@/lib/types/story';
+import { StoryTone, ExpansionLevel, ClothingConsistency } from '@/lib/types/story';
 import ExpansionLevelSelector from './ExpansionLevelSelector';
 
 interface StorySettingsPanelProps {
@@ -8,8 +8,14 @@ interface StorySettingsPanelProps {
   onReadingLevelChange: (level: number) => void;
   storyTone: StoryTone;
   onStoryToneChange: (tone: StoryTone) => void;
+  clothingConsistency: ClothingConsistency;
+  onClothingConsistencyChange: (mode: ClothingConsistency) => void;
   expansionLevel: ExpansionLevel;
   onExpansionLevelChange: (level: ExpansionLevel) => void;
+  // Bilingual options (only shown for English content)
+  contentLanguage?: 'en' | 'zh';
+  generateChineseTranslation?: boolean;
+  onGenerateChineseTranslationChange?: (value: boolean) => void;
   disabled?: boolean;
 }
 
@@ -74,8 +80,13 @@ export default function StorySettingsPanel({
   onReadingLevelChange,
   storyTone,
   onStoryToneChange,
+  clothingConsistency,
+  onClothingConsistencyChange,
   expansionLevel,
   onExpansionLevelChange,
+  contentLanguage = 'en',
+  generateChineseTranslation = false,
+  onGenerateChineseTranslationChange,
   disabled = false,
 }: StorySettingsPanelProps) {
   return (
@@ -87,9 +98,14 @@ export default function StorySettingsPanel({
 
       {/* Reading Level Slider */}
       <div className="space-y-3">
-        <label className="block text-sm font-medium text-gray-700">
-          Reading Age
-        </label>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
+          <label className="block text-sm font-semibold text-gray-700">
+            Reading Age
+          </label>
+          <p className="text-sm text-purple-700 italic">
+            Text complexity example: "{readingLevelLabels[readingLevel].example}"
+          </p>
+        </div>
 
         {/* Slider */}
         <div className="relative px-2">
@@ -125,21 +141,11 @@ export default function StorySettingsPanel({
             ))}
           </div>
         </div>
-
-        {/* Example text */}
-        <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-md">
-          <div className="text-xs font-medium text-purple-900 mb-1">
-            Text complexity example:
-          </div>
-          <div className="text-sm text-purple-800 italic">
-            "{readingLevelLabels[readingLevel].example}"
-          </div>
-        </div>
       </div>
 
       {/* Story Tone Selector */}
       <div className="space-y-3">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-semibold text-gray-700">
           Story Tone
         </label>
 
@@ -168,12 +174,117 @@ export default function StorySettingsPanel({
         </div>
       </div>
 
+      {/* Character Clothing Consistency */}
+      <div className="space-y-3">
+        <label className="block text-sm font-semibold text-gray-700">
+          Character Clothing
+        </label>
+
+        <div className="grid grid-cols-2 gap-3">
+          {/* Consistent Option (Default) */}
+          <button
+            type="button"
+            onClick={() => !disabled && onClothingConsistencyChange('consistent')}
+            disabled={disabled}
+            className={`relative flex flex-col p-3 border-2 rounded-xl cursor-pointer transition-all text-left ${
+              clothingConsistency === 'consistent'
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/30'
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <div className="flex items-start gap-2.5 mb-2">
+              <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                clothingConsistency === 'consistent'
+                  ? 'border-blue-500 bg-blue-500'
+                  : 'border-gray-300 bg-white'
+              }`}>
+                {clothingConsistency === 'consistent' && (
+                  <div className="w-2 h-2 rounded-full bg-white"></div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-semibold text-gray-900 text-sm">Consistent</span>
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium whitespace-nowrap">
+                    Default
+                  </span>
+                </div>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 leading-snug pl-7">
+              Same outfit throughout all scenes
+            </p>
+          </button>
+
+          {/* Scene-Based Option */}
+          <button
+            type="button"
+            onClick={() => !disabled && onClothingConsistencyChange('scene-based')}
+            disabled={disabled}
+            className={`relative flex flex-col p-3 border-2 rounded-xl cursor-pointer transition-all text-left ${
+              clothingConsistency === 'scene-based'
+                ? 'border-purple-500 bg-purple-50'
+                : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50/30'
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <div className="flex items-start gap-2.5 mb-2">
+              <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                clothingConsistency === 'scene-based'
+                  ? 'border-purple-500 bg-purple-500'
+                  : 'border-gray-300 bg-white'
+              }`}>
+                {clothingConsistency === 'scene-based' && (
+                  <div className="w-2 h-2 rounded-full bg-white"></div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="font-semibold text-gray-900 text-sm">Scene-Based</span>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 leading-snug pl-7">
+              AI adapts to scene context
+            </p>
+          </button>
+        </div>
+      </div>
+
       {/* Expansion Level Selector */}
       <ExpansionLevelSelector
         value={expansionLevel}
         readingLevel={readingLevel}
         onChange={onExpansionLevelChange}
       />
+
+      {/* Chinese Captions Checkbox (Only for English stories) */}
+      {contentLanguage === 'en' && onGenerateChineseTranslationChange && (
+        <div className="flex items-center gap-3 pt-2">
+          <div className="relative inline-flex items-center">
+            <input
+              type="checkbox"
+              id="bilingual-checkbox-settings"
+              checked={generateChineseTranslation}
+              onChange={(e) => onGenerateChineseTranslationChange(e.target.checked)}
+              disabled={disabled}
+              className="peer w-5 h-5 appearance-none bg-white border-2 border-gray-400 rounded cursor-pointer checked:bg-purple-600 checked:border-purple-600 focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            />
+            <svg
+              className="absolute w-3 h-3 left-1 top-1 pointer-events-none hidden peer-checked:block text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <label htmlFor="bilingual-checkbox-settings" className="text-sm font-semibold text-gray-700 cursor-pointer select-none">
+            Generate Chinese Captions for Bilingual Book
+          </label>
+        </div>
+      )}
     </div>
   );
 }

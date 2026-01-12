@@ -9,7 +9,7 @@
  */
 
 import { GoogleGenAI, Modality } from '@google/genai';
-import { CharacterDescription } from './types/story';
+import { CharacterDescription, ClothingConsistency } from './types/story';
 
 export interface GeminiCharacterInfo {
   name: string;
@@ -21,6 +21,8 @@ export interface GeminiGenerateParams {
   characters: GeminiCharacterInfo[];
   sceneDescription: string;
   artStyle?: string;
+  /** Controls whether character clothing stays consistent or adapts to scene context */
+  clothingConsistency?: ClothingConsistency;
 }
 
 export interface GeminiGenerateResult {
@@ -349,10 +351,15 @@ export function clearOutfitCache(): void {
 /**
  * Build smart character prompt with proper type detection and clothing logic
  *
- * Priority for clothing:
- * 1. Scene-specific explicit costume (user wrote "wearing X" or "dressed as X")
- * 2. Character's base outfit (from description.clothing)
- * 3. If no outfit specified, use character description as-is
+ * When clothingConsistency is 'consistent' (default):
+ * - Always use character's base outfit from description.clothing
+ * - Skip scene-based role detection (no swimsuits, costumes, etc.)
+ * - Ensures same outfit throughout all scenes
+ *
+ * When clothingConsistency is 'scene-based':
+ * - Check for scene-specific explicit costume (user wrote "wearing X")
+ * - Falls back to character's base outfit
+ * - Allows AI to adapt clothing to scene context
  *
  * NOTE: Theme-based auto clothing was REMOVED
  * We no longer auto-add "winter jacket" for snowy scenes or "pajamas" for Christmas
@@ -361,7 +368,8 @@ export function clearOutfitCache(): void {
 function buildSmartCharacterPrompt(
   char: GeminiCharacterInfo,
   sceneDescription: string,
-  _storyTheme: string | null  // kept for API compatibility, but no longer used for clothing
+  _storyTheme: string | null,  // kept for API compatibility, but no longer used for clothing
+  clothingConsistency: ClothingConsistency = 'consistent'
 ): { prompt: string; isAnimal: boolean } {
   const { name, description } = char;
 
@@ -393,9 +401,29 @@ function buildSmartCharacterPrompt(
   }
 
   // For characters WITH reference images (photo-based humans):
-  // Apply clothing logic for consistency
+  // Apply clothing logic based on clothingConsistency setting
 
-  // Check for scene-specific role clothing (highest priority)
+  const characterKey = name.toLowerCase();
+  const baseOutfit = description.clothing;
+
+  // CONSISTENT MODE: Always use base outfit, skip scene-based detection
+  if (clothingConsistency === 'consistent') {
+    const cachedOutfit = getOrCacheOutfit(characterKey, baseOutfit);
+    if (cachedOutfit) {
+      return {
+        prompt: `${charContext}, wearing ${cachedOutfit}`,
+        isAnimal: false,
+      };
+    }
+    // No base outfit defined - use description as-is
+    // AI should pick something and keep it consistent across scenes
+    return {
+      prompt: charContext,
+      isAnimal: false,
+    };
+  }
+
+  // SCENE-BASED MODE: Check for scene-specific role clothing first
   const roleClothing = detectRoleClothing(sceneDescription, name);
   if (roleClothing) {
     return {
@@ -404,11 +432,8 @@ function buildSmartCharacterPrompt(
     };
   }
 
-  // Use base outfit from character description (no auto theme clothing)
-  const characterKey = name.toLowerCase();
-  const baseOutfit = description.clothing;
+  // Fall back to base outfit from character description
   const cachedOutfit = getOrCacheOutfit(characterKey, baseOutfit);
-
   if (cachedOutfit) {
     return {
       prompt: `${charContext}, wearing ${cachedOutfit}`,
@@ -432,6 +457,7 @@ export async function generateImageWithGemini({
   characters,
   sceneDescription,
   artStyle = "children's book illustration, colorful, whimsical",
+  clothingConsistency = 'consistent',
 }: GeminiGenerateParams): Promise<GeminiGenerateResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -443,17 +469,18 @@ export async function generateImageWithGemini({
   // Use new @google/genai SDK
   const genAI = new GoogleGenAI({ apiKey });
 
-  // Detect story theme for appropriate clothing
+  // Detect story theme (for logging purposes, not used for auto-clothing anymore)
   const storyTheme = detectStoryTheme(sceneDescription);
 
   if (storyTheme) {
     console.log(`[Gemini] Detected story theme: ${storyTheme}`);
   }
+  console.log(`[Gemini] Clothing consistency mode: ${clothingConsistency}`);
 
   // Build character descriptions using smart prompt builder
-  // Handles: animal detection, clothing priority, outfit caching
+  // Handles: animal detection, clothing priority based on clothingConsistency setting
   const characterPrompts = characters.map(c => {
-    const result = buildSmartCharacterPrompt(c, sceneDescription, storyTheme);
+    const result = buildSmartCharacterPrompt(c, sceneDescription, storyTheme, clothingConsistency);
     console.log(`[Gemini] ${c.name}: ${result.isAnimal ? 'ANIMAL' : 'HUMAN'} - ${result.prompt.substring(0, 80)}...`);
     return { char: c, ...result };
   });
@@ -486,6 +513,11 @@ export async function generateImageWithGemini({
     ? `ANIMALS IN SCENE:\n- Any animals mentioned in scene: cute cartoon animals with ANIMAL faces, NOT humanoid, NO human clothing`
     : '';
 
+  // Build clothing consistency rule based on setting
+  const clothingRule = clothingConsistency === 'consistent'
+    ? '- IMPORTANT: Keep character clothing EXACTLY the same as specified in their description. Do NOT change clothing based on scene context, activities, or themes.'
+    : '- Keep clothing consistent with character description unless scene specifies costume/role/holiday attire';
+
   // Build prompt with clear separation between humans and animals
   const fullPrompt = `Create a 3D children's book illustration: ${sceneDescription}
 
@@ -502,7 +534,7 @@ ${animalCharacterSection}
 ${sceneAnimalSection}
 
 RULES:
-- Keep clothing consistent with character description unless scene specifies costume/role/holiday attire
+${clothingRule}
 ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans and animals are COMPLETELY SEPARATE entities - each has their own distinct body' : ''}`;
 
   // Build content parts with images for the new SDK format
@@ -635,6 +667,7 @@ export async function generateImageWithGeminiClassic({
   characters,
   sceneDescription,
   artStyle = "children's book illustration, colorful, whimsical",
+  clothingConsistency = 'consistent',
 }: GeminiGenerateParams): Promise<GeminiGenerateResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -646,17 +679,18 @@ export async function generateImageWithGeminiClassic({
   // Use new @google/genai SDK
   const genAI = new GoogleGenAI({ apiKey });
 
-  // Detect story theme for appropriate clothing
+  // Detect story theme (for logging purposes, not used for auto-clothing anymore)
   const storyTheme = detectStoryTheme(sceneDescription);
 
   if (storyTheme) {
     console.log(`[Gemini Classic] Detected story theme: ${storyTheme}`);
   }
+  console.log(`[Gemini Classic] Clothing consistency mode: ${clothingConsistency}`);
 
   // Build character descriptions using smart prompt builder
-  // Handles: animal detection, clothing priority, outfit caching
+  // Handles: animal detection, clothing priority based on clothingConsistency setting
   const characterPrompts = characters.map(c => {
-    const result = buildSmartCharacterPrompt(c, sceneDescription, storyTheme);
+    const result = buildSmartCharacterPrompt(c, sceneDescription, storyTheme, clothingConsistency);
     console.log(`[Gemini Classic] ${c.name}: ${result.isAnimal ? 'ANIMAL' : 'HUMAN'} - ${result.prompt.substring(0, 80)}...`);
     return { char: c, ...result };
   });
@@ -689,6 +723,11 @@ export async function generateImageWithGeminiClassic({
     ? `ANIMALS IN SCENE:\n- Any animals mentioned in scene: cute cartoon animals with ANIMAL faces, NOT humanoid, NO human clothing`
     : '';
 
+  // Build clothing consistency rule based on setting
+  const clothingRule = clothingConsistency === 'consistent'
+    ? '- IMPORTANT: Keep character clothing EXACTLY the same as specified in their description. Do NOT change clothing based on scene context, activities, or themes.'
+    : '- Keep clothing consistent with character description unless scene specifies costume/role/holiday attire';
+
   // Build Classic Storybook style prompt (2D illustration) - Modern vibrant digital style
   const fullPrompt = `Create a 2D children's book illustration: ${sceneDescription}
 
@@ -706,7 +745,7 @@ ${animalCharacterSection}
 ${sceneAnimalSection}
 
 RULES:
-- Keep clothing consistent with character description unless scene specifies costume/role/holiday attire
+${clothingRule}
 ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans and animals are COMPLETELY SEPARATE entities - each has their own distinct body' : ''}`;
 
   // Build content parts with images for the new SDK format

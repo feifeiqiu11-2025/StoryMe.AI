@@ -20,18 +20,6 @@ export default function ExpansionLevelSelector({
   onChange,
   disabled = false,
 }: ExpansionLevelSelectorProps) {
-  const getExpectedSceneCount = (level: ExpansionLevel): string => {
-    if (level === 'minimal') return 'Same as your script';
-
-    if (level === 'smart') {
-      if (readingLevel <= 4) return '6-8 scenes';
-      if (readingLevel <= 6) return '8-10 scenes';
-      return '10-12 scenes';
-    }
-
-    return '12-15 scenes';
-  };
-
   return (
     <div className="space-y-3">
       <label className="block text-sm font-semibold text-gray-700">
@@ -71,11 +59,8 @@ export default function ExpansionLevelSelector({
               </div>
             </div>
           </div>
-          <p className="text-sm text-gray-600 leading-snug mb-1.5 pl-7">
+          <p className="text-sm text-gray-600 leading-snug pl-7">
             AI only improves captions for clarity. Your story stays the same.
-          </p>
-          <p className="text-sm text-gray-400 mt-auto pl-7">
-            {getExpectedSceneCount('minimal')}
           </p>
         </button>
 
@@ -110,11 +95,8 @@ export default function ExpansionLevelSelector({
               </div>
             </div>
           </div>
-          <p className="text-sm text-gray-600 leading-snug mb-1.5 pl-7">
+          <p className="text-sm text-gray-600 leading-snug pl-7">
             AI expands with more scenes and transitions for age {readingLevel}.
-          </p>
-          <p className="text-sm text-gray-400 mt-auto pl-7">
-            {getExpectedSceneCount('smart')}
           </p>
         </button>
 
@@ -144,19 +126,10 @@ export default function ExpansionLevelSelector({
               <span className="font-semibold text-gray-900 text-sm">Rich</span>
             </div>
           </div>
-          <p className="text-sm text-gray-600 leading-snug mb-1.5 pl-7">
+          <p className="text-sm text-gray-600 leading-snug pl-7">
             Full narrative with dialogue and character development.
           </p>
-          <p className="text-sm text-gray-400 mt-auto pl-7">
-            {getExpectedSceneCount('rich')}
-          </p>
         </button>
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
-        <p className="text-sm text-blue-800">
-          <strong>Tip:</strong> Start with "Minimal" to see how AI enhances your captions. You can always regenerate with more expansion later!
-        </p>
       </div>
     </div>
   );

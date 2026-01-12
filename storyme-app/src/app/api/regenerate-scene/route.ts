@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo, sceneContainsAnimals } from '@/lib/fal-client';
 import { generateImageWithGemini, generateImageWithGeminiClassic, isGeminiAvailable, GeminiCharacterInfo } from '@/lib/gemini-image-client';
 import { extractSceneLocation } from '@/lib/scene-parser';
-import { Character } from '@/lib/types/story';
+import { Character, ClothingConsistency } from '@/lib/types/story';
 import { createClient } from '@/lib/supabase/server';
 import { StorageService } from '@/lib/services/storage.service';
 import OpenAI from 'openai';
@@ -172,7 +172,11 @@ export async function POST(request: NextRequest) {
       sceneLocation,
       imageProvider: requestedProvider,
       illustrationStyle,
+      clothingConsistency: requestedClothingConsistency,
     } = body;
+
+    // Determine clothing consistency mode (default to 'consistent')
+    const clothingConsistency: ClothingConsistency = requestedClothingConsistency || 'consistent';
 
     // Determine illustration style (default to 'classic' for 2D storybook)
     const selectedIllustrationStyle: IllustrationStyle = illustrationStyle || 'classic';
@@ -242,13 +246,28 @@ export async function POST(request: NextRequest) {
       : `http://localhost:${process.env.PORT || 3002}`;
 
     // Prepare character prompt info with absolute URLs
-    const characterPrompts: CharacterPromptInfo[] = characters.map((char: Character) => ({
-      name: char.name,
-      referenceImageUrl: char.referenceImage.url.startsWith('http')
-        ? char.referenceImage.url
-        : `${baseUrl}${char.referenceImage.url}`,
-      description: char.description,
-    }));
+    // Priority: animated preview (already in illustration style) > reference photo > null
+    const characterPrompts: CharacterPromptInfo[] = characters.map((char: Character) => {
+      let referenceUrl: string | undefined = undefined;
+
+      if (char.animatedPreviewUrl && char.animatedPreviewUrl.trim()) {
+        // Animated preview exists - use it (best for consistency)
+        referenceUrl = char.animatedPreviewUrl.startsWith('http')
+          ? char.animatedPreviewUrl
+          : `${baseUrl}${char.animatedPreviewUrl}`;
+      } else if (char.referenceImage?.url && char.referenceImage.url.trim()) {
+        // Fallback to original reference photo
+        referenceUrl = char.referenceImage.url.startsWith('http')
+          ? char.referenceImage.url
+          : `${baseUrl}${char.referenceImage.url}`;
+      }
+
+      return {
+        name: char.name,
+        referenceImageUrl: referenceUrl || '',
+        description: char.description,
+      };
+    });
 
     // Extract location if not provided
     const location = sceneLocation || extractSceneLocation(refinedPrompt);
@@ -274,12 +293,14 @@ export async function POST(request: NextRequest) {
           characters: geminiCharacters,
           sceneDescription: refinedPrompt,
           artStyle: artStyle || "children's book illustration, colorful, whimsical",
+          clothingConsistency,
         });
       } else {
         result = await generateImageWithGemini({
           characters: geminiCharacters,
           sceneDescription: refinedPrompt,
           artStyle: artStyle || "children's book illustration, colorful, whimsical",
+          clothingConsistency,
         });
       }
 

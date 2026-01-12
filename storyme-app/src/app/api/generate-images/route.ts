@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
-import { generateImageWithGemini, generateImageWithGeminiClassic, isGeminiAvailable, GeminiCharacterInfo } from '@/lib/gemini-image-client';
+import { generateImageWithGemini, generateImageWithGeminiClassic, isGeminiAvailable, GeminiCharacterInfo, clearOutfitCache } from '@/lib/gemini-image-client';
 import { parseScriptIntoScenes, buildConsistentSceneSettings, extractSceneLocation } from '@/lib/scene-parser';
-import { GeneratedImage, Character, CharacterRating } from '@/lib/types/story';
+import { GeneratedImage, Character, CharacterRating, ClothingConsistency } from '@/lib/types/story';
 import { createClient } from '@/lib/supabase/server';
 import { checkImageGenerationLimit, logApiUsage } from '@/lib/utils/rate-limit';
 import { StorageService } from '@/lib/services/storage.service';
@@ -21,7 +21,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { characters, script, artStyle, imageProvider: requestedProvider, illustrationStyle } = body;
+    const { characters, script, artStyle, imageProvider: requestedProvider, illustrationStyle, clothingConsistency: requestedClothingConsistency } = body;
+
+    // Determine clothing consistency mode (default to 'consistent')
+    const clothingConsistency: ClothingConsistency = requestedClothingConsistency || 'consistent';
+    console.log(`👔 Clothing consistency mode: ${clothingConsistency}`);
+
+    // Clear outfit cache at the start of a new story generation
+    // This ensures outfits don't leak between different story sessions
+    clearOutfitCache();
 
     // Determine illustration style (default to 'classic' for 2D storybook)
     const selectedIllustrationStyle: IllustrationStyle = illustrationStyle || 'classic';
@@ -112,22 +120,25 @@ export async function POST(request: NextRequest) {
       : `http://localhost:${process.env.PORT || 3002}`;
 
     // Prepare character prompt info with absolute URLs
-    // For description-only characters (no reference photo), use animatedPreviewUrl instead
+    // Priority: animated preview (already in illustration style) > reference photo > null
     const characterPrompts: CharacterPromptInfo[] = characters.map((char: Character) => {
       // Determine the best reference image URL
-      // Priority: reference photo > animated preview > null
+      // Priority: animated preview > reference photo > null
+      // Animated preview is preferred because it's already in the target illustration style
       let referenceUrl: string | undefined = undefined;
 
-      if (char.referenceImage.url && char.referenceImage.url.trim()) {
-        // Has a reference photo
-        referenceUrl = char.referenceImage.url.startsWith('http')
-          ? char.referenceImage.url
-          : `${baseUrl}${char.referenceImage.url}`;
-      } else if (char.animatedPreviewUrl && char.animatedPreviewUrl.trim()) {
-        // Description-only character - use animated preview as reference
+      if (char.animatedPreviewUrl && char.animatedPreviewUrl.trim()) {
+        // Animated preview exists - use it (best for consistency)
         referenceUrl = char.animatedPreviewUrl.startsWith('http')
           ? char.animatedPreviewUrl
           : `${baseUrl}${char.animatedPreviewUrl}`;
+        console.log(`[Character] ${char.name}: Using animated preview for reference`);
+      } else if (char.referenceImage?.url && char.referenceImage.url.trim()) {
+        // Fallback to original reference photo
+        referenceUrl = char.referenceImage.url.startsWith('http')
+          ? char.referenceImage.url
+          : `${baseUrl}${char.referenceImage.url}`;
+        console.log(`[Character] ${char.name}: Using reference photo (no animated preview)`);
       }
       // If neither exists, referenceUrl stays undefined
 
@@ -194,6 +205,7 @@ export async function POST(request: NextRequest) {
               characters: geminiCharacters,
               sceneDescription: scene.description,
               artStyle: artStyle || "children's book illustration, colorful, whimsical",
+              clothingConsistency,
             });
           } else {
             // 3D Pixar style (default Gemini behavior)
@@ -201,6 +213,7 @@ export async function POST(request: NextRequest) {
               characters: geminiCharacters,
               sceneDescription: scene.description,
               artStyle: artStyle || "children's book illustration, colorful, whimsical",
+              clothingConsistency,
             });
           }
 

@@ -234,6 +234,7 @@ export default function GuestStoryPage() {
         body: JSON.stringify({
           characters: session.characters,
           script: enhancedScript, // Use enhanced prompts for image generation
+          clothingConsistency: 'consistent', // Default to consistent clothing for guest users
         }),
       });
 

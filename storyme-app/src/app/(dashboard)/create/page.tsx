@@ -17,7 +17,7 @@ import { ArtStyleType } from '@/components/story/StyleSelector';
 import GenerationProgress from '@/components/story/GenerationProgress';
 import ImageGallery from '@/components/story/ImageGallery';
 import FeedbackModal from '@/components/feedback/FeedbackModal';
-import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScene, ExpansionLevel } from '@/lib/types/story';
+import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScene, ExpansionLevel, ClothingConsistency } from '@/lib/types/story';
 import { parseScriptIntoScenes } from '@/lib/scene-parser';
 import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
@@ -40,6 +40,7 @@ export default function CreateStoryPage() {
   // Story settings (NEW)
   const [readingLevel, setReadingLevel] = useState<number>(5);
   const [storyTone, setStoryTone] = useState<StoryTone>('playful');
+  const [clothingConsistency, setClothingConsistency] = useState<ClothingConsistency>('consistent');
   const [expansionLevel, setExpansionLevel] = useState<ExpansionLevel>('minimal');
 
   // Language selection (NEW - Bilingual Support)
@@ -918,6 +919,7 @@ export default function CreateStoryPage() {
           artStyle: ART_STYLE,
           imageProvider: imageProvider, // Use selected image provider (gemini or flux)
           illustrationStyle: artStyle, // 'pixar' (3D) or 'classic' (2D storybook)
+          clothingConsistency, // 'consistent' (default) or 'scene-based'
         }),
       });
 
@@ -1249,41 +1251,15 @@ export default function CreateStoryPage() {
               onReadingLevelChange={setReadingLevel}
               storyTone={storyTone}
               onStoryToneChange={setStoryTone}
+              clothingConsistency={clothingConsistency}
+              onClothingConsistencyChange={setClothingConsistency}
               expansionLevel={expansionLevel}
               onExpansionLevelChange={setExpansionLevel}
+              contentLanguage={contentLanguage}
+              generateChineseTranslation={generateChineseTranslation}
+              onGenerateChineseTranslationChange={setGenerateChineseTranslation}
               disabled={isEnhancing}
             />
-
-            {/* Chinese Translation Checkbox (Only for English stories) */}
-            {contentLanguage === 'en' && (
-              <div className="mt-4 flex items-center gap-3">
-                <div className="relative inline-flex items-center">
-                  <input
-                    type="checkbox"
-                    id="bilingual-checkbox"
-                    checked={generateChineseTranslation}
-                    onChange={(e) => setGenerateChineseTranslation(e.target.checked)}
-                    disabled={isEnhancing}
-                    className="peer w-5 h-5 appearance-none bg-white border-2 border-gray-400 rounded cursor-pointer checked:bg-purple-600 checked:border-purple-600 focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  />
-                  <svg
-                    className="absolute w-3 h-3 left-1 top-1 pointer-events-none hidden peer-checked:block text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                  </svg>
-                </div>
-                <label htmlFor="bilingual-checkbox" className="text-sm font-semibold text-gray-700 cursor-pointer select-none">
-                  Generate Chinese Captions for Bilingual Book
-                </label>
-              </div>
-            )}
 
             {/* Enhance Button */}
             <div className="mt-6 bg-white rounded-2xl shadow-xl p-8">

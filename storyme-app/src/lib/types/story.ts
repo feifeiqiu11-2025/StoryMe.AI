@@ -17,6 +17,11 @@ export type ExpansionLevel =
   | 'smart'         // AI expands story based on age, adds scenes
   | 'rich';         // Full creative expansion with detailed narrative
 
+// Character clothing consistency mode
+export type ClothingConsistency =
+  | 'consistent'    // Keep same outfit throughout all scenes (default)
+  | 'scene-based';  // AI adapts clothing based on scene context (swimsuit, costume, etc.)
+
 // Story visibility/privacy level
 export type StoryVisibility =
   | 'private'       // Only creator can see (default for safety)
