@@ -136,36 +136,56 @@ export default function CharacterManager({
       // Clear uploading state immediately after image is set
       setUploadingCharacterId(null);
 
-      // Auto-analyze image immediately after upload
+      // Auto-analyze image immediately after upload using unified Gemini API
       setAnalyzingCharacterId(characterId);
 
       try {
-        const analysisResponse = await fetch('/api/analyze-character-image', {
+        const analysisResponse = await fetch('/api/analyze-character', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            imageUrl: data.url,
-          }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: data.url }),
         });
 
         if (analysisResponse.ok) {
           const analysisData = await analysisResponse.json();
-          console.log('✅ Character analysis successful:', analysisData);
+          console.log('Character analysis successful:', analysisData);
 
-          if (analysisData.success && analysisData.analysis) {
+          if (analysisData.success) {
             // Update character with BOTH description AND referenceImage to preserve it
-            const updates = {
-              referenceImage, // Explicitly include the referenceImage we uploaded
-              description: {
-                hairColor: analysisData.analysis.hairColor || '',
-                skinTone: analysisData.analysis.skinTone || '',
-                clothing: analysisData.analysis.clothing || '',
-                age: analysisData.analysis.age || '',
-                otherFeatures: analysisData.analysis.otherFeatures || '',
-              }
-            };
+            let updates;
+
+            if (analysisData.subjectType === 'human' && analysisData.humanDetails) {
+              // Human detected: use structured fields
+              const details = analysisData.humanDetails;
+              const otherFeatures = [details.gender, details.otherFeatures]
+                .filter(Boolean)
+                .join(', ');
+
+              updates = {
+                referenceImage,
+                description: {
+                  hairColor: details.hairColor || '',
+                  skinTone: details.skinTone || '',
+                  clothing: details.clothing || '',
+                  age: details.age || '',
+                  otherFeatures: otherFeatures || '',
+                  subjectType: 'human' as const,
+                }
+              };
+            } else {
+              // Non-human detected: use description
+              updates = {
+                referenceImage,
+                description: {
+                  hairColor: '',
+                  skinTone: '',
+                  clothing: '',
+                  age: '',
+                  otherFeatures: analysisData.briefDescription || '',
+                  subjectType: analysisData.subjectType,
+                }
+              };
+            }
 
             updateCharacter(characterId, updates);
 
@@ -175,20 +195,11 @@ export default function CharacterManager({
           }
         } else {
           const errorData = await analysisResponse.json();
-          console.error('❌ Image analysis failed:', errorData);
-          console.warn('Image analysis failed, user can fill in manually. Error:', errorData.error);
-
-          // Optionally show user-friendly message (don't block workflow)
-          if (errorData.error?.includes('unavailable')) {
-            console.info('💡 Tip: User can still fill in character details manually');
-          }
+          console.error('Image analysis failed:', errorData);
+          // Continue silently - user can still fill in manually
         }
-      } catch (analysisError: any) {
-        console.error('❌ Image analysis error:', analysisError);
-        console.error('Error details:', {
-          message: analysisError.message,
-          name: analysisError.name
-        });
+      } catch (analysisError: unknown) {
+        console.error('Image analysis error:', analysisError);
         // Continue silently - user can still fill in manually
       } finally {
         setAnalyzingCharacterId(null);
@@ -269,13 +280,13 @@ export default function CharacterManager({
           disabled={disabled}
           className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          + Add Character
+          + Add Element
         </button>
       )}
 
       {characters.length === 0 && (
         <p className="text-center text-gray-500 py-8">
-          Add at least one character to start creating your story
+          Add at least one element to start creating your story
         </p>
       )}
 

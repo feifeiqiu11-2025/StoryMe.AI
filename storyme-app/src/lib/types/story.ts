@@ -74,6 +74,10 @@ export const PREDEFINED_TAG_SLUGS = {
 
 export type TagSlug = typeof PREDEFINED_TAG_SLUGS[keyof typeof PREDEFINED_TAG_SLUGS];
 
+// Subject type for image-based character creation
+// Detected by AI during preview generation
+export type SubjectType = 'human' | 'animal' | 'creature' | 'object' | 'scenery';
+
 export interface CharacterDescription {
   hairColor?: string;
   skinTone?: string;
@@ -90,6 +94,15 @@ export interface CharacterDescription {
   // true = animal/creature (cat, dog, dragon, etc.) - no clothing needed
   // false/undefined = human - apply clothing logic
   isAnimal?: boolean;
+
+  // Subject type - detected by AI when creating character from image
+  // 'human' = person (preserve face, hair, skin tone)
+  // 'animal' = real animals (dog, cat, bird)
+  // 'creature' = fantasy beings (dragon, unicorn, monster)
+  // 'object' = inanimate items (toy, sword, car)
+  // 'scenery' = backgrounds/places (house, castle, tree)
+  // undefined defaults to 'human' for backwards compatibility
+  subjectType?: SubjectType;
 }
 
 export interface Character {

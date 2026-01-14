@@ -110,28 +110,38 @@ export default function NewCharacterPage() {
 
       console.log('Analyzing character image:', uploadData.url);
 
-      // Analyze the uploaded image
-      const analysisResponse = await fetch('/api/analyze-character-image', {
+      // Analyze the uploaded image using unified Gemini API
+      const analysisResponse = await fetch('/api/analyze-character', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageUrl: uploadData.url,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: uploadData.url }),
       });
 
       if (analysisResponse.ok) {
         const analysisData = await analysisResponse.json();
         console.log('Character analysis successful:', analysisData);
 
-        if (analysisData.success && analysisData.analysis) {
-          // Auto-fill description fields
-          setHairColor(analysisData.analysis.hairColor || '');
-          setSkinTone(analysisData.analysis.skinTone || '');
-          setClothing(analysisData.analysis.clothing || '');
-          setAge(analysisData.analysis.age || '');
-          setOtherFeatures(analysisData.analysis.otherFeatures || '');
+        if (analysisData.success) {
+          if (analysisData.subjectType === 'human' && analysisData.humanDetails) {
+            // Human detected: use structured fields
+            const details = analysisData.humanDetails;
+            const otherFeatures = [details.gender, details.otherFeatures]
+              .filter(Boolean)
+              .join(', ');
+
+            setHairColor(details.hairColor || '');
+            setSkinTone(details.skinTone || '');
+            setClothing(details.clothing || '');
+            setAge(details.age || '');
+            setOtherFeatures(otherFeatures || '');
+          } else {
+            // Non-human detected: clear human fields, use description
+            setHairColor('');
+            setSkinTone('');
+            setClothing('');
+            setAge('');
+            setOtherFeatures(analysisData.briefDescription || '');
+          }
 
           // Trigger auto-generation of preview after analysis
           setShouldAutoGenerate(true);
@@ -139,7 +149,7 @@ export default function NewCharacterPage() {
       } else {
         const errorData = await analysisResponse.json();
         console.error('Image analysis failed:', errorData);
-        console.warn('User can fill in manually. Error:', errorData.error);
+        // User can fill in manually
       }
     } catch (analysisError: unknown) {
       console.error('Auto-analysis error:', analysisError);

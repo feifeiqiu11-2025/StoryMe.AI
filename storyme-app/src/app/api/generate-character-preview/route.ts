@@ -6,9 +6,13 @@
  * 1. 3D Pixar - Disney/Pixar CGI style
  * 2. Classic Storybook - 2D illustrated, warm watercolor feel
  *
- * Supports two modes:
- * - With reference image: Creates animated version of a photo (for human characters)
+ * Supports three modes:
+ * - With reference image (human): Creates animated version of a human photo
+ * - With reference image (non-human): Creates animated version of a drawing/animal/object
  * - Description only: Creates character from text description (for animals, fantasy creatures)
+ *
+ * For image-based modes, the UI passes the already-detected subject type from /api/analyze-character
+ * to avoid redundant detection. If not provided, falls back to detection (backward compatibility).
  *
  * Both styles are generated in parallel for faster response.
  * User can then pick their preferred style.
@@ -19,11 +23,14 @@ import { createClient } from '@/lib/supabase/server';
 import {
   generateCharacterPreview,
   generateCharacterPreviewClassic,
+  generateNonHumanPreview,
+  generateNonHumanPreviewClassic,
   generateDescriptionOnlyPreview,
   generateDescriptionOnlyPreviewClassic,
+  detectSubjectType,
   isGeminiAvailable,
 } from '@/lib/gemini-image-client';
-import { CharacterDescription } from '@/lib/types/story';
+import { CharacterDescription, SubjectType } from '@/lib/types/story';
 
 export const maxDuration = 120; // 2 minutes timeout
 
@@ -31,6 +38,8 @@ interface GeneratePreviewRequest {
   name: string;
   referenceImageUrl?: string; // Optional - if not provided, use description-only mode
   characterType?: string; // For description-only mode: "baby eagle", "friendly dragon", etc.
+  subjectType?: SubjectType; // Pre-detected subject type from UI (avoids redundant detection)
+  subjectDescription?: string; // Pre-detected description from UI
   description: {
     hairColor?: string;
     skinTone?: string;
@@ -64,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: GeneratePreviewRequest = await request.json();
-    const { name, referenceImageUrl, characterType, description } = body;
+    const { name, referenceImageUrl, characterType, subjectType: preDetectedType, subjectDescription: preDetectedDescription, description } = body;
 
     // Validate required fields
     if (!name || !name.trim()) {
@@ -88,8 +97,10 @@ export async function POST(request: NextRequest) {
     console.log(`[API] Generating character previews (both styles) for: ${name}`);
     console.log(`[API] Mode: ${isDescriptionOnly ? 'Description Only' : 'With Reference Image'}`);
 
-    let pixarResult: PromiseSettledResult<{ imageUrl: string; generationTime: number }>;
-    let classicResult: PromiseSettledResult<{ imageUrl: string; generationTime: number }>;
+    let pixarResult: PromiseSettledResult<{ imageUrl: string; generationTime: number; subjectType?: SubjectType }>;
+    let classicResult: PromiseSettledResult<{ imageUrl: string; generationTime: number; subjectType?: SubjectType }>;
+    let detectedSubjectType: SubjectType = 'human'; // Default for backwards compatibility
+    let detectedDescription: string = '';
 
     if (isDescriptionOnly) {
       // Description-only mode: generate from text description (for animals, fantasy characters)
@@ -107,31 +118,84 @@ export async function POST(request: NextRequest) {
 
       console.log(`[API] Generating from description: ${characterType} - ${descriptionText}`);
 
+      // For description-only, infer subjectType from characterType
+      // This is a simple heuristic - the actual character creation UI handles isAnimal separately
+      detectedSubjectType = inferSubjectTypeFromDescription(characterType!);
+
       // Generate BOTH styles in parallel
       [pixarResult, classicResult] = await Promise.allSettled([
         generateDescriptionOnlyPreview(descParams),
         generateDescriptionOnlyPreviewClassic(descParams),
       ]);
     } else {
-      // Reference image mode: generate animated version of photo (for human characters)
-      const charDescription: CharacterDescription = {
-        hairColor: description?.hairColor,
-        skinTone: description?.skinTone,
-        age: description?.age,
-        otherFeatures: description?.otherFeatures,
-      };
+      // Reference image mode: use pre-detected subject type from UI if available
+      // This avoids redundant AI detection since /api/analyze-character already detected it
+      if (preDetectedType) {
+        detectedSubjectType = preDetectedType;
+        detectedDescription = preDetectedDescription || description?.otherFeatures || '';
+        console.log(`[API] Using pre-detected subject type: ${detectedSubjectType} - ${detectedDescription}`);
+      } else {
+        // Fallback: detect subject type (for backward compatibility or if UI didn't provide it)
+        console.log(`[API] Detecting subject type from reference image (fallback)...`);
 
-      const previewParams = {
-        name: name.trim(),
-        referenceImageUrl: referenceImageUrl!,
-        description: charDescription,
-      };
+        try {
+          const imageResponse = await fetch(referenceImageUrl!);
+          const imageBuffer = await imageResponse.arrayBuffer();
+          const base64 = Buffer.from(imageBuffer).toString('base64');
+          const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
 
-      // Generate BOTH styles in parallel for faster response
-      [pixarResult, classicResult] = await Promise.allSettled([
-        generateCharacterPreview(previewParams),
-        generateCharacterPreviewClassic(previewParams),
-      ]);
+          const detection = await detectSubjectType(base64, contentType);
+          detectedSubjectType = detection.subjectType;
+          detectedDescription = detection.briefDescription;
+
+          console.log(`[API] Detected subject type: ${detectedSubjectType} - ${detectedDescription}`);
+        } catch (detectionError) {
+          console.warn('[API] Subject detection failed, defaulting to human:', detectionError);
+          detectedSubjectType = 'human';
+          detectedDescription = 'Detection failed';
+        }
+      }
+
+      if (detectedSubjectType === 'human') {
+        // Human mode: use existing human-focused generation
+        const charDescription: CharacterDescription = {
+          hairColor: description?.hairColor,
+          skinTone: description?.skinTone,
+          age: description?.age,
+          otherFeatures: description?.otherFeatures,
+        };
+
+        const previewParams = {
+          name: name.trim(),
+          referenceImageUrl: referenceImageUrl!,
+          description: charDescription,
+        };
+
+        console.log(`[API] Using human preview generation`);
+
+        // Generate BOTH styles in parallel for faster response
+        [pixarResult, classicResult] = await Promise.allSettled([
+          generateCharacterPreview(previewParams),
+          generateCharacterPreviewClassic(previewParams),
+        ]);
+      } else {
+        // Non-human mode: use flexible generation for animals, creatures, objects, scenery
+        const nonHumanParams = {
+          name: name.trim(),
+          referenceImageUrl: referenceImageUrl!,
+          subjectType: detectedSubjectType,
+          briefDescription: detectedDescription,
+          additionalDetails: description?.otherFeatures,
+        };
+
+        console.log(`[API] Using non-human preview generation for ${detectedSubjectType}`);
+
+        // Generate BOTH styles in parallel
+        [pixarResult, classicResult] = await Promise.allSettled([
+          generateNonHumanPreview(nonHumanParams),
+          generateNonHumanPreviewClassic(nonHumanParams),
+        ]);
+      }
     }
 
     // Extract results, handling any failures gracefully
@@ -180,6 +244,9 @@ export async function POST(request: NextRequest) {
       },
       // Keep backward compatibility - return first successful preview as "preview"
       preview: pixar || classic,
+      // Return detected subject type so UI can adjust form fields
+      subjectType: detectedSubjectType,
+      subjectDescription: detectedDescription,
       totalTime: (Date.now() - startTime) / 1000,
     });
 
@@ -207,4 +274,56 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Infer subject type from character type description (for description-only mode)
+ * This is a simple heuristic - the key logic is in detectSubjectType for image mode
+ */
+function inferSubjectTypeFromDescription(characterType: string): SubjectType {
+  const lowerType = characterType.toLowerCase();
+
+  // Check for fantasy/mythical creatures
+  const creatureKeywords = [
+    'dragon', 'unicorn', 'phoenix', 'fairy', 'mermaid', 'monster', 'alien',
+    'robot', 'goblin', 'troll', 'elf', 'dwarf', 'ogre', 'wizard', 'witch',
+    'ghost', 'vampire', 'zombie', 'dinosaur', 'magical', 'fantasy', 'mythical',
+  ];
+  if (creatureKeywords.some(kw => lowerType.includes(kw))) {
+    return 'creature';
+  }
+
+  // Check for real animals
+  const animalKeywords = [
+    'dog', 'cat', 'bird', 'fish', 'rabbit', 'bunny', 'horse', 'elephant',
+    'lion', 'tiger', 'bear', 'mouse', 'rat', 'hamster', 'guinea pig', 'turtle',
+    'frog', 'snake', 'lizard', 'eagle', 'owl', 'duck', 'chicken', 'cow', 'pig',
+    'sheep', 'goat', 'deer', 'fox', 'wolf', 'monkey', 'gorilla', 'panda',
+    'penguin', 'dolphin', 'whale', 'shark', 'octopus', 'crab', 'butterfly',
+    'bee', 'ant', 'spider', 'puppy', 'kitten', 'animal',
+  ];
+  if (animalKeywords.some(kw => lowerType.includes(kw))) {
+    return 'animal';
+  }
+
+  // Check for objects
+  const objectKeywords = [
+    'toy', 'car', 'truck', 'ball', 'book', 'sword', 'wand', 'lamp', 'clock',
+    'phone', 'computer', 'cup', 'plate', 'chair', 'table', 'bed', 'door',
+  ];
+  if (objectKeywords.some(kw => lowerType.includes(kw))) {
+    return 'object';
+  }
+
+  // Check for scenery
+  const sceneryKeywords = [
+    'house', 'castle', 'tree', 'forest', 'mountain', 'river', 'lake', 'ocean',
+    'beach', 'garden', 'park', 'city', 'building', 'tower', 'bridge', 'road',
+  ];
+  if (sceneryKeywords.some(kw => lowerType.includes(kw))) {
+    return 'scenery';
+  }
+
+  // Default to creature for description-only mode (usually used for non-humans)
+  return 'creature';
 }

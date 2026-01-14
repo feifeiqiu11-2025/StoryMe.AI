@@ -9,7 +9,7 @@
  */
 
 import { GoogleGenAI, Modality } from '@google/genai';
-import { CharacterDescription, ClothingConsistency } from './types/story';
+import { CharacterDescription, ClothingConsistency, SubjectType } from './types/story';
 
 export interface GeminiCharacterInfo {
   name: string;
@@ -376,9 +376,14 @@ function buildSmartCharacterPrompt(
   // Get the character description
   const charContext = description.fullDescription || buildMinimalCharacterDescription(name, description);
 
-  // Use isAnimal flag set during character creation
-  // This is the source of truth - user explicitly chose character type
-  const isAnimal = description.isAnimal === true;
+  // Use isAnimal flag or subjectType to determine if this is a non-human character
+  // isAnimal is the legacy flag, subjectType is the new field from AI detection
+  // Either being true/non-human means we skip human-specific clothing logic
+  const isAnimal = description.isAnimal === true ||
+    description.subjectType === 'animal' ||
+    description.subjectType === 'creature' ||
+    description.subjectType === 'object' ||
+    description.subjectType === 'scenery';
 
   if (isAnimal) {
     // For animals: Use the description as-is, flag as animal for prompt rules
@@ -866,6 +871,374 @@ export function isGeminiAvailable(): boolean {
   return !!process.env.GEMINI_API_KEY;
 }
 
+// ============================================================================
+// SUBJECT TYPE DETECTION
+// ============================================================================
+
+/**
+ * Result from subject type detection
+ */
+export interface SubjectDetectionResult {
+  subjectType: SubjectType;
+  briefDescription: string;
+  confidence: number; // 0-1
+}
+
+/**
+ * Detect the subject type from an uploaded image using Gemini Vision
+ *
+ * This analyzes the image to determine if it contains:
+ * - 'human': Real person, child, adult (from photo)
+ * - 'animal': Real animals (dog, cat, bird)
+ * - 'creature': Fantasy beings (dragon, unicorn, monster), cartoon characters
+ * - 'object': Inanimate items (toy, sword, car)
+ * - 'scenery': Backgrounds/places (house, castle, tree)
+ *
+ * Used to branch preview generation prompts appropriately.
+ */
+export async function detectSubjectType(
+  imageBase64: string,
+  mimeType: string = 'image/jpeg'
+): Promise<SubjectDetectionResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+
+  const genAI = new GoogleGenAI({ apiKey });
+
+  const detectionPrompt = `Analyze this image and identify the main subject.
+
+Return ONLY a JSON object (no markdown, no code blocks, just raw JSON):
+{
+  "subjectType": "human" | "animal" | "creature" | "object" | "scenery",
+  "briefDescription": "short description of key visual features (10-20 words)",
+  "confidence": 0.0 to 1.0
+}
+
+Classification guidelines:
+- "human": Real person (child, adult, baby) from a photograph. Includes stylized portraits that are clearly meant to represent a real person.
+- "animal": Real-world animals (dog, cat, bird, fish, elephant). Both photos and drawings of real animals.
+- "creature": Fantasy/imaginary beings (dragon, unicorn, monster, alien), cartoon characters, anthropomorphic characters, magical beings.
+- "object": Inanimate items (toy, sword, car, ball, book, food). Things that don't move on their own.
+- "scenery": Backgrounds, places, buildings (house, castle, tree, mountain, landscape, room).
+
+For children's drawings: Interpret what the drawing REPRESENTS, not that it's "a drawing". A child's drawing of a dragon is "creature", not "object".
+
+If multiple subjects exist, classify based on the MAIN/PRIMARY subject.
+If the image shows a person with a pet, classify as "human" (the person is primary).
+If the image shows only scenery with small figures, classify as "scenery".`;
+
+  try {
+    const result = await genAI.models.generateContent({
+      model: 'gemini-2.0-flash', // Use fast model for detection (no image generation needed)
+      contents: [
+        { text: detectionPrompt },
+        {
+          inlineData: {
+            mimeType,
+            data: imageBase64,
+          },
+        },
+      ],
+    });
+
+    const candidates = result.candidates;
+    if (!candidates || candidates.length === 0) {
+      console.warn('[Gemini Detection] No candidates in response, defaulting to human');
+      return { subjectType: 'human', briefDescription: 'Unable to detect', confidence: 0.5 };
+    }
+
+    const parts = candidates[0].content?.parts;
+    if (!parts) {
+      console.warn('[Gemini Detection] No parts in response, defaulting to human');
+      return { subjectType: 'human', briefDescription: 'Unable to detect', confidence: 0.5 };
+    }
+
+    // Find the text part with the JSON response
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const textPart = parts.find((p: any) => p.text);
+    if (!textPart?.text) {
+      console.warn('[Gemini Detection] No text in response, defaulting to human');
+      return { subjectType: 'human', briefDescription: 'Unable to detect', confidence: 0.5 };
+    }
+
+    // Parse the JSON response (handle potential markdown code blocks)
+    let jsonText = textPart.text.trim();
+
+    // Remove markdown code blocks if present
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.slice(7);
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.slice(3);
+    }
+    if (jsonText.endsWith('```')) {
+      jsonText = jsonText.slice(0, -3);
+    }
+    jsonText = jsonText.trim();
+
+    const parsed = JSON.parse(jsonText);
+
+    // Validate the response
+    const validTypes: SubjectType[] = ['human', 'animal', 'creature', 'object', 'scenery'];
+    if (!validTypes.includes(parsed.subjectType)) {
+      console.warn(`[Gemini Detection] Invalid subject type "${parsed.subjectType}", defaulting to human`);
+      return { subjectType: 'human', briefDescription: parsed.briefDescription || 'Unknown', confidence: 0.5 };
+    }
+
+    console.log(`[Gemini Detection] Detected: ${parsed.subjectType} - ${parsed.briefDescription} (confidence: ${parsed.confidence})`);
+
+    return {
+      subjectType: parsed.subjectType as SubjectType,
+      briefDescription: parsed.briefDescription || '',
+      confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.8,
+    };
+  } catch (error) {
+    console.error('[Gemini Detection] Error detecting subject type:', error);
+    // Default to human for backwards compatibility
+    return { subjectType: 'human', briefDescription: 'Detection failed', confidence: 0.5 };
+  }
+}
+
+// ============================================================================
+// UNIFIED CHARACTER IMAGE ANALYSIS (Option 3)
+// ============================================================================
+
+/**
+ * Result from unified character image analysis
+ * Contains either human-specific structured fields OR non-human description
+ */
+export interface CharacterAnalysisResult {
+  subjectType: SubjectType;
+  confidence: number;
+  // For humans: structured fields
+  humanDetails?: {
+    gender: string;      // boy, girl, man, woman, baby, etc.
+    hairColor: string;
+    skinTone: string;
+    age: string;
+    clothing: string;
+    otherFeatures: string;
+  };
+  // For non-humans: description text
+  briefDescription?: string;
+}
+
+/**
+ * Unified character image analysis using Gemini Vision
+ *
+ * This is the single-call solution that:
+ * 1. Detects subject type (human vs non-human)
+ * 2. Returns appropriate data based on type:
+ *    - Human: Structured fields (gender, hair, skin, age, clothing, features)
+ *    - Non-human: Brief description text
+ *
+ * Benefits over previous GPT+Gemini approach:
+ * - Single API call (~1-2s vs ~3-5s)
+ * - No fragile fallback logic
+ * - Consistent AI model for all analysis
+ */
+export async function analyzeCharacterImage(
+  imageBase64: string,
+  mimeType: string = 'image/jpeg'
+): Promise<CharacterAnalysisResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+
+  const genAI = new GoogleGenAI({ apiKey });
+
+  const analysisPrompt = `Analyze this image and extract character information for a children's storybook.
+
+STEP 1: Determine the subject type:
+- "human": Real person from a photograph (child, adult, baby)
+- "animal": Real-world animals (dog, cat, bird, fish)
+- "creature": Fantasy/cartoon beings (dragon, unicorn, monster, cartoon character)
+- "object": Inanimate items (toy, sword, car)
+- "scenery": Backgrounds, places, buildings
+
+STEP 2: Based on subject type, return the appropriate JSON:
+
+IF HUMAN, return:
+{
+  "subjectType": "human",
+  "confidence": 0.0 to 1.0,
+  "humanDetails": {
+    "gender": "boy/girl/man/woman/baby boy/baby girl/toddler",
+    "hairColor": "description of hair color and style",
+    "skinTone": "description of skin tone",
+    "age": "approximate age or age range",
+    "clothing": "description of visible clothing",
+    "otherFeatures": "notable features like glasses, freckles, dimples"
+  }
+}
+
+IF NOT HUMAN (animal, creature, object, scenery), return:
+{
+  "subjectType": "animal" | "creature" | "object" | "scenery",
+  "confidence": 0.0 to 1.0,
+  "briefDescription": "detailed visual description (15-30 words) including colors, features, style"
+}
+
+Important guidelines:
+- For children's drawings: Identify what the drawing REPRESENTS (a dragon drawing = "creature")
+- Be specific and descriptive for storybook character consistency
+- For gender: Use child-friendly terms (boy, girl) for children; man, woman for adults
+- Return ONLY raw JSON, no markdown code blocks
+
+Return the JSON now:`;
+
+  try {
+    const result = await genAI.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: [
+        { text: analysisPrompt },
+        {
+          inlineData: {
+            mimeType,
+            data: imageBase64,
+          },
+        },
+      ],
+    });
+
+    const candidates = result.candidates;
+    if (!candidates || candidates.length === 0) {
+      console.warn('[Gemini Analysis] No candidates in response, defaulting to human');
+      return {
+        subjectType: 'human',
+        confidence: 0.5,
+        humanDetails: {
+          gender: '',
+          hairColor: '',
+          skinTone: '',
+          age: '',
+          clothing: '',
+          otherFeatures: 'Unable to analyze automatically',
+        },
+      };
+    }
+
+    const parts = candidates[0].content?.parts;
+    if (!parts) {
+      console.warn('[Gemini Analysis] No parts in response');
+      return {
+        subjectType: 'human',
+        confidence: 0.5,
+        humanDetails: {
+          gender: '',
+          hairColor: '',
+          skinTone: '',
+          age: '',
+          clothing: '',
+          otherFeatures: 'Unable to analyze automatically',
+        },
+      };
+    }
+
+    // Find the text part with the JSON response
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const textPart = parts.find((p: any) => p.text);
+    if (!textPart?.text) {
+      console.warn('[Gemini Analysis] No text in response');
+      return {
+        subjectType: 'human',
+        confidence: 0.5,
+        humanDetails: {
+          gender: '',
+          hairColor: '',
+          skinTone: '',
+          age: '',
+          clothing: '',
+          otherFeatures: 'Unable to analyze automatically',
+        },
+      };
+    }
+
+    // Parse the JSON response (handle potential markdown code blocks)
+    let jsonText = textPart.text.trim();
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.slice(7);
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.slice(3);
+    }
+    if (jsonText.endsWith('```')) {
+      jsonText = jsonText.slice(0, -3);
+    }
+    jsonText = jsonText.trim();
+
+    const parsed = JSON.parse(jsonText);
+
+    // Validate subject type
+    const validTypes: SubjectType[] = ['human', 'animal', 'creature', 'object', 'scenery'];
+    const subjectType = validTypes.includes(parsed.subjectType) ? parsed.subjectType : 'human';
+    const confidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0.8;
+
+    if (subjectType === 'human') {
+      // Human: return structured fields
+      const details = parsed.humanDetails || {};
+      console.log(`[Gemini Analysis] Human detected: ${details.gender || 'unknown'}, ${details.age || 'unknown age'}`);
+      return {
+        subjectType: 'human',
+        confidence,
+        humanDetails: {
+          gender: details.gender || '',
+          hairColor: details.hairColor || '',
+          skinTone: details.skinTone || '',
+          age: details.age || '',
+          clothing: details.clothing || '',
+          otherFeatures: details.otherFeatures || '',
+        },
+      };
+    } else {
+      // Non-human: return description
+      console.log(`[Gemini Analysis] Non-human detected: ${subjectType} - ${parsed.briefDescription || ''}`);
+      return {
+        subjectType,
+        confidence,
+        briefDescription: parsed.briefDescription || `${subjectType} character`,
+      };
+    }
+  } catch (error) {
+    console.error('[Gemini Analysis] Error analyzing character image:', error);
+    // Default to human with empty fields
+    return {
+      subjectType: 'human',
+      confidence: 0.5,
+      humanDetails: {
+        gender: '',
+        hairColor: '',
+        skinTone: '',
+        age: '',
+        clothing: '',
+        otherFeatures: 'Analysis failed - please enter details manually',
+      },
+    };
+  }
+}
+
+/**
+ * Check if a subject type represents a living/acting entity
+ * (as opposed to objects or scenery which don't "act" in stories)
+ */
+export function isActorSubjectType(subjectType: SubjectType | undefined): boolean {
+  if (!subjectType) return true; // Default to actor for backwards compatibility
+  return ['human', 'animal', 'creature'].includes(subjectType);
+}
+
+/**
+ * Check if a subject type should use human-specific prompts
+ * (preserve face, hair, skin tone, etc.)
+ */
+export function isHumanSubjectType(subjectType: SubjectType | undefined): boolean {
+  return !subjectType || subjectType === 'human';
+}
+
+// ============================================================================
+// CHARACTER PREVIEW GENERATION
+// ============================================================================
+
 /**
  * Character Preview Generation Parameters
  */
@@ -1198,6 +1571,377 @@ This is a CHARACTER PREVIEW for a children's storybook app. The style should fee
 
   throw lastError || new Error('Gemini classic preview generation failed after all retries');
 }
+
+// ============================================================================
+// NON-HUMAN IMAGE-BASED PREVIEW GENERATION
+// ============================================================================
+
+/**
+ * Parameters for non-human image-based character generation
+ * Used when AI detects the uploaded image is NOT a human (animal, creature, object, scenery)
+ */
+export interface NonHumanPreviewParams {
+  name: string;
+  referenceImageUrl: string;
+  subjectType: SubjectType; // 'animal' | 'creature' | 'object' | 'scenery'
+  briefDescription: string; // AI-detected description of key features
+  additionalDetails?: string; // User-provided additional details
+}
+
+export interface NonHumanPreviewResult {
+  imageUrl: string; // data URL (base64)
+  generationTime: number;
+  prompt: string;
+  subjectType: SubjectType;
+}
+
+/**
+ * Generate a preview for non-human subjects (Pixar 3D style)
+ *
+ * This creates an animated version of the uploaded image (drawing, animal photo, etc.)
+ * preserving the key visual characteristics while transforming to Pixar style.
+ */
+export async function generateNonHumanPreview({
+  name,
+  referenceImageUrl,
+  subjectType,
+  briefDescription,
+  additionalDetails,
+}: NonHumanPreviewParams): Promise<NonHumanPreviewResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+
+  const startTime = Date.now();
+  const genAI = new GoogleGenAI({ apiKey });
+
+  // Build subject-specific rules
+  const subjectRules = getSubjectSpecificRules(subjectType);
+
+  // Build the prompt for non-human subjects
+  const fullPrompt = `Create a 3D animated illustration of the subject in this reference image.
+
+=== SUBJECT INFORMATION ===
+- Name: ${name}
+- Type: ${subjectType} (${briefDescription})
+${additionalDetails ? `- Additional details: ${additionalDetails}` : ''}
+
+=== CRITICAL RENDERING STYLE (MANDATORY) ===
+- Transform the reference image into a 3D ANIMATED/ILLUSTRATED version (Pixar/Disney style)
+- Do NOT just copy the reference - CREATE an animated interpretation
+- The output should look like a character/element from an animated movie
+- Style: Modern 3D animation like Pixar, Disney Junior, or Cocomelon
+
+=== ART STYLE ===
+- 3D rendered illustration (like Pixar, Disney Junior, Cocomelon)
+- Soft, rounded features with warm, flattering lighting
+- Vibrant, cheerful colors
+- Large expressive features typical of animation
+- Friendly, approachable appearance
+- Clean background (soft gradient or simple solid color)
+- Portrait/centered composition
+
+=== PRESERVATION RULES ===
+1. Keep the SAME colors from the reference (if it's purple, stay purple)
+2. Keep distinctive features (wings, horns, shape, patterns)
+3. Keep the mood/personality (friendly, scary, cute, majestic)
+4. Make it suitable for children's storybook
+${subjectRules}
+
+=== DO NOT ===
+- Make it photorealistic
+- Change the fundamental nature of the subject
+- Add human features to non-human subjects
+- Make it scary or inappropriate for children
+
+This is for a children's storybook app. The result should be appealing, memorable, and kid-friendly.`;
+
+  // Build content parts with the reference image
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contentParts: any[] = [{ text: fullPrompt }];
+
+  try {
+    console.log(`[Gemini NonHuman Preview] Fetching reference image for ${name}: ${referenceImageUrl}`);
+    const imageData = await fetchImageAsBase64(referenceImageUrl);
+
+    contentParts.push({
+      inlineData: {
+        mimeType: imageData.mimeType,
+        data: imageData.base64,
+      },
+    });
+    contentParts.push({ text: `[Reference image for ${name}]` });
+  } catch (imgError) {
+    console.error(`[Gemini NonHuman Preview] Failed to fetch image for ${name}:`, imgError);
+    throw new Error(`Failed to fetch reference image: ${imgError instanceof Error ? imgError.message : 'Unknown error'}`);
+  }
+
+  console.log(`[Gemini NonHuman Preview] Generating ${subjectType} portrait for ${name}`);
+
+  // Retry logic for rate limits
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await genAI.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: contentParts,
+        config: {
+          responseModalities: [Modality.TEXT, Modality.IMAGE],
+          imageConfig: {
+            aspectRatio: '1:1', // Square portrait images
+          },
+        },
+      });
+
+      const candidates = result.candidates;
+      if (!candidates || candidates.length === 0) {
+        throw new Error('No candidates in Gemini response');
+      }
+
+      const parts = candidates[0].content?.parts;
+      if (!parts) {
+        throw new Error('No parts in Gemini response');
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const imagePart = parts.find((p: any) => p.inlineData);
+      if (!imagePart || !imagePart.inlineData) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const textPart = parts.find((p: any) => p.text);
+        throw new Error(`Gemini preview generation failed: ${textPart?.text || 'No image generated'}`);
+      }
+
+      const generationTime = (Date.now() - startTime) / 1000;
+      console.log(`[Gemini NonHuman Preview] Generated ${subjectType} portrait for ${name} in ${generationTime.toFixed(1)}s`);
+
+      const imageDataUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+
+      return {
+        imageUrl: imageDataUrl,
+        generationTime,
+        prompt: fullPrompt,
+        subjectType,
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const errorMessage = lastError.message;
+
+      if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate')) {
+        const retryMatch = errorMessage.match(/retry in (\d+)/i);
+        const retryDelay = retryMatch ? parseInt(retryMatch[1], 10) * 1000 : 60000;
+        const waitTime = Math.min(retryDelay, 120000);
+
+        if (attempt < maxRetries) {
+          console.warn(`[Gemini NonHuman Preview] Rate limited (attempt ${attempt}/${maxRetries}). Waiting ${waitTime / 1000}s...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+      }
+
+      console.error(`[Gemini NonHuman Preview] Generation error (attempt ${attempt}/${maxRetries}):`, error);
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError || new Error('Gemini non-human preview generation failed after all retries');
+}
+
+/**
+ * Generate a preview for non-human subjects (Classic 2D style)
+ */
+export async function generateNonHumanPreviewClassic({
+  name,
+  referenceImageUrl,
+  subjectType,
+  briefDescription,
+  additionalDetails,
+}: NonHumanPreviewParams): Promise<NonHumanPreviewResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+
+  const startTime = Date.now();
+  const genAI = new GoogleGenAI({ apiKey });
+
+  // Build subject-specific rules
+  const subjectRules = getSubjectSpecificRules(subjectType);
+
+  // Build the prompt for non-human subjects in classic 2D style
+  const fullPrompt = `Create a 2D illustrated version of the subject in this reference image.
+
+=== SUBJECT INFORMATION ===
+- Name: ${name}
+- Type: ${subjectType} (${briefDescription})
+${additionalDetails ? `- Additional details: ${additionalDetails}` : ''}
+
+=== CRITICAL RENDERING STYLE (MANDATORY) ===
+- Transform the reference image into a 2D HAND-DRAWN/DIGITAL ILLUSTRATION
+- Do NOT create 3D rendered or CGI style - this must look hand-drawn/painted
+- Style: Classic children's storybook illustration with soft watercolor/painted feel
+- Do NOT just copy the reference - CREATE an illustrated interpretation
+
+=== ART STYLE ===
+- 2D digital illustration with soft watercolor/painted feel
+- Warm golden hour lighting with soft bokeh background
+- Pastel, muted color palette with gentle saturation
+- Large expressive features (anime/chibi inspired proportions where appropriate)
+- Soft edges and dreamy atmosphere
+- Hand-drawn quality, not computer generated look
+- Nostalgic, cozy, heartwarming feeling
+- Clean soft gradient or nature background
+- Portrait/centered composition
+
+=== PRESERVATION RULES ===
+1. Keep the SAME colors from the reference (if it's purple, stay purple)
+2. Keep distinctive features (wings, horns, shape, patterns)
+3. Keep the mood/personality (friendly, scary, cute, majestic)
+4. Make it suitable for children's storybook
+${subjectRules}
+
+=== DO NOT ===
+- Make it photorealistic or 3D rendered
+- Change the fundamental nature of the subject
+- Add human features to non-human subjects
+- Make it scary or inappropriate for children
+
+This is for a children's storybook app. The result should be appealing, memorable, and kid-friendly.`;
+
+  // Build content parts with the reference image
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contentParts: any[] = [{ text: fullPrompt }];
+
+  try {
+    console.log(`[Gemini NonHuman Classic] Fetching reference image for ${name}: ${referenceImageUrl}`);
+    const imageData = await fetchImageAsBase64(referenceImageUrl);
+
+    contentParts.push({
+      inlineData: {
+        mimeType: imageData.mimeType,
+        data: imageData.base64,
+      },
+    });
+    contentParts.push({ text: `[Reference image for ${name}]` });
+  } catch (imgError) {
+    console.error(`[Gemini NonHuman Classic] Failed to fetch image for ${name}:`, imgError);
+    throw new Error(`Failed to fetch reference image: ${imgError instanceof Error ? imgError.message : 'Unknown error'}`);
+  }
+
+  console.log(`[Gemini NonHuman Classic] Generating ${subjectType} portrait for ${name}`);
+
+  // Retry logic for rate limits
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await genAI.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: contentParts,
+        config: {
+          responseModalities: [Modality.TEXT, Modality.IMAGE],
+          imageConfig: {
+            aspectRatio: '1:1', // Square portrait images
+          },
+        },
+      });
+
+      const candidates = result.candidates;
+      if (!candidates || candidates.length === 0) {
+        throw new Error('No candidates in Gemini response');
+      }
+
+      const parts = candidates[0].content?.parts;
+      if (!parts) {
+        throw new Error('No parts in Gemini response');
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const imagePart = parts.find((p: any) => p.inlineData);
+      if (!imagePart || !imagePart.inlineData) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const textPart = parts.find((p: any) => p.text);
+        throw new Error(`Gemini classic preview generation failed: ${textPart?.text || 'No image generated'}`);
+      }
+
+      const generationTime = (Date.now() - startTime) / 1000;
+      console.log(`[Gemini NonHuman Classic] Generated ${subjectType} portrait for ${name} in ${generationTime.toFixed(1)}s`);
+
+      const imageDataUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+
+      return {
+        imageUrl: imageDataUrl,
+        generationTime,
+        prompt: fullPrompt,
+        subjectType,
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const errorMessage = lastError.message;
+
+      if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate')) {
+        const retryMatch = errorMessage.match(/retry in (\d+)/i);
+        const retryDelay = retryMatch ? parseInt(retryMatch[1], 10) * 1000 : 60000;
+        const waitTime = Math.min(retryDelay, 120000);
+
+        if (attempt < maxRetries) {
+          console.warn(`[Gemini NonHuman Classic] Rate limited (attempt ${attempt}/${maxRetries}). Waiting ${waitTime / 1000}s...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+      }
+
+      console.error(`[Gemini NonHuman Classic] Generation error (attempt ${attempt}/${maxRetries}):`, error);
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError || new Error('Gemini non-human classic preview generation failed after all retries');
+}
+
+/**
+ * Get subject-type specific rules for prompt generation
+ */
+function getSubjectSpecificRules(subjectType: SubjectType): string {
+  switch (subjectType) {
+    case 'animal':
+      return `
+5. For ANIMALS: Keep natural animal features, NO human clothing unless the reference shows it
+6. Maintain the animal's natural proportions and species characteristics`;
+
+    case 'creature':
+      return `
+5. For CREATURES/FANTASY: Embrace the magical/fantastical nature
+6. Keep any special features (wings, horns, magical elements)
+7. Make it whimsical and appealing for children`;
+
+    case 'object':
+      return `
+5. For OBJECTS: Can add personality through expression if appropriate (like Pixar's lamp)
+6. Keep the object recognizable but stylized
+7. Add warmth and appeal typical of animated objects`;
+
+    case 'scenery':
+      return `
+5. For SCENERY: Maintain the location/building's character
+6. Add warmth and whimsy (like houses in Up or Howl's Moving Castle)
+7. Keep architectural features but stylize them`;
+
+    default:
+      return '';
+  }
+}
+
+// ============================================================================
+// DESCRIPTION-ONLY CHARACTER GENERATION
+// ============================================================================
 
 /**
  * Parameters for description-only character generation (no reference image)

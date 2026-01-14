@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Character } from '@/lib/types/story';
+import { Character, SubjectType } from '@/lib/types/story';
 
 /**
  * Common animal types for detecting if character type is an animal
@@ -84,6 +84,7 @@ export default function CharacterFormModal({
   });
 
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [analyzingImage, setAnalyzingImage] = useState(false); // Shows overlay while AI analyzes
   const [generatingPreview, setGeneratingPreview] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [characterMode, setCharacterMode] = useState<'photo' | 'description'>('photo');
@@ -92,6 +93,8 @@ export default function CharacterFormModal({
     classic: string | null;
   }>({ pixar: null, classic: null });
   const [selectedStyle, setSelectedStyle] = useState<'pixar' | 'classic' | null>(null);
+  // Detected subject type from AI (for image mode)
+  const [detectedSubjectType, setDetectedSubjectType] = useState<SubjectType | null>(null);
 
   // Reset form when modal opens/closes or editingCharacter changes
   const resetForm = () => {
@@ -111,6 +114,7 @@ export default function CharacterFormModal({
     setSelectedStyle(null);
     setPreviewError(null);
     setCharacterMode('photo');
+    setDetectedSubjectType(null);
   };
 
   const handleClose = () => {
@@ -146,15 +150,20 @@ export default function CharacterFormModal({
       }
 
       const data = await response.json();
+      // Reset detected subject type when uploading new image
+      setDetectedSubjectType(null);
       setFormData({
         ...formData,
         imageUrl: data.url,
         imageFileName: file.name,
       });
 
-      // Auto-analyze image with AI
+      // Auto-analyze image with unified Gemini API (single call for all subject types)
+      console.log('Analyzing character image:', data.url);
+      setAnalyzingImage(true);
+
       try {
-        const analysisResponse = await fetch('/api/analyze-character-image', {
+        const analysisResponse = await fetch('/api/analyze-character', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageUrl: data.url }),
@@ -162,22 +171,55 @@ export default function CharacterFormModal({
 
         if (analysisResponse.ok) {
           const analysisData = await analysisResponse.json();
-          if (analysisData.success && analysisData.analysis) {
-            setFormData((prev) => ({
-              ...prev,
-              imageUrl: data.url,
-              imageFileName: file.name,
-              hairColor: analysisData.analysis.hairColor || prev.hairColor,
-              skinTone: analysisData.analysis.skinTone || prev.skinTone,
-              clothing: analysisData.analysis.clothing || prev.clothing,
-              age: analysisData.analysis.age || prev.age,
-              otherFeatures: analysisData.analysis.otherFeatures || prev.otherFeatures,
-            }));
+          console.log('Character analysis response:', analysisData);
+
+          if (analysisData.success) {
+            setDetectedSubjectType(analysisData.subjectType);
+
+            if (analysisData.subjectType === 'human' && analysisData.humanDetails) {
+              // Human detected: populate structured fields
+              const details = analysisData.humanDetails;
+              // Combine gender with other features if present
+              const otherFeatures = [details.gender, details.otherFeatures]
+                .filter(Boolean)
+                .join(', ');
+
+              setFormData((prev) => ({
+                ...prev,
+                imageUrl: data.url,
+                imageFileName: file.name,
+                hairColor: details.hairColor || prev.hairColor,
+                skinTone: details.skinTone || prev.skinTone,
+                clothing: details.clothing || prev.clothing,
+                age: details.age || prev.age,
+                otherFeatures: otherFeatures || prev.otherFeatures,
+              }));
+              console.log(`[CharacterFormModal] Human detected: ${details.gender}, ${details.age}`);
+            } else {
+              // Non-human detected: populate description, clear human fields
+              setFormData((prev) => ({
+                ...prev,
+                imageUrl: data.url,
+                imageFileName: file.name,
+                otherFeatures: analysisData.briefDescription || prev.otherFeatures,
+                // Clear human-specific fields for non-human subjects
+                hairColor: '',
+                skinTone: '',
+                age: '',
+                clothing: '',
+              }));
+              console.log(`[CharacterFormModal] Non-human detected: ${analysisData.subjectType} - ${analysisData.briefDescription}`);
+            }
           }
+        } else {
+          console.error('Character analysis API failed');
+          // Fail silently - user can still fill in manually
         }
       } catch (analysisError) {
         console.error('Auto-analysis error:', analysisError);
         // User can still fill in manually
+      } finally {
+        setAnalyzingImage(false);
       }
     } catch (error) {
       console.error('Upload error:', error);
@@ -207,10 +249,13 @@ export default function CharacterFormModal({
     setSelectedStyle(null);
 
     try {
+      // Pass pre-detected subjectType to avoid redundant AI detection
       const requestBody = characterMode === 'photo'
         ? {
             name: formData.name,
             referenceImageUrl: formData.imageUrl,
+            subjectType: detectedSubjectType || undefined, // Pass pre-detected type
+            subjectDescription: detectedSubjectType !== 'human' ? formData.otherFeatures : undefined,
             description: {
               hairColor: formData.hairColor,
               skinTone: formData.skinTone,
@@ -241,6 +286,24 @@ export default function CharacterFormModal({
       }
 
       const data = await response.json();
+
+      // Store detected subject type from API (for image mode)
+      // Only update if we didn't already detect during upload (backward compatibility)
+      if (data.subjectType && characterMode === 'photo' && !detectedSubjectType) {
+        setDetectedSubjectType(data.subjectType);
+        console.log(`[CharacterFormModal] Detected subject type from preview: ${data.subjectType}`);
+
+        // For non-human subjects, populate otherFeatures only if empty
+        // (don't overwrite user's manual edits)
+        if (data.subjectType !== 'human' && data.subjectDescription && !formData.otherFeatures) {
+          setFormData((prev) => ({
+            ...prev,
+            otherFeatures: data.subjectDescription,
+          }));
+          console.log(`[CharacterFormModal] Populated otherFeatures with: ${data.subjectDescription}`);
+        }
+      }
+
       if (data.previews) {
         setPreviewOptions({
           pixar: data.previews.pixar?.imageUrl || null,
@@ -341,10 +404,22 @@ export default function CharacterFormModal({
     // Build the full description - source of truth for all scene generation
     const fullDescription = buildFullDescription();
 
-    // Detect if this is an animal character based on the description mode and character type
-    // "From Description" mode with animal-like character types = animal
-    // "From Photo" mode = always human (they uploaded a photo of a person)
-    const isAnimal = characterMode === 'description' && detectIsAnimal(formData.characterType);
+    // Detect if this is an animal character based on:
+    // - "From Description" mode with animal-like character types
+    // - "From Image" mode with detected animal/creature subjectType
+    const isAnimal = characterMode === 'description'
+      ? detectIsAnimal(formData.characterType)
+      : (detectedSubjectType === 'animal' || detectedSubjectType === 'creature');
+
+    // Determine subjectType:
+    // - For "From Image" mode: use detected subjectType (default to 'human' if not detected)
+    // - For "From Description" mode: infer from character type
+    const subjectType: SubjectType = characterMode === 'photo'
+      ? (detectedSubjectType || 'human')
+      : (detectIsAnimal(formData.characterType) ? 'creature' : 'human');
+
+    // For non-human subjects, don't save human-specific fields
+    const isHuman = subjectType === 'human';
 
     const character: Character = {
       id: editingCharacter?.id || `char-${Date.now()}`,
@@ -355,13 +430,14 @@ export default function CharacterFormModal({
       },
       animatedPreviewUrl: formData.animatedPreviewUrl || undefined,
       description: {
-        hairColor: formData.hairColor || undefined,
-        skinTone: characterMode === 'photo' ? formData.skinTone : undefined,
-        clothing: characterMode === 'photo' ? formData.clothing : undefined,
-        age: formData.age || undefined,
+        hairColor: isHuman ? (formData.hairColor || undefined) : undefined,
+        skinTone: isHuman ? (formData.skinTone || undefined) : undefined,
+        clothing: isHuman ? (formData.clothing || undefined) : undefined,
+        age: isHuman ? (formData.age || undefined) : undefined,
         otherFeatures: otherFeatures || undefined,
         fullDescription: fullDescription,
         isAnimal: isAnimal, // Flag for image generation
+        subjectType: subjectType, // NEW: Store detected/inferred subject type
       },
       isPrimary: false,
       order: 0,
@@ -422,8 +498,8 @@ export default function CharacterFormModal({
                   )}
                 </div>
                 <div>
-                  <div className="font-medium text-gray-900 text-sm">From Photo</div>
-                  <div className="text-xs text-gray-500">Upload reference image</div>
+                  <div className="font-medium text-gray-900 text-sm">From Image</div>
+                  <div className="text-xs text-gray-500">Upload any image - photo, drawing, etc.</div>
                 </div>
               </button>
 
@@ -580,58 +656,103 @@ export default function CharacterFormModal({
 
           {/* Character Description Fields */}
           {characterMode === 'photo' ? (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Hair Color</label>
-                <input
-                  type="text"
-                  value={formData.hairColor}
-                  onChange={(e) => setFormData({ ...formData, hairColor: e.target.value })}
-                  placeholder="brown, blonde..."
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
+            // For "From Image" mode: show human fields only if human detected (or not yet detected)
+            // After preview generation, if non-human detected, show simplified fields
+            detectedSubjectType && detectedSubjectType !== 'human' ? (
+              // Non-human detected: show simplified fields
+              <div className="space-y-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                  <p className="text-sm text-blue-700">
+                    <span className="font-medium">Detected: </span>
+                    {detectedSubjectType === 'animal' && 'Animal'}
+                    {detectedSubjectType === 'creature' && 'Fantasy Creature'}
+                    {detectedSubjectType === 'object' && 'Object'}
+                    {detectedSubjectType === 'scenery' && 'Scenery/Background'}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Additional Details (optional)</label>
+                  <input
+                    type="text"
+                    value={formData.otherFeatures}
+                    onChange={(e) => setFormData({ ...formData, otherFeatures: e.target.value })}
+                    placeholder="colors, special features, personality traits..."
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Add any specific features you want to preserve
+                  </p>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Age</label>
-                <input
-                  type="text"
-                  value={formData.age}
-                  onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                  placeholder="8 years old..."
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
+            ) : (
+              // Human or not yet detected: show full human fields
+              <div className="relative">
+                {/* Analyzing overlay */}
+                {analyzingImage && (
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-lg z-10 flex items-center justify-center">
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span className="text-sm font-medium">Analyzing image...</span>
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Hair Color</label>
+                    <input
+                      type="text"
+                      value={formData.hairColor}
+                      onChange={(e) => setFormData({ ...formData, hairColor: e.target.value })}
+                      placeholder="brown, blonde..."
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Age</label>
+                    <input
+                      type="text"
+                      value={formData.age}
+                      onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                      placeholder="8 years old..."
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Skin Tone</label>
+                    <input
+                      type="text"
+                      value={formData.skinTone}
+                      onChange={(e) => setFormData({ ...formData, skinTone: e.target.value })}
+                      placeholder="light, tan, dark..."
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Clothing</label>
+                    <input
+                      type="text"
+                      value={formData.clothing}
+                      onChange={(e) => setFormData({ ...formData, clothing: e.target.value })}
+                      placeholder="blue shirt..."
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Other Features</label>
+                    <input
+                      type="text"
+                      value={formData.otherFeatures}
+                      onChange={(e) => setFormData({ ...formData, otherFeatures: e.target.value })}
+                      placeholder="glasses, freckles, curly hair..."
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Skin Tone</label>
-                <input
-                  type="text"
-                  value={formData.skinTone}
-                  onChange={(e) => setFormData({ ...formData, skinTone: e.target.value })}
-                  placeholder="light, tan, dark..."
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Clothing</label>
-                <input
-                  type="text"
-                  value={formData.clothing}
-                  onChange={(e) => setFormData({ ...formData, clothing: e.target.value })}
-                  placeholder="blue shirt..."
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Other Features</label>
-                <input
-                  type="text"
-                  value={formData.otherFeatures}
-                  onChange={(e) => setFormData({ ...formData, otherFeatures: e.target.value })}
-                  placeholder="glasses, freckles, curly hair..."
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
-              </div>
-            </div>
+            )
           ) : (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Additional Details (optional)</label>
@@ -811,11 +932,11 @@ export default function CharacterFormModal({
                 </div>
               )}
 
-              {/* Generate Button */}
+              {/* Generate Button - name validation moved to save */}
               <button
                 type="button"
                 onClick={handleGeneratePreview}
-                disabled={generatingPreview || !formData.name || (characterMode === 'photo' ? !formData.imageUrl : !formData.characterType)}
+                disabled={generatingPreview || (characterMode === 'photo' ? !formData.imageUrl : !formData.characterType)}
                 className="mt-4 px-6 py-2 bg-gradient-to-r from-purple-600 to-amber-500 text-white rounded-lg hover:from-purple-700 hover:to-amber-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all"
               >
                 {generatingPreview
