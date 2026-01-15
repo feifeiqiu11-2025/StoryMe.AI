@@ -70,13 +70,13 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
     checkAuth();
   }, []);
 
-  // Main message typing effect - complete in ~2 seconds
+  // Main message typing effect - complete in ~2.5 seconds
   useEffect(() => {
     if (typingComplete) return;
 
     const totalChars = MAIN_MESSAGE.length;
-    // ~2 seconds to type main message
-    const intervalTime = Math.floor(2000 / totalChars);
+    // ~2.5 seconds to type main message
+    const intervalTime = Math.floor(2500 / totalChars);
 
     const timer = setInterval(() => {
       setDisplayedText(prev => {
@@ -92,13 +92,13 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
     return () => clearInterval(timer);
   }, [typingComplete]);
 
-  // Sub message typing effect - starts after main message, complete in ~1.5 seconds
+  // Sub message typing effect - starts after main message, complete in ~2 seconds
   useEffect(() => {
     if (!typingComplete || subTypingComplete) return;
 
     const totalChars = SUB_MESSAGE.length;
-    // ~1.5 seconds to type sub message
-    const intervalTime = Math.floor(1500 / totalChars);
+    // ~2 seconds to type sub message
+    const intervalTime = Math.floor(2000 / totalChars);
 
     const timer = setInterval(() => {
       setSubDisplayedText(prev => {
@@ -166,6 +166,15 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
     router.push('/stories');
   };
 
+  // Track viewport width for responsive card positioning
+  const [viewportWidth, setViewportWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Get position class for each card based on its distance from active
   const getCardStyle = (index: number): React.CSSProperties => {
     const diff = index - activeIndex;
@@ -177,8 +186,13 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
       position = normalizedDiff - totalStories;
     }
 
-    // Only show 5 cards (-2, -1, 0, 1, 2)
-    if (Math.abs(position) > 2) {
+    // Responsive: On mobile (< 640px) only show 3 cards, on tablet (< 1024px) show 5 but tighter
+    const isMobile = viewportWidth < 640;
+    const isTablet = viewportWidth < 1024;
+    const maxVisiblePosition = isMobile ? 1 : 2;
+
+    // Hide cards beyond visible range
+    if (Math.abs(position) > maxVisiblePosition) {
       return {
         opacity: 0,
         transform: 'scale(0.5) translateX(0)',
@@ -190,26 +204,35 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
     // Calculate scale and opacity based on position
     let scale: number;
     if (position === 0) {
-      scale = 1;
+      scale = isMobile ? 0.9 : 1;
     } else if (Math.abs(position) === 1) {
-      scale = 0.85;
+      scale = isMobile ? 0.7 : 0.85;
     } else {
       scale = 0.75;
     }
 
     const opacity = position === 0 ? 1 : 0.9 - Math.abs(position) * 0.05;
 
-    // Position cards with visually even spacing
-    // Outer cards should align with page content (max-w-6xl = 1152px, half = 576px)
-    // Account for card width (240px * 0.75 scale = 180px, half = 90px)
-    // So outer card center should be around 576 - 90 = ~486px from center
+    // Responsive spacing - use viewport-relative values
     let translateXPx: number;
     if (position === 0) {
       translateXPx = 0;
     } else if (Math.abs(position) === 1) {
-      translateXPx = position * 268; // Adjacent cards
+      // Adjacent cards - responsive spacing
+      if (isMobile) {
+        translateXPx = position * 130; // Tighter on mobile
+      } else if (isTablet) {
+        translateXPx = position * 200; // Medium on tablet
+      } else {
+        translateXPx = position * 268; // Full on desktop
+      }
     } else {
-      translateXPx = position * 238; // Outer cards - aligned with page edges
+      // Outer cards (position ±2) - only shown on larger screens
+      if (isTablet) {
+        translateXPx = position * 180;
+      } else {
+        translateXPx = position * 238;
+      }
     }
 
     const zIndex = 10 - Math.abs(position);
@@ -222,9 +245,17 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
     };
   };
 
-  // Card dimensions - original sizes
-  const getCenterCardSize = () => ({ width: 300, height: 400 });
-  const getSideCardSize = () => ({ width: 240, height: 320 });
+  // Card dimensions - responsive sizes
+  const getCenterCardSize = () => {
+    if (viewportWidth < 640) return { width: 200, height: 280 }; // Mobile
+    if (viewportWidth < 1024) return { width: 260, height: 360 }; // Tablet
+    return { width: 300, height: 400 }; // Desktop
+  };
+  const getSideCardSize = () => {
+    if (viewportWidth < 640) return { width: 160, height: 220 }; // Mobile
+    if (viewportWidth < 1024) return { width: 200, height: 280 }; // Tablet
+    return { width: 240, height: 320 }; // Desktop
+  };
 
   // Render a single card
   const renderCard = (story: ProjectWithScenesDTO | MockStory, index: number, isMockStory: boolean) => {
@@ -303,14 +334,16 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
 
   if (loading) {
     return (
-      <div className={`relative h-[440px] ${className}`}>
+      <div className={`relative h-[320px] sm:h-[380px] lg:h-[440px] ${className}`}>
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="animate-pulse flex gap-3">
-            {[...Array(5)].map((_, i) => (
+          <div className="animate-pulse flex gap-2 sm:gap-3">
+            {[...Array(3)].map((_, i) => (
               <div
                 key={i}
                 className={`bg-gray-200 rounded-2xl ${
-                  i === 2 ? 'w-[300px] h-[400px]' : 'w-[240px] h-[320px]'
+                  i === 1
+                    ? 'w-[200px] h-[280px] sm:w-[260px] sm:h-[360px] lg:w-[300px] lg:h-[400px]'
+                    : 'w-[160px] h-[220px] sm:w-[200px] sm:h-[280px] lg:w-[240px] lg:h-[320px]'
                 }`}
               />
             ))}
@@ -323,28 +356,28 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
   return (
     <div className={`relative ${className}`}>
       {/* Carousel Container */}
-      <div className="relative h-[440px]">
+      <div className="relative h-[320px] sm:h-[380px] lg:h-[440px]">
         {/* Cards */}
         <div className="relative h-full w-full">
           {displayStories.map((story, index) => renderCard(story, index, isMock))}
         </div>
 
         {/* Overlay with Typing Effect */}
-        <div className="absolute inset-0 flex items-end justify-center z-20 pointer-events-none pb-16">
-          <div className="bg-white/65 backdrop-blur-sm rounded-xl px-5 py-3 max-w-3xl mx-4 text-center shadow-lg pointer-events-auto">
+        <div className="absolute inset-0 flex items-end justify-center z-20 pointer-events-none pb-16 px-2 sm:px-4">
+          <div className="bg-white/65 backdrop-blur-sm rounded-xl px-3 sm:px-5 py-3 max-w-[calc(100%-1rem)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl text-center shadow-lg pointer-events-auto">
             {/* Main Message with Typing Effect */}
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-0.5 whitespace-nowrap">
+            <h2 className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-gray-900 mb-0.5 leading-tight">
               {displayedText}
               {!typingComplete && (
-                <span className="inline-block w-0.5 h-5 bg-blue-600 ml-1 animate-pulse" />
+                <span className="inline-block w-0.5 h-4 sm:h-5 bg-blue-600 ml-1 animate-pulse" />
               )}
             </h2>
 
             {/* Sub Message with Typing Effect */}
-            <p className="text-gray-600 text-sm sm:text-base mb-2 whitespace-nowrap">
+            <p className="text-gray-600 text-xs sm:text-sm md:text-base mb-2 leading-tight">
               {subDisplayedText}
               {typingComplete && !subTypingComplete && (
-                <span className="inline-block w-0.5 h-4 bg-blue-600 ml-1 animate-pulse" />
+                <span className="inline-block w-0.5 h-3 sm:h-4 bg-blue-600 ml-1 animate-pulse" />
               )}
             </p>
 
