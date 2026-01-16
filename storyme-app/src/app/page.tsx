@@ -10,9 +10,9 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import Testimonials from '@/components/landing/Testimonials';
 import ErrorHandler from '@/components/ErrorHandler';
-import PricingCards from '@/components/pricing/PricingCards';
 import LandingNav from '@/components/navigation/LandingNav';
 import HeroCarousel from '@/components/landing/HeroCarousel';
+import WhyCreativitySection from '@/components/landing/WhyCreativitySection';
 
 export default function HomePage() {
   return (
@@ -33,16 +33,16 @@ export default function HomePage() {
           <HeroCarousel />
         </div>
 
-        {/* KindleWood Principles - Visual Journey Section */}
+        {/* Why Creativity Matters Section */}
+        <WhyCreativitySection />
+
+        {/* The Creation Journey Section */}
         <div className="mb-12 sm:mb-16">
           {/* Section Title */}
-          <div className="text-center mb-8 sm:mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
-              Our Principles
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              The Creation Journey
             </h2>
-            <p className="text-base sm:text-lg text-gray-700 leading-relaxed max-w-3xl mx-auto">
-              At <strong className="text-amber-700">KindleWood</strong>, we believe every child is born creative. Our role is to protect and amplify it through a journey of sparking ideas, creating boldly, and growing into confident thinkers.
-            </p>
           </div>
 
           {/* Clean Journey Flow - Inspired by Slides */}
@@ -58,27 +58,16 @@ export default function HomePage() {
                 {/* Image */}
                 <div className="mb-4 rounded-lg overflow-hidden">
                   <img
-                    src="/images/spark-hands.jpg"
-                    alt="Hands holding a spark of light"
-                    className="w-full h-40 object-cover"
+                    src="/images/crayon-drawing.jpg"
+                    alt="Child's crayon drawing of a dragon and house"
+                    className="w-full h-52 object-cover"
                   />
                 </div>
 
-                {/* Bullet Points */}
-                <ul className="space-y-2 text-sm text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <span className="text-yellow-600 mt-1">•</span>
-                    <span>A wild idea whispered before bedtime</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-yellow-600 mt-1">•</span>
-                    <span>A creative drawing scribbled on a napkin</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-yellow-600 mt-1">•</span>
-                    <span>A curious question that won't stop</span>
-                  </li>
-                </ul>
+                {/* Simplified Copy */}
+                <p className="text-gray-700 leading-relaxed text-center">
+                  A wild idea whispered at bedtime, a curious question, a drawing on a napkin.
+                </p>
               </div>
 
               {/* Arrow 1 */}
@@ -94,30 +83,19 @@ export default function HomePage() {
                 {/* Title - Top Center */}
                 <h4 className="text-xl font-bold text-gray-900 text-center mb-4">Create</h4>
 
-                {/* Image - object-bottom to show hands crafting */}
+                {/* Image - iPad storytelling app */}
                 <div className="mb-4 rounded-lg overflow-hidden">
                   <img
-                    src="/images/kids-creating.jpg"
-                    alt="Children creating and drawing together"
-                    className="w-full h-40 object-cover object-bottom"
+                    src="/images/ipad-storytelling.jpg"
+                    alt="iPad app turning drawing into interactive story"
+                    className="w-full h-52 object-cover object-center"
                   />
                 </div>
 
-                {/* Bullet Points */}
-                <ul className="space-y-2 text-sm text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <span className="text-pink-600 mt-1">•</span>
-                    <span>Storybooks they read and share</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-pink-600 mt-1">•</span>
-                    <span>Art projects they proudly display</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-pink-600 mt-1">•</span>
-                    <span>Digital and physical creations that last</span>
-                  </li>
-                </ul>
+                {/* Simplified Copy */}
+                <p className="text-gray-700 leading-relaxed text-center">
+                  Turn sparks into real creations—personalized storybooks, art projects, and 3D models that kids proudly share.
+                </p>
               </div>
 
               {/* Arrow 2 */}
@@ -133,32 +111,94 @@ export default function HomePage() {
                 {/* Title - Top Center */}
                 <h4 className="text-xl font-bold text-gray-900 text-center mb-4">Grow</h4>
 
-                {/* Image - object-bottom to show books complete */}
+                {/* Image - handmade storybooks */}
                 <div className="mb-4 rounded-lg overflow-hidden">
                   <img
-                    src="/images/kids-reading.jpg"
-                    alt="Children reading books together"
-                    className="w-full h-40 object-cover object-bottom"
+                    src="/images/handmade-storybooks.jpg"
+                    alt="Stack of handmade storybooks with child's hand"
+                    className="w-full h-52 object-cover"
                   />
                 </div>
 
-                {/* Bullet Points */}
-                <ul className="space-y-2 text-sm text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-600 mt-1">•</span>
-                    <span>Confident in their own voice</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-600 mt-1">•</span>
-                    <span>Resilient when ideas don't work</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-600 mt-1">•</span>
-                    <span>Empathetic storytellers</span>
-                  </li>
-                </ul>
+                {/* Simplified Copy */}
+                <p className="text-gray-700 leading-relaxed text-center">
+                  Through creating, children become confident, resilient, and empathetic thinkers.
+                </p>
               </div>
 
+            </div>
+          </div>
+        </div>
+
+        {/* How We Do It - With Background Image */}
+        <div className="mb-12 sm:mb-16">
+          <div className="text-center mb-2">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              How We Do It
+            </h2>
+          </div>
+
+          {/* Container with hands background image */}
+          <div
+            className="relative max-w-5xl mx-auto bg-no-repeat bg-center bg-contain"
+            style={{ backgroundImage: 'url(/images/HowWeDoBackground.png)' }}
+          >
+            <div className="relative grid md:grid-cols-2 gap-4 md:gap-8">
+              {/* Left: Online Tools */}
+              <div className="p-6 sm:p-10 flex flex-col items-center text-center">
+                <h3 className="text-lg font-semibold text-gray-900 uppercase tracking-wide">
+                  Online Tools
+                </h3>
+
+                <div className="space-y-5 mt-2">
+                  {/* KindleWood Studio */}
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-900">
+                      KindleWood Studio <span className="text-sm font-normal text-gray-500">For Parents & Educators</span>
+                    </h4>
+                    <p className="text-gray-700 leading-relaxed mt-2">
+                      The creator platform that turns imagination—wild ideas, drawings, and photos—into digital storybooks and creative projects.{' '}
+                      <Link href="/signup" className="text-purple-600 hover:text-purple-700 font-medium transition-colors">
+                        Visit Studio →
+                      </Link>
+                    </p>
+                  </div>
+
+                  {/* KindleWood Kids */}
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-900">
+                      KindleWood Kids <span className="text-sm font-normal text-gray-500">For Children</span>
+                    </h4>
+                    <p className="text-gray-700 leading-relaxed mt-2">
+                      A fun, engaging reading and learning app where kids enjoy their own stories and track their creative progress.{' '}
+                      <a
+                        href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                      >
+                        Download App →
+                      </a>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Learning Lab */}
+              <div className="p-6 sm:p-10 flex flex-col items-center text-center">
+                <h3 className="text-lg font-semibold text-gray-900 uppercase tracking-wide">
+                  Offline Learning Lab <span className="text-sm font-medium text-amber-600 normal-case">(Coming Soon)</span>
+                </h3>
+                <p className="text-gray-700 leading-relaxed mt-2">
+                  In-person creative workshops at <span className="font-bold text-gray-900">partner schools</span> and <span className="font-bold text-gray-900">KindleWood Learning Lab</span>.
+                </p>
+                <p className="text-gray-700 mt-4 mb-2">Sample activities:</p>
+                <ul className="space-y-2 text-gray-700">
+                  <li>• Imagination to storybook with show & tell <span className="text-gray-500 text-sm">(Ages 3-6)</span></li>
+                  <li>• Turn drawing into 3D Model & Paint <span className="text-gray-500 text-sm">(Ages 3-6)</span></li>
+                  <li>• PBL Engineering: AI coding, complex 3D modeling <span className="text-gray-500 text-sm">(Ages 6-8)</span></li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -170,7 +210,7 @@ export default function HomePage() {
               Partnering with Schools & Educators
             </h2>
             <p className="text-gray-600 leading-relaxed max-w-3xl mx-auto">
-              We partner with schools, educators, and community organizations to bring creativity-driven storytelling into classrooms and homes. Together, we inspire children's imagination, empower teachers as educational creators, and help kids become confident storytellers who trust their ideas and believe in their own voice.
+              We partner with schools, educators, and community organizations to bring creativity-driven storytelling and learning into classrooms and homes.
             </p>
           </div>
 
@@ -204,7 +244,7 @@ export default function HomePage() {
 
         {/* Product Demo Video */}
         <div className="mb-12 sm:mb-16">
-          <div className="text-center mb-6">
+          <div className="text-center mb-8">
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
               What Inspired KindleWood
             </h2>
@@ -222,148 +262,9 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* How KindleWood Works */}
-        <div className="mb-12 sm:mb-16">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-8">
-            How KindleWood Works
-          </h2>
-
-          {/* Product Cards */}
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
-            {/* KindleWood Studio */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border-2 border-purple-200 hover:shadow-2xl transition-all flex flex-col">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <span className="text-2xl sm:text-3xl">🎨</span>
-                </div>
-                <div>
-                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900">KindleWood Studio</h3>
-                  <p className="text-xs sm:text-sm text-gray-600">For Parents & Educators</p>
-                </div>
-              </div>
-              <p className="text-gray-700 mb-4 sm:mb-6 leading-relaxed text-sm sm:text-base">
-                Turn your child's stories, drawings, and wild ideas into beautiful bilingual storybooks — in just minutes.
-              </p>
-
-              <ul className="space-y-2 sm:space-y-3 mb-4 sm:mb-6 flex-grow text-xs sm:text-sm">
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>AI-Powered Story Creation</strong> — Voice, video, text, or photos</span>
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Consistent Characters</strong> — Your child becomes the hero</span>
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Bilingual Support</strong> — English and Chinese</span>
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Voice Narration</strong> — Record your own or use AI</span>
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-purple-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Export & Print</strong> — Download PDFs ready for printing</span>
-                </li>
-              </ul>
-
-              <div className="mt-auto pt-4">
-                <Link
-                  href="/signup"
-                  className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold text-center shadow-md hover:shadow-lg transition-all text-sm sm:text-base whitespace-nowrap"
-                >
-                  Start Creating Stories
-                </Link>
-              </div>
-            </div>
-
-            {/* KindleWood Kids */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border-2 border-blue-200 hover:shadow-2xl transition-all flex flex-col">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <span className="text-2xl sm:text-3xl">📱</span>
-                </div>
-                <div>
-                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900">KindleWood Kids</h3>
-                  <p className="text-xs sm:text-sm text-gray-600">For Children</p>
-                </div>
-              </div>
-              <p className="text-gray-700 mb-4 sm:mb-6 leading-relaxed text-sm sm:text-base">
-                A native mobile app where children explore their personalized story library. Read, listen, learn, and play — all in one magical space.
-              </p>
-
-              <ul className="space-y-2 sm:space-y-3 mb-4 sm:mb-6 flex-grow text-xs sm:text-sm">
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Multiple Child Profiles</strong> — Separate profiles for each child</span>
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Interactive Reading</strong> — Tap words to hear pronunciation</span>
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Audio Narration</strong> — Listen to stories anywhere</span>
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>Fun Quizzes</strong> — AI-powered questions that adapt</span>
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5 sm:mt-1">✓</span>
-                  <span className="text-gray-700"><strong>100% Safe</strong> — No ads, no in-app purchases</span>
-                </li>
-              </ul>
-
-              <div className="mt-auto pt-4">
-                <a
-                  href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold text-center transition-colors text-sm sm:text-base whitespace-nowrap"
-                >
-                  Download the Free Kids App
-                </a>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
       </div>
 
-      {/* Pricing CTA Section */}
-      <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 border-t border-purple-100">
-        <div className="max-w-6xl mx-auto px-4 py-12 sm:py-16">
-          {/* Section Header */}
-          <div className="text-center mb-10">
-            <p className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
-              Every great story starts with a child's imagination
-            </p>
-            <p className="text-base sm:text-lg text-gray-600">
-              Check out our pricing plans and start inspiring your child's imagination journey today
-            </p>
-          </div>
-
-          {/* Pricing Cards - Using shared component */}
-          <div className="mb-10">
-            <PricingCards billingCycle="monthly" simpleMode={true} />
-          </div>
-
-          {/* Detailed Pricing Link */}
-          <div className="text-center">
-            <Link
-              href="/pricing"
-              className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold transition-colors"
-            >
-              View detailed pricing and features →
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Testimonials Section - After Pricing */}
+      {/* Testimonials Section */}
       <Testimonials />
 
       {/* Footer */}

@@ -49,13 +49,10 @@ export default function Testimonials() {
     <section className="py-6 bg-gradient-to-b from-white to-blue-50">
       <div className="max-w-6xl mx-auto px-4">
         {/* Section Header */}
-        <div className="text-center mb-6">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
-            Voice from Our Little Authors
+        <div className="text-center mb-8">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            Voice from Our Little Creators
           </h2>
-          <p className="text-base text-gray-600 max-w-2xl mx-auto">
-            See what parents are saying about KindleWood
-          </p>
         </div>
 
         {/* Testimonials Grid */}
@@ -69,7 +66,7 @@ export default function Testimonials() {
             {testimonials.map((testimonial) => (
               <div
                 key={testimonial.id}
-                className="bg-white rounded-2xl shadow-lg p-6 border-2 border-blue-100 hover:shadow-xl transition-shadow relative"
+                className="p-6 relative"
               >
                 {/* Featured Badge */}
                 {testimonial.is_featured && (
