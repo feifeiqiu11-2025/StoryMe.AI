@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Character, CharacterDescription } from '@/lib/types/story';
-import UnifiedCharacterFormModal from '@/components/characters/UnifiedCharacterFormModal';
+import CharacterFormModal from './CharacterFormModal';
 
 interface CharacterManagerProps {
   characters: Character[];
@@ -290,12 +290,11 @@ export default function CharacterManager({
         </p>
       )}
 
-      {/* Unified Character Form Modal */}
-      <UnifiedCharacterFormModal
+      {/* Character Form Modal */}
+      <CharacterFormModal
         isOpen={showCharacterModal}
         onClose={() => setShowCharacterModal(false)}
         onSave={handleModalSave}
-        mode="story"
       />
     </div>
   );
