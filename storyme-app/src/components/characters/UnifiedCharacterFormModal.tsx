@@ -464,8 +464,9 @@ export default function UnifiedCharacterFormModal({
       const data = await response.json();
       console.log('[UnifiedCharacterForm] Sketch generated:', data);
 
-      if (data.success && data.guide) {
-        setSketchGuideData(data.guide);
+      // API returns { success: true, data: { guide_image_url, steps, character_description } }
+      if (data.success && data.data) {
+        setSketchGuideData(data.data);
         setSketchError(null);
       } else {
         throw new Error('Invalid response from sketch API');
