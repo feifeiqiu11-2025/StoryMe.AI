@@ -200,17 +200,38 @@ export default function CharactersPage() {
       // Determine if this was a description-only character (no reference image)
       const isDescriptionOnly = !character.referenceImage.url;
       setCharacterMode(isDescriptionOnly ? 'description' : 'photo');
+
+      // Parse characterType from otherFeatures for description-only characters
+      // Format: "characterType - additionalDetails" or just "characterType"
+      let parsedCharacterType = '';
+      let parsedOtherFeatures = character.description.otherFeatures || '';
+
+      if (isDescriptionOnly && character.description.otherFeatures) {
+        const otherFeaturesStr = character.description.otherFeatures;
+        const dashIndex = otherFeaturesStr.indexOf(' - ');
+
+        if (dashIndex !== -1) {
+          // Format: "characterType - additionalDetails"
+          parsedCharacterType = otherFeaturesStr.substring(0, dashIndex).trim();
+          parsedOtherFeatures = otherFeaturesStr.substring(dashIndex + 3).trim();
+        } else {
+          // Format: just "characterType" (no additional details)
+          parsedCharacterType = otherFeaturesStr;
+          parsedOtherFeatures = '';
+        }
+      }
+
       setFormData({
         name: character.name,
         hairColor: character.description.hairColor || '',
         skinTone: character.description.skinTone || '',
         clothing: character.description.clothing || '',
         age: character.description.age || '',
-        otherFeatures: character.description.otherFeatures || '',
+        otherFeatures: parsedOtherFeatures,
         imageUrl: character.referenceImage.url,
         imageFileName: character.referenceImage.fileName,
         animatedPreviewUrl: character.animatedPreviewUrl || '',
-        characterType: '', // Will be parsed from otherFeatures if needed
+        characterType: parsedCharacterType,
       });
       // Restore preview if character has an animated preview URL
       if (character.animatedPreviewUrl) {
