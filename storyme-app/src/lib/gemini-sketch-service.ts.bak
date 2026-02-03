@@ -1,0 +1,296 @@
+/**
+ * Gemini Sketch Guide Service
+ *
+ * Generates step-by-step drawing guides for kids using Gemini.
+ *
+ * Features:
+ * - Text-based step breakdown (3-6 steps)
+ * - Sketch-style image generation for each step
+ * - Kid-friendly language and simple shapes
+ * - Print-ready black & white line drawings
+ *
+ * Follows Principle 5: Reuse Before Rebuild (uses existing Gemini client)
+ */
+
+import { GoogleGenAI } from '@google/genai';
+import { isGeminiAvailable } from './gemini-image-client';
+
+export interface DrawingStep {
+  step_number: number;
+  title: string;
+  description: string;
+  image_prompt: string; // Internal prompt for image generation
+}
+
+export interface SketchGuideInput {
+  character_name: string;
+  character_type: string;
+  additional_details?: string;
+}
+
+export interface SketchGuide {
+  sketch_preview_url: string; // Final complete sketch
+  steps: Array<{
+    step_number: number;
+    title: string;
+    description: string;
+    image_url: string; // Base64 data URL
+  }>;
+  character_description: string;
+}
+
+/**
+ * Generate step-by-step drawing guide using Gemini
+ */
+export async function generateSketchGuide(
+  input: SketchGuideInput
+): Promise<SketchGuide> {
+  if (!isGeminiAvailable()) {
+    throw new Error('Gemini API is not configured');
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY not found');
+  }
+
+  const genAI = new GoogleGenAI({ apiKey });
+
+  console.log('[GeminiSketch] Generating drawing guide for:', input.character_name);
+
+  // Step 1: Ask Gemini to break down the drawing into steps
+  const stepsData = await generateDrawingSteps(genAI, input);
+
+  // Step 2: Generate sketch images for each step
+  const stepsWithImages = await generateStepImages(genAI, stepsData.steps, input);
+
+  // Step 3: Generate final preview sketch
+  const previewUrl = await generateFinalPreview(genAI, input, stepsData.steps);
+
+  return {
+    sketch_preview_url: previewUrl,
+    steps: stepsWithImages,
+    character_description: `${input.character_name} the ${input.character_type}`,
+  };
+}
+
+/**
+ * Ask Gemini to break down the character into drawing steps
+ */
+async function generateDrawingSteps(
+  genAI: GoogleGenAI,
+  input: SketchGuideInput
+): Promise<{ steps: DrawingStep[] }> {
+  const prompt = `You are a children's art teacher helping kids learn to draw.
+
+Break down how to draw a "${input.character_type}" named "${input.character_name}" into 3-6 simple steps for a 7-year-old child.
+
+Additional details: ${input.additional_details || 'none'}
+
+RULES:
+- Use 3-6 steps (choose based on complexity - simpler characters use fewer steps)
+- Maximum 6 steps
+- Each step should be ONE sentence, max 15 words
+- Use simple, encouraging language
+- Focus on basic shapes first (circles, ovals, triangles, rectangles)
+- Build complexity gradually
+- Be specific about what to draw, not just "add details"
+- Use kid-friendly terms (not technical art terms)
+
+EXAMPLES OF GOOD STEPS:
+✓ "Draw a big oval for the body"
+✓ "Add a smaller circle on top for the head"
+✓ "Draw two triangle wings on each side"
+✓ "Add two dots for eyes and a smile"
+
+EXAMPLES OF BAD STEPS:
+✗ "Add anatomical proportions" (too technical)
+✗ "Draw the details" (too vague)
+✗ "Sketch the preliminary outline using light strokes" (too complex)
+
+Return ONLY valid JSON in this EXACT format (no markdown, no code blocks):
+{
+  "steps": [
+    {
+      "step_number": 1,
+      "title": "Draw the Body",
+      "description": "Draw a big oval for the body.",
+      "image_prompt": "Simple black and white line drawing showing ONLY a large oval shape in the center"
+    },
+    {
+      "step_number": 2,
+      "title": "Add the Head",
+      "description": "Add a smaller circle on top for the head.",
+      "image_prompt": "Simple black and white line drawing showing a large oval body with a smaller circle on top for the head"
+    }
+  ]
+}`;
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
+    console.log('[GeminiSketch] Raw Gemini response:', text.substring(0, 200));
+
+    // Clean up response (remove markdown code blocks if present)
+    let cleanedText = text.trim();
+    cleanedText = cleanedText.replace(/^```json\s*/i, '');
+    cleanedText = cleanedText.replace(/^```\s*/i, '');
+    cleanedText = cleanedText.replace(/\s*```$/i, '');
+    cleanedText = cleanedText.trim();
+
+    const data = JSON.parse(cleanedText);
+
+    // Validate response
+    if (!data.steps || !Array.isArray(data.steps)) {
+      throw new Error('Invalid response: missing steps array');
+    }
+
+    if (data.steps.length < 3 || data.steps.length > 6) {
+      throw new Error(`Invalid step count: ${data.steps.length} (must be 3-6)`);
+    }
+
+    // Validate each step
+    data.steps.forEach((step: DrawingStep, index: number) => {
+      if (!step.step_number || !step.title || !step.description || !step.image_prompt) {
+        throw new Error(`Invalid step at index ${index}: missing required fields`);
+      }
+    });
+
+    console.log('[GeminiSketch] Generated', data.steps.length, 'steps');
+    return data;
+  } catch (error) {
+    console.error('[GeminiSketch] Error generating steps:', error);
+    throw new Error(`Failed to generate drawing steps: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Generate sketch images for each step using Gemini Imagen
+ */
+async function generateStepImages(
+  genAI: GoogleGenAI,
+  steps: DrawingStep[],
+  input: SketchGuideInput
+): Promise<Array<{
+  step_number: number;
+  title: string;
+  description: string;
+  image_url: string;
+}>> {
+  console.log('[GeminiSketch] Generating images for', steps.length, 'steps');
+
+  const stepsWithImages = await Promise.all(
+    steps.map(async (step) => {
+      try {
+        const enhancedPrompt = `${step.image_prompt}
+
+Style requirements:
+- Simple black and white line drawing
+- Sketch style, hand-drawn look
+- Clean, bold lines (like a coloring book)
+- No shading, no colors, no gradients
+- White background
+- Educational drawing guide style
+- Kid-friendly and easy to copy
+- Large, clear shapes
+- High contrast (pure black lines on pure white)`;
+
+        const imageUrl = await generateSketchImage(genAI, enhancedPrompt);
+
+        console.log('[GeminiSketch] Generated image for step', step.step_number);
+
+        return {
+          step_number: step.step_number,
+          title: step.title,
+          description: step.description,
+          image_url: imageUrl,
+        };
+      } catch (error) {
+        console.error(`[GeminiSketch] Error generating image for step ${step.step_number}:`, error);
+        throw new Error(`Failed to generate image for step ${step.step_number}`);
+      }
+    })
+  );
+
+  return stepsWithImages;
+}
+
+/**
+ * Generate final preview sketch (complete character)
+ */
+async function generateFinalPreview(
+  genAI: GoogleGenAI,
+  input: SketchGuideInput,
+  steps: DrawingStep[]
+): Promise<string> {
+  console.log('[GeminiSketch] Generating final preview sketch');
+
+  const allDetails = [
+    input.character_type,
+    input.additional_details,
+  ].filter(Boolean).join(', ');
+
+  const prompt = `Simple black and white line drawing sketch of a complete ${input.character_type} named ${input.character_name}.
+
+Character details: ${allDetails}
+
+Style requirements:
+- Simple black and white line drawing
+- Sketch style, hand-drawn look
+- Clean, bold lines (like a coloring book)
+- No shading, no colors, no gradients
+- White background
+- Show the complete character with all features from the drawing steps
+- Kid-friendly and easy to copy
+- High contrast (pure black lines on pure white)`;
+
+  const imageUrl = await generateSketchImage(genAI, prompt);
+
+  console.log('[GeminiSketch] Generated final preview');
+
+  return imageUrl;
+}
+
+/**
+ * Generate a single sketch image using Gemini Imagen
+ */
+async function generateSketchImage(
+  genAI: GoogleGenAI,
+  prompt: string
+): Promise<string> {
+  try {
+    const model = genAI.getGenerativeModel({
+      model: 'imagen-3.0-generate-001',
+    });
+
+    const result = await model.generateImages({
+      prompt,
+      numberOfImages: 1,
+      config: {
+        aspectRatio: '1:1', // Square images for consistency
+        outputFormat: 'image/png',
+      },
+    });
+
+    if (!result.images || result.images.length === 0) {
+      throw new Error('No images generated');
+    }
+
+    // Return as base64 data URL
+    const imageData = result.images[0];
+    const base64 = Buffer.from(imageData).toString('base64');
+    return `data:image/png;base64,${base64}`;
+  } catch (error) {
+    console.error('[GeminiSketch] Error generating image:', error);
+    throw new Error(`Image generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Check if sketch generation is available
+ */
+export function isSketchServiceAvailable(): boolean {
+  return isGeminiAvailable() && !!process.env.GEMINI_API_KEY;
+}

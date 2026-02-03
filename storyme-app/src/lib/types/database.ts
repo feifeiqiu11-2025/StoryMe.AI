@@ -29,6 +29,9 @@ export interface CharacterLibrary {
   // Animated Preview (Gemini-generated 3D Pixar-style version)
   animated_preview_url?: string;
 
+  // Simple Sketch (Gemini-generated learning sketch)
+  sketch_image_url?: string;
+
   // Description Fields
   hair_color?: string;
   skin_tone?: string;

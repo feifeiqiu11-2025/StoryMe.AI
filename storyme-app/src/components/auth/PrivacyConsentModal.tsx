@@ -77,15 +77,15 @@ export default function PrivacyConsentModal({
                   <ul className="text-sm text-gray-700 space-y-1">
                     <li className="flex items-start gap-2">
                       <span className="text-purple-600 mt-0.5">•</span>
-                      <span>We use fal.ai to generate personalized story illustrations</span>
+                      <span>We use Google Gemini and OpenAI to generate personalized story illustrations</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-purple-600 mt-0.5">•</span>
-                      <span>Your photos are temporarily sent to fal.ai only for image generation</span>
+                      <span>Your photos are temporarily sent to AI services only for image generation</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-purple-600 mt-0.5">•</span>
-                      <span>fal.ai does not permanently store your photos after generation</span>
+                      <span>AI providers do not permanently store your photos after generation</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-purple-600 mt-0.5">•</span>
@@ -120,18 +120,32 @@ export default function PrivacyConsentModal({
               </div>
             </div>
 
-            {/* Consent Checkbox */}
-            <div className="bg-gray-50 rounded-lg p-4 border-2 border-gray-300">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={consentChecked}
-                  onChange={(e) => setConsentChecked(e.target.checked)}
-                  className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                  disabled={loading}
-                />
-                <span className="text-sm text-gray-700 flex-1">
-                  I understand and consent to KindleWood Studio's data practices. I have read the{' '}
+            {/* Consent Checkbox - Made more visible */}
+            <div className="bg-white rounded-lg p-5 border-2 border-blue-300 shadow-sm">
+              <label className="flex items-start gap-4 cursor-pointer group">
+                <div className="flex-shrink-0 pt-0.5 relative inline-flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={consentChecked}
+                    onChange={(e) => setConsentChecked(e.target.checked)}
+                    className="peer w-6 h-6 appearance-none bg-white border-2 border-gray-400 rounded cursor-pointer checked:bg-blue-600 checked:border-blue-600 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    disabled={loading}
+                  />
+                  <svg
+                    className="absolute w-4 h-4 left-1 top-1 pointer-events-none hidden peer-checked:block text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+                <span className="text-sm text-gray-800 flex-1 leading-relaxed">
+                  <span className="font-semibold text-gray-900">Required:</span> I understand and consent to KindleWood Studio's data practices. I have read the{' '}
                   <Link
                     href="/privacy"
                     target="_blank"
@@ -150,6 +164,14 @@ export default function PrivacyConsentModal({
                   .
                 </span>
               </label>
+              {!consentChecked && (
+                <div className="mt-3 ml-10 text-xs text-orange-600 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  Please check the box above to continue
+                </div>
+              )}
             </div>
           </div>
         </div>

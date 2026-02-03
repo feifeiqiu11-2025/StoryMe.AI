@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Character, SubjectType } from '@/lib/types/story';
 import Link from 'next/link';
 import Image from 'next/image';
+import { SketchStep } from '@/components/characters/SketchGuideViewer';
 
 const CHARACTERS_STORAGE_KEY = 'storyme_character_library';
 
@@ -103,6 +104,14 @@ export default function CharactersPage() {
   const [selectedStyle, setSelectedStyle] = useState<'pixar' | 'classic' | null>(null);
   // Detected subject type from AI (for image mode)
   const [detectedSubjectType, setDetectedSubjectType] = useState<SubjectType | null>(null);
+  // Sketch guide state
+  const [sketchGuideData, setSketchGuideData] = useState<{
+    guide_image_url: string;
+    steps: SketchStep[];
+    character_description: string;
+  } | null>(null);
+  const [isGeneratingSketch, setIsGeneratingSketch] = useState(false);
+  const [sketchError, setSketchError] = useState<string | null>(null);
 
   // Load characters from database
   const loadCharacters = async (userId: string) => {
@@ -125,6 +134,7 @@ export default function CharactersPage() {
           fileName: char.reference_image_filename || '',
         },
         animatedPreviewUrl: char.animated_preview_url || undefined,
+        sketchImageUrl: char.sketch_image_url || undefined,
         description: {
           hairColor: char.hair_color,
           skinTone: char.skin_tone,
@@ -215,6 +225,19 @@ export default function CharactersPage() {
         setPreviewOptions({ pixar: null, classic: null });
         setSelectedStyle(null);
       }
+      // Restore sketch if character has one
+      if (character.sketchImageUrl) {
+        setSketchGuideData({
+          guide_image_url: character.sketchImageUrl,
+          steps: [],
+          character_description: '',
+        });
+        setSketchError(null);
+      } else {
+        setSketchGuideData(null);
+        setSketchError(null);
+      }
+      setPreviewError(null);
     } else {
       setEditingCharacter(null);
       setCharacterMode('photo');
@@ -232,8 +255,10 @@ export default function CharactersPage() {
       });
       setPreviewOptions({ pixar: null, classic: null });
       setSelectedStyle(null);
+      setPreviewError(null);
+      setSketchGuideData(null);
+      setSketchError(null);
     }
-    setPreviewError(null);
     setShowNewCharacterForm(true);
   };
 
@@ -247,6 +272,8 @@ export default function CharactersPage() {
     setSelectedStyle(null);
     setCharacterMode('photo');
     setDetectedSubjectType(null);
+    setSketchGuideData(null);
+    setSketchError(null);
     setFormData({
       name: '',
       hairColor: '',
@@ -365,6 +392,58 @@ export default function CharactersPage() {
     }
   };
 
+  // Generate sketch guide for drawing tutorial
+  const generateSketchGuide = async () => {
+    if (!formData.name || !formData.characterType) {
+      setSketchError('Name and character type are required');
+      return;
+    }
+
+    setIsGeneratingSketch(true);
+    setSketchError(null);
+
+    try {
+      const response = await fetch('/api/characters/sketch-guide', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          character_name: formData.name.trim(),
+          character_type: formData.characterType.trim(),
+          additional_details: formData.otherFeatures || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      console.log('[Client] Sketch guide response:', data);
+      console.log('[Client] Image URL length:', data.data?.guide_image_url?.length);
+      console.log('[Client] Image URL preview:', data.data?.guide_image_url?.substring(0, 100));
+
+      // Test if the base64 image is valid by trying to load it
+      if (data.success && data.data?.guide_image_url) {
+        const testImg = document.createElement('img');
+        testImg.onload = () => {
+          console.log('[Client] ✅ Image loaded successfully! Dimensions:', testImg.width, 'x', testImg.height);
+        };
+        testImg.onerror = (e) => {
+          console.error('[Client] ❌ Image failed to load!', e);
+          console.error('[Client] Problematic URL (first 200 chars):', data.data.guide_image_url.substring(0, 200));
+        };
+        testImg.src = data.data.guide_image_url;
+
+        setSketchGuideData(data.data);
+        console.log('[Client] Sketch guide data set successfully');
+      } else {
+        setSketchError(data.error?.message || 'Failed to generate sketch guide');
+      }
+    } catch (err: any) {
+      console.error('Sketch guide generation error:', err);
+      setSketchError(err.message || 'Failed to generate sketch guide');
+    } finally {
+      setIsGeneratingSketch(false);
+    }
+  };
+
   // Handle style selection
   const handleSelectStyle = (style: 'pixar' | 'classic') => {
     const imageUrl = style === 'pixar' ? previewOptions.pixar : previewOptions.classic;
@@ -375,15 +454,16 @@ export default function CharactersPage() {
   };
 
   // Upload animated preview to Supabase storage
-  const uploadPreviewToStorage = async (dataUrl: string, userId: string): Promise<string> => {
+  const uploadPreviewToStorage = async (dataUrl: string, userId: string, imageType: 'preview' | 'sketch' = 'preview'): Promise<string> => {
     const supabase = createClient();
 
     // Convert data URL to blob
     const response = await fetch(dataUrl);
     const blob = await response.blob();
 
-    // Create file path
-    const fileName = `${userId}/animated-preview-${Date.now()}.png`;
+    // Create file path based on image type
+    const prefix = imageType === 'sketch' ? 'sketch' : 'animated-preview';
+    const fileName = `${userId}/${prefix}-${Date.now()}.png`;
 
     // Upload to Supabase storage
     const { error: uploadError } = await supabase.storage
@@ -394,7 +474,7 @@ export default function CharactersPage() {
       });
 
     if (uploadError) {
-      throw new Error(`Failed to upload preview: ${uploadError.message}`);
+      throw new Error(`Failed to upload ${imageType}: ${uploadError.message}`);
     }
 
     // Get public URL
@@ -543,6 +623,12 @@ export default function CharactersPage() {
         finalPreviewUrl = await uploadPreviewToStorage(formData.animatedPreviewUrl, user.id);
       }
 
+      // Upload sketch image if it exists and is a data URL
+      let finalSketchUrl = sketchGuideData?.guide_image_url || null;
+      if (sketchGuideData?.guide_image_url && sketchGuideData.guide_image_url.startsWith('data:')) {
+        finalSketchUrl = await uploadPreviewToStorage(sketchGuideData.guide_image_url, user.id, 'sketch');
+      }
+
       // For description-only mode, store character type in other_features
       const otherFeatures = characterMode === 'description'
         ? `${formData.characterType}${formData.otherFeatures ? ` - ${formData.otherFeatures}` : ''}`
@@ -564,6 +650,7 @@ export default function CharactersPage() {
         reference_image_url: characterMode === 'photo' ? (formData.imageUrl || null) : null,
         reference_image_filename: characterMode === 'photo' ? (formData.imageFileName || null) : null,
         animated_preview_url: finalPreviewUrl,
+        sketch_image_url: finalSketchUrl,
         hair_color: isHuman ? (formData.hairColor || null) : null,
         skin_tone: isHuman ? (formData.skinTone || null) : null,
         clothing: isHuman ? (formData.clothing || null) : null,
@@ -680,7 +767,7 @@ export default function CharactersPage() {
 
         {/* Character Form Modal */}
         {showNewCharacterForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">
@@ -767,8 +854,41 @@ export default function CharactersPage() {
 
                 {/* Character Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                     Character Name *
+                    {characterMode === 'description' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!formData.name || !formData.characterType) {
+                            setSketchError('Please fill in Character Name and Type first');
+                            return;
+                          }
+                          generateSketchGuide();
+                        }}
+                        disabled={isGeneratingSketch}
+                        className="group relative inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        aria-label="Generate simple sketch for learning"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          className="w-3.5 h-3.5"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM8.94 6.94a.75.75 0 11-1.061-1.061 3 3 0 112.871 5.026v.345a.75.75 0 01-1.5 0v-.5c0-.72.57-1.172 1.081-1.287A1.5 1.5 0 108.94 6.94zM10 15a1 1 0 100-2 1 1 0 000 2z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                          Want to learn how to draw this?<br />
+                          <span className="text-gray-300">Click to generate a simple sketch!</span>
+                          <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></span>
+                        </span>
+                      </button>
+                    )}
                   </label>
                   <input
                     type="text"
@@ -999,8 +1119,15 @@ export default function CharactersPage() {
                   </div>
                 )}
 
-                {/* Character Preview Section - Now supports both modes */}
-                {(characterMode === 'photo' ? formData.imageUrl : formData.characterType) && (
+                {/* Show sketch error if any */}
+                {sketchError && (
+                  <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 mt-4">
+                    {sketchError}
+                  </div>
+                )}
+
+                {/* Character Preview Section - Always show in description mode, conditionally in photo mode */}
+                {(characterMode === 'description' || (characterMode === 'photo' && formData.imageUrl)) && (
                   <div className="border-t border-gray-200 pt-4 mt-4">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-semibold text-gray-900">Character Preview</h3>
@@ -1019,21 +1146,53 @@ export default function CharactersPage() {
                         <p className="text-xs text-gray-400 mt-1">This takes 15-30 seconds</p>
                       </div>
                     ) : formData.animatedPreviewUrl && previewOptions.pixar === previewOptions.classic ? (
-                      /* Editing existing character - show Reference vs Saved Animated side by side */
+                      /* Editing existing character - 2 columns: Left (Sketch or loading) | Right (Saved Animated) */
                       <div className="grid grid-cols-2 gap-4">
-                        {/* Reference Photo */}
+                        {/* Left: Simple Sketch (or loading, or reference photo) */}
                         <div className="text-center">
-                          <p className="text-sm font-medium text-gray-700 mb-2">Reference Photo</p>
-                          <div className="bg-gray-50 rounded-xl overflow-hidden aspect-square border border-gray-200">
-                            <img
-                              src={formData.imageUrl}
-                              alt="Reference"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
+                          <p className="text-sm font-medium text-blue-700 mb-2">
+                            {isGeneratingSketch || sketchGuideData ? 'ℹ️ Simple Sketch' : (characterMode === 'photo' ? 'Reference Photo' : 'Character')}
+                          </p>
+
+                          {isGeneratingSketch ? (
+                            <div className="bg-blue-50 rounded-xl aspect-square flex items-center justify-center border-2 border-blue-300">
+                              <div className="text-center">
+                                <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
+                                <p className="text-blue-600 font-medium text-sm">Generating sketch...</p>
+                                <p className="text-xs text-blue-400 mt-1">~5 seconds</p>
+                              </div>
+                            </div>
+                          ) : sketchGuideData ? (
+                            <div className="bg-blue-50 rounded-xl overflow-hidden aspect-square border-2 border-blue-300">
+                              <img
+                                src={sketchGuideData.guide_image_url}
+                                alt="Simple sketch for learning"
+                                className="w-full h-full object-contain p-2"
+                              />
+                            </div>
+                          ) : characterMode === 'photo' && formData.imageUrl ? (
+                            <div className="bg-gray-50 rounded-xl overflow-hidden aspect-square border border-gray-200">
+                              <img
+                                src={formData.imageUrl}
+                                alt="Reference"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl aspect-square flex items-center justify-center border border-blue-200">
+                              <div className="text-center p-4">
+                                <div className="text-4xl mb-2">ℹ️</div>
+                                <p className="text-sm font-medium text-gray-700">{formData.characterType || 'Character'}</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {sketchGuideData && (
+                            <p className="text-xs text-gray-500 mt-1">Learn to draw!</p>
+                          )}
                         </div>
 
-                        {/* Saved Animated Preview */}
+                        {/* Right: Saved Animated Preview */}
                         <div className="text-center">
                           <p className="text-sm font-medium text-gray-700 mb-2">Animated Preview</p>
                           <div className="bg-purple-50 rounded-xl overflow-hidden aspect-square border-2 border-purple-300">
@@ -1046,10 +1205,61 @@ export default function CharactersPage() {
                         </div>
                       </div>
                     ) : (previewOptions.pixar || previewOptions.classic) && previewOptions.pixar !== previewOptions.classic ? (
-                      /* Freshly generated - show both style options for selection */
+                      /* Freshly generated - show style selection with sketch on left */
                       <div className="space-y-4">
-                        <p className="text-sm font-medium text-gray-700">Choose your preferred style:</p>
                         <div className="grid grid-cols-2 gap-4">
+                          {/* Left: Simple Sketch (or loading) */}
+                          <div className="text-center">
+                            <p className="text-sm font-medium text-blue-700 mb-2">
+                              {isGeneratingSketch || sketchGuideData ? 'ℹ️ Simple Sketch' : 'Character'}
+                            </p>
+
+                            {isGeneratingSketch ? (
+                              <div className="bg-blue-50 rounded-xl aspect-square flex items-center justify-center border-2 border-blue-300">
+                                <div className="text-center">
+                                  <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
+                                  <p className="text-blue-600 font-medium text-sm">Generating sketch...</p>
+                                  <p className="text-xs text-blue-400 mt-1">~5 seconds</p>
+                                </div>
+                              </div>
+                            ) : sketchGuideData ? (
+                              <div className="bg-blue-50 rounded-xl overflow-hidden aspect-square border-2 border-blue-300">
+                                <img
+                                  src={sketchGuideData.guide_image_url}
+                                  alt="Simple sketch for learning"
+                                  className="w-full h-full object-contain p-2"
+                                />
+                              </div>
+                            ) : (
+                              <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl aspect-square flex items-center justify-center border border-blue-200">
+                                <div className="text-center p-4">
+                                  <p className="text-sm font-medium text-gray-700">{formData.characterType || 'Character type'}</p>
+                                  <p className="text-xs text-gray-500 mt-2">Click ℹ️ next to name<br/>to generate sketch</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {sketchGuideData && (
+                              <p className="text-xs text-gray-500 mt-1">Learn to draw!</p>
+                            )}
+                          </div>
+
+                          {/* Right: Style selection placeholder */}
+                          <div className="text-center">
+                            <p className="text-sm font-medium text-gray-700 mb-2">Choose Style Below ↓</p>
+                            <div className="bg-gradient-to-br from-purple-50 to-amber-50 rounded-xl aspect-square flex items-center justify-center border-2 border-dashed border-gray-300">
+                              <div className="text-center text-gray-400">
+                                <div className="text-3xl mb-2">👇</div>
+                                <p className="text-xs">Select Pixar or Classic</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Style selection grid below */}
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-3">Choose your preferred style:</p>
+                          <div className="grid grid-cols-2 gap-4">
                           {/* 3D Pixar Option */}
                           <div
                             className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
@@ -1126,60 +1336,105 @@ export default function CharactersPage() {
                             )}
                           </div>
                         </div>
+                        </div>
                       </div>
                     ) : (
-                      /* Initial state - no previews yet, show reference or description placeholder */
+                      /* Initial state - 2 clickable boxes: Left (Sketch) | Right (Animated Preview) */
                       <div className="grid grid-cols-2 gap-4">
-                        {/* Reference Photo or Character Type */}
+                        {/* Left: Simple Sketch - CLICKABLE */}
                         <div className="text-center">
-                          <p className="text-sm font-medium text-gray-700 mb-2">
-                            {characterMode === 'photo' ? 'Reference Photo' : 'Character Type'}
+                          <p className="text-sm font-medium text-blue-700 mb-2">
+                            {isGeneratingSketch || sketchGuideData ? 'ℹ️ Simple Sketch' : 'Simple Sketch'}
                           </p>
-                          {characterMode === 'photo' ? (
-                            <div className="bg-gray-50 rounded-xl overflow-hidden aspect-square border border-gray-200">
-                              <img
-                                src={formData.imageUrl}
-                                alt="Reference"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          ) : (
-                            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl aspect-square flex items-center justify-center border border-blue-200">
-                              <div className="text-center p-4">
-                                <div className="text-4xl mb-2">🦅</div>
-                                <p className="text-sm font-medium text-gray-700">{formData.characterType || 'Enter type above'}</p>
+
+                          {/* Loading state while generating sketch */}
+                          {isGeneratingSketch ? (
+                            <div className="bg-blue-50 rounded-xl aspect-square flex items-center justify-center border-2 border-blue-300">
+                              <div className="text-center">
+                                <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
+                                <p className="text-blue-600 font-medium text-sm">Generating sketch...</p>
+                                <p className="text-xs text-blue-400 mt-1">~5 seconds</p>
                               </div>
                             </div>
+                          ) : sketchGuideData ? (
+                            /* Sketch generated - clickable to regenerate */
+                            <button
+                              type="button"
+                              onClick={() => generateSketchGuide()}
+                              className="w-full aspect-square border-2 border-gray-300 hover:border-blue-400 rounded-xl p-4 bg-white transition-colors cursor-pointer"
+                            >
+                              <img
+                                key={sketchGuideData.guide_image_url}
+                                src={sketchGuideData.guide_image_url}
+                                alt="Simple sketch for learning"
+                                className="w-full h-full object-contain pointer-events-none"
+                              />
+                            </button>
+                          ) : (
+                            /* No sketch yet - clickable to generate */
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!formData.name || !formData.characterType) {
+                                  setSketchError('Please fill in Character Name and Type first');
+                                  return;
+                                }
+                                generateSketchGuide();
+                              }}
+                              disabled={isGeneratingSketch || !formData.name || !formData.characterType}
+                              className="w-full aspect-square border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-xl flex items-center justify-center bg-gray-50 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                            >
+                              <div className="text-center p-4">
+                                <div className="text-5xl mb-3">✏️</div>
+                                <p className="text-base font-bold text-gray-900 mb-2">{formData.characterType || 'Character type'}</p>
+                                <p className="text-sm text-blue-600 font-medium">Click to Generate</p>
+                              </div>
+                            </button>
+                          )}
+
+                          {sketchGuideData && (
+                            <p className="text-xs text-gray-500 mt-1">Learn to draw!</p>
+                          )}
+                          {sketchError && (
+                            <p className="text-xs text-red-600 mt-1">{sketchError}</p>
                           )}
                         </div>
 
-                        {/* Animated Preview placeholder */}
+                        {/* Right: Animated Preview - CLICKABLE */}
                         <div className="text-center">
-                          <p className="text-sm font-medium text-gray-700 mb-2">Animated Preview</p>
-                          <div className="bg-gradient-to-br from-purple-50 to-amber-50 rounded-xl aspect-square flex items-center justify-center border-2 border-dashed border-purple-200">
-                            <div className="text-center text-gray-400">
-                              <div className="text-3xl mb-2">✨</div>
-                              <p className="text-xs">Click button below</p>
-                              <p className="text-xs">to generate</p>
+                          <p className="text-sm font-medium text-purple-700 mb-2">Animated Preview</p>
+
+                          {generatingPreview ? (
+                            /* Loading state */
+                            <div className="bg-purple-50 rounded-xl aspect-square flex items-center justify-center border-2 border-purple-300">
+                              <div className="text-center">
+                                <div className="w-10 h-10 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-3"></div>
+                                <p className="text-purple-600 font-medium text-sm">Generating styles...</p>
+                                <p className="text-xs text-purple-400 mt-1">~10 seconds</p>
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            /* CLICKABLE BOX to generate or regenerate */
+                            <button
+                              type="button"
+                              onClick={handleGeneratePreview}
+                              disabled={generatingPreview || (characterMode === 'photo' ? !formData.imageUrl : !formData.characterType)}
+                              className="bg-gradient-to-br from-purple-50 to-amber-50 rounded-xl aspect-square flex items-center justify-center border-2 border-dashed border-purple-300 hover:border-purple-500 hover:from-purple-100 hover:to-amber-100 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed group w-full"
+                            >
+                              <div className="text-center p-4">
+                                <div className="text-5xl mb-3 group-hover:scale-110 transition-transform">✨</div>
+                                <p className="text-base font-bold text-gray-900 mb-2">
+                                  {(previewOptions.pixar || previewOptions.classic) ? 'Preview Styles' : 'Preview Styles'}
+                                </p>
+                                <p className="text-sm text-purple-600 font-bold group-hover:text-purple-700">
+                                  {(previewOptions.pixar || previewOptions.classic) ? 'Click to Regenerate' : 'Click to Generate'}
+                                </p>
+                              </div>
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
-
-                    {/* Generate Button - name validation moved to save */}
-                    <button
-                      type="button"
-                      onClick={handleGeneratePreview}
-                      disabled={generatingPreview || (characterMode === 'photo' ? !formData.imageUrl : !formData.characterType)}
-                      className="mt-4 px-6 py-2 bg-gradient-to-r from-purple-600 to-amber-500 text-white rounded-lg hover:from-purple-700 hover:to-amber-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all"
-                    >
-                      {generatingPreview
-                        ? 'Generating 2 Styles...'
-                        : (previewOptions.pixar || previewOptions.classic)
-                          ? 'Regenerate Styles'
-                          : 'Generate Preview Styles'}
-                    </button>
 
                     {/* Preview Error */}
                     {previewError && (

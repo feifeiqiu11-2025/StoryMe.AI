@@ -528,6 +528,8 @@ export async function generateImageWithGemini({
 
 STYLE: 3D animated Pixar/Disney style, soft rounded features, vibrant colors, large expressive eyes. Square 1:1.
 
+PROPORTIONS: Normal, healthy body proportions - not overly fat or chubby. If "big" is mentioned, interpret as LARGE/TALL in size, NOT fat. Maintain natural proportions for the species/character type.
+
 IMPORTANT:
 - Generate an ILLUSTRATED 3D animated image, NOT a photograph
 - Reference photos show face/hair features only - transform into cute 3D animated characters
@@ -737,6 +739,8 @@ export async function generateImageWithGeminiClassic({
   const fullPrompt = `Create a 2D children's book illustration: ${sceneDescription}
 
 STYLE: Modern 2D digital cartoon, vibrant saturated colors, smooth cel-shading, large glossy expressive eyes, soft warm lighting, clean polished style. Square 1:1.
+
+PROPORTIONS: Normal, healthy body proportions - not overly fat or chubby. If "big" is mentioned, interpret as LARGE/TALL in size, NOT fat. Maintain natural proportions for the species/character type.
 
 IMPORTANT:
 - Generate a DIGITAL ILLUSTRATION, NOT a photograph, NOT watercolor
@@ -1279,6 +1283,10 @@ export async function generateCharacterPreview({
   // Build minimal character description as fallback
   const charDesc = buildMinimalCharacterDescription(name, description);
 
+  // Check if description mentions chubby/plump/round body type
+  const hasChubbyDescription = description ?
+    /\b(chubby|plump|round|fat|chunky|pudgy|stocky|big)\b/i.test(description) : false;
+
   // Portrait-focused prompt for character preview
   const fullPrompt = `Create a 3D animated character portrait showing: ${name}
 
@@ -1292,7 +1300,7 @@ export async function generateCharacterPreview({
 
 === ART STYLE ===
 - 3D rendered character portrait (like Pixar, Disney Junior, Cocomelon)
-- Soft, rounded features with warm, flattering lighting
+- ${hasChubbyDescription ? 'Soft, rounded features' : 'Balanced, well-proportioned face and body with normal features'} with warm, flattering lighting
 - Vibrant, cheerful colors
 - Smooth skin textures (not photorealistic)
 - Large expressive eyes typical of animation
@@ -1312,6 +1320,7 @@ export async function generateCharacterPreview({
 4. Face: Recognizable from photo but stylized for 3D animation
 5. Clothing: Simple, neutral casual clothes (this is just a portrait preview)
 6. Expression: Friendly, happy, approachable
+7. ${hasChubbyDescription ? 'Character has a chubby/plump body as described' : 'IMPORTANT: Use normal, balanced proportions - avoid making the face/body overly round or chubby unless specified in description'}
 
 This is a CHARACTER PREVIEW for a children's storybook app. The character should look appealing and kid-friendly.`;
 
@@ -1619,6 +1628,10 @@ export async function generateNonHumanPreview({
   // Build subject-specific rules
   const subjectRules = getSubjectSpecificRules(subjectType);
 
+  // Check if description mentions chubby/plump/round body type
+  const hasChubbyDescription = additionalDetails ?
+    /\b(chubby|plump|round|fat|chunky|pudgy|stocky|big)\b/i.test(additionalDetails) : false;
+
   // Build the prompt for non-human subjects
   const fullPrompt = `Create a 3D animated illustration of the subject in this reference image.
 
@@ -1635,7 +1648,7 @@ ${additionalDetails ? `- Additional details: ${additionalDetails}` : ''}
 
 === ART STYLE ===
 - 3D rendered illustration (like Pixar, Disney Junior, Cocomelon)
-- Soft, rounded features with warm, flattering lighting
+- ${hasChubbyDescription ? 'Soft, rounded features' : 'Balanced, well-proportioned body with normal features'} with warm, flattering lighting
 - Vibrant, cheerful colors
 - Large expressive features typical of animation
 - Friendly, approachable appearance
@@ -1647,6 +1660,7 @@ ${additionalDetails ? `- Additional details: ${additionalDetails}` : ''}
 2. Keep distinctive features (wings, horns, shape, patterns)
 3. Keep the mood/personality (friendly, scary, cute, majestic)
 4. Make it suitable for children's storybook
+5. ${hasChubbyDescription ? 'Character has a chubby/plump body as described' : 'IMPORTANT: Use normal, balanced proportions - avoid making overly round or chubby unless specified'}
 ${subjectRules}
 
 === DO NOT ===
@@ -1654,6 +1668,7 @@ ${subjectRules}
 - Change the fundamental nature of the subject
 - Add human features to non-human subjects
 - Make it scary or inappropriate for children
+- ${!hasChubbyDescription ? 'Make the character overly round, chubby, or excessively plump' : ''}
 
 This is for a children's storybook app. The result should be appealing, memorable, and kid-friendly.`;
 
@@ -1978,6 +1993,10 @@ export async function generateDescriptionOnlyPreview({
   // Use new @google/genai SDK
   const genAI = new GoogleGenAI({ apiKey });
 
+  // Check if description mentions chubby/plump/round body type
+  const hasChubbyDescription = description ?
+    /\b(chubby|plump|round|fat|chunky|pudgy|stocky|big)\b/i.test(description) : false;
+
   // Build description-based prompt for 3D style
   const fullPrompt = `Create a 3D animated character portrait showing: ${name} (a ${characterType})
 
@@ -1989,7 +2008,7 @@ export async function generateDescriptionOnlyPreview({
 
 === ART STYLE ===
 - 3D rendered character portrait (like Pixar, Disney Junior, Cocomelon)
-- Soft, rounded features with warm, flattering lighting
+- ${hasChubbyDescription ? 'Soft, rounded features' : 'Balanced, well-proportioned body with normal features'} with warm, flattering lighting
 - Vibrant, cheerful colors
 - Smooth textures (stylized, not photorealistic)
 - Large expressive eyes typical of animation
@@ -2008,6 +2027,7 @@ export async function generateDescriptionOnlyPreview({
 3. Add personality through expression and pose
 4. Keep colors vibrant and cheerful
 5. Expression: Friendly, happy, approachable
+6. ${hasChubbyDescription ? 'Character has a chubby/plump body as described' : 'IMPORTANT: Use normal, balanced proportions - avoid making the character overly round or chubby unless specified in description'}
 
 This is a CHARACTER PREVIEW for a children's storybook app. The character should look appealing, memorable, and perfect for children's stories.`;
 
@@ -2109,6 +2129,10 @@ export async function generateDescriptionOnlyPreviewClassic({
   // Use new @google/genai SDK
   const genAI = new GoogleGenAI({ apiKey });
 
+  // Check if description mentions chubby/plump/round body type
+  const hasChubbyDescription = description ?
+    /\b(chubby|plump|round|fat|chunky|pudgy|stocky|big)\b/i.test(description) : false;
+
   // Build description-based prompt for Classic 2D style
   const fullPrompt = `Create a 2D illustrated character portrait showing: ${name} (a ${characterType})
 
@@ -2123,6 +2147,7 @@ export async function generateDescriptionOnlyPreviewClassic({
 - Warm golden hour lighting with soft bokeh background
 - Pastel, muted color palette with gentle saturation
 - Large expressive eyes (anime/chibi inspired proportions)
+- ${hasChubbyDescription ? 'Soft, rounded body shape' : 'Balanced, well-proportioned body with normal features'}
 - Soft edges and dreamy atmosphere
 - Hand-drawn quality, not computer generated look
 - Nostalgic, cozy, heartwarming feeling
@@ -2141,6 +2166,7 @@ export async function generateDescriptionOnlyPreviewClassic({
 4. Keep colors warm and gentle (watercolor feel)
 5. Expression: Friendly, happy, gentle
 6. MUST BE 2D ILLUSTRATED - not 3D rendered
+7. ${hasChubbyDescription ? 'Character has a chubby/plump body as described' : 'IMPORTANT: Use normal, balanced proportions - avoid making the character overly round or chubby unless specified in description'}
 
 This is a CHARACTER PREVIEW for a children's storybook app. The style should feel warm, nostalgic, and like a classic children's book illustration.`;
 
@@ -2301,6 +2327,8 @@ EDIT REQUEST: ${editInstruction}
 ${sceneDescription ? `SCENE CONTEXT: ${sceneDescription}` : ''}
 
 STYLE TO MAINTAIN: ${styleDescription}
+
+PROPORTIONS TO MAINTAIN: Normal, healthy body proportions - not overly fat or chubby. If "big" is mentioned, interpret as LARGE/TALL in size, NOT fat. Maintain natural proportions for the species/character type.
 
 IMPORTANT RULES:
 - Apply ONLY the requested edit

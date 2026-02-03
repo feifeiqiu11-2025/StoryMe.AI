@@ -113,6 +113,7 @@ export interface Character {
     fileName: string;
   };
   animatedPreviewUrl?: string; // Gemini-generated 3D Pixar-style preview
+  sketchImageUrl?: string; // Gemini-generated simple sketch for learning
   description: CharacterDescription;
   isPrimary: boolean; // Primary character uses reference image in generation
   order: number; // Display order

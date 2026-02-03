@@ -13,18 +13,32 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { SketchGuideViewer, SketchStep } from '@/components/characters/SketchGuideViewer';
 
 type PreviewStatus = 'idle' | 'generating' | 'ready' | 'error';
 type CharacterMode = 'photo' | 'description';
 type SelectedStyle = 'pixar' | 'classic';
+type ViewMode = 'create' | 'sketch-preview' | 'sketch-guide';
 
 export default function NewCharacterPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // View mode: create form, sketch preview, or sketch guide
+  const [viewMode, setViewMode] = useState<ViewMode>('create');
+
   // Character mode: photo-based or description-only
   const [characterMode, setCharacterMode] = useState<CharacterMode>('photo');
+
+  // Sketch guide state
+  const [sketchGuideData, setSketchGuideData] = useState<{
+    sketch_preview_url: string;
+    steps: SketchStep[];
+    character_description: string;
+  } | null>(null);
+  const [isGeneratingSketch, setIsGeneratingSketch] = useState(false);
+  const [sketchError, setSketchError] = useState<string | null>(null);
 
   // Photo-based mode state
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -251,6 +265,50 @@ export default function NewCharacterPage() {
     }
   };
 
+  // Generate sketch guide for "From Description" mode
+  const generateSketchGuide = async () => {
+    if (!name.trim() || !characterType.trim()) {
+      setSketchError('Please provide a name and character type first');
+      return;
+    }
+
+    setIsGeneratingSketch(true);
+    setSketchError(null);
+
+    try {
+      const response = await fetch('/api/characters/sketch-guide', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          character_name: name.trim(),
+          character_type: characterType.trim(),
+          additional_details: otherFeatures || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to generate drawing guide');
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSketchGuideData(data.data);
+        setViewMode('sketch-preview');
+      } else {
+        throw new Error(data.error?.message || 'Failed to generate drawing guide');
+      }
+    } catch (err) {
+      console.error('Sketch guide generation error:', err);
+      setSketchError(err instanceof Error ? err.message : 'Failed to generate drawing guide');
+    } finally {
+      setIsGeneratingSketch(false);
+    }
+  };
+
   // Get the currently selected preview URL
   const getSelectedPreviewUrl = () => {
     return selectedStyle === 'pixar' ? pixarPreviewUrl : classicPreviewUrl;
@@ -404,6 +462,110 @@ export default function NewCharacterPage() {
     setError(null);
   };
 
+  // Show sketch guide viewer
+  if (viewMode === 'sketch-guide' && sketchGuideData) {
+    return (
+      <SketchGuideViewer
+        sketch_preview_url={sketchGuideData.sketch_preview_url}
+        steps={sketchGuideData.steps}
+        character_description={sketchGuideData.character_description}
+        onBack={() => {
+          setViewMode('sketch-preview');
+        }}
+        onCreateCharacter={() => {
+          // Go back to create form and trigger regular character generation
+          setViewMode('create');
+          generatePreview();
+        }}
+      />
+    );
+  }
+
+  // Show sketch preview (choice between guide or full character)
+  if (viewMode === 'sketch-preview' && sketchGuideData) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Sketch Preview</h1>
+          <p className="mt-2 text-gray-600">
+            Here&apos;s what {name} looks like! Choose what to do next.
+          </p>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          {/* Sketch preview image */}
+          <div className="mb-6">
+            <div className="flex justify-center">
+              <img
+                src={sketchGuideData.sketch_preview_url}
+                alt={`Sketch of ${name}`}
+                className="max-w-md w-full h-auto rounded-lg border-4 border-gray-200"
+              />
+            </div>
+            <p className="text-center text-gray-600 mt-4 text-lg">
+              {sketchGuideData.character_description}
+            </p>
+          </div>
+
+          {/* Action buttons */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+              onClick={() => setViewMode('sketch-guide')}
+              className="min-h-[44px] p-6 border-4 border-purple-500 bg-purple-50 text-purple-900 rounded-lg hover:bg-purple-100 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-purple-500 text-white rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <div className="font-bold text-lg">Show Drawing Guide</div>
+                  <div className="text-sm text-purple-700">
+                    Learn to draw this step-by-step
+                  </div>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => {
+                setViewMode('create');
+                generatePreview();
+              }}
+              className="min-h-[44px] p-6 border-4 border-blue-500 bg-blue-50 text-blue-900 rounded-lg hover:bg-blue-100 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <div className="font-bold text-lg">Create Character</div>
+                  <div className="text-sm text-blue-700">
+                    Generate full animated version
+                  </div>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          <button
+            onClick={() => {
+              setViewMode('create');
+              setSketchGuideData(null);
+            }}
+            className="mt-6 w-full text-gray-600 hover:text-gray-900 underline"
+          >
+            Back to form
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Main character creation form
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
@@ -598,16 +760,56 @@ export default function NewCharacterPage() {
                     <svg className="w-16 h-16 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
-                    <p className="text-sm">Enter a name and character type, then generate preview</p>
+                    <p className="text-sm mb-4">Enter a name and character type, then choose an option below</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={generatePreview}
-                    disabled={!name.trim() || !characterType.trim()}
-                    className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                  >
-                    Generate Preview
-                  </button>
+
+                  {/* Error message for sketch generation */}
+                  {sketchError && (
+                    <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                      {sketchError}
+                    </div>
+                  )}
+
+                  {/* Two options: Drawing Guide or Full Character */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                    {/* Drawing Guide Option */}
+                    <button
+                      type="button"
+                      onClick={generateSketchGuide}
+                      disabled={!name.trim() || !characterType.trim() || isGeneratingSketch}
+                      className="min-h-[44px] p-4 border-2 border-purple-500 bg-purple-50 text-purple-900 rounded-lg hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                        <div>
+                          <div className="font-bold">Drawing Guide</div>
+                          <div className="text-xs text-purple-700">
+                            {isGeneratingSketch ? 'Generating...' : 'Learn to draw step-by-step'}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Full Character Option */}
+                    <button
+                      type="button"
+                      onClick={generatePreview}
+                      disabled={!name.trim() || !characterType.trim() || isGeneratingSketch}
+                      className="min-h-[44px] p-4 border-2 border-blue-500 bg-blue-50 text-blue-900 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                        </svg>
+                        <div>
+                          <div className="font-bold">Full Character</div>
+                          <div className="text-xs text-blue-700">Generate animated version</div>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="text-gray-500">
