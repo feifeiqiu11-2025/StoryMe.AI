@@ -197,6 +197,8 @@ export default function CharactersPage() {
         editingCharacter={editingCharacter}
         mode="library"
         userId={user?.id}
+        userEmail={user?.email}
+        userName={user?.name}
         onReloadCharacters={() => loadCharacters(user.id)}
       />
 

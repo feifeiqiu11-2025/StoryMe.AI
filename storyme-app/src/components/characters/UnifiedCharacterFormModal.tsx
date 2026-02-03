@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Character, SubjectType } from '@/lib/types/story';
 import { createClient } from '@/lib/supabase/client';
 
@@ -61,6 +61,8 @@ interface UnifiedCharacterFormModalProps {
   // Configuration
   mode: 'library' | 'story'; // library: save to DB, story: callback only
   userId?: string; // Required for library mode
+  userEmail?: string; // Optional for library mode (for ensureUserExists)
+  userName?: string; // Optional for library mode (for ensureUserExists)
   onReloadCharacters?: () => Promise<void>; // Required for library mode
 }
 
@@ -84,6 +86,8 @@ export default function UnifiedCharacterFormModal({
   editingCharacter = null,
   mode,
   userId,
+  userEmail,
+  userName,
   onReloadCharacters,
 }: UnifiedCharacterFormModalProps) {
   const [formData, setFormData] = useState<FormData>(() => {
@@ -131,6 +135,74 @@ export default function UnifiedCharacterFormModal({
   const [sketchGuideData, setSketchGuideData] = useState<SketchGuideData | null>(null);
   const [isGeneratingSketch, setIsGeneratingSketch] = useState(false);
   const [sketchError, setSketchError] = useState<string | null>(null);
+
+  // CRITICAL FIX: Restore editing state when editingCharacter changes
+  useEffect(() => {
+    if (editingCharacter) {
+      // Fix Issue #2: Restore character mode based on whether photo exists
+      const isDescriptionOnly = !editingCharacter.referenceImage?.url;
+      setCharacterMode(isDescriptionOnly ? 'description' : 'photo');
+
+      // Fix Issue #4: Parse character type from otherFeatures for description-mode characters
+      let parsedCharacterType = '';
+      let parsedOtherFeatures = editingCharacter.description.otherFeatures || '';
+
+      if (isDescriptionOnly && parsedOtherFeatures) {
+        // Format in DB: "baby eagle - fluffy golden feathers"
+        // Parse back into: characterType="baby eagle", otherFeatures="fluffy golden feathers"
+        const parts = parsedOtherFeatures.split(' - ');
+        if (parts.length > 1) {
+          parsedCharacterType = parts[0];
+          parsedOtherFeatures = parts.slice(1).join(' - ');
+        } else {
+          parsedCharacterType = parsedOtherFeatures;
+          parsedOtherFeatures = '';
+        }
+      }
+
+      // Update form data with parsed values
+      setFormData({
+        name: editingCharacter.name,
+        hairColor: editingCharacter.description.hairColor || '',
+        skinTone: editingCharacter.description.skinTone || '',
+        clothing: editingCharacter.description.clothing || '',
+        age: editingCharacter.description.age || '',
+        otherFeatures: parsedOtherFeatures,
+        imageUrl: editingCharacter.referenceImage?.url || '',
+        imageFileName: editingCharacter.referenceImage?.fileName || '',
+        animatedPreviewUrl: editingCharacter.animatedPreviewUrl || '',
+        characterType: parsedCharacterType,
+      });
+
+      // Fix Issue #3: Restore preview options
+      if (editingCharacter.animatedPreviewUrl) {
+        setPreviewOptions({
+          pixar: editingCharacter.animatedPreviewUrl,
+          classic: editingCharacter.animatedPreviewUrl,
+        });
+        setSelectedStyle('pixar');
+      } else {
+        setPreviewOptions({ pixar: null, classic: null });
+        setSelectedStyle(null);
+      }
+
+      // Fix Issue #1: Restore sketch if exists
+      if (editingCharacter.sketchImageUrl) {
+        setSketchGuideData({
+          guide_image_url: editingCharacter.sketchImageUrl,
+          steps: [],
+          character_description: '',
+        });
+        setSketchError(null);
+      } else {
+        setSketchGuideData(null);
+        setSketchError(null);
+      }
+    } else {
+      // New character - reset to defaults
+      resetForm();
+    }
+  }, [editingCharacter]);
 
   // Reset form when modal opens/closes or editingCharacter changes
   const resetForm = () => {
@@ -441,6 +513,41 @@ export default function UnifiedCharacterFormModal({
   };
 
   /**
+   * Fix Issue #5: Ensure user exists in database before saving character
+   */
+  const ensureUserExists = async (userId: string, email?: string, name?: string) => {
+    const supabase = createClient();
+
+    // Check if user exists
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .single();
+
+    if (existingUser) {
+      return { success: true, created: false };
+    }
+
+    // Create user if doesn't exist
+    const { error } = await supabase
+      .from('users')
+      .insert([{
+        id: userId,
+        email: email || `user-${userId}@storyme.app`,
+        name: name || 'StoryMe User',
+        subscription_tier: 'free'
+      }]);
+
+    if (error && error.code !== '23505') { // Ignore duplicate key error
+      console.error('Error creating user:', error);
+      return { success: false, error };
+    }
+
+    return { success: true, created: true };
+  };
+
+  /**
    * Build fullDescription from form data
    */
   const buildFullDescription = (): string => {
@@ -492,6 +599,11 @@ export default function UnifiedCharacterFormModal({
       }
 
       try {
+        // Fix Issue #5: Ensure user exists in database first
+        console.log('[UnifiedCharacterForm] Ensuring user exists...', { userId, userEmail, userName });
+        const userResult = await ensureUserExists(userId, userEmail, userName);
+        console.log('[UnifiedCharacterForm] User ensure result:', userResult);
+
         const supabase = createClient();
 
         // Upload animated preview if it's a data URL
