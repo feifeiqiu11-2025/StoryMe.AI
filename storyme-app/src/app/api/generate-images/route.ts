@@ -21,7 +21,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { characters, script, artStyle, imageProvider: requestedProvider, illustrationStyle, clothingConsistency: requestedClothingConsistency } = body;
+    const {
+      characters,
+      script,
+      artStyle,
+      imageProvider: requestedProvider,
+      illustrationStyle,
+      clothingConsistency: requestedClothingConsistency,
+      coverMetadata  // NEW: Cover image metadata (title, description, prompt)
+    } = body;
 
     // Determine clothing consistency mode (default to 'consistent')
     const clothingConsistency: ClothingConsistency = requestedClothingConsistency || 'consistent';
@@ -65,13 +73,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse script into scenes with character detection
-    const scenes = parseScriptIntoScenes(script, characters);
+    let scenes = parseScriptIntoScenes(script, characters);
 
     if (scenes.length === 0) {
       return NextResponse.json(
         { error: 'No valid scenes found in script' },
         { status: 400 }
       );
+    }
+
+    // NEW: Prepend Scene 0 (cover) if metadata provided
+    if (coverMetadata && coverMetadata.title && coverMetadata.coverPrompt) {
+      console.log(`📖 Adding cover image (Scene 0): "${coverMetadata.title}"`);
+
+      const coverScene = {
+        id: 'cover',
+        sceneNumber: 0,
+        description: coverMetadata.coverPrompt,
+        characterNames: characters.map((c: Character) => c.name)
+      };
+
+      // Prepend cover to scenes array
+      scenes = [coverScene, ...scenes];
     }
 
     // Get authenticated user
@@ -271,6 +294,7 @@ export async function POST(request: NextRequest) {
             generationTime: result.generationTime,
             status: 'completed' as const,
             characterRatings,
+            isCover: scene.sceneNumber === 0,  // NEW: Mark cover image
           }
         };
       } catch (error) {
@@ -291,6 +315,7 @@ export async function POST(request: NextRequest) {
             generationTime: 0,
             status: 'failed' as const,
             error: errorMessage,
+            isCover: scene.sceneNumber === 0,  // NEW: Mark cover image
           }
         };
       }

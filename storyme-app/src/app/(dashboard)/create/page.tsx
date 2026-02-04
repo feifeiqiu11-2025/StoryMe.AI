@@ -53,6 +53,10 @@ export default function CreateStoryPage() {
   const [enhancedScenes, setEnhancedScenes] = useState<EnhancedScene[]>([]);
   const [isEnhancing, setIsEnhancing] = useState(false);
 
+  // Story metadata state (NEW - generated during enhancement)
+  const [storyTitle, setStoryTitle] = useState<string>('');
+  const [storyDescription, setStoryDescription] = useState<string>('');
+
   // Image generation state
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
@@ -345,7 +349,7 @@ export default function CreateStoryPage() {
 
       console.log(`Enhancing ${rawScenes.length} scenes with reading level ${readingLevel}, ${storyTone} tone, and ${contentLanguage} language`);
 
-      // Call AI enhancement API
+      // Call AI enhancement API (now includes metadata generation)
       const response = await fetch('/api/enhance-scenes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -360,6 +364,7 @@ export default function CreateStoryPage() {
           expansionLevel, // NEW: Pass expansion level to API
           language: contentLanguage, // NEW: Pass content language (en or zh)
           generateChineseTranslation, // NEW: For bilingual English stories with Chinese captions
+          script: scriptInput,  // NEW: Pass raw script for title/description generation
           characters: characters.map(c => ({
             name: c.name,
             // Exclude clothing from character description - let scene enhancer decide
@@ -384,10 +389,33 @@ export default function CreateStoryPage() {
         alert('AI enhancement unavailable, using original descriptions');
       }
 
-      // Store enhanced scenes
-      setEnhancedScenes(data.enhancedScenes);
+      // Extract and store metadata (title, description)
+      if (data.metadata) {
+        setStoryTitle(data.metadata.title);
+        setStoryDescription(data.metadata.description);
+        console.log(`✓ Generated title: "${data.metadata.title}"`);
+        console.log(`✓ Generated description: "${data.metadata.description}"`);
 
-      console.log(`✓ Enhanced ${data.enhancedScenes.length} scenes successfully`);
+        // Create Scene 0 (cover) and prepend to enhanced scenes
+        const coverScene: EnhancedScene = {
+          sceneNumber: 0,
+          isCover: true,
+          storyTitle: data.metadata.title,
+          storyDescription: data.metadata.description,
+          raw_description: data.metadata.coverPrompt,
+          enhanced_prompt: data.metadata.coverPrompt,
+          caption: '', // Cover has no caption (title is the caption)
+          characterNames: characters.map(c => c.name)
+        };
+
+        // Prepend cover scene to enhanced scenes
+        setEnhancedScenes([coverScene, ...data.enhancedScenes]);
+        console.log(`✓ Enhanced ${data.enhancedScenes.length} scenes + 1 cover successfully`);
+      } else {
+        // Fallback: no metadata generated
+        setEnhancedScenes(data.enhancedScenes);
+        console.log(`✓ Enhanced ${data.enhancedScenes.length} scenes successfully`);
+      }
 
     } catch (error) {
       console.error('Enhancement error:', error);
@@ -410,6 +438,8 @@ export default function CreateStoryPage() {
   // NEW: Handle back button (go back to settings and clear enhanced scenes)
   const handleRegenerateAll = () => {
     setEnhancedScenes([]);
+    setStoryTitle('');  // NEW: Clear title
+    setStoryDescription('');  // NEW: Clear description
   };
 
   // NEW: Handle caption editing in preview
@@ -429,6 +459,32 @@ export default function CreateStoryPage() {
       prev.map(scene =>
         scene.sceneNumber === sceneNumber
           ? { ...scene, caption_chinese: newCaptionChinese }
+          : scene
+      )
+    );
+  };
+
+  // NEW: Handle title editing (for Scene 0/cover)
+  const handleTitleEdit = (newTitle: string) => {
+    setStoryTitle(newTitle);
+    // Update Scene 0 in enhancedScenes
+    setEnhancedScenes(prev =>
+      prev.map(scene =>
+        scene.sceneNumber === 0
+          ? { ...scene, storyTitle: newTitle }
+          : scene
+      )
+    );
+  };
+
+  // NEW: Handle description editing (for Scene 0/cover)
+  const handleDescriptionEdit = (newDescription: string) => {
+    setStoryDescription(newDescription);
+    // Update Scene 0 in enhancedScenes
+    setEnhancedScenes(prev =>
+      prev.map(scene =>
+        scene.sceneNumber === 0
+          ? { ...scene, storyDescription: newDescription }
           : scene
       )
     );
@@ -616,9 +672,19 @@ export default function CreateStoryPage() {
     setSaveError('');
 
     try {
-      // Prepare scenes data with enhancement info
+      // NEW: Extract cover image (Scene 0) and regular scenes (Scene 1+)
+      const coverImage = imageGenerationStatus.find(img => img.sceneNumber === 0 && img.status === 'completed');
+      const coverImageUrlToSave = coverImage?.imageUrl || coverImageUrl || undefined;
+
+      if (coverImageUrlToSave) {
+        console.log('✅ Using cover from Scene 0:', coverImageUrlToSave);
+      } else {
+        console.log('⚠️ No cover image generated, saving without cover');
+      }
+
+      // Prepare scenes data (exclude cover/Scene 0, only regular scenes)
       const scenesData = imageGenerationStatus
-        .filter(img => img.status === 'completed')
+        .filter(img => img.status === 'completed' && img.sceneNumber > 0)  // Exclude Scene 0
         .map(img => {
           const enhancedScene = enhancedScenes.find(es => es.sceneNumber === img.sceneNumber);
           return {
@@ -638,15 +704,6 @@ export default function CreateStoryPage() {
         setSaveError('No completed scenes to save');
         setIsSaving(false);
         return;
-      }
-
-      // Use the pre-approved cover image URL
-      const coverImageUrlToSave = coverImageUrl || undefined;
-
-      if (coverImageUrlToSave) {
-        console.log('✅ Using pre-approved cover:', coverImageUrlToSave);
-      } else {
-        console.log('⚠️ No cover image approved, saving without cover');
       }
 
       // Check if characters have temporary IDs (from guest mode)
@@ -756,6 +813,9 @@ export default function CreateStoryPage() {
 
       // Close save modal
       setShowSaveModal(false);
+
+      // Reset saving state (IMPORTANT: must be done before redirect/modal)
+      setIsSaving(false);
 
       // Check if we should show feedback modal (first story)
       if (data.showFeedbackModal) {
@@ -885,8 +945,17 @@ export default function CreateStoryPage() {
     setImageGenerationStatus(initialStatus);
 
     try {
-      // Build script from enhanced prompts for image generation
+      // NEW: Extract cover metadata (Scene 0)
+      const coverScene = enhancedScenes.find(s => s.isCover);
+      const coverMetadata = coverScene ? {
+        title: coverScene.storyTitle || storyTitle,
+        description: coverScene.storyDescription || storyDescription,
+        coverPrompt: coverScene.enhanced_prompt
+      } : null;
+
+      // Build script from enhanced prompts (excluding cover/Scene 0)
       const enhancedScript = enhancedScenes
+        .filter(s => !s.isCover)  // Exclude cover from script
         .map(s => s.enhanced_prompt)
         .join('\n');
 
@@ -915,11 +984,12 @@ export default function CreateStoryPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           characters: charactersWithTypes,
-          script: enhancedScript, // Use enhanced prompts, not raw script
+          script: enhancedScript, // Use enhanced prompts (excludes cover)
           artStyle: ART_STYLE,
           imageProvider: imageProvider, // Use selected image provider (gemini or flux)
           illustrationStyle: artStyle, // 'pixar' (3D) or 'classic' (2D storybook)
           clothingConsistency, // 'consistent' (default) or 'scene-based'
+          coverMetadata,  // NEW: Cover metadata for Scene 0 generation
         }),
       });
 
@@ -937,7 +1007,10 @@ export default function CreateStoryPage() {
           const enhancedScene = enhancedScenes.find(es => es.sceneNumber === img.sceneNumber);
           return {
             ...img,
-            sceneDescription: enhancedScene?.caption || img.sceneDescription, // Use caption
+            // For Scene 0 (cover), use the short story description instead of the long system prompt
+            sceneDescription: img.sceneNumber === 0
+              ? (enhancedScene?.storyDescription || storyDescription || 'Story cover')
+              : (enhancedScene?.caption || img.sceneDescription),
           };
         });
         setImageGenerationStatus(updatedImages);
@@ -1309,6 +1382,8 @@ export default function CreateStoryPage() {
               onCaptionChineseEdit={handleCaptionChineseEdit}
               onImagePromptEdit={handleImagePromptEdit}
               onScenesUpdate={handleScenesUpdate}
+              onTitleEdit={handleTitleEdit}  // NEW: Title editing
+              onDescriptionEdit={handleDescriptionEdit}  // NEW: Description editing
               isGenerating={isGenerating}
               readingLevel={readingLevel}
               storyTone={storyTone}
@@ -1372,11 +1447,10 @@ export default function CreateStoryPage() {
               <div className="flex gap-4 flex-wrap">
                 <button
                   className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-emerald-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={async () => {
-                    // Generate AI-powered title and description
-                    if (!saveTitle || !saveDescription) {
-                      await handleGenerateMetadata();
-                    }
+                  onClick={() => {
+                    // Pre-populate with generated title/description from enhancement
+                    setSaveTitle(storyTitle || saveTitle);
+                    setSaveDescription(storyDescription || saveDescription);
                     setShowSaveModal(true);
                   }}
                   disabled={isSaving}
@@ -1385,8 +1459,16 @@ export default function CreateStoryPage() {
                 </button>
                 <button
                   className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl hover:from-orange-700 hover:to-red-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={handleDownloadPDF}
-                  disabled={generatingPDF}
+                  onClick={() => {
+                    // Require story to be saved first for PDF generation
+                    if (!saveTitle || !storyTitle) {
+                      alert('📖 Please save your story to the library first before downloading PDF.\n\nClick "Save to Library" button to save your story.');
+                      return;
+                    }
+                    handleDownloadPDF();
+                  }}
+                  disabled={generatingPDF || !saveTitle}
+                  title={!saveTitle ? 'Save story first to download PDF' : 'Download PDF'}
                 >
                   {generatingPDF ? (
                     <span className="flex items-center gap-2">
@@ -1488,50 +1570,45 @@ export default function CreateStoryPage() {
               </div>
 
               <div className="space-y-4 mb-6">
-                {/* AI Generation Info */}
-                {isGeneratingMetadata && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                    <p className="text-sm text-blue-700">AI is writing your title and description...</p>
-                  </div>
-                )}
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Story Title <span className="text-red-500">*</span>
-                    </label>
-                    <button
-                      onClick={handleGenerateMetadata}
-                      disabled={isSaving || isGeneratingMetadata}
-                      className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                    >
-                      ✨ Regenerate with AI
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={saveTitle}
-                    onChange={(e) => setSaveTitle(e.target.value)}
-                    disabled={isSaving || isGeneratingMetadata}
-                    placeholder={isGeneratingMetadata ? "Generating..." : "Enter a title for your story"}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  />
-                </div>
-
+                {/* Title - Read-only (generated during enhancement) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description (Optional)
+                    ✅ Story Title
                   </label>
-                  <textarea
-                    value={saveDescription}
-                    onChange={(e) => setSaveDescription(e.target.value)}
-                    disabled={isSaving || isGeneratingMetadata}
-                    placeholder={isGeneratingMetadata ? "Generating..." : "Add a brief description of your story"}
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  />
+                  <div className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 font-semibold">
+                    {saveTitle || 'Untitled Story'}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Edit in the scene review screen if needed
+                  </p>
                 </div>
+
+                {/* Description - Read-only (generated during enhancement) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    ✅ Description
+                  </label>
+                  <div className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 min-h-[60px]">
+                    {saveDescription || 'No description'}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Edit in the scene review screen if needed
+                  </p>
+                </div>
+
+                {/* Cover Preview */}
+                {imageGenerationStatus.find(img => img.sceneNumber === 0)?.imageUrl && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      ✅ Cover Image
+                    </label>
+                    <img
+                      src={imageGenerationStatus.find(img => img.sceneNumber === 0)?.imageUrl}
+                      alt="Cover"
+                      className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                    />
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -1570,23 +1647,7 @@ export default function CreateStoryPage() {
                   </div>
                 )}
 
-                {/* Cover Preview Section */}
-                {!coverImageUrl && !coverApproved && (
-                  <button
-                    onClick={generateCoverPreview}
-                    disabled={!saveTitle.trim() || generatingCover}
-                    className="w-full bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {generatingCover ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                        Generating Cover Preview...
-                      </span>
-                    ) : (
-                      '🎨 Generate Cover Preview'
-                    )}
-                  </button>
-                )}
+                {/* REMOVED: Old "Generate Cover Preview" button - cover is now generated with scenes */}
 
                 {coverImageUrl && !coverApproved && (
                   <div className="border-2 border-purple-200 rounded-xl p-4 bg-purple-50">
@@ -1680,19 +1741,10 @@ export default function CreateStoryPage() {
                 )}
                 ============================================================ */}
 
-                {coverApproved && (
-                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                    <img
-                      src={coverImageUrl || ''}
-                      alt="Approved cover"
-                      className="w-16 h-16 rounded object-cover"
-                    />
-                    <span className="text-green-700 font-medium">✓ Cover Approved!</span>
-                  </div>
-                )}
+                {/* REMOVED: Old "Cover Approved" message - cover is now part of scene generation */}
 
-                {/* Quiz Generation Section */}
-                {coverApproved && !quizData && (
+                {/* Quiz Generation Section - Show if no quiz generated yet */}
+                {!quizData && (
                   <div className="border-2 border-purple-200 rounded-xl p-4 bg-purple-50">
                     <p className="text-sm font-medium text-gray-700 mb-3">Generate Quiz (Optional)</p>
                     <p className="text-xs text-gray-600 mb-3">
@@ -1775,7 +1827,7 @@ export default function CreateStoryPage() {
               <div className="flex gap-3">
                 <button
                   onClick={handleSaveStory}
-                  disabled={isSaving || !saveTitle.trim() || !coverApproved}
+                  disabled={isSaving || !saveTitle.trim()}
                   className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-emerald-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? (

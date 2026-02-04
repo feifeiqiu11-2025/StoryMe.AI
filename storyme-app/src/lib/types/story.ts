@@ -135,7 +135,7 @@ export interface CharacterType {
 
 // Enhanced scene after AI processing
 export interface EnhancedScene {
-  sceneNumber: number;
+  sceneNumber: number;           // Scene number (0 = cover, 1+ = regular scenes)
   title?: string;                // Scene title for preview (NEW)
   raw_description: string;       // Original user input
   enhanced_prompt: string;       // AI-enhanced for image generation
@@ -144,6 +144,11 @@ export interface EnhancedScene {
   characterNames: string[];      // Characters in this scene
   isNewCharacter?: boolean;      // Flag if AI added new minor character (NEW)
   characterTypes?: CharacterType[]; // AI-detected character types (animal vs human)
+
+  // NEW: Cover-specific fields (only for Scene 0)
+  isCover?: boolean;             // true if this is the cover (sceneNumber === 0)
+  storyTitle?: string;           // Story title (only for cover/Scene 0)
+  storyDescription?: string;     // Story description (only for cover/Scene 0)
 }
 
 // Enhanced scene with generated image
@@ -162,7 +167,7 @@ export interface CharacterRating {
 export interface GeneratedImage {
   id: string;
   sceneId: string;
-  sceneNumber: number;
+  sceneNumber: number;           // 0 = cover, 1+ = regular scenes
   sceneDescription: string;
   imageUrl: string;
   prompt: string;
@@ -170,6 +175,7 @@ export interface GeneratedImage {
   status: 'pending' | 'generating' | 'completed' | 'failed';
   characterRatings?: CharacterRating[]; // Per-character consistency ratings
   error?: string;
+  isCover?: boolean;             // NEW: true if this is the cover image (sceneNumber === 0)
 
   // Overall Scene Ratings (1-5 stars)
   overallRating?: number; // 1-5

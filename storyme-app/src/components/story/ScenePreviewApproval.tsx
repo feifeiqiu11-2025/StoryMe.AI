@@ -23,6 +23,9 @@ interface ScenePreviewApprovalProps {
   onImagePromptEdit?: (sceneNumber: number, newPrompt: string) => void;  // NEW: For image prompt editing
   onScenesUpdate?: (updatedScenes: EnhancedScene[]) => void;
   isGenerating: boolean;
+  // NEW: Handlers for cover metadata editing
+  onTitleEdit?: (newTitle: string) => void;
+  onDescriptionEdit?: (newDescription: string) => void;
   // Settings for new scene enhancement
   readingLevel?: number;
   storyTone?: string;
@@ -47,6 +50,8 @@ export default function ScenePreviewApproval({
   onImagePromptEdit,
   onScenesUpdate,
   isGenerating,
+  onTitleEdit,
+  onDescriptionEdit,
   readingLevel = 5,
   storyTone = 'playful',
   expansionLevel = 'minimal',
@@ -84,6 +89,12 @@ export default function ScenePreviewApproval({
   // Delete scene handler
   const handleDeleteScene = (sceneNumber: number) => {
     if (!onScenesUpdate) return;
+
+    // Prevent deleting cover (Scene 0)
+    if (sceneNumber === 0) {
+      alert('Cannot delete the cover. The story must have a cover.');
+      return;
+    }
 
     if (enhancedScenes.length <= 1) {
       alert('Cannot delete the only scene. Stories must have at least one scene.');
@@ -328,20 +339,66 @@ export default function ScenePreviewApproval({
                 {/* Scene Number */}
                 <div className="flex-shrink-0">
                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                    {scene.sceneNumber}
+                    {scene.isCover ? '📖' : scene.sceneNumber}
                   </div>
                 </div>
 
                 {/* Scene Content */}
                 <div className="flex-1 min-w-0">
-                  {/* Scene Title */}
-                  {scene.title && (
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">
-                      {scene.title}
-                    </h3>
+                  {/* Cover-specific rendering */}
+                  {scene.isCover ? (
+                    <>
+                      {/* Story Title - Editable */}
+                      <div className="bg-blue-50 rounded-lg p-3 mb-3">
+                        <label className="text-sm font-medium text-blue-700 mb-1 block">
+                          📝 Story Title:
+                        </label>
+                        {onTitleEdit ? (
+                          <input
+                            type="text"
+                            value={scene.storyTitle || ''}
+                            onChange={(e) => onTitleEdit(e.target.value)}
+                            className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-semibold text-lg"
+                            placeholder="Enter story title..."
+                          />
+                        ) : (
+                          <div className="text-lg font-bold text-gray-900">
+                            {scene.storyTitle || 'Untitled Story'}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Story Description - Editable */}
+                      <div className="bg-purple-50 rounded-lg p-3 mb-3">
+                        <label className="text-sm font-medium text-purple-700 mb-1 block">
+                          📝 Story Description:
+                        </label>
+                        {onDescriptionEdit ? (
+                          <textarea
+                            value={scene.storyDescription || ''}
+                            onChange={(e) => onDescriptionEdit(e.target.value)}
+                            rows={2}
+                            className="w-full px-3 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                            placeholder="Enter story description..."
+                          />
+                        ) : (
+                          <div className="text-gray-700">
+                            {scene.storyDescription || 'No description'}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    /* Regular Scene Title */
+                    scene.title && (
+                      <h3 className="text-lg font-bold text-gray-900 mb-2">
+                        {scene.title}
+                      </h3>
+                    )
                   )}
 
-                  {/* Caption - Editable */}
+                  {/* Caption - Editable (skip for cover) */}
+                  {!scene.isCover && (
                   <div className="bg-gray-50 rounded-lg p-3 mb-3">
                     <label className="text-sm font-medium text-gray-700 mb-1 block">
                       📝 Story Caption:
@@ -371,9 +428,10 @@ export default function ScenePreviewApproval({
                       </p>
                     )}
                   </div>
+                  )}
 
-                  {/* Chinese Caption - Editable (NEW - Bilingual Support) */}
-                  {generateChineseTranslation && (
+                  {/* Chinese Caption - Editable (NEW - Bilingual Support) - Skip for cover */}
+                  {!scene.isCover && generateChineseTranslation && (
                     <div className="bg-purple-50 rounded-lg p-3 mb-3 border border-purple-200">
                       <label className="text-sm font-medium text-purple-700 mb-1 flex items-center gap-2">
                         <span>🇨🇳</span>

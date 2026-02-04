@@ -23,6 +23,8 @@ import {
 } from '@/lib/ai/scene-enhancer-chinese';
 import { getModelForLanguage, logModelUsage } from '@/lib/ai/deepseek-client';
 import { StoryTone, ExpansionLevel } from '@/lib/types/story';
+import { generateStoryMetadata } from '@/lib/ai/metadata-generator';
+import { buildCoverPrompt } from '@/lib/ai/cover-prompt-builder';
 
 export const maxDuration = 60; // 1 minute timeout
 
@@ -36,7 +38,8 @@ export async function POST(request: NextRequest) {
       characters,
       expansionLevel = 'minimal',
       language = 'en',
-      generateChineseTranslation = false  // NEW: For bilingual English stories
+      generateChineseTranslation = false,  // NEW: For bilingual English stories
+      script  // NEW: Raw script text for title/description generation
     } = body;
 
     // Validate inputs
@@ -145,6 +148,59 @@ export async function POST(request: NextRequest) {
 
     console.log(`✓ Enhanced ${enhancedScenes.length} scenes successfully`);
 
+    // NEW: Generate title and description for the story
+    let metadata = {
+      title: '',
+      description: '',
+      coverPrompt: ''
+    };
+
+    if (script && script.trim()) {
+      try {
+        console.log('🎨 Generating story title and description...');
+        const storyMetadata = await generateStoryMetadata({
+          script,
+          readingLevel,
+          storyTone,
+          characterNames: characters.map((c: Character) => c.name),
+          language: language as 'en' | 'zh'
+        });
+
+        // Build cover prompt using the generated title
+        const coverPrompt = buildCoverPrompt({
+          title: storyMetadata.title,
+          description: storyMetadata.description,
+          characterNames: characters.map((c: Character) => c.name),
+          language: language as 'en' | 'zh'
+        });
+
+        metadata = {
+          title: storyMetadata.title,
+          description: storyMetadata.description,
+          coverPrompt
+        };
+
+        console.log(`✓ Generated title: "${metadata.title}"`);
+        console.log(`✓ Generated description: "${metadata.description}"`);
+      } catch (metadataError) {
+        console.error('Metadata generation failed, using fallback:', metadataError);
+        // Use fallback values
+        const firstWords = script.trim().split(' ').slice(0, 5).join(' ');
+        metadata = {
+          title: firstWords || 'My Amazing Story',
+          description: 'A wonderful adventure awaits!',
+          coverPrompt: buildCoverPrompt({
+            title: firstWords || 'My Amazing Story',
+            description: 'A wonderful adventure awaits!',
+            characterNames: characters.map((c: Character) => c.name),
+            language: language as 'en' | 'zh'
+          })
+        };
+      }
+    } else {
+      console.warn('No script provided, skipping metadata generation');
+    }
+
     // NEW: If bilingual mode, generate Chinese translations
     if (language === 'en' && generateChineseTranslation) {
       console.log('🌏 Generating Chinese translations for bilingual story...');
@@ -200,6 +256,7 @@ Chinese Translations:`;
 
     return NextResponse.json({
       success: true,
+      metadata,  // NEW: Include title, description, coverPrompt
       enhancedScenes,
       readingLevel,
       storyTone,

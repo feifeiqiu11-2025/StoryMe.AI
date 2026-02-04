@@ -39,11 +39,26 @@ export function getModelForLanguage(language: 'en' | 'zh'): {
     };
   }
 
-  // Default to OpenAI for English
-  return {
-    client: new OpenAI({ apiKey: process.env.OPENAI_API_KEY }),
-    model: 'gpt-4o',
-  };
+  // Check if OpenAI is configured for English
+  if (process.env.OPENAI_API_KEY) {
+    return {
+      client: new OpenAI({ apiKey: process.env.OPENAI_API_KEY }),
+      model: 'gpt-4o',
+    };
+  }
+
+  // Fallback to DeepSeek for English if no OpenAI key
+  // DeepSeek handles English well too, just optimized for Chinese
+  if (isDeepSeekConfigured()) {
+    console.warn('Using DeepSeek for English (OPENAI_API_KEY not configured)');
+    return {
+      client: deepseek,
+      model: 'deepseek-chat',
+    };
+  }
+
+  // Last resort: throw error if no API keys configured
+  throw new Error('No AI API key configured. Please set OPENAI_API_KEY or DEEPSEEK_API_KEY in .env.local');
 }
 
 /**
