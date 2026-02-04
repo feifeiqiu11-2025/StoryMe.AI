@@ -23,6 +23,7 @@ import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import { getGuestStory, clearGuestStory } from '@/lib/utils/guest-story-storage';
 import EditImageControl from '@/components/story/EditImageControl';
+import { buildCoverPrompt } from '@/lib/ai/cover-prompt-builder';
 
 const CHARACTERS_STORAGE_KEY = 'storyme_character_library';
 const ART_STYLE = "children's book illustration, colorful, whimsical";
@@ -465,28 +466,52 @@ export default function CreateStoryPage() {
   };
 
   // NEW: Handle title editing (for Scene 0/cover)
+  // This updates the title in state AND rebuilds the cover prompt
+  // Called onBlur (when user leaves the field) for better UX
   const handleTitleEdit = (newTitle: string) => {
     setStoryTitle(newTitle);
-    // Update Scene 0 in enhancedScenes
+    // Update Scene 0 in enhancedScenes and rebuild cover prompt
     setEnhancedScenes(prev =>
-      prev.map(scene =>
-        scene.sceneNumber === 0
-          ? { ...scene, storyTitle: newTitle }
-          : scene
-      )
+      prev.map(scene => {
+        if (scene.sceneNumber === 0) {
+          return {
+            ...scene,
+            storyTitle: newTitle,
+            enhanced_prompt: buildCoverPrompt({
+              title: newTitle,
+              description: scene.storyDescription || storyDescription,
+              characterNames: characters.map(c => c.name),
+              language: contentLanguage as 'en' | 'zh'
+            })
+          };
+        }
+        return scene;
+      })
     );
   };
 
   // NEW: Handle description editing (for Scene 0/cover)
+  // This updates the description in state AND rebuilds the cover prompt
+  // Called onBlur (when user leaves the field) for better UX
   const handleDescriptionEdit = (newDescription: string) => {
     setStoryDescription(newDescription);
-    // Update Scene 0 in enhancedScenes
+    // Update Scene 0 in enhancedScenes and rebuild cover prompt
     setEnhancedScenes(prev =>
-      prev.map(scene =>
-        scene.sceneNumber === 0
-          ? { ...scene, storyDescription: newDescription }
-          : scene
-      )
+      prev.map(scene => {
+        if (scene.sceneNumber === 0) {
+          return {
+            ...scene,
+            storyDescription: newDescription,
+            enhanced_prompt: buildCoverPrompt({
+              title: scene.storyTitle || storyTitle,
+              description: newDescription,
+              characterNames: characters.map(c => c.name),
+              language: contentLanguage as 'en' | 'zh'
+            })
+          };
+        }
+        return scene;
+      })
     );
   };
 

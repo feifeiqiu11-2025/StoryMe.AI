@@ -348,7 +348,7 @@ export default function ScenePreviewApproval({
                   {/* Cover-specific rendering */}
                   {scene.isCover ? (
                     <>
-                      {/* Story Title - Editable */}
+                      {/* Story Title - Editable (updates on blur for better UX) */}
                       <div className="bg-blue-50 rounded-lg p-3 mb-3">
                         <label className="text-sm font-medium text-blue-700 mb-1 block">
                           📝 Story Title:
@@ -356,8 +356,13 @@ export default function ScenePreviewApproval({
                         {onTitleEdit ? (
                           <input
                             type="text"
-                            value={scene.storyTitle || ''}
-                            onChange={(e) => onTitleEdit(e.target.value)}
+                            defaultValue={scene.storyTitle || ''}
+                            onBlur={(e) => {
+                              const newValue = e.target.value.trim();
+                              if (newValue !== scene.storyTitle) {
+                                onTitleEdit(newValue);
+                              }
+                            }}
                             className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-semibold text-lg"
                             placeholder="Enter story title..."
                           />
@@ -368,15 +373,20 @@ export default function ScenePreviewApproval({
                         )}
                       </div>
 
-                      {/* Story Description - Editable */}
+                      {/* Story Description - Editable (updates on blur for better UX) */}
                       <div className="bg-purple-50 rounded-lg p-3 mb-3">
                         <label className="text-sm font-medium text-purple-700 mb-1 block">
                           📝 Story Description:
                         </label>
                         {onDescriptionEdit ? (
                           <textarea
-                            value={scene.storyDescription || ''}
-                            onChange={(e) => onDescriptionEdit(e.target.value)}
+                            defaultValue={scene.storyDescription || ''}
+                            onBlur={(e) => {
+                              const newValue = e.target.value.trim();
+                              if (newValue !== scene.storyDescription) {
+                                onDescriptionEdit(newValue);
+                              }
+                            }}
                             rows={2}
                             className="w-full px-3 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
                             placeholder="Enter story description..."
