@@ -2,6 +2,9 @@
  * Public Stories API
  * GET /api/stories/public - Get public stories for landing page and gallery
  * No authentication required
+ *
+ * IMPORTANT: Tag filtering is done at the database level BEFORE pagination
+ * to ensure correct results and accurate counts.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -10,12 +13,12 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '20'); // Changed default to 20
+    const limit = parseInt(searchParams.get('limit') || '24');
     const offset = parseInt(searchParams.get('offset') || '0');
     const featured = searchParams.get('featured') === 'true';
     const sortBy = searchParams.get('sortBy') || 'recent'; // 'popular' or 'recent'
-    const tags = searchParams.get('tags')?.split(',').filter(Boolean) || []; // NEW: Tag filtering
-    const search = searchParams.get('search') || ''; // NEW: Search query
+    const tagSlugs = searchParams.get('tags')?.split(',').filter(Boolean) || [];
+    const search = searchParams.get('search') || '';
 
     // Validate params
     if (limit < 1 || limit > 100) {
@@ -28,7 +31,86 @@ export async function GET(request: NextRequest) {
     // Use service role client to bypass RLS for public display
     const supabase = createServiceRoleClient();
 
-    // Build query for public stories with scenes, images, and tags
+    // Step 1: If tags are provided, resolve them to project IDs at the database level
+    // This ensures filtering happens BEFORE pagination
+    let filteredProjectIds: string[] | null = null;
+
+    if (tagSlugs.length > 0) {
+      // First, get all matching tag IDs (by slug OR category)
+      // For category matches, also include all child tags
+      const { data: matchingTags, error: tagError } = await supabase
+        .from('story_tags')
+        .select('id, slug, category, is_leaf, parent_id')
+        .or(tagSlugs.map(slug => `slug.eq.${slug},category.eq.${slug}`).join(','));
+
+      if (tagError) {
+        console.error('Error fetching tags:', tagError);
+        return NextResponse.json(
+          { error: 'Failed to fetch tags' },
+          { status: 500 }
+        );
+      }
+
+      if (!matchingTags || matchingTags.length === 0) {
+        // No matching tags found - return empty result
+        return NextResponse.json({
+          success: true,
+          stories: [],
+          totalCount: 0,
+          currentPage: 1,
+          totalPages: 0,
+          offset,
+          limit,
+        }, {
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+          },
+        });
+      }
+
+      // Collect all tag IDs that should match
+      const tagIds = matchingTags.map(t => t.id);
+
+      // Get project IDs that have any of these tags
+      const { data: projectTags, error: ptError } = await supabase
+        .from('project_tags')
+        .select('project_id')
+        .in('tag_id', tagIds);
+
+      if (ptError) {
+        console.error('Error fetching project tags:', ptError);
+        return NextResponse.json(
+          { error: 'Failed to fetch project tags' },
+          { status: 500 }
+        );
+      }
+
+      // Extract unique project IDs
+      filteredProjectIds = [...new Set(projectTags?.map(pt => pt.project_id) || [])];
+
+      if (filteredProjectIds.length === 0) {
+        // No projects have these tags - return empty result
+        return NextResponse.json({
+          success: true,
+          stories: [],
+          totalCount: 0,
+          currentPage: 1,
+          totalPages: 0,
+          offset,
+          limit,
+        }, {
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+          },
+        });
+      }
+    }
+
+    // Step 2: Build the main query with tag filter applied at DB level
     let query = supabase
       .from('projects')
       .select(`
@@ -68,9 +150,14 @@ export async function GET(request: NextRequest) {
             display_order
           )
         )
-      `, { count: 'exact' }) // Get total count for pagination
+      `, { count: 'exact' })
       .eq('visibility', 'public')
       .eq('status', 'completed');
+
+    // Apply tag filter at database level (BEFORE pagination)
+    if (filteredProjectIds !== null) {
+      query = query.in('id', filteredProjectIds);
+    }
 
     // Apply search filter (title or description)
     if (search) {
@@ -92,7 +179,7 @@ export async function GET(request: NextRequest) {
       query = query.order('published_at', { ascending: false });
     }
 
-    // Apply pagination
+    // Apply pagination AFTER filtering
     query = query.range(offset, offset + limit - 1);
 
     const { data: projects, error, count } = await query;
@@ -106,7 +193,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data to include only first image per scene and tags
-    let formattedProjects = projects.map((project: any) => ({
+    const formattedProjects = projects.map((project: any) => ({
       id: project.id,
       title: project.title,
       description: project.description,
@@ -139,21 +226,7 @@ export async function GET(request: NextRequest) {
       })) || [],
     }));
 
-    // Filter by tags if provided (client-side filtering)
-    // Support filtering by both tag slug AND category
-    if (tags.length > 0) {
-      formattedProjects = formattedProjects.filter((project: any) => {
-        const projectTagSlugs = project.tags.map((t: any) => t.slug);
-        const projectTagCategories = project.tags.map((t: any) => t.category);
-
-        // Project must have at least one of the requested tags (by slug or category)
-        return tags.some(tag =>
-          projectTagSlugs.includes(tag) || projectTagCategories.includes(tag)
-        );
-      });
-    }
-
-    // Calculate pagination metadata
+    // Calculate pagination metadata - count now reflects filtered results
     const totalCount = count || 0;
     const currentPage = Math.floor(offset / limit) + 1;
     const totalPages = Math.ceil(totalCount / limit);

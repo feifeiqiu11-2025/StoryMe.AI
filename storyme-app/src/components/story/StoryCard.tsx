@@ -104,6 +104,7 @@ export function StoryCard({
           <img
             src={coverImage}
             alt={story.title}
+            loading="lazy"
             className="w-full h-full object-cover"
           />
         ) : (

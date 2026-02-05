@@ -30,7 +30,7 @@ export default function PublicStoriesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const limit = 20;
+  const limit = 24;
 
   useEffect(() => {
     fetchTags();
