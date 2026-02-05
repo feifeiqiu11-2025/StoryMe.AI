@@ -1,20 +1,22 @@
 // Core types for the POC
 
+// Story template categories for guided story creation
+export type { StoryTemplateId } from '@/lib/ai/story-templates';
+
 // Story tone options for AI caption generation
+// NOTE: 'gentle', 'silly', 'mystery', 'brave' were removed from the UI.
+// They may still exist in older saved stories in the database — that's fine,
+// we just don't offer them as options for new stories.
 export type StoryTone =
-  | 'playful'       // Fun, energetic, joyful
+  | 'playful'       // Fun, energetic, joyful (absorbs 'silly')
   | 'educational'   // Learning-focused, informative
-  | 'adventure'     // Exciting, brave, heroic
-  | 'gentle'        // Calm, soothing, peaceful
-  | 'silly'         // Absurd, humorous, wacky
-  | 'mystery'       // Curious, questioning, wondering
-  | 'friendly'      // Warm, social, cooperative
-  | 'brave';        // Courageous, overcoming fears
+  | 'adventure'     // Exciting, brave, heroic (absorbs 'brave')
+  | 'friendly';     // Warm, social, cooperative
 
 // AI expansion level for story enhancement
 export type ExpansionLevel =
-  | 'minimal'       // Keep original structure, only enhance captions (default)
-  | 'smart'         // AI expands story based on age, adds scenes
+  | 'as_written'    // Use script as-is for captions, only generate image prompts (default)
+  | 'light'         // Light enhancement: improve captions, may add scenes (never reduce count)
   | 'rich';         // Full creative expansion with detailed narrative
 
 // Character clothing consistency mode

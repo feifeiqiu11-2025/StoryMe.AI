@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       characterNames = [],
       readingLevel = 5,
       storyTone = 'playful',
-      expansionLevel = 'minimal',
+      expansionLevel = 'as_written',
       language = 'en'
     } = body;
 
@@ -41,16 +41,17 @@ export async function POST(request: NextRequest) {
 
     // Get appropriate AI model for language
     const { client, model } = getModelForLanguage(language as 'en' | 'zh');
-    logModelUsage(model, language as 'en' | 'zh', 'enhance-single-scene');
+    logModelUsage(language as 'en' | 'zh', model);
 
     // Build the prompt based on expansion level
     let expansionGuidance = '';
-    if (expansionLevel === 'moderate') {
-      expansionGuidance = 'Add sensory details and emotional context.';
+    if (expansionLevel === 'light') {
+      expansionGuidance = 'Enhance with sensory details, emotional context, and age-appropriate language.';
     } else if (expansionLevel === 'rich') {
       expansionGuidance = 'Add rich sensory details, emotional depth, and scene-setting descriptions.';
     } else {
-      expansionGuidance = 'Keep it concise and focused on the main action.';
+      // as_written: keep it close to the original
+      expansionGuidance = 'Keep the caption close to the original description. Focus on generating a good image prompt.';
     }
 
     const systemPrompt = `You are a children's book author creating age-appropriate content for ${readingLevel}-year-olds with a ${storyTone} tone.
@@ -60,21 +61,19 @@ Your task: Transform a simple scene description into TWO outputs:
 2. **enhanced_prompt**: Detailed visual description for AI image generation
 
 READING LEVEL GUIDELINES:
-- Age 1: Single words only (e.g., "Dog!" or "Ball!")
-- Age 2: 2-3 simple words (e.g., "Mommy. Ball." or "Dog runs!")
-- Age 3: Very short sentences (e.g., "Emma plays. She is happy!")
-- Age 4-5: Short simple sentences (e.g., "Emma went to the park.")
-- Age 6-8: More complex sentences with descriptive words
+- Age 1-2: Single words or short phrases (e.g., "Dog!" or "Mommy. Ball.")
+- Age 3-4: Very short sentences (e.g., "Emma plays. She is happy!")
+- Age 5: Short simple sentences (e.g., "Emma went to the park.")
+- Age 6: Building vocabulary with compound words (8-12 words/sentence)
+- Age 7-8: Richer vocabulary, descriptive words (10-15 words/sentence)
+- Age 9-10: Complex narratives with character thoughts (12-20 words/sentence)
+- Age 11-12: Advanced narratives with literary techniques (15-25 words/sentence)
 
 TONE GUIDELINES (${storyTone}):
-- playful: Fun, giggly, lighthearted
-- educational: Learning-focused, informative
-- adventure: Exciting, brave, exploratory
-- gentle: Calm, soothing, peaceful
-- silly: Wacky, absurd, funny
-- mystery: Curious, wondering, discovering
-- friendly: Social, kind, warm
-- brave: Courageous, strong, determined
+- playful: Fun, giggly, lighthearted, humorous, whimsical
+- educational: Learning-focused, informative, curious
+- adventure: Exciting, brave, exploratory, courageous, confident
+- friendly: Social, kind, warm, cooperative, caring
 
 EXPANSION LEVEL: ${expansionGuidance}
 
@@ -121,8 +120,8 @@ Generate the caption and enhanced_prompt.`;
 
     // Return fallback response instead of error
     return NextResponse.json({
-      enhanced_prompt: body.sceneDescription || 'A scene from a children\'s story',
-      caption: body.sceneDescription || 'A scene from a children\'s story',
+      enhanced_prompt: 'A scene from a children\'s story',
+      caption: 'A scene from a children\'s story',
       warning: 'AI enhancement unavailable, using original description'
     });
   }

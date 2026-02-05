@@ -9,15 +9,17 @@ import { StoryTone, ExpansionLevel } from '../types/story';
 import type { SceneToEnhance, Character, EnhancedSceneResult } from './scene-enhancer';
 
 /**
- * Get Chinese tone-specific guidelines
+ * Get Chinese tone-specific guidelines.
+ * Matches English version: 4 active tones (playful absorbs silly, adventure absorbs brave).
  */
 function getChineseToneGuidelines(tone: StoryTone): string {
-  const guidelines = {
+  const guidelines: Record<string, string> = {
     playful: `
       - 使用活泼、充满活力的语言
       - 包含"开心"、"快乐"、"有趣"、"兴奋"等词
       - 传达轻松愉快的感觉
-      - 例如："笑了"、"跳了"、"玩耍"、"欢呼"
+      - 拥抱幽默和俏皮，使用夸张和有趣的意象
+      - 例如："笑了"、"跳了"、"玩耍"、"欢呼"、"哎呀"、"古怪"
     `,
     educational: `
       - 自然地引入学习时刻
@@ -27,27 +29,9 @@ function getChineseToneGuidelines(tone: StoryTone): string {
     `,
     adventure: `
       - 使用以行动为导向的动态语言
-      - 包含勇气和探索的元素
-      - 创造兴奋和期待
-      - 例如："探索"、"勇敢"、"旅程"、"冒险"、"发现"
-    `,
-    gentle: `
-      - 使用柔和、平静、舒缓的语言
-      - 关注平和、舒适的时刻
-      - 节奏较慢，反思和宁静的基调
-      - 例如："轻轻地"、"温柔地"、"安静"、"温暖"、"平静"
-    `,
-    silly: `
-      - 拥抱荒诞、幽默和俏皮
-      - 使用夸张和有趣的意象
-      - 让它异想天开、令人咯咯笑
-      - 例如："巨大的"、"哎呀"、"摇摇晃晃"、"傻傻的"、"古怪"
-    `,
-    mystery: `
-      - 创造好奇、惊奇和神秘感
-      - 使用疑问语言并建立期待
-      - 鼓励想象力和发现
-      - 例如："好奇"、"秘密"、"发现"、"神秘"、"隐藏"
+      - 包含勇气、探索和克服挑战的元素
+      - 创造兴奋和期待，在激发勇气的同时认可情感
+      - 例如："探索"、"勇敢"、"旅程"、"冒险"、"发现"、"自信"、"坚强"
     `,
     friendly: `
       - 强调关系、团结和温暖
@@ -55,22 +39,25 @@ function getChineseToneGuidelines(tone: StoryTone): string {
       - 突出分享、善良和联系
       - 例如："一起"、"朋友"、"帮助"、"分享"、"善良"、"关心"
     `,
-    brave: `
-      - 关注克服挑战和建立信心
-      - 使用赋权、鼓励的语言
-      - 在激发勇气的同时认可情感
-      - 例如："尝试"、"自信"、"坚强"、"自豪"、"勇敢"
-    `
   };
 
-  return guidelines[tone];
+  return guidelines[tone] || guidelines.playful;
 }
 
 /**
- * Get Chinese reading level guidelines based on age
+ * Get Chinese reading level guidelines based on age.
+ * Supports ages 1-12 with Lexile approximation.
  */
 function getChineseReadingLevelGuidelines(readingLevel: number): string {
-  if (readingLevel <= 4) {
+  if (readingLevel <= 2) {
+    return `
+      - 年龄 1-2岁：最简单的语言
+      - 只使用单字或2-3个字的短语
+      - 句子长度：1-3个字
+      - 最多1-2个短语
+      - 例子："狗狗！" 或 "妈妈。球球。"
+    `;
+  } else if (readingLevel <= 4) {
     return `
       - 年龄 3-4岁：非常简单的语言
       - 只使用简单的词汇（1-2个字的词）
@@ -94,7 +81,7 @@ function getChineseReadingLevelGuidelines(readingLevel: number): string {
       - 最多3句话
       - 例子："小明在阳光明媚的公园里和朋友们一起玩。"
     `;
-  } else {
+  } else if (readingLevel <= 8) {
     return `
       - 年龄 7-8岁：更丰富的词汇和复杂性
       - 使用描述性词语，多样化的句子结构
@@ -102,32 +89,53 @@ function getChineseReadingLevelGuidelines(readingLevel: number): string {
       - 最多3-4句话
       - 例子："小明发现了一个神奇的游乐场，那里所有的秋千在阳光下闪闪发光。"
     `;
+  } else if (readingLevel <= 10) {
+    return `
+      - 年龄 9-10岁：复杂叙事
+      - 使用丰富的词汇、比喻和描述性细节
+      - 句子长度：每句12-20个字
+      - 最多4-5句话
+      - 包含角色思想、对话和情感
+      - 例子："小明站在森林的边缘，犹豫着是否有足够的勇气去寻找奶奶提到的那条隐藏的瀑布。"
+    `;
+  } else {
+    return `
+      - 年龄 11-12岁：高级叙事
+      - 使用丰富的词汇、复杂句式和文学技巧
+      - 句子长度：每句15-25个字
+      - 最多5-6句话
+      - 包含潜台词、角色动机和主题深度
+      - 例子："那张旧地图被夹在图书馆的书里已经几十年了，褪色的墨迹描绘出一条镇上无人记得的小径——但小明决心要追寻它。"
+    `;
   }
 }
 
 /**
- * Get target scene count for Chinese stories
+ * Get target scene count for Chinese stories.
+ * Matches English logic: as_written (exact), light (>= original), rich (12-15).
  */
 function getTargetSceneCount(
   originalSceneCount: number,
   readingLevel: number,
   expansionLevel: ExpansionLevel
 ): number {
-  if (expansionLevel === 'minimal') {
+  if (expansionLevel === 'as_written') {
     return originalSceneCount;
   }
 
-  if (expansionLevel === 'smart') {
-    if (readingLevel <= 4) return Math.min(Math.ceil(originalSceneCount * 2), 8);
-    if (readingLevel <= 6) return Math.min(Math.ceil(originalSceneCount * 2.5), 10);
-    return Math.min(Math.ceil(originalSceneCount * 3), 12);
+  if (expansionLevel === 'light') {
+    if (readingLevel <= 4) return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 1.5), 8));
+    if (readingLevel <= 6) return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 1.5), 10));
+    if (readingLevel <= 8) return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 2), 12));
+    return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 2), 15));
   }
 
   return Math.max(12, Math.min(Math.ceil(originalSceneCount * 3), 15));
 }
 
 /**
- * Get expansion instructions in Chinese
+ * Get expansion instructions in Chinese.
+ * Matches English logic: as_written, light, rich.
  */
 function getExpansionInstructions(
   expansionLevel: ExpansionLevel,
@@ -135,29 +143,33 @@ function getExpansionInstructions(
   targetSceneCount: number,
   characterNames: string
 ): string {
-  if (expansionLevel === 'minimal') {
+  if (expansionLevel === 'as_written') {
     return `
-扩展级别：最小（保持原始故事）
+扩展级别：原样保留（完全保持用户的原始脚本）
 - 必须创建恰好 ${originalSceneCount} 个场景（与输入相同）
 - 不要添加新场景或改变故事结构
 - 不要添加新角色，只使用：${characterNames}
-- 只增强字幕使其适合年龄和清晰
-- 保持用户原始故事的精神
-- 专注于提高语言质量，而不是添加内容
+- 字幕：必须使用用户的原始文本，一字不改——不要调整词汇、句子结构或标点
+  - 孩子自己写的文字，要完全保留他们的表达
+  - 不要根据阅读水平调整——用户选择"原样保留"就是要保持原文不变
+  - 只修正明显的错别字，其他不做任何改动
+- 图像提示：为图像生成创建生动的视觉描述（在这里添加细节）
+- 完全保持用户原始故事的精神
     `;
   }
 
-  if (expansionLevel === 'smart') {
+  if (expansionLevel === 'light') {
     return `
-扩展级别：智能（基于年龄的扩展）
+扩展级别：轻度扩展
 - 原始场景数：${originalSceneCount}
 - 目标场景数：${targetSceneCount}
-- 用过渡场景和细节扩展故事
+- 重要：必须创建至少 ${originalSceneCount} 个场景（不能减少）
+- 增强字幕使其适合年龄、清晰、引人入胜
+- 可以添加过渡场景以改善故事流畅性
 - 如果需要，可以添加次要配角（父母、朋友、宠物）
 - 在characterNames中用"(NEW)"标记任何新角色
 - 添加感官细节（颜色、声音、感觉）
 - 添加适合年龄的简单对话
-- 添加小的情节元素（小挑战、发现）
 - 保持清晰的故事弧：开始→中间→结束
 - 必须保留用户的主要角色：${characterNames}
     `;
@@ -179,14 +191,16 @@ function getExpansionInstructions(
 }
 
 /**
- * Build Chinese enhancement prompt
+ * Build Chinese enhancement prompt.
+ * Accepts optional templateBasePrompt for story category guidance.
  */
 export function buildChineseEnhancementPrompt(
   scenes: SceneToEnhance[],
   characters: Character[],
   readingLevel: number,
   storyTone: StoryTone,
-  expansionLevel: ExpansionLevel = 'minimal'
+  expansionLevel: ExpansionLevel = 'as_written',
+  templateBasePrompt?: string
 ): string {
   const characterNames = characters.map(c => c.name).join('、');
   const characterDescriptions = characters
@@ -211,7 +225,10 @@ export function buildChineseEnhancementPrompt(
 
 角色信息：
 ${characterDescriptions}
-
+${templateBasePrompt ? `
+故事类别指导：
+${templateBasePrompt}
+` : ''}
 ${expansionInstructions}
 
 "${storyTone.toUpperCase()}"基调指南：

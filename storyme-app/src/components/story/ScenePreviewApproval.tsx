@@ -54,7 +54,7 @@ export default function ScenePreviewApproval({
   onDescriptionEdit,
   readingLevel = 5,
   storyTone = 'playful',
-  expansionLevel = 'minimal',
+  expansionLevel = 'as_written',
   contentLanguage = 'en',
   generateChineseTranslation = false,
   artStyle = 'classic',

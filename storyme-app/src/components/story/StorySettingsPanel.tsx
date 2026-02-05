@@ -3,15 +3,15 @@
 import { StoryTone, ExpansionLevel, ClothingConsistency } from '@/lib/types/story';
 import ExpansionLevelSelector from './ExpansionLevelSelector';
 
-interface StorySettingsPanelProps {
+export interface StorySettingsPanelProps {
   readingLevel: number;
   onReadingLevelChange: (level: number) => void;
   storyTone: StoryTone;
   onStoryToneChange: (tone: StoryTone) => void;
-  clothingConsistency: ClothingConsistency;
-  onClothingConsistencyChange: (mode: ClothingConsistency) => void;
-  expansionLevel: ExpansionLevel;
-  onExpansionLevelChange: (level: ExpansionLevel) => void;
+  clothingConsistency?: ClothingConsistency;
+  onClothingConsistencyChange?: (mode: ClothingConsistency) => void;
+  expansionLevel?: ExpansionLevel;
+  onExpansionLevelChange?: (level: ExpansionLevel) => void;
   // Bilingual options (only shown for English content)
   contentLanguage?: 'en' | 'zh';
   generateChineseTranslation?: boolean;
@@ -27,51 +27,103 @@ const toneOptions: Array<{
   { value: 'playful', label: 'Playful', icon: '🎈' },
   { value: 'friendly', label: 'Friendly', icon: '🤗' },
   { value: 'adventure', label: 'Adventure', icon: '⚔️' },
-  { value: 'brave', label: 'Brave', icon: '🦁' },
   { value: 'educational', label: 'Educational', icon: '🎓' },
-  { value: 'silly', label: 'Silly', icon: '🤪' },
 ];
 
-const readingLevelLabels: Record<number, { emoji: string; label: string; example: string }> = {
+/**
+ * Internal Lexile mapping for reading ages 1-12.
+ * Used for tooltip display and AI prompt context.
+ */
+const readingLevelLabels: Record<number, {
+  emoji: string;
+  label: string;
+  example: string;
+  lexile: string;
+  grade: string;
+}> = {
   1: {
     emoji: '🍼',
     label: 'Age 1',
-    example: 'Dog!'
+    example: 'Dog!',
+    lexile: '~100L',
+    grade: 'Pre-K',
   },
   2: {
     emoji: '👶',
     label: 'Age 2',
-    example: 'Mommy. Ball.'
+    example: 'Mommy. Ball.',
+    lexile: '~200L',
+    grade: 'Pre-K',
   },
   3: {
     emoji: '👧',
     label: 'Age 3',
-    example: 'Emma plays. She is happy!'
+    example: 'Emma plays. She is happy!',
+    lexile: '~300L',
+    grade: 'Pre-K',
   },
   4: {
     emoji: '🧒',
     label: 'Age 4',
-    example: 'Emma plays outside. She has fun!'
+    example: 'Emma plays outside. She has fun!',
+    lexile: '~350L',
+    grade: 'Pre-K',
   },
   5: {
     emoji: '👦',
     label: 'Age 5',
-    example: 'Emma went to the park. She had so much fun!'
+    example: 'Emma went to the park. She had so much fun!',
+    lexile: '~400L',
+    grade: 'K',
   },
   6: {
     emoji: '📖',
     label: 'Age 6',
-    example: 'Emma was playing at the sunny park with her friends.'
+    example: 'Emma was playing at the sunny park with her friends.',
+    lexile: '~500L',
+    grade: 'Grade 1',
   },
   7: {
     emoji: '📚',
     label: 'Age 7',
-    example: 'Emma discovered a magical playground where all the swings sparkled.'
+    example: 'Emma discovered a magical playground where all the swings sparkled.',
+    lexile: '~600L',
+    grade: 'Grade 2',
   },
   8: {
     emoji: '🎓',
     label: 'Age 8',
-    example: 'Emma explored the enchanted park and found a secret garden full of colorful flowers.'
+    example: 'Emma explored the enchanted park and found a secret garden full of colorful flowers.',
+    lexile: '~700L',
+    grade: 'Grade 3',
+  },
+  9: {
+    emoji: '🔬',
+    label: 'Age 9',
+    example: 'Emma hesitated at the forest edge, wondering if she was brave enough to find the hidden waterfall.',
+    lexile: '~800L',
+    grade: 'Grade 4',
+  },
+  10: {
+    emoji: '🌍',
+    label: 'Age 10',
+    example: 'The ancient map revealed a path no one in town remembered, but Emma was determined to follow it.',
+    lexile: '~900L',
+    grade: 'Grade 5',
+  },
+  11: {
+    emoji: '🔭',
+    label: 'Age 11',
+    example: 'As the last light faded behind the mountains, Emma realized the journey had changed her in ways she hadn\'t expected.',
+    lexile: '~1000L',
+    grade: 'Grade 6',
+  },
+  12: {
+    emoji: '🎯',
+    label: 'Age 12',
+    example: 'The old library held secrets that the town council preferred forgotten, but curiosity, Emma decided, was stronger than caution.',
+    lexile: '~1050L',
+    grade: 'Grade 7',
   },
 };
 
@@ -80,15 +132,17 @@ export default function StorySettingsPanel({
   onReadingLevelChange,
   storyTone,
   onStoryToneChange,
-  clothingConsistency,
+  clothingConsistency = 'consistent',
   onClothingConsistencyChange,
-  expansionLevel,
+  expansionLevel = 'as_written',
   onExpansionLevelChange,
   contentLanguage = 'en',
   generateChineseTranslation = false,
   onGenerateChineseTranslationChange,
   disabled = false,
 }: StorySettingsPanelProps) {
+  const currentLevel = readingLevelLabels[readingLevel];
+
   return (
     <div className="w-full space-y-6 p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
       <div className="flex items-center gap-2 mb-4">
@@ -96,50 +150,57 @@ export default function StorySettingsPanel({
         <span className="text-sm text-gray-500">Customize your storybook</span>
       </div>
 
-      {/* Reading Level Slider */}
+      {/* Reading Level Selector */}
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
           <label className="block text-sm font-semibold text-gray-700">
             Reading Age
           </label>
           <p className="text-sm text-purple-700 italic">
-            Text complexity example: "{readingLevelLabels[readingLevel].example}"
+            &ldquo;{currentLevel.example}&rdquo;
           </p>
         </div>
 
-        {/* Slider */}
-        <div className="relative px-2">
-          <input
-            type="range"
-            min={1}
-            max={8}
-            step={1}
-            value={readingLevel}
-            onChange={(e) => onReadingLevelChange(Number(e.target.value))}
-            disabled={disabled}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed accent-purple-600"
-          />
-
-          {/* Age markers */}
-          <div className="flex justify-between mt-2 px-1">
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((age) => (
+        {/* Slider with number labels */}
+        <div className="space-y-1">
+          <div className="relative px-2">
+            <input
+              type="range"
+              min={1}
+              max={12}
+              step={1}
+              value={readingLevel}
+              onChange={(e) => !disabled && onReadingLevelChange(Number(e.target.value))}
+              disabled={disabled}
+              className="w-full h-2 bg-gray-200 rounded-full appearance-none cursor-pointer accent-purple-600 disabled:opacity-50 disabled:cursor-not-allowed [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-600 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-purple-600 [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:cursor-pointer"
+            />
+          </div>
+          {/* Number labels under slider */}
+          <div className="flex justify-between px-2">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((age) => (
               <button
                 key={age}
+                type="button"
                 onClick={() => !disabled && onReadingLevelChange(age)}
                 disabled={disabled}
-                className={`flex flex-col items-center gap-1 transition-all ${
-                  readingLevel === age
-                    ? 'scale-110'
-                    : 'opacity-50 hover:opacity-75'
-                } disabled:cursor-not-allowed`}
+                className={`
+                  w-6 text-center text-xs font-semibold transition-all rounded-full leading-5
+                  ${readingLevel === age
+                    ? 'text-purple-700 bg-purple-100'
+                    : 'text-gray-400 hover:text-purple-600'
+                  }
+                  ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}
+                `}
               >
-                <span className="text-2xl">{readingLevelLabels[age].emoji}</span>
-                <span className="text-xs font-medium text-gray-600">
-                  {readingLevelLabels[age].label}
-                </span>
+                {age}
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Lexile + grade info */}
+        <div className="text-xs text-gray-500 text-center">
+          {currentLevel.lexile} Lexile &middot; {currentLevel.grade}
         </div>
       </div>
 
@@ -184,7 +245,7 @@ export default function StorySettingsPanel({
           {/* Consistent Option (Default) */}
           <button
             type="button"
-            onClick={() => !disabled && onClothingConsistencyChange('consistent')}
+            onClick={() => !disabled && onClothingConsistencyChange?.('consistent')}
             disabled={disabled}
             className={`relative flex flex-col p-3 border-2 rounded-xl cursor-pointer transition-all text-left ${
               clothingConsistency === 'consistent'
@@ -219,7 +280,7 @@ export default function StorySettingsPanel({
           {/* Scene-Based Option */}
           <button
             type="button"
-            onClick={() => !disabled && onClothingConsistencyChange('scene-based')}
+            onClick={() => !disabled && onClothingConsistencyChange?.('scene-based')}
             disabled={disabled}
             className={`relative flex flex-col p-3 border-2 rounded-xl cursor-pointer transition-all text-left ${
               clothingConsistency === 'scene-based'
@@ -249,11 +310,13 @@ export default function StorySettingsPanel({
       </div>
 
       {/* Expansion Level Selector */}
-      <ExpansionLevelSelector
-        value={expansionLevel}
-        readingLevel={readingLevel}
-        onChange={onExpansionLevelChange}
-      />
+      {onExpansionLevelChange && (
+        <ExpansionLevelSelector
+          value={expansionLevel}
+          readingLevel={readingLevel}
+          onChange={onExpansionLevelChange}
+        />
+      )}
 
       {/* Chinese Captions Checkbox (Only for English stories) */}
       {contentLanguage === 'en' && onGenerateChineseTranslationChange && (

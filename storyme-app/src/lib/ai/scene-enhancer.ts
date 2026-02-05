@@ -33,15 +33,19 @@ export interface EnhancedSceneResult {
 }
 
 /**
- * Get tone-specific guidelines for AI prompt
+ * Get tone-specific guidelines for AI prompt.
+ *
+ * Active tones: playful (absorbs old 'silly'), educational, adventure (absorbs old 'brave'), friendly.
+ * Removed tones: gentle, silly, mystery, brave — keywords merged into remaining tones.
  */
 function getToneGuidelines(tone: StoryTone): string {
-  const guidelines = {
+  const guidelines: Record<string, string> = {
     playful: `
       - Use upbeat, energetic language
       - Include words like "fun", "happy", "exciting", "joy"
       - Convey lightheartedness and delight
-      - Examples: "giggled", "bounced", "danced", "cheered", "played"
+      - Embrace humor, playful exaggeration, and whimsical imagery
+      - Examples: "giggled", "bounced", "danced", "cheered", "played", "whoops", "uh-oh", "wacky"
     `,
     educational: `
       - Introduce learning moments naturally
@@ -51,27 +55,10 @@ function getToneGuidelines(tone: StoryTone): string {
     `,
     adventure: `
       - Use action-oriented, dynamic language
-      - Include elements of courage and exploration
+      - Include elements of courage, exploration, and overcoming challenges
       - Create excitement and anticipation
-      - Examples: "explored", "brave", "journey", "quest", "discovered", "ventured"
-    `,
-    gentle: `
-      - Use soft, calming, soothing language
-      - Focus on peaceful, comforting moments
-      - Slower pacing, reflective and serene tone
-      - Examples: "softly", "gently", "peaceful", "cozy", "warm", "calm"
-    `,
-    silly: `
-      - Embrace absurdity, humor, and playfulness
-      - Use playful exaggeration and funny imagery
-      - Make it whimsical and giggle-worthy
-      - Examples: "gigantic", "whoops", "wibbly-wobbly", "uh-oh", "silly", "wacky"
-    `,
-    mystery: `
-      - Create curiosity, wonder, and intrigue
-      - Use questioning language and build anticipation
-      - Encourage imagination and discovery
-      - Examples: "wondered", "curious", "secret", "discovered", "mysterious", "hidden"
+      - Validate emotions while inspiring confidence
+      - Examples: "explored", "brave", "journey", "quest", "ventured", "confident", "strong", "proud"
     `,
     friendly: `
       - Emphasize relationships, togetherness, and warmth
@@ -79,32 +66,35 @@ function getToneGuidelines(tone: StoryTone): string {
       - Highlight sharing, kindness, and connection
       - Examples: "together", "friends", "helped", "shared", "kind", "caring"
     `,
-    brave: `
-      - Focus on overcoming challenges and building confidence
-      - Use empowering, encouraging language
-      - Validate emotions while inspiring courage
-      - Examples: "tried", "confident", "strong", "proud", "brave", "fearless"
-    `
   };
 
-  return guidelines[tone];
+  return guidelines[tone] || guidelines.playful;
 }
 
 /**
- * Get reading level guidelines for AI prompt
+ * Get reading level guidelines for AI prompt.
+ * Supports ages 1-12. Internal Lexile mapping for AI reference.
  */
 function getReadingLevelGuidelines(readingLevel: number): string {
-  if (readingLevel <= 4) {
+  if (readingLevel <= 2) {
     return `
-      - Age 3-4: Very simple language
+      - Age 1-2: Minimal language (~100-200L Lexile, Pre-K)
+      - Use single words or 2-3 word phrases
+      - Sentence length: 1-3 words
+      - Maximum 1-2 phrases
+      - Example: "Dog!" or "Mommy. Ball."
+    `;
+  } else if (readingLevel <= 4) {
+    return `
+      - Age 3-4: Very simple language (~200-400L Lexile, Pre-K)
       - Use 1-2 syllable words only
       - Sentence length: 3-5 words per sentence
       - Maximum 2 sentences
-      - Example: "Emma plays. She is happy."
+      - Example: "Emma plays. She is happy!"
     `;
   } else if (readingLevel === 5) {
     return `
-      - Age 5: Simple, clear language
+      - Age 5: Simple, clear language (~400L Lexile, Kindergarten)
       - Use mostly simple words, occasional 3-syllable words
       - Sentence length: 5-8 words per sentence
       - Maximum 2-3 sentences
@@ -112,48 +102,76 @@ function getReadingLevelGuidelines(readingLevel: number): string {
     `;
   } else if (readingLevel === 6) {
     return `
-      - Age 6: Building vocabulary
+      - Age 6: Building vocabulary (~500L Lexile, Grade 1)
       - More word variety, some compound words
       - Sentence length: 8-12 words per sentence
       - Maximum 3 sentences
       - Example: "Emma was playing at the sunny park with her friends."
     `;
-  } else {
+  } else if (readingLevel <= 8) {
     return `
-      - Age 7-8: Richer vocabulary and complexity
+      - Age 7-8: Richer vocabulary (~600-700L Lexile, Grade 2-3)
       - Use descriptive words, varied sentence structure
       - Sentence length: 10-15 words per sentence
       - Maximum 3-4 sentences
       - Example: "Emma discovered a magical playground where all the swings sparkled in the sunlight."
     `;
+  } else if (readingLevel <= 10) {
+    return `
+      - Age 9-10: Complex narratives (~800-900L Lexile, Grade 4-5)
+      - Use varied vocabulary, figurative language, and descriptive detail
+      - Sentence length: 12-20 words per sentence
+      - Maximum 4-5 sentences
+      - Include character thoughts, dialogue, and emotional nuance
+      - Example: "Emma hesitated at the edge of the forest, wondering if she was brave enough to find the hidden waterfall her grandmother had told her about."
+    `;
+  } else {
+    return `
+      - Age 11-12: Advanced narratives (~1000-1050L Lexile, Grade 6-7)
+      - Use rich vocabulary, complex sentence structures, and literary techniques
+      - Sentence length: 15-25 words per sentence
+      - Maximum 5-6 sentences
+      - Include subtext, character motivation, and thematic depth
+      - Example: "The old map had been tucked inside a library book for decades, its faded ink revealing a path that no one in town remembered — but Emma was determined to follow it."
+    `;
   }
 }
 
 /**
- * Get target scene count based on expansion level and reading level
+ * Get target scene count based on expansion level and reading level.
+ *
+ * as_written: exact same count (script used verbatim)
+ * light: at least original count, up to ~2x (never reduces)
+ * rich: 12-15 scenes
  */
 function getTargetSceneCount(
   originalSceneCount: number,
   readingLevel: number,
   expansionLevel: ExpansionLevel
 ): number {
-  if (expansionLevel === 'minimal') {
-    return originalSceneCount; // Keep same count
+  if (expansionLevel === 'as_written') {
+    return originalSceneCount;
   }
 
-  if (expansionLevel === 'smart') {
-    // Age-based smart expansion
-    if (readingLevel <= 4) return Math.min(Math.ceil(originalSceneCount * 2), 8);
-    if (readingLevel <= 6) return Math.min(Math.ceil(originalSceneCount * 2.5), 10);
-    return Math.min(Math.ceil(originalSceneCount * 3), 12);
+  if (expansionLevel === 'light') {
+    // Light expansion: never reduce, may add some scenes
+    if (readingLevel <= 4) return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 1.5), 8));
+    if (readingLevel <= 6) return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 1.5), 10));
+    if (readingLevel <= 8) return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 2), 12));
+    // Ages 9-12: can expand a bit more
+    return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 2), 15));
   }
 
-  // Rich expansion
+  // Rich expansion: 12-15 scenes
   return Math.max(12, Math.min(Math.ceil(originalSceneCount * 3), 15));
 }
 
 /**
- * Get expansion-specific instructions for AI
+ * Get expansion-specific instructions for AI.
+ *
+ * as_written: captions are the user's script verbatim, only generate image prompts
+ * light: enhance captions + may add transitional scenes (never reduce count)
+ * rich: full creative expansion
  */
 function getExpansionInstructions(
   expansionLevel: ExpansionLevel,
@@ -161,29 +179,33 @@ function getExpansionInstructions(
   targetSceneCount: number,
   characterNames: string
 ): string {
-  if (expansionLevel === 'minimal') {
+  if (expansionLevel === 'as_written') {
     return `
-EXPANSION LEVEL: MINIMAL (Keep Original Story)
+EXPANSION LEVEL: AS WRITTEN (Preserve User's Exact Script)
 - You MUST create EXACTLY ${originalSceneCount} scenes (same as input)
 - DO NOT add new scenes or change the story structure
 - DO NOT add new characters beyond: ${characterNames}
-- ONLY enhance the captions to be age-appropriate and clear
-- Keep the user's original story spirit intact
-- Focus on improving language quality, not adding content
+- For CAPTIONS: use the user's EXACT original text VERBATIM — do NOT change any words, vocabulary, sentence structure, or punctuation
+  - The child wrote this themselves and wants their own words preserved
+  - Do NOT adjust for reading level — the user chose "As Written" specifically to keep their script unchanged
+  - Only fix obvious typos if present (misspelled words), nothing else
+- For ENHANCED IMAGE PROMPTS: create vivid visual descriptions for image generation (this is where you add detail)
+- Keep the user's original story spirit fully intact
     `;
   }
 
-  if (expansionLevel === 'smart') {
+  if (expansionLevel === 'light') {
     return `
-EXPANSION LEVEL: SMART (Age-Based Expansion)
+EXPANSION LEVEL: LIGHT EXPANSION
 - Original scenes: ${originalSceneCount}
 - Target scenes: ${targetSceneCount}
-- Expand the story with transitional scenes and details
+- IMPORTANT: You MUST create AT LEAST ${originalSceneCount} scenes (never reduce count)
+- Enhance captions to be age-appropriate, clear, and engaging
+- You MAY add transitional scenes for better story flow
 - You MAY add minor supporting characters if needed (parents, friends, pets)
 - Label any new characters with "(NEW)" in characterNames
 - Add sensory details (colors, sounds, feelings)
 - Add simple dialogue appropriate for the age
-- Add small plot elements (minor challenges, discoveries)
 - Maintain clear story arc: beginning → middle → end
 - MUST preserve user's main characters: ${characterNames}
     `;
@@ -206,14 +228,24 @@ EXPANSION LEVEL: RICH (Full Creative Expansion)
 }
 
 /**
- * Build system prompt for Claude API
+ * Build system prompt for AI scene enhancement.
+ *
+ * Prompt layering order:
+ *   1. Story settings (reading level, tone, scene count)
+ *   2. Character information
+ *   3. Story category guidance (from template, if selected)
+ *   4. Expansion instructions
+ *   5. Tone guidelines
+ *   6. Reading level guidelines
+ *   7. Task instructions + output format
  */
 export function buildEnhancementPrompt(
   scenes: SceneToEnhance[],
   characters: Character[],
   readingLevel: number,
   storyTone: StoryTone,
-  expansionLevel: ExpansionLevel = 'minimal'
+  expansionLevel: ExpansionLevel = 'as_written',
+  templateBasePrompt?: string
 ): string {
   const characterNames = characters.map(c => c.name).join(', ');
   const characterDescriptions = characters
@@ -238,7 +270,10 @@ STORY SETTINGS:
 
 CHARACTER INFORMATION:
 ${characterDescriptions}
-
+${templateBasePrompt ? `
+STORY CATEGORY GUIDANCE:
+${templateBasePrompt}
+` : ''}
 ${expansionInstructions}
 
 TONE GUIDELINES FOR "${storyTone.toUpperCase()}":

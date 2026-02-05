@@ -18,11 +18,13 @@ import GenerationProgress from '@/components/story/GenerationProgress';
 import ImageGallery from '@/components/story/ImageGallery';
 import FeedbackModal from '@/components/feedback/FeedbackModal';
 import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScene, ExpansionLevel, ClothingConsistency } from '@/lib/types/story';
+import { StoryTemplateId, STORY_TEMPLATES } from '@/lib/ai/story-templates';
 import { parseScriptIntoScenes } from '@/lib/scene-parser';
 import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import { getGuestStory, clearGuestStory } from '@/lib/utils/guest-story-storage';
 import EditImageControl from '@/components/story/EditImageControl';
+import WritingCoachModal from '@/components/story/WritingCoachModal';
 import { buildCoverPrompt } from '@/lib/ai/cover-prompt-builder';
 
 const CHARACTERS_STORAGE_KEY = 'storyme_character_library';
@@ -42,7 +44,11 @@ export default function CreateStoryPage() {
   const [readingLevel, setReadingLevel] = useState<number>(5);
   const [storyTone, setStoryTone] = useState<StoryTone>('playful');
   const [clothingConsistency, setClothingConsistency] = useState<ClothingConsistency>('consistent');
-  const [expansionLevel, setExpansionLevel] = useState<ExpansionLevel>('minimal');
+  const [expansionLevel, setExpansionLevel] = useState<ExpansionLevel>('as_written');
+
+  // Template + Writing Coach state
+  const [selectedTemplate, setSelectedTemplate] = useState<StoryTemplateId | null>('sel');
+  const [isCoachModalOpen, setIsCoachModalOpen] = useState(false);
 
   // Language selection (NEW - Bilingual Support)
   const [contentLanguage, setContentLanguage] = useState<'en' | 'zh'>('en');
@@ -362,8 +368,9 @@ export default function CreateStoryPage() {
           })),
           readingLevel,
           storyTone,
-          expansionLevel, // NEW: Pass expansion level to API
-          language: contentLanguage, // NEW: Pass content language (en or zh)
+          expansionLevel,
+          language: contentLanguage,
+          templateBasePrompt: selectedTemplate ? STORY_TEMPLATES[selectedTemplate]?.basePrompt : undefined,
           generateChineseTranslation, // NEW: For bilingual English stories with Chinese captions
           script: scriptInput,  // NEW: Pass raw script for title/description generation
           characters: characters.map(c => ({
@@ -1082,6 +1089,19 @@ export default function CreateStoryPage() {
         loading={feedbackLoading}
       />
 
+      <WritingCoachModal
+        isOpen={isCoachModalOpen}
+        onClose={() => setIsCoachModalOpen(false)}
+        script={scriptInput}
+        templateId={selectedTemplate}
+        characters={characters}
+        readingLevel={readingLevel}
+        onAcceptPolish={(newScript) => {
+          setScriptInput(newScript);
+          setIsCoachModalOpen(false);
+        }}
+      />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Your Story</h1>
@@ -1328,6 +1348,9 @@ export default function CreateStoryPage() {
               value={scriptInput}
               onChange={setScriptInput}
               characters={characters}
+              selectedTemplate={selectedTemplate}
+              onTemplateChange={setSelectedTemplate}
+              onCoachClick={() => setIsCoachModalOpen(true)}
             />
           </div>
         )}

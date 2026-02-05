@@ -36,10 +36,11 @@ export async function POST(request: NextRequest) {
       readingLevel,
       storyTone,
       characters,
-      expansionLevel = 'minimal',
+      expansionLevel = 'as_written',
       language = 'en',
-      generateChineseTranslation = false,  // NEW: For bilingual English stories
-      script  // NEW: Raw script text for title/description generation
+      generateChineseTranslation = false,  // For bilingual English stories
+      script,  // Raw script text for title/description generation
+      templateBasePrompt  // Optional: story category guidance from selected template
     } = body;
 
     // Validate inputs
@@ -50,9 +51,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!readingLevel || readingLevel < 3 || readingLevel > 8) {
+    if (!readingLevel || readingLevel < 1 || readingLevel > 12) {
       return NextResponse.json(
-        { error: 'Reading level must be between 3 and 8' },
+        { error: 'Reading level must be between 1 and 12' },
         { status: 400 }
       );
     }
@@ -72,8 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     const validTones: StoryTone[] = [
-      'playful', 'educational', 'adventure', 'gentle',
-      'silly', 'mystery', 'friendly', 'brave'
+      'playful', 'educational', 'adventure', 'friendly'
     ];
 
     if (!validTones.includes(storyTone)) {
@@ -93,14 +93,16 @@ export async function POST(request: NextRequest) {
           characters as Character[],
           readingLevel,
           storyTone as StoryTone,
-          expansionLevel as ExpansionLevel
+          expansionLevel as ExpansionLevel,
+          templateBasePrompt
         )
       : buildChineseEnhancementPrompt(
           scenes as SceneToEnhance[],
           characters as Character[],
           readingLevel,
           storyTone as StoryTone,
-          expansionLevel as ExpansionLevel
+          expansionLevel as ExpansionLevel,
+          templateBasePrompt
         );
 
     // Get appropriate AI model for language
@@ -144,6 +146,22 @@ export async function POST(request: NextRequest) {
     } catch (parseError) {
       console.error('Failed to parse AI response, using fallback:', parseError);
       enhancedScenes = createFallbackEnhancement(scenes);
+    }
+
+    // For "as_written" mode: override AI captions with user's exact original text.
+    // The AI may still subtly change wording despite instructions — this guarantees
+    // the child's original script is preserved verbatim. Image prompts remain AI-generated.
+    if (expansionLevel === 'as_written') {
+      enhancedScenes = enhancedScenes.map((scene, index) => {
+        const originalScene = (scenes as SceneToEnhance[])[index];
+        if (originalScene) {
+          return {
+            ...scene,
+            caption: originalScene.rawDescription,
+          };
+        }
+        return scene;
+      });
     }
 
     console.log(`✓ Enhanced ${enhancedScenes.length} scenes successfully`);

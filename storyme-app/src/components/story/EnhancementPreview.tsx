@@ -9,8 +9,8 @@ interface EnhancementPreviewProps {
   onRegenerateAll: () => void;
   onProceedToGenerate: () => void;
   isGenerating?: boolean;
-  readingLevel: number;
-  storyTone: string;
+  readingLevel?: number;
+  storyTone?: string;
 }
 
 export default function EnhancementPreview({
@@ -19,8 +19,8 @@ export default function EnhancementPreview({
   onRegenerateAll,
   onProceedToGenerate,
   isGenerating = false,
-  readingLevel,
-  storyTone,
+  readingLevel = 5,
+  storyTone = 'playful',
 }: EnhancementPreviewProps) {
   const [editingScene, setEditingScene] = useState<number | null>(null);
   const [editedCaption, setEditedCaption] = useState<string>('');
