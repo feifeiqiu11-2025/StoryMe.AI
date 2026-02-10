@@ -21,6 +21,23 @@ export type StoryTemplateId =
   | 'fiction'
   | 'just_for_fun';
 
+/**
+ * Story Architecture Definition
+ *
+ * Defines the structural framework for a story template.
+ * Used by AI to reorganize scenes into a coherent narrative arc.
+ */
+export interface StoryArchitecture {
+  // Required narrative beats (checkpoints the story must hit)
+  requiredBeats: string[];
+
+  // How scenes should flow logically from one to the next
+  sceneFlowGuidance: string;
+
+  // Pedagogical checkpoints that must be addressed
+  pedagogicalCheckpoints: string[];
+}
+
 export interface StoryTemplate {
   id: StoryTemplateId;
   name: string;            // Display label on the card
@@ -28,6 +45,7 @@ export interface StoryTemplate {
   placeholderHint: string; // Dynamic textarea placeholder when this template is selected
   basePrompt: string;      // Pedagogical guidance injected into system prompt (no tone/length/style)
   coachingFocus: string[]; // Aspects the Strengthen coaching checks for
+  architecture: StoryArchitecture; // Narrative structure framework (NEW)
 }
 
 export const DEFAULT_TEMPLATE_ID: StoryTemplateId = 'sel';
@@ -62,6 +80,31 @@ Requirements:
       'showing choices and their consequences',
       'ending with connection or confidence',
     ],
+    architecture: {
+      requiredBeats: [
+        "Setup: Character in their normal world, establish emotional baseline",
+        "Trigger: Emotional challenge or social conflict arises naturally",
+        "Response: Character's initial reaction - show specific feelings",
+        "Exploration: Character processes the situation (confusion, worry, hope)",
+        "Learning: Character gains insight through experience, observation, or help",
+        "Resolution: Character applies learning, situation improves",
+        "Reflection: End with emotional growth, connection, or confidence"
+      ],
+      sceneFlowGuidance: `
+- Open with character feeling content or engaged (baseline emotion)
+- Introduce conflict through misunderstanding, disappointment, change, or fear
+- Show character's emotional journey (don't skip the feelings)
+- Model healthy choices: asking for help, expressing feelings kindly, trying again
+- Resolution shows warmth and reassurance, not shaming
+- End with character feeling stronger, connected, or understood`,
+      pedagogicalCheckpoints: [
+        "At least one scene explicitly names a specific emotion (sad, worried, excited, etc.)",
+        "At least one scene shows perspective-taking or empathy (understanding how someone else feels)",
+        "At least one scene demonstrates healthy communication (asking questions, expressing feelings, listening)",
+        "Resolution shows positive outcome without shaming or punishment",
+        "Character experiences emotional growth by the end"
+      ]
+    },
   },
 
   life_skills: {
@@ -83,6 +126,32 @@ Requirements:
       'using gentle guidance instead of fear',
       'ending with empowerment',
     ],
+    architecture: {
+      requiredBeats: [
+        "Setup: Character's normal routine or habit",
+        "Challenge: Character skips the habit or faces a choice",
+        "Consequence: Show what happens (mild, realistic, not scary)",
+        "Explanation: Why the habit matters (health, safety, kindness, responsibility)",
+        "Better Choice: Character tries the habit properly",
+        "Success: Character experiences positive result",
+        "Empowerment: Character feels capable and commits to the habit"
+      ],
+      sceneFlowGuidance: `
+- Begin with character's typical day or routine
+- Introduce challenge naturally (forgets, doesn't want to, unsure why it matters)
+- Show realistic consequence (tooth hurts, feels tired, mess is hard to clean, etc.)
+- Explain WHY in age-appropriate terms (not fear-based)
+- Character chooses to try the better way
+- Positive outcome reinforces the lesson
+- End with character feeling proud and capable`,
+      pedagogicalCheckpoints: [
+        "The habit or skill is clearly identified (brushing teeth, tidying up, being careful, etc.)",
+        "Consequence is realistic and age-appropriate (not scary or punitive)",
+        "Explanation shows WHY it matters (health, safety, responsibility, kindness)",
+        "Character makes the better choice independently (not forced)",
+        "Tone is empowering, not preachy or fear-based"
+      ]
+    },
   },
 
   knowledge: {
@@ -104,6 +173,30 @@ Requirements:
       'building curiosity about the topic',
       'ending with understanding or wonder',
     ],
+    architecture: {
+      requiredBeats: [
+        "Curiosity: Character notices or wonders about something",
+        "Discovery: Character finds opportunity to explore (visit, observe, ask)",
+        "Observation: Character sees or experiences the topic firsthand",
+        "Explanation: Information presented naturally (guide explains, book shows, etc.)",
+        "Understanding: Character connects new knowledge to something familiar",
+        "Wonder: Character expresses excitement or curiosity about what they learned"
+      ],
+      sceneFlowGuidance: `
+- Start with character's genuine curiosity or question
+- Create opportunity for exploration (visit museum, meet expert, read book, observe nature)
+- Show character actively observing (not just being told)
+- Information delivered through demonstration, comparison, or storytelling
+- Use analogies or comparisons to familiar concepts
+- End with character feeling curious and excited to learn more`,
+      pedagogicalCheckpoints: [
+        "Topic is factually accurate (no fantasy explanations for real-world topics)",
+        "Information is age-appropriate and uses simple comparisons",
+        "Character actively discovers rather than passively receives information",
+        "Includes at least one 'Aha!' or 'I learned that...' moment",
+        "Ends with curiosity and wonder, not just facts"
+      ]
+    },
   },
 
   stem: {
@@ -125,6 +218,34 @@ Requirements:
       'trying a different approach',
       'ending with discovery or confidence',
     ],
+    architecture: {
+      requiredBeats: [
+        "Question: Character faces a problem or wonders how something works",
+        "Hypothesis: Character has an idea to try",
+        "Test: Character experiments or builds something",
+        "Failure: First attempt doesn't work as expected",
+        "Learning: Character observes what went wrong and why",
+        "New Approach: Character tries a different way based on learning",
+        "Discovery: Character succeeds and understands why it worked",
+        "Confidence: Character feels proud and capable of figuring things out"
+      ],
+      sceneFlowGuidance: `
+- Open with a problem to solve or question to investigate
+- Character proposes an idea (hypothesis)
+- Show character actively testing, building, or experimenting
+- First attempt fails or has unexpected results (this is KEY)
+- Character observes, thinks, and adjusts approach
+- Second attempt succeeds because character learned from failure
+- End with character feeling like a problem-solver`,
+      pedagogicalCheckpoints: [
+        "Problem or question is clearly stated",
+        "Character demonstrates reasoning or testing (not just luck)",
+        "Failure is shown as learning opportunity (not frustrating or shameful)",
+        "Character tries a different approach based on observation",
+        "Process is more important than perfect outcome",
+        "Ends with 'I can figure things out' confidence"
+      ]
+    },
   },
 
   finance: {
@@ -146,6 +267,32 @@ Requirements:
       'keeping the tone pressure-free',
       'ending with responsibility or agency',
     ],
+    architecture: {
+      requiredBeats: [
+        "Want/Goal: Character desires something (toy, treat, experience)",
+        "Choice Presented: Character learns the cost or trade-off",
+        "Options: Character considers different choices (save, spend now, share)",
+        "Decision: Character makes a choice",
+        "Consequence: Character experiences the result of their decision",
+        "Reflection: Character realizes what they learned about planning or value",
+        "Responsibility: Character feels capable of making good choices"
+      ],
+      sceneFlowGuidance: `
+- Start with character wanting something specific
+- Introduce real-world context (allowance, birthday money, earned reward)
+- Present clear trade-off (spend now vs. save for bigger goal)
+- Show character thinking through options
+- Character experiences natural consequence (positive or learning moment)
+- End with sense of agency and responsibility`,
+      pedagogicalCheckpoints: [
+        "Financial choice is age-appropriate (allowance, toys, simple goals)",
+        "Options are clearly presented (save, spend, share)",
+        "Consequences are realistic and balanced (not preachy)",
+        "Tone is positive and pressure-free",
+        "Character learns about planning, patience, or value",
+        "Ends with responsibility and agency, not guilt"
+      ]
+    },
   },
 
   fiction: {
@@ -166,6 +313,34 @@ Requirements:
       'using imaginative and vivid details',
       'ending with wonder or excitement',
     ],
+    architecture: {
+      requiredBeats: [
+        "Normal World: Character in everyday setting",
+        "Portal/Trigger: Something magical or unusual happens",
+        "Adventure Begins: Character enters new world or situation",
+        "Challenge: Character faces obstacle or problem",
+        "Creative Solution: Character uses imagination, courage, or cleverness",
+        "Climax: Exciting peak moment",
+        "Return: Character returns to normal world (or magical world becomes new normal)",
+        "Wonder: Character reflects on the adventure with excitement or warmth"
+      ],
+      sceneFlowGuidance: `
+- Open in familiar, relatable setting
+- Introduce magical element naturally (discovery, invitation, accident)
+- Build sense of wonder and excitement (not fear)
+- Challenge is age-appropriate (lost item, helping friend, solving puzzle)
+- Character uses creativity and courage to solve problem
+- Climax is exciting but not scary
+- Resolution brings closure and warmth
+- End with sense of possibility and imagination`,
+      pedagogicalCheckpoints: [
+        "Story has clear beginning (setup), middle (adventure), and end (resolution)",
+        "Magical elements are playful and age-appropriate (not dark or scary)",
+        "Character demonstrates courage, kindness, or creativity",
+        "Challenge is solved through character's actions, not luck",
+        "Ends with wonder, warmth, or excitement (not fear or sadness)"
+      ]
+    },
   },
 
   just_for_fun: {
@@ -186,6 +361,30 @@ Requirements:
       'building to a funny or warm ending',
       'keeping language simple and joyful',
     ],
+    architecture: {
+      requiredBeats: [
+        "Setup: Character in everyday situation",
+        "Silly Situation: Something unexpected and funny happens",
+        "Escalation: Situation gets more ridiculous or playful",
+        "Peak Silliness: Funniest or most surprising moment",
+        "Resolution: Situation resolves in lighthearted way",
+        "Ending: Character (and reader) laugh or smile"
+      ],
+      sceneFlowGuidance: `
+- Start with simple, relatable moment
+- Introduce silly twist (exaggeration, mishap, magic gone wrong)
+- Build humor through escalation or repetition
+- Keep tone light and joyful throughout
+- No lesson needed - just fun!
+- End with laughter, warmth, or playful surprise`,
+      pedagogicalCheckpoints: [
+        "Story is genuinely playful or funny (not mean-spirited)",
+        "Tone is light and joyful throughout",
+        "Situation is silly but not scary or gross",
+        "No lesson or moral is required",
+        "Ends with laughter, warmth, or happy surprise"
+      ]
+    },
   },
 };
 
@@ -210,4 +409,12 @@ export function getTemplateList(): StoryTemplate[] {
     'just_for_fun',
   ];
   return order.map(id => STORY_TEMPLATES[id]);
+}
+
+/**
+ * Get story architecture by template ID.
+ * Returns undefined if template not found.
+ */
+export function getStoryArchitecture(id: StoryTemplateId): StoryArchitecture | undefined {
+  return STORY_TEMPLATES[id]?.architecture;
 }

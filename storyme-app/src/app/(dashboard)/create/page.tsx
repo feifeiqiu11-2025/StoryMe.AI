@@ -371,6 +371,7 @@ export default function CreateStoryPage() {
           expansionLevel,
           language: contentLanguage,
           templateBasePrompt: selectedTemplate ? STORY_TEMPLATES[selectedTemplate]?.basePrompt : undefined,
+          templateId: selectedTemplate,  // NEW: Pass template ID for story architecture
           generateChineseTranslation, // NEW: For bilingual English stories with Chinese captions
           script: scriptInput,  // NEW: Pass raw script for title/description generation
           characters: characters.map(c => ({

@@ -7,6 +7,7 @@
 
 import { StoryTone, ExpansionLevel } from '../types/story';
 import type { CharacterType } from '../types/story';
+import type { StoryArchitecture } from './story-templates';
 
 export interface SceneToEnhance {
   sceneNumber: number;
@@ -141,8 +142,8 @@ function getReadingLevelGuidelines(readingLevel: number): string {
  * Get target scene count based on expansion level and reading level.
  *
  * as_written: exact same count (script used verbatim)
- * light: at least original count, up to ~2x (never reduces)
- * rich: 12-15 scenes
+ * light: 10-12 scenes (flexible architecture)
+ * rich: 15 scenes (strict architecture with more plot depth)
  */
 function getTargetSceneCount(
   originalSceneCount: number,
@@ -154,30 +155,27 @@ function getTargetSceneCount(
   }
 
   if (expansionLevel === 'light') {
-    // Light expansion: never reduce, may add some scenes
-    if (readingLevel <= 4) return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 1.5), 8));
-    if (readingLevel <= 6) return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 1.5), 10));
-    if (readingLevel <= 8) return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 2), 12));
-    // Ages 9-12: can expand a bit more
-    return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 2), 15));
+    // Light: 10-12 scenes (flexible)
+    return Math.max(10, Math.min(12, Math.max(originalSceneCount, 10)));
   }
 
-  // Rich expansion: 12-15 scenes
-  return Math.max(12, Math.min(Math.ceil(originalSceneCount * 3), 15));
+  // Rich: Always 15 scenes for deeper plot and more images
+  return 15;
 }
 
 /**
  * Get expansion-specific instructions for AI.
  *
  * as_written: captions are the user's script verbatim, only generate image prompts
- * light: enhance captions + may add transitional scenes (never reduce count)
- * rich: full creative expansion
+ * light: enhance captions + follow architecture flexibly
+ * rich: full creative expansion following architecture strictly
  */
 function getExpansionInstructions(
   expansionLevel: ExpansionLevel,
   originalSceneCount: number,
   targetSceneCount: number,
-  characterNames: string
+  characterNames: string,
+  architecture?: StoryArchitecture
 ): string {
   if (expansionLevel === 'as_written') {
     return `
@@ -195,36 +193,88 @@ EXPANSION LEVEL: AS WRITTEN (Preserve User's Exact Script)
   }
 
   if (expansionLevel === 'light') {
+    const architectureGuidance = architecture ? `
+STORY ARCHITECTURE (FLEXIBLE GUIDANCE):
+The story should follow this narrative structure, but adapt if the user's script has a different flow:
+
+${architecture.requiredBeats.map((beat, i) => `${i + 1}. ${beat}`).join('\n')}
+
+Scene Flow:
+${architecture.sceneFlowGuidance}
+
+Try to include these pedagogical elements:
+${architecture.pedagogicalCheckpoints.map((cp, i) => `• ${cp}`).join('\n')}
+
+IMPORTANT: Use this architecture as a GUIDE. If the user's script already has good flow, enhance it rather than forcing this structure.
+` : '';
+
     return `
 EXPANSION LEVEL: LIGHT EXPANSION
 - Original scenes: ${originalSceneCount}
-- Target scenes: ${targetSceneCount}
-- IMPORTANT: You MUST create AT LEAST ${originalSceneCount} scenes (never reduce count)
+- Target scenes: ${targetSceneCount} (10-12 scenes)
 - Enhance captions to be age-appropriate, clear, and engaging
-- You MAY add transitional scenes for better story flow
+- Add transitional scenes to improve story flow and complete narrative arc
 - You MAY add minor supporting characters if needed (parents, friends, pets)
 - Label any new characters with "(NEW)" in characterNames
 - Add sensory details (colors, sounds, feelings)
 - Add simple dialogue appropriate for the age
-- Maintain clear story arc: beginning → middle → end
 - MUST preserve user's main characters: ${characterNames}
-    `;
+${architectureGuidance}`;
   }
 
   // Rich expansion
+  const architectureGuidance = architecture ? `
+STORY ARCHITECTURE (REQUIRED STRUCTURE):
+This story MUST follow this narrative arc. Reorganize the user's scenes to fit this structure:
+
+${architecture.requiredBeats.map((beat, i) => `${i + 1}. ${beat}`).join('\n')}
+
+Scene Flow Requirements:
+${architecture.sceneFlowGuidance}
+
+Required Pedagogical Checkpoints (ALL MUST BE ADDRESSED):
+${architecture.pedagogicalCheckpoints.map((cp, i) => `✓ ${cp}`).join('\n')}
+
+YOUR TASK WITH ARCHITECTURE:
+1. Read the user's script and identify which story beats are already present
+2. Reorganize scenes to fit the required narrative arc above
+3. Add scenes where needed to complete missing beats
+4. Ensure ALL pedagogical checkpoints are addressed
+5. Create logical flow from beginning → middle → end
+6. The user's script may be incomplete or out of order - your job is to structure it properly while preserving their core ideas and characters
+
+CRITICAL: ENFORCE CAUSE-AND-EFFECT LOGIC
+- NEVER jump from problem to solution without showing the process
+- Add transitional scenes that show HOW and WHY things happen
+- Use explicit cause-effect connections: "BECAUSE X happened, Y occurs" or "X does Y, WHICH CAUSES Z"
+- Show character MOTIVATION before actions (why does the character decide to do something?)
+- Show the PROCESS, not just the outcome (if magic fixes something, show HOW it's used)
+- Each scene should logically lead to the next - no abrupt jumps
+
+Examples of GOOD logical flow:
+✓ "Dragon breathes fire → flames touch water → water changes color → characters notice change"
+✓ "Character sees problem → feels concerned → decides to help → takes action"
+
+Examples of BAD logical flow (avoid these):
+✗ "Dragon blew fire. Ocean turned purple." (missing: how fire affects water)
+✗ "Dragon felt sad. Ocean turned blue." (missing: what did dragon DO to fix it?)
+✗ "Characters were worried. Dragon used magic!" (missing: why/how did dragon know to use magic?)
+` : '';
+
   return `
 EXPANSION LEVEL: RICH (Full Creative Expansion)
 - Original scenes: ${originalSceneCount}
-- Target scenes: ${targetSceneCount} (12-15 scenes)
-- Create a fully developed narrative with rich storytelling
+- Target scenes: ${targetSceneCount} (EXACTLY 15 scenes for deeper plot and more images)
+- Create a fully developed narrative with rich storytelling and clear cause-effect flow
 - Add dialogue, character development, emotional moments
 - You MAY add supporting characters (label with "(NEW)")
 - Add mini story arcs, conflicts, and resolutions
 - Create detailed settings and atmospheres
 - Add character thoughts and emotions
+- Show the PROCESS of events, not just outcomes
 - MUST preserve user's main characters: ${characterNames}
 - Keep core theme from original script
-  `;
+${architectureGuidance}`;
 }
 
 /**
@@ -234,10 +284,11 @@ EXPANSION LEVEL: RICH (Full Creative Expansion)
  *   1. Story settings (reading level, tone, scene count)
  *   2. Character information
  *   3. Story category guidance (from template, if selected)
- *   4. Expansion instructions
- *   5. Tone guidelines
- *   6. Reading level guidelines
- *   7. Task instructions + output format
+ *   4. Story architecture (narrative structure)
+ *   5. Expansion instructions
+ *   6. Tone guidelines
+ *   7. Reading level guidelines
+ *   8. Task instructions + output format
  */
 export function buildEnhancementPrompt(
   scenes: SceneToEnhance[],
@@ -245,7 +296,8 @@ export function buildEnhancementPrompt(
   readingLevel: number,
   storyTone: StoryTone,
   expansionLevel: ExpansionLevel = 'as_written',
-  templateBasePrompt?: string
+  templateBasePrompt?: string,
+  storyArchitecture?: StoryArchitecture
 ): string {
   const characterNames = characters.map(c => c.name).join(', ');
   const characterDescriptions = characters
@@ -257,7 +309,8 @@ export function buildEnhancementPrompt(
     expansionLevel,
     scenes.length,
     targetSceneCount,
-    characterNames
+    characterNames,
+    storyArchitecture
   );
 
   return `You are a children's storybook expert specializing in creating engaging, age-appropriate stories.

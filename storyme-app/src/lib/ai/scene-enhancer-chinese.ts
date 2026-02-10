@@ -7,6 +7,7 @@
 
 import { StoryTone, ExpansionLevel } from '../types/story';
 import type { SceneToEnhance, Character, EnhancedSceneResult } from './scene-enhancer';
+import type { StoryArchitecture } from './story-templates';
 
 /**
  * Get Chinese tone-specific guidelines.
@@ -112,7 +113,7 @@ function getChineseReadingLevelGuidelines(readingLevel: number): string {
 
 /**
  * Get target scene count for Chinese stories.
- * Matches English logic: as_written (exact), light (>= original), rich (12-15).
+ * Matches English logic: as_written (exact), light/rich (10-15 scenes).
  */
 function getTargetSceneCount(
   originalSceneCount: number,
@@ -124,24 +125,24 @@ function getTargetSceneCount(
   }
 
   if (expansionLevel === 'light') {
-    if (readingLevel <= 4) return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 1.5), 8));
-    if (readingLevel <= 6) return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 1.5), 10));
-    if (readingLevel <= 8) return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 2), 12));
-    return Math.max(originalSceneCount, Math.min(Math.ceil(originalSceneCount * 2), 15));
+    // Light: 10-12 scenes (flexible)
+    return Math.max(10, Math.min(12, Math.max(originalSceneCount, 10)));
   }
 
-  return Math.max(12, Math.min(Math.ceil(originalSceneCount * 3), 15));
+  // Rich: Always 15 scenes for deeper plot and more images
+  return 15;
 }
 
 /**
  * Get expansion instructions in Chinese.
- * Matches English logic: as_written, light, rich.
+ * Matches English logic: as_written, light (flexible architecture), rich (strict architecture).
  */
 function getExpansionInstructions(
   expansionLevel: ExpansionLevel,
   originalSceneCount: number,
   targetSceneCount: number,
-  characterNames: string
+  characterNames: string,
+  architecture?: StoryArchitecture
 ): string {
   if (expansionLevel === 'as_written') {
     return `
@@ -159,35 +160,88 @@ function getExpansionInstructions(
   }
 
   if (expansionLevel === 'light') {
+    const architectureGuidance = architecture ? `
+故事架构（灵活指导）：
+故事应遵循此叙事结构，但如果用户的脚本有不同的流程，可以进行调整：
+
+${architecture.requiredBeats.map((beat, i) => `${i + 1}. ${beat}`).join('\n')}
+
+场景流程：
+${architecture.sceneFlowGuidance}
+
+尝试包含这些教学元素：
+${architecture.pedagogicalCheckpoints.map((cp, i) => `• ${cp}`).join('\n')}
+
+重要：将此架构作为指导。如果用户的脚本已经有好的流程，增强它而不是强制这个结构。
+` : '';
+
     return `
 扩展级别：轻度扩展
 - 原始场景数：${originalSceneCount}
-- 目标场景数：${targetSceneCount}
-- 重要：必须创建至少 ${originalSceneCount} 个场景（不能减少）
+- 目标场景数：${targetSceneCount}（10-12个场景）
 - 增强字幕使其适合年龄、清晰、引人入胜
-- 可以添加过渡场景以改善故事流畅性
+- 添加过渡场景以改善故事流畅性并完成叙事弧
 - 如果需要，可以添加次要配角（父母、朋友、宠物）
 - 在characterNames中用"(NEW)"标记任何新角色
 - 添加感官细节（颜色、声音、感觉）
 - 添加适合年龄的简单对话
-- 保持清晰的故事弧：开始→中间→结束
 - 必须保留用户的主要角色：${characterNames}
-    `;
+${architectureGuidance}`;
   }
+
+  // Rich expansion
+  const architectureGuidance = architecture ? `
+故事架构（必需结构）：
+此故事必须遵循此叙事弧。重新组织用户的场景以适应此结构：
+
+${architecture.requiredBeats.map((beat, i) => `${i + 1}. ${beat}`).join('\n')}
+
+场景流程要求：
+${architecture.sceneFlowGuidance}
+
+必需的教学检查点（必须全部满足）：
+${architecture.pedagogicalCheckpoints.map((cp, i) => `✓ ${cp}`).join('\n')}
+
+使用架构的任务：
+1. 阅读用户的脚本并识别已存在的故事节拍
+2. 重新组织场景以适应上述所需的叙事弧
+3. 在需要的地方添加场景以完成缺失的节拍
+4. 确保所有教学检查点都得到满足
+5. 创建从开始→中间→结束的逻辑流程
+6. 用户的脚本可能不完整或无序 - 您的工作是正确构建它，同时保留他们的核心想法和角色
+
+关键：强化因果逻辑
+- 永远不要在不展示过程的情况下从问题跳到解决方案
+- 添加过渡场景，展示事情如何发生以及为什么发生
+- 使用明确的因果关系："因为X发生了，Y出现" 或 "X做Y，导致Z"
+- 在行动之前展示角色动机（角色为什么决定做某事？）
+- 展示过程，而不仅仅是结果（如果魔法修复了某事，展示如何使用）
+- 每个场景应该逻辑地引向下一个场景 - 没有突然的跳跃
+
+良好逻辑流的例子：
+✓ "龙喷火 → 火焰触及水面 → 水变色 → 角色注意到变化"
+✓ "角色看到问题 → 感到担忧 → 决定帮助 → 采取行动"
+
+不良逻辑流的例子（避免这些）：
+✗ "龙喷火。海洋变紫色。"（缺少：火如何影响水）
+✗ "龙感到悲伤。海洋变蓝。"（缺少：龙做了什么来修复它？）
+✗ "角色很担心。龙使用了魔法！"（缺少：为什么/如何龙知道使用魔法？）
+` : '';
 
   return `
 扩展级别：丰富（完整的创意扩展）
 - 原始场景数：${originalSceneCount}
-- 目标场景数：${targetSceneCount}（12-15个场景）
-- 创建具有丰富叙事的完整故事
+- 目标场景数：${targetSceneCount}（恰好15个场景，以获得更深入的情节和更多图像）
+- 创建具有丰富叙事和清晰因果流程的完整故事
 - 添加对话、角色发展、情感时刻
 - 可以添加配角（用"(NEW)"标记）
 - 添加迷你故事弧、冲突和解决方案
 - 创建详细的场景和氛围
 - 添加角色的想法和情感
+- 展示事件的过程，而不仅仅是结果
 - 必须保留用户的主要角色：${characterNames}
 - 保持原始剧本的核心主题
-  `;
+${architectureGuidance}`;
 }
 
 /**
@@ -200,7 +254,8 @@ export function buildChineseEnhancementPrompt(
   readingLevel: number,
   storyTone: StoryTone,
   expansionLevel: ExpansionLevel = 'as_written',
-  templateBasePrompt?: string
+  templateBasePrompt?: string,
+  storyArchitecture?: StoryArchitecture
 ): string {
   const characterNames = characters.map(c => c.name).join('、');
   const characterDescriptions = characters
@@ -212,7 +267,8 @@ export function buildChineseEnhancementPrompt(
     expansionLevel,
     scenes.length,
     targetSceneCount,
-    characterNames
+    characterNames,
+    storyArchitecture
   );
 
   return `你是儿童故事书专家，专门创作引人入胜、适合年龄的中文故事。

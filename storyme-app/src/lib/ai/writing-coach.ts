@@ -10,7 +10,7 @@
  */
 
 import { StoryTemplateId } from '@/lib/types/story';
-import { STORY_TEMPLATES, GENERIC_BASE_PROMPT } from './story-templates';
+import { STORY_TEMPLATES, GENERIC_BASE_PROMPT, getStoryArchitecture } from './story-templates';
 
 export interface WritingCoachInput {
   script: string;
@@ -50,17 +50,45 @@ export function buildCoachPrompt(input: WritingCoachInput): {
     ? `Characters in this story: ${characters.map(c => `${c.name} (${c.description})`).join(', ')}`
     : 'No specific characters defined yet.';
 
-  // Get template coaching focus if a template is selected
+  // Get template coaching focus and architecture if a template is selected
   let strengthenInstructions: string;
   let templateName: string;
 
   if (templateId && STORY_TEMPLATES[templateId]) {
     const template = STORY_TEMPLATES[templateId];
+    const architecture = getStoryArchitecture(templateId);
     templateName = template.name;
+
+    // Build architecture-aware strengthen instructions
+    const architectureContext = architecture ? `
+STORY ARCHITECTURE FOR THIS TEMPLATE:
+The story should follow this narrative structure:
+${architecture.requiredBeats.map((beat, i) => `${i + 1}. ${beat}`).join('\n')}
+
+Scene Flow:
+${architecture.sceneFlowGuidance}
+
+Pedagogical Checkpoints:
+${architecture.pedagogicalCheckpoints.map((cp, i) => `• ${cp}`).join('\n')}
+
+` : '';
+
     strengthenInstructions = `This is a "${template.name}" story. Based on this category, check if the script addresses these aspects:
 ${template.coachingFocus.map((f, i) => `${i + 1}. ${f}`).join('\n')}
 
-Generate 9 specific, age-appropriate questions that guide the child to strengthen their story based on what's MISSING or could be improved. Focus on the aspects above that the script doesn't yet address well.`;
+${architectureContext}
+YOUR TASK:
+1. Read the user's script carefully
+2. Identify which story beats/checkpoints are present
+3. Identify which beats/checkpoints are MISSING or weak
+4. Generate 9 specific, age-appropriate questions that guide the child to strengthen their story based on what's MISSING or could be improved
+5. Reference actual characters and events from their script in your questions
+6. Focus on the narrative structure and pedagogical aspects that the script doesn't yet address well
+
+IMPORTANT: Ask questions that help them add missing beats or strengthen weak ones. For example:
+- "Your story has a great setup, but what challenge could [Character] face?"
+- "How does [Character] feel when [event] happens?"
+- "What does [Character] learn by the end?"`;
   } else {
     templateName = 'General';
     strengthenInstructions = `This is a freeform story (no specific category selected). Check for general story structure:

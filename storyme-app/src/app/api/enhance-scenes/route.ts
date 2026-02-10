@@ -22,9 +22,10 @@ import {
   parseChineseEnhancementResponse,
 } from '@/lib/ai/scene-enhancer-chinese';
 import { getModelForLanguage, logModelUsage } from '@/lib/ai/deepseek-client';
-import { StoryTone, ExpansionLevel } from '@/lib/types/story';
+import { StoryTone, ExpansionLevel, StoryTemplateId } from '@/lib/types/story';
 import { generateStoryMetadata } from '@/lib/ai/metadata-generator';
 import { buildCoverPrompt } from '@/lib/ai/cover-prompt-builder';
+import { getStoryArchitecture } from '@/lib/ai/story-templates';
 
 export const maxDuration = 60; // 1 minute timeout
 
@@ -40,7 +41,8 @@ export async function POST(request: NextRequest) {
       language = 'en',
       generateChineseTranslation = false,  // For bilingual English stories
       script,  // Raw script text for title/description generation
-      templateBasePrompt  // Optional: story category guidance from selected template
+      templateBasePrompt,  // Optional: story category guidance from selected template
+      templateId  // Optional: template ID for story architecture
     } = body;
 
     // Validate inputs
@@ -85,6 +87,15 @@ export async function POST(request: NextRequest) {
 
     console.log(`Enhancing ${scenes.length} scenes with reading level ${readingLevel}, ${storyTone} tone, ${expansionLevel} expansion, language: ${language}`);
 
+    // Get story architecture if template is selected
+    const storyArchitecture = templateId
+      ? getStoryArchitecture(templateId as StoryTemplateId)
+      : undefined;
+
+    if (storyArchitecture) {
+      console.log(`📐 Using story architecture for template: ${templateId}`);
+    }
+
     // Build prompt based on language
     const isEnglish = language === 'en';
     const prompt = isEnglish
@@ -94,7 +105,8 @@ export async function POST(request: NextRequest) {
           readingLevel,
           storyTone as StoryTone,
           expansionLevel as ExpansionLevel,
-          templateBasePrompt
+          templateBasePrompt,
+          storyArchitecture
         )
       : buildChineseEnhancementPrompt(
           scenes as SceneToEnhance[],
@@ -102,7 +114,8 @@ export async function POST(request: NextRequest) {
           readingLevel,
           storyTone as StoryTone,
           expansionLevel as ExpansionLevel,
-          templateBasePrompt
+          templateBasePrompt,
+          storyArchitecture
         );
 
     // Get appropriate AI model for language
