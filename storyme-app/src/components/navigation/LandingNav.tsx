@@ -34,10 +34,16 @@ export default function LandingNav() {
   const productsRef = useRef<HTMLDivElement>(null);
   const founderRef = useRef<HTMLDivElement>(null);
   const communityRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      // Don't close dropdowns if clicking inside mobile menu
+      if (mobileMenuRef.current?.contains(event.target as Node)) {
+        return;
+      }
+
       if (productsRef.current && !productsRef.current.contains(event.target as Node)) {
         setProductsDropdownOpen(false);
       }
@@ -262,7 +268,7 @@ export default function LandingNav() {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden border-t border-gray-200 py-4 space-y-2">
+          <div ref={mobileMenuRef} className="lg:hidden border-t border-gray-200 py-4 space-y-2">
             <Link
               href="/"
               onClick={() => setIsMobileMenuOpen(false)}
