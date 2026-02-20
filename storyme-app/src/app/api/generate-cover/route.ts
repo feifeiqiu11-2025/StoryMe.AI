@@ -15,8 +15,14 @@ export async function POST(request: NextRequest) {
     const { title, description, author, age, language = 'en', characters, illustrationStyle, customPrompt, imageProvider: requestedProvider } = body;
 
     // Determine illustration style (default to 'classic' for 2D storybook)
-    const selectedStyle = illustrationStyle || 'classic';
+    // For coloring book mode, cover should always be colorful (use pixar style)
+    const requestedStyle = illustrationStyle || 'classic';
+    const selectedStyle = requestedStyle === 'coloring' ? 'pixar' : requestedStyle;
     const is3DStyle = selectedStyle === 'pixar';
+
+    if (requestedStyle === 'coloring') {
+      console.log(`🖍️ Coloring book mode - cover will use 3D Pixar style (colorful)`);
+    }
 
     // Validate inputs
     if (!title) {

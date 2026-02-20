@@ -10,7 +10,7 @@ import React, { useState } from 'react';
 import { EnhancedScene } from '@/lib/types/story';
 
 // Art style type
-type ArtStyleType = 'pixar' | 'classic';
+type ArtStyleType = 'pixar' | 'classic' | 'coloring';
 
 interface ScenePreviewApprovalProps {
   enhancedScenes: EnhancedScene[];
@@ -614,13 +614,13 @@ export default function ScenePreviewApproval({
           {onArtStyleChange && (
             <div className="mb-6">
               <h4 className="text-sm font-semibold text-gray-900 mb-3">Art Style</h4>
-              <div className="flex gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {/* 3D Pixar Option */}
                 <button
                   type="button"
                   onClick={() => !isGenerating && onArtStyleChange('pixar')}
                   disabled={isGenerating}
-                  className={`flex-1 flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all text-left ${
+                  className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all text-left ${
                     artStyle === 'pixar'
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
@@ -638,7 +638,7 @@ export default function ScenePreviewApproval({
                   </div>
                   <div>
                     <div className="font-medium text-gray-900 text-sm">3D Pixar Style</div>
-                    <p className="text-sm text-gray-500">Modern 3D animation look</p>
+                    <p className="text-xs text-gray-500">Modern 3D animation look</p>
                   </div>
                 </button>
 
@@ -647,7 +647,7 @@ export default function ScenePreviewApproval({
                   type="button"
                   onClick={() => !isGenerating && onArtStyleChange('classic')}
                   disabled={isGenerating}
-                  className={`flex-1 flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all text-left ${
+                  className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all text-left ${
                     artStyle === 'classic'
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
@@ -665,10 +665,43 @@ export default function ScenePreviewApproval({
                   </div>
                   <div>
                     <div className="font-medium text-gray-900 text-sm">Classic Storybook 2D</div>
-                    <p className="text-sm text-gray-500">Traditional watercolor illustration</p>
+                    <p className="text-xs text-gray-500">Traditional watercolor illustration</p>
+                  </div>
+                </button>
+
+                {/* Coloring Book Option */}
+                <button
+                  type="button"
+                  onClick={() => !isGenerating && onArtStyleChange('coloring')}
+                  disabled={isGenerating}
+                  className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all text-left ${
+                    artStyle === 'coloring'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
+                  } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {/* Custom radio circle */}
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    artStyle === 'coloring'
+                      ? 'border-blue-500 bg-blue-500'
+                      : 'border-gray-300 bg-white'
+                  }`}>
+                    {artStyle === 'coloring' && (
+                      <div className="w-2 h-2 rounded-full bg-white"></div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-900 text-sm">Coloring Book</div>
+                    <p className="text-xs text-gray-500">B&W line art for coloring</p>
                   </div>
                 </button>
               </div>
+              {/* Coloring Book Note */}
+              {artStyle === 'coloring' && (
+                <p className="text-xs text-blue-600 mt-2 bg-blue-50 p-2 rounded-lg">
+                  📖 Cover will be colorful (3D style), scene pages will be black & white line art for kids to color!
+                </p>
+              )}
             </div>
           )}
 

@@ -869,6 +869,227 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
 }
 
 /**
+ * Generate image with Gemini in Coloring Book style (B&W line art)
+ *
+ * Creates black and white line art illustrations suitable for children to color.
+ * Maintains character likeness from reference photos but outputs as clean outlines.
+ * Cover images should NOT use this - use generateImageWithGemini instead for colorful covers.
+ *
+ * Uses new @google/genai SDK with imageConfig for proper 1:1 aspect ratio
+ */
+export async function generateImageWithGeminiColoring({
+  characters,
+  sceneDescription,
+  artStyle = "children's coloring book, line art",
+  clothingConsistency = 'consistent',
+}: GeminiGenerateParams): Promise<GeminiGenerateResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+
+  const startTime = Date.now();
+
+  // Use new @google/genai SDK
+  const genAI = new GoogleGenAI({ apiKey });
+
+  // Detect story theme (for logging purposes, not used for auto-clothing anymore)
+  const storyTheme = detectStoryTheme(sceneDescription);
+
+  if (storyTheme) {
+    console.log(`[Gemini Coloring] Detected story theme: ${storyTheme}`);
+  }
+  console.log(`[Gemini Coloring] Clothing consistency mode: ${clothingConsistency}`);
+
+  // Build character descriptions using smart prompt builder
+  // Handles: animal detection, clothing priority based on clothingConsistency setting
+  const characterPrompts = characters.map(c => {
+    const result = buildSmartCharacterPrompt(c, sceneDescription, storyTheme, clothingConsistency);
+    console.log(`[Gemini Coloring] ${c.name}: ${result.isAnimal ? 'ANIMAL' : 'HUMAN'} - ${result.prompt.substring(0, 80)}...`);
+    return { char: c, ...result };
+  });
+
+  // Check if any characters are animals (affects prompt structure)
+  const hasAnimalCharacters = characterPrompts.some(cp => cp.isAnimal);
+  const hasHumanCharacters = characterPrompts.some(cp => !cp.isAnimal);
+
+  // Check for animals in scene (separate from character animals)
+  const hasAnimalsInScene = sceneContainsAnimals(sceneDescription);
+
+  // Build human and animal character sections separately for clearer separation
+  const humanCharacters = characterPrompts.filter(cp => !cp.isAnimal);
+  const animalCharacters = characterPrompts.filter(cp => cp.isAnimal);
+
+  const humanCharacterSection = humanCharacters.length > 0
+    ? `HUMAN CHARACTERS (from reference photos):\n${humanCharacters.map(cp => `- ${cp.char.name} (human child) - ${cp.prompt}`).join('\n')}`
+    : '';
+
+  const animalCharacterSection = animalCharacters.length > 0
+    ? `ANIMAL CHARACTERS:\n${animalCharacters.map(cp => `- ${cp.prompt} (cute cartoon animal in line art, animal face, NO human features)`).join('\n')}`
+    : '';
+
+  // Detect if scene mentions animals not in character list
+  const sceneAnimalSection = hasAnimalsInScene && !hasAnimalCharacters
+    ? `ANIMALS IN SCENE:\n- Any animals mentioned in scene: cute cartoon animals with ANIMAL faces in line art style, NOT humanoid, NO human clothing`
+    : '';
+
+  // Build clothing consistency rule based on setting
+  const clothingRule = clothingConsistency === 'consistent'
+    ? '- IMPORTANT: Keep character clothing EXACTLY the same as specified in their description. Do NOT change clothing based on scene context, activities, or themes.'
+    : '- Keep clothing consistent with character description unless scene specifies costume/role/holiday attire';
+
+  // Build Coloring Book style prompt (B&W line art)
+  // IMPORTANT: Extremely strict about NO COLOR to prevent Gemini from adding any color
+  const fullPrompt = `Create a children's COLORING BOOK PAGE: ${sceneDescription}
+
+*** ABSOLUTELY CRITICAL - READ THIS FIRST ***
+This MUST be a BLACK AND WHITE COLORING PAGE.
+- ZERO colors allowed - not blue, not red, not any color
+- NO colored clothing, NO colored objects, NO colored backgrounds
+- NO blue shirts, NO green grass, NO yellow sun - EVERYTHING must be white with black outlines only
+- If you add ANY color at all, the image is WRONG and UNUSABLE
+
+OUTPUT FORMAT: Pure black line art on pure white background. Like a page from a children's coloring book that has NOT been colored in yet.
+
+STYLE: Clean thin black outlines only. Cartoon style with expressive faces. Simple but recognizable features. Simplified background. Square 1:1.
+
+MANDATORY REQUIREMENTS:
+1. ONLY black lines (#000000) on white background (#FFFFFF)
+2. NO fill colors of any kind - all areas inside outlines must be WHITE
+3. NO shading, NO gradients, NO gray tones
+4. NO colored elements whatsoever - clothing, skin, hair, objects must all be unfilled outlines
+5. Lines should be clean and suitable for children to color in
+
+PROPORTIONS: Normal healthy body proportions. If "big" is mentioned, interpret as LARGE/TALL, NOT fat.
+
+CHARACTER GUIDELINES:
+- Match reference photos for face shape and hair style
+- Render as simple LINE ART outlines only
+- NO religious figures
+${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? `- Human children have HUMAN faces. Animals have ANIMAL faces. NEVER mix.` : ''}
+
+${humanCharacterSection}
+${animalCharacterSection}
+${sceneAnimalSection}
+
+RULES:
+${clothingRule}
+${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans and animals are COMPLETELY SEPARATE entities' : ''}
+
+FINAL REMINDER: This is a COLORING BOOK page. Output MUST be BLACK LINES ON WHITE ONLY. Any color = failure.`;
+
+  // Build content parts with images for the new SDK format
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contentParts: any[] = [{ text: fullPrompt }];
+
+  // Add reference images for each character
+  for (const char of characters.slice(0, 5)) {
+    // Only fetch if there's a valid reference image URL
+    // Skip: empty URLs, URLs that are just the base localhost, or URLs without actual paths
+    const url = char.referenceImageUrl?.trim() || '';
+    const isValidImageUrl = url &&
+      !url.match(/^https?:\/\/localhost(:\d+)?\/?$/) && // Skip bare localhost URLs
+      url.includes('/') && // Must have a path
+      url.split('/').pop()?.includes('.'); // Path must have a file extension
+
+    if (isValidImageUrl) {
+      try {
+        console.log(`[Gemini Coloring] Fetching reference image for ${char.name}: ${char.referenceImageUrl}`);
+        const imageData = await fetchImageAsBase64(char.referenceImageUrl);
+
+        contentParts.push({
+          inlineData: {
+            mimeType: imageData.mimeType,
+            data: imageData.base64,
+          },
+        });
+        contentParts.push({ text: `[Reference photo for ${char.name} - use face/hair features but render as line art]` });
+      } catch (imgError) {
+        console.warn(`[Gemini Coloring] Failed to fetch image for ${char.name}:`, imgError);
+      }
+    } else {
+      console.log(`[Gemini Coloring] No reference image for ${char.name} - using description only`);
+    }
+  }
+
+  console.log(`[Gemini Coloring] Generating with ${characters.length} characters`);
+  console.log(`[Gemini Coloring] Prompt preview: ${fullPrompt.substring(0, 200)}...`);
+
+  // Retry logic for rate limits
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Use Gemini 2.5 Flash Image model (Nano Banana) - better quality and character consistency
+      const result = await genAI.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: contentParts,
+        config: {
+          responseModalities: [Modality.TEXT, Modality.IMAGE],
+          imageConfig: {
+            aspectRatio: '1:1', // Square images for consistent display
+          },
+        },
+      });
+
+      // Extract image from response
+      const candidates = result.candidates;
+      if (!candidates || candidates.length === 0) {
+        throw new Error('No candidates in Gemini response');
+      }
+
+      const parts = candidates[0].content?.parts;
+      if (!parts) {
+        throw new Error('No parts in Gemini response');
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const imagePart = parts.find((p: any) => p.inlineData);
+      if (!imagePart || !imagePart.inlineData) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const textPart = parts.find((p: any) => p.text);
+        throw new Error(`Gemini Coloring image generation failed: ${textPart?.text || 'No image generated'}`);
+      }
+
+      const generationTime = (Date.now() - startTime) / 1000;
+      console.log(`[Gemini Coloring] Generated in ${generationTime.toFixed(1)}s`);
+
+      const imageDataUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+
+      return {
+        imageUrl: imageDataUrl,
+        generationTime,
+        seed: 0,
+        prompt: fullPrompt,
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const errorMessage = lastError.message;
+
+      if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate')) {
+        const retryMatch = errorMessage.match(/retry in (\d+)/i);
+        const retryDelay = retryMatch ? parseInt(retryMatch[1], 10) * 1000 : 60000;
+        const waitTime = Math.min(retryDelay, 120000);
+
+        if (attempt < maxRetries) {
+          console.warn(`[Gemini Coloring] Rate limited (attempt ${attempt}/${maxRetries}). Waiting ${waitTime / 1000}s before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+      }
+
+      console.error(`[Gemini Coloring] Generation error (attempt ${attempt}/${maxRetries}):`, error);
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError || new Error('Gemini Coloring generation failed after all retries');
+}
+
+/**
  * Check if Gemini is available (API key configured)
  */
 export function isGeminiAvailable(): boolean {
@@ -2264,7 +2485,7 @@ export interface GeminiEditParams {
   /** Original scene description for context */
   sceneDescription?: string;
   /** Illustration style to maintain */
-  illustrationStyle?: 'pixar' | 'classic';
+  illustrationStyle?: 'pixar' | 'classic' | 'coloring';
 }
 
 /**
@@ -2315,9 +2536,14 @@ export async function editImageWithGemini({
   const genAI = new GoogleGenAI({ apiKey });
 
   // Build the edit prompt based on illustration style
-  const styleDescription = illustrationStyle === 'pixar'
+  const styleDescription = illustrationStyle === 'coloring'
+    ? 'Black and white line art for a coloring book - clean thin outlines on white background, NO colors, NO shading, NO gradients'
+    : illustrationStyle === 'pixar'
     ? '3D animated Pixar/Disney style with soft rounded features, vibrant colors, large expressive eyes'
     : 'Modern 2D digital cartoon with vibrant saturated colors, smooth cel-shading, large glossy expressive eyes';
+
+  const styleLabel = illustrationStyle === 'coloring' ? 'B&W coloring book line art' :
+                     illustrationStyle === 'pixar' ? '3D Pixar' : '2D cartoon';
 
   // Construct the edit prompt
   const editPrompt = `Edit this children's book illustration with the following change:
@@ -2332,9 +2558,11 @@ PROPORTIONS TO MAINTAIN: Normal, healthy body proportions - not overly fat or ch
 
 IMPORTANT RULES:
 - Apply ONLY the requested edit
-- Keep the same illustration style (${illustrationStyle === 'pixar' ? '3D Pixar' : '2D cartoon'})
+- Keep the same illustration style (${styleLabel})
 - Preserve character appearances and expressions unless specifically asked to change them
-- Maintain the same color palette and lighting
+${illustrationStyle === 'coloring'
+  ? '- MUST remain black and white line art ONLY - NO colors, NO shading, NO gradients\n- Keep clean outlines on white background'
+  : '- Maintain the same color palette and lighting'}
 - Keep the same background unless specifically asked to change it
 - Output must be a children's book illustration, NOT a photograph
 - Square 1:1 aspect ratio`;

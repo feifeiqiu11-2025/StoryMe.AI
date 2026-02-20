@@ -17,7 +17,7 @@ interface EditImageControlProps {
   onEditComplete: (newImageUrl: string) => void;
   buttonLabel?: string;
   /** Illustration style to maintain during edit (defaults to 'pixar') */
-  illustrationStyle?: 'pixar' | 'classic';
+  illustrationStyle?: 'pixar' | 'classic' | 'coloring';
   /** Original scene description for context */
   sceneDescription?: string;
 }

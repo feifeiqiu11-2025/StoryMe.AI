@@ -38,7 +38,7 @@ interface EditImageRequest {
   instruction: string;
   imageType: 'scene' | 'cover';
   imageId: string;
-  illustrationStyle?: 'pixar' | 'classic';
+  illustrationStyle?: 'pixar' | 'classic' | 'coloring';
   sceneDescription?: string;
   useProvider?: ImageProvider;
 }

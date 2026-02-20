@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
-import { generateImageWithGemini, generateImageWithGeminiClassic, isGeminiAvailable, GeminiCharacterInfo, clearOutfitCache } from '@/lib/gemini-image-client';
+import { generateImageWithGemini, generateImageWithGeminiClassic, generateImageWithGeminiColoring, isGeminiAvailable, GeminiCharacterInfo, clearOutfitCache } from '@/lib/gemini-image-client';
 import { parseScriptIntoScenes, buildConsistentSceneSettings, extractSceneLocation } from '@/lib/scene-parser';
 import { GeneratedImage, Character, CharacterRating, ClothingConsistency } from '@/lib/types/story';
 import { createClient } from '@/lib/supabase/server';
@@ -11,7 +11,7 @@ import { StorageService } from '@/lib/services/storage.service';
 type ImageProvider = 'flux' | 'gemini';
 
 // Illustration style type
-type IllustrationStyle = 'pixar' | 'classic';
+type IllustrationStyle = 'pixar' | 'classic' | 'coloring';
 
 export const maxDuration = 300; // 5 minutes timeout for Vercel
 
@@ -222,7 +222,22 @@ export async function POST(request: NextRequest) {
           }));
 
           // Choose generation function based on illustration style
-          if (selectedIllustrationStyle === 'classic') {
+          // For coloring book mode: cover (scene 0) uses Pixar style, other scenes use coloring
+          const isCoverScene = scene.sceneNumber === 0;
+          const effectiveStyle = (selectedIllustrationStyle === 'coloring' && isCoverScene)
+            ? 'pixar'  // Cover always colorful even in coloring book mode
+            : selectedIllustrationStyle;
+
+          if (effectiveStyle === 'coloring') {
+            // Coloring Book - B&W line art for kids to color
+            console.log(`[Scene ${scene.sceneNumber}] Using Coloring Book style (B&W line art)`);
+            result = await generateImageWithGeminiColoring({
+              characters: geminiCharacters,
+              sceneDescription: scene.description,
+              artStyle: artStyle || "children's coloring book, line art",
+              clothingConsistency,
+            });
+          } else if (effectiveStyle === 'classic') {
             // Classic Storybook - 2D hand-drawn/watercolor style
             result = await generateImageWithGeminiClassic({
               characters: geminiCharacters,
@@ -232,6 +247,9 @@ export async function POST(request: NextRequest) {
             });
           } else {
             // 3D Pixar style (default Gemini behavior)
+            if (selectedIllustrationStyle === 'coloring' && isCoverScene) {
+              console.log(`[Scene ${scene.sceneNumber}] Cover in coloring mode - using Pixar style for colorful cover`);
+            }
             result = await generateImageWithGemini({
               characters: geminiCharacters,
               sceneDescription: scene.description,
