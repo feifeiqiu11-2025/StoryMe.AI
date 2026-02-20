@@ -79,7 +79,7 @@ export default function LandingNav() {
             <nav className="hidden lg:flex items-center space-x-4">
             <Link
               href="/"
-              className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors ${
+              className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-lg font-medium transition-colors ${
                 isActive('/') ? 'text-blue-600 border-b-2 border-blue-600' : ''
               }`}
             >
@@ -90,7 +90,7 @@ export default function LandingNav() {
             <div className="relative" ref={productsRef}>
               <button
                 onClick={() => setProductsDropdownOpen(!productsDropdownOpen)}
-                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors flex items-center gap-1 ${
+                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-lg font-medium transition-colors flex items-center gap-1 ${
                   isActive('/products') ? 'text-blue-600 border-b-2 border-blue-600' : ''
                 }`}
               >
@@ -105,33 +105,30 @@ export default function LandingNav() {
                 </svg>
               </button>
               {productsDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
+                <div className="absolute top-full left-0 mt-1 w-52 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
                   <Link
                     href="/products"
                     onClick={() => setProductsDropdownOpen(false)}
-                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 transition-colors"
+                    className="block px-4 py-2.5 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors whitespace-nowrap"
                   >
-                    <div className="font-semibold text-gray-900">KindleWood Ecosystem</div>
-                    <div className="text-xs text-gray-500 mt-0.5">Studio & Kids - Full overview</div>
+                    Products & Services
+                  </Link>
+                  <Link
+                    href="/pricing"
+                    onClick={() => setProductsDropdownOpen(false)}
+                    className="block px-4 py-2.5 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                  >
+                    Pricing
                   </Link>
                 </div>
               )}
             </div>
 
-            <Link
-              href="/pricing"
-              className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors ${
-                isActive('/pricing') ? 'text-blue-600 border-b-2 border-blue-600' : ''
-              }`}
-            >
-              Pricing
-            </Link>
-
             {/* Founder Stories Dropdown */}
             <div className="relative" ref={founderRef}>
               <button
                 onClick={() => setFounderDropdownOpen(!founderDropdownOpen)}
-                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors flex items-center gap-1 ${
+                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-lg font-medium transition-colors flex items-center gap-1 ${
                   isActive('/founder-letter') || isActive('/founder-journal') || isActive('/what-sparked-kindlewood') ? 'text-blue-600 border-b-2 border-blue-600' : ''
                 }`}
               >
@@ -146,28 +143,27 @@ export default function LandingNav() {
                 </svg>
               </button>
               {founderDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
+                <div className="absolute top-full left-0 mt-1 w-60 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
                   <Link
                     href="/what-sparked-kindlewood"
                     onClick={() => setFounderDropdownOpen(false)}
-                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 transition-colors"
+                    className="block px-4 py-2.5 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                   >
-                    <div className="font-semibold text-gray-900">What Sparked KindleWood</div>
-                    <div className="text-xs text-gray-500 mt-0.5">The origin story</div>
+                    What Sparked KindleWood
                   </Link>
                   <Link
                     href="/founder-letter"
                     onClick={() => setFounderDropdownOpen(false)}
-                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 transition-colors"
+                    className="block px-4 py-2.5 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                   >
-                    <div className="font-semibold text-gray-900">A Letter from the Founder</div>
+                    A Letter from the Founder
                   </Link>
                   <Link
                     href="/founder-journal"
                     onClick={() => setFounderDropdownOpen(false)}
-                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 transition-colors"
+                    className="block px-4 py-2.5 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                   >
-                    <div className="font-semibold text-gray-900">Founder's Journal</div>
+                    Founder's Journal
                   </Link>
                 </div>
               )}
@@ -177,7 +173,7 @@ export default function LandingNav() {
             <div className="relative" ref={communityRef}>
               <button
                 onClick={() => setCommunityDropdownOpen(!communityDropdownOpen)}
-                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors flex items-center gap-1 ${
+                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-lg font-medium transition-colors flex items-center gap-1 ${
                   isActive('/stories') || isActive('/little-artists') || isActive('/community-stories') ? 'text-blue-600 border-b-2 border-blue-600' : ''
                 }`}
               >
@@ -192,22 +188,20 @@ export default function LandingNav() {
                 </svg>
               </button>
               {communityDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
+                <div className="absolute top-full left-0 mt-1 w-52 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
                   <Link
                     href="/stories"
                     onClick={() => setCommunityDropdownOpen(false)}
-                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 transition-colors"
+                    className="block px-4 py-2.5 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                   >
-                    <div className="font-semibold text-gray-900">📚 Community Stories</div>
-                    <div className="text-xs text-gray-500 mt-0.5">Discover amazing stories</div>
+                    Community Stories
                   </Link>
                   <Link
                     href="/little-artists"
                     onClick={() => setCommunityDropdownOpen(false)}
-                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 transition-colors"
+                    className="block px-4 py-2.5 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                   >
-                    <div className="font-semibold text-gray-900">🎨 Little Artists</div>
-                    <div className="text-xs text-gray-500 mt-0.5">Meet our young creators</div>
+                    Little Artists
                   </Link>
                 </div>
               )}
@@ -231,13 +225,13 @@ export default function LandingNav() {
               <>
                 <Link
                   href="/login"
-                  className="text-gray-700 hover:text-gray-900 font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all text-sm"
+                  className="text-gray-700 hover:text-gray-900 font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all text-lg"
                 >
                   Sign In
                 </Link>
                 <Link
                   href="/signup"
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg transition-all text-sm shadow-sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-lg transition-all text-lg shadow-sm"
                 >
                   Start Free Trial
                 </Link>
@@ -301,20 +295,18 @@ export default function LandingNav() {
                     className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
                     style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
                   >
-                    KindleWood Ecosystem
+                    Products & Services
+                  </Link>
+                  <Link
+                    href="/pricing"
+                    className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
+                    style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
+                  >
+                    Pricing
                   </Link>
                 </div>
               )}
             </div>
-
-            <Link
-              href="/pricing"
-              className={`block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors ${
-                isActive('/pricing') ? 'bg-blue-50 text-blue-600 font-semibold' : ''
-              }`}
-            >
-              Pricing
-            </Link>
 
             {/* Founder Stories - Mobile */}
             <div>
@@ -382,14 +374,14 @@ export default function LandingNav() {
                     className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
                     style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
                   >
-                    📚 Community Stories
+                    Community Stories
                   </Link>
                   <Link
                     href="/little-artists"
                     className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
                     style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
                   >
-                    🎨 Little Artists
+                    Little Artists
                   </Link>
                 </div>
               )}

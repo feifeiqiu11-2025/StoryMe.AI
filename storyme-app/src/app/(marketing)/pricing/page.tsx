@@ -108,10 +108,13 @@ export default function PricingPage() {
         {/* Hero Section */}
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Choose Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Story Journey</span>
+            Choose Your <span className="text-amber-700 underline decoration-amber-700 decoration-2 underline-offset-4">Creative Journey</span>
           </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Start free, upgrade anytime. All plans include access to the FREE KindleWood Kids app!
+          <p className="text-xl text-gray-600 mb-4 max-w-3xl mx-auto">
+            Pricing for <strong>KindleWood Studio</strong> online tools. Start free, upgrade anytime.
+          </p>
+          <p className="text-base text-gray-500 mb-8 max-w-2xl mx-auto">
+            All plans include FREE access to the KindleWood Kids app for reading and learning.
           </p>
 
           {/* Billing Toggle */}
@@ -120,7 +123,7 @@ export default function PricingPage() {
               onClick={() => setBillingCycle('monthly')}
               className={`px-6 py-2 rounded-full font-medium transition-all ${
                 billingCycle === 'monthly'
-                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                  ? 'bg-purple-600 text-white shadow-md'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -130,7 +133,7 @@ export default function PricingPage() {
               onClick={() => setBillingCycle('annual')}
               className={`px-6 py-2 rounded-full font-medium transition-all relative ${
                 billingCycle === 'annual'
-                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                  ? 'bg-purple-600 text-white shadow-md'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -151,37 +154,22 @@ export default function PricingPage() {
           />
         </div>
 
-        {/* Kids App Callout */}
-        <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-2xl shadow-lg p-6 md:p-8 border border-green-200 mb-12">
-          <div className="flex items-start gap-4">
-            <div className="text-4xl">📱</div>
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                KindleWood Kids App - Always FREE 🎉
-              </h3>
-              <p className="text-gray-700 mb-4">
-                All KindleWood Studio subscribers get FREE access to the KindleWood Kids app!
-                Your children can read, listen, and interact with their stories on any device.
-              </p>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span>
-                  Read stories offline
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span>
-                  Audio narration in English & Chinese
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span>
-                  Interactive quizzes
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span>
-                  Multiple child profiles
-                </li>
-              </ul>
-            </div>
+        {/* In-Person Learning Lab Coming Soon */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 mb-12 max-w-2xl mx-auto">
+          <div className="text-center">
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+              In-Person Learning Lab
+            </h3>
+            <p className="text-amber-600 font-medium mb-4">Pricing Coming Soon</p>
+            <p className="text-gray-600 max-w-lg mx-auto">
+              Pricing for our in-person enrichment classes at partner schools and KindleWood Learning Lab workshops will vary based on the type of learning experience and workshop.
+            </p>
+            <a
+              href="mailto:admin@kindlewoodstudio.ai?subject=In-Person Learning Lab Inquiry"
+              className="inline-block mt-6 bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors"
+            >
+              Contact Us for Details
+            </a>
           </div>
         </div>
 
@@ -192,46 +180,52 @@ export default function PricingPage() {
           </h2>
 
           <div className="space-y-4">
-            <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="py-4 border-b border-gray-200">
               <h3 className="font-semibold text-gray-900 mb-2">Can I upgrade or downgrade anytime?</h3>
               <p className="text-gray-600 text-sm">
                 Yes! You can upgrade, downgrade, or cancel your subscription at any time. Changes take effect at the start of your next billing cycle.
               </p>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="font-semibold text-gray-900 mb-2">What happens when I reach my story limit?</h3>
+            <div className="py-4 border-b border-gray-200">
+              <h3 className="font-semibold text-gray-900 mb-2">What happens when I reach my project limit?</h3>
               <p className="text-gray-600 text-sm">
-                You'll be prompted to upgrade to continue creating new stories. Your existing stories remain accessible forever.
+                You'll be prompted to upgrade to continue creating new projects. Your existing projects remain accessible forever.
               </p>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="py-4 border-b border-gray-200">
               <h3 className="font-semibold text-gray-900 mb-2">Is the Kids app really free?</h3>
               <p className="text-gray-600 text-sm">
                 Yes! The KindleWood Kids app is 100% FREE for all KindleWood Studio subscribers. No additional charges.
               </p>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="font-semibold text-gray-900 mb-2">How does the Team plan work?</h3>
+            <div className="py-4">
+              <h3 className="font-semibold text-gray-900 mb-2">How does the Schools & Educators plan work?</h3>
               <p className="text-gray-600 text-sm">
-                The Team plan includes 5 separate KindleWood Studio accounts with unlimited stories each. Perfect for families with multiple adults or educational settings. One primary account handles billing.
+                The Schools & Educators plan includes 5 separate KindleWood Studio accounts with unlimited projects each. Perfect for classrooms, families with multiple adults, or educational settings. One primary account handles billing.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Bottom CTA */}
-        <div className="text-center mt-12">
-          <Link
-            href="/signup"
-            className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-lg hover:from-blue-700 hover:to-purple-700 font-semibold text-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
-          >
-            🎁 Start Your Free Trial
-          </Link>
-          <p className="text-gray-600 mt-4 text-sm">
-            No credit card required • Cancel anytime
+      </div>
+
+      {/* Footer */}
+      <div className="bg-gradient-to-b from-blue-50 to-white border-t border-blue-100">
+        <div className="max-w-6xl mx-auto px-4 text-center py-8">
+          {/* Footer Links */}
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm text-gray-600 mb-4">
+            <a href="mailto:Admin@KindleWoodStudio.ai" className="hover:text-indigo-600 transition-colors">Contact</a>
+            <Link href="/support" className="hover:text-indigo-600 transition-colors">Support</Link>
+            <Link href="/privacy" className="hover:text-indigo-600 transition-colors">Privacy</Link>
+            <Link href="/terms" className="hover:text-indigo-600 transition-colors">Terms</Link>
+          </div>
+
+          {/* Copyright */}
+          <p className="text-xs text-gray-500">
+            © {new Date().getFullYear()} KindleWood Studio. All rights reserved.
           </p>
         </div>
       </div>

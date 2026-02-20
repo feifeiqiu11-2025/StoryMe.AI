@@ -187,16 +187,16 @@ export default function HomePage() {
               {/* Right: Learning Lab */}
               <div className="p-6 sm:p-10 flex flex-col items-center text-center">
                 <h3 className="text-lg font-semibold text-gray-900 uppercase tracking-wide">
-                  Offline Learning Lab <span className="text-sm font-medium text-amber-600 normal-case">(Coming Soon)</span>
+                  In-Person Learning Lab <span className="text-sm font-medium text-amber-600 normal-case">(Coming Soon)</span>
                 </h3>
                 <p className="text-gray-700 leading-relaxed mt-2">
                   In-person creative workshops at <span className="font-bold text-gray-900">partner schools</span> and <span className="font-bold text-gray-900">KindleWood Learning Lab</span>.
                 </p>
                 <p className="text-gray-700 mt-4 mb-2">Sample activities:</p>
-                <ul className="space-y-2 text-gray-700">
-                  <li>• Imagination to storybook with show & tell <span className="text-gray-500 text-sm">(Ages 3-6)</span></li>
-                  <li>• Turn drawing into 3D Model & Paint <span className="text-gray-500 text-sm">(Ages 3-6)</span></li>
-                  <li>• PBL Engineering: AI coding, complex 3D modeling <span className="text-gray-500 text-sm">(Ages 6-8)</span></li>
+                <ul className="space-y-2 text-gray-700 text-sm sm:text-base">
+                  <li className="whitespace-nowrap">• Imagination to storybook with show & tell <span className="text-gray-500">(Ages 3-6)</span></li>
+                  <li className="whitespace-nowrap">• Bring story character into real world with 3D Modeling <span className="text-gray-500">(Ages 6-7)</span></li>
+                  <li className="whitespace-nowrap">• PBL Engineering: AI coding, complex 3D modeling <span className="text-gray-500">(Ages 7-12+)</span></li>
                 </ul>
               </div>
             </div>
