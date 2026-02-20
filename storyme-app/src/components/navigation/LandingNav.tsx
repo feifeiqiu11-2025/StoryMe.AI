@@ -79,7 +79,7 @@ export default function LandingNav() {
             <nav className="hidden lg:flex items-center space-x-4">
             <Link
               href="/"
-              className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-lg font-medium transition-colors ${
+              className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors ${
                 isActive('/') ? 'text-blue-600 border-b-2 border-blue-600' : ''
               }`}
             >
@@ -90,7 +90,7 @@ export default function LandingNav() {
             <div className="relative" ref={productsRef}>
               <button
                 onClick={() => setProductsDropdownOpen(!productsDropdownOpen)}
-                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-lg font-medium transition-colors flex items-center gap-1 ${
+                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors flex items-center gap-1 ${
                   isActive('/products') ? 'text-blue-600 border-b-2 border-blue-600' : ''
                 }`}
               >
@@ -128,7 +128,7 @@ export default function LandingNav() {
             <div className="relative" ref={founderRef}>
               <button
                 onClick={() => setFounderDropdownOpen(!founderDropdownOpen)}
-                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-lg font-medium transition-colors flex items-center gap-1 ${
+                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors flex items-center gap-1 ${
                   isActive('/founder-letter') || isActive('/founder-journal') || isActive('/what-sparked-kindlewood') ? 'text-blue-600 border-b-2 border-blue-600' : ''
                 }`}
               >
@@ -173,7 +173,7 @@ export default function LandingNav() {
             <div className="relative" ref={communityRef}>
               <button
                 onClick={() => setCommunityDropdownOpen(!communityDropdownOpen)}
-                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-lg font-medium transition-colors flex items-center gap-1 ${
+                className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors flex items-center gap-1 ${
                   isActive('/stories') || isActive('/little-artists') || isActive('/community-stories') ? 'text-blue-600 border-b-2 border-blue-600' : ''
                 }`}
               >
@@ -225,13 +225,13 @@ export default function LandingNav() {
               <>
                 <Link
                   href="/login"
-                  className="text-gray-700 hover:text-gray-900 font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all text-lg"
+                  className="text-gray-700 hover:text-gray-900 font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all text-base"
                 >
                   Sign In
                 </Link>
                 <Link
                   href="/signup"
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-lg transition-all text-lg shadow-sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-lg transition-all text-base shadow-sm"
                 >
                   Start Free Trial
                 </Link>
@@ -265,6 +265,7 @@ export default function LandingNav() {
           <div className="lg:hidden border-t border-gray-200 py-4 space-y-2">
             <Link
               href="/"
+              onClick={() => setIsMobileMenuOpen(false)}
               className={`block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors ${
                 isActive('/') ? 'bg-blue-50 text-blue-600 font-semibold' : ''
               }`}
@@ -292,6 +293,7 @@ export default function LandingNav() {
                 <div className="ml-4 mt-2 space-y-1">
                   <Link
                     href="/products"
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
                     style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
                   >
@@ -299,6 +301,7 @@ export default function LandingNav() {
                   </Link>
                   <Link
                     href="/pricing"
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
                     style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
                   >
@@ -328,6 +331,7 @@ export default function LandingNav() {
                 <div className="ml-4 mt-2 space-y-1">
                   <Link
                     href="/what-sparked-kindlewood"
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
                     style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
                   >
@@ -335,6 +339,7 @@ export default function LandingNav() {
                   </Link>
                   <Link
                     href="/founder-letter"
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
                     style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
                   >
@@ -342,6 +347,7 @@ export default function LandingNav() {
                   </Link>
                   <Link
                     href="/founder-journal"
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
                     style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
                   >
@@ -371,6 +377,7 @@ export default function LandingNav() {
                 <div className="ml-4 mt-2 space-y-1">
                   <Link
                     href="/stories"
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
                     style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
                   >
@@ -378,6 +385,7 @@ export default function LandingNav() {
                   </Link>
                   <Link
                     href="/little-artists"
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
                     style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
                   >
@@ -392,6 +400,7 @@ export default function LandingNav() {
               isLoggedIn ? (
                 <Link
                   href="/dashboard"
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors font-medium"
                 >
                   Dashboard
@@ -400,12 +409,14 @@ export default function LandingNav() {
                 <div className="space-y-2 mt-4 px-4">
                   <Link
                     href="/signup"
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className="block text-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all shadow-md"
                   >
                     Start Free Trial
                   </Link>
                   <Link
                     href="/login"
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className="block text-center text-gray-700 hover:text-gray-900 px-6 py-2 rounded-lg font-medium transition-all"
                   >
                     Sign In

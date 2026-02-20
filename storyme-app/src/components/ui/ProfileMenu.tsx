@@ -77,7 +77,7 @@ export default function ProfileMenu({ displayName }: ProfileMenuProps) {
 
   if (!usage) {
     return (
-      <button className="text-lg font-medium text-gray-700 hover:text-blue-600 transition-colors">
+      <button className="text-base font-medium text-gray-700 hover:text-blue-600 transition-colors">
         {displayName}
       </button>
     );
@@ -113,7 +113,7 @@ export default function ProfileMenu({ displayName }: ProfileMenuProps) {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 text-lg font-medium text-gray-700 hover:text-blue-600 transition-colors"
+        className="flex items-center gap-2 text-base font-medium text-gray-700 hover:text-blue-600 transition-colors"
       >
         <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
           {displayName.charAt(0).toUpperCase()}
