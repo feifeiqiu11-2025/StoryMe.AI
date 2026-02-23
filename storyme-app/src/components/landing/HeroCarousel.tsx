@@ -40,7 +40,7 @@ interface HeroCarouselProps {
 
 // Messages for typing effect
 const MAIN_MESSAGE = "Turn Your Child's Ideas Into Creations They Can Learn From";
-const SUB_MESSAGE = "A wild story, a drawing, and more—brought to life by their imagination.";
+const SUB_MESSAGE = "A story, a drawing, a 3D model, and more—brought to life by their imagination.";
 
 export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
   const router = useRouter();
@@ -363,7 +363,7 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
         </div>
 
         {/* Overlay with Typing Effect */}
-        <div className="absolute inset-0 flex items-end justify-center z-20 pointer-events-none pb-16 px-2 sm:px-4">
+        <div className="absolute inset-0 flex items-end justify-center z-20 pointer-events-none pb-3 px-2 sm:px-4">
           <div className="bg-white/65 backdrop-blur-sm rounded-xl px-3 sm:px-5 py-3 max-w-[calc(100%-1rem)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl text-center shadow-lg pointer-events-auto">
             {/* Main Message with Typing Effect */}
             <h2 className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-gray-900 mb-0.5 leading-tight">

@@ -6,15 +6,41 @@
 
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Testimonials from '@/components/landing/Testimonials';
 import ErrorHandler from '@/components/ErrorHandler';
 import LandingNav from '@/components/navigation/LandingNav';
 import HeroCarousel from '@/components/landing/HeroCarousel';
 import WhyCreativitySection from '@/components/landing/WhyCreativitySection';
+import VideoCarousel from '@/components/landing/VideoCarousel';
+import type { YouTubeVideo } from '@/app/api/v1/youtube/playlist/route';
+
+const LANDING_PLAYLIST_ID = 'PLyDpAVbXE4SUAEuc2SnXwhsbUMg9j3dy9';
 
 export default function HomePage() {
+  const [videos, setVideos] = useState<YouTubeVideo[]>([]);
+  const [videosLoading, setVideosLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchVideos() {
+      try {
+        const response = await fetch(`/api/v1/youtube/playlist?playlistId=${LANDING_PLAYLIST_ID}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.videos) {
+            setVideos(data.videos);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching playlist videos:', error);
+      } finally {
+        setVideosLoading(false);
+      }
+    }
+    fetchVideos();
+  }, []);
+
   return (
     <>
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
@@ -242,24 +268,25 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Product Demo Video */}
+        {/* Our Stories - Video Carousel */}
         <div className="mb-12 sm:mb-16">
           <div className="text-center mb-8">
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              What Inspired KindleWood
+              Our Stories
             </h2>
           </div>
-          <div className="max-w-3xl mx-auto">
-            <div className="relative aspect-video rounded-2xl overflow-hidden shadow-xl">
-              <iframe
-                src="https://www.youtube.com/embed/7ISlDfVdTdk"
-                title="KindleWood Studio Product Demo"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="w-full h-full border-0"
-              />
+          {videosLoading ? (
+            <div className="flex gap-6 overflow-hidden">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="w-[300px] sm:w-[380px] flex-shrink-0">
+                  <div className="aspect-video bg-gray-200 rounded-xl animate-pulse" />
+                  <div className="mt-3 h-4 bg-gray-200 rounded animate-pulse w-3/4" />
+                </div>
+              ))}
             </div>
-          </div>
+          ) : (
+            <VideoCarousel videos={videos} />
+          )}
         </div>
 
       </div>
