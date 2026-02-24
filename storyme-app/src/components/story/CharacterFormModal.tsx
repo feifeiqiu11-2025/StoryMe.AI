@@ -502,7 +502,7 @@ export default function CharacterFormModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-900">
             {editingCharacter ? 'Edit Character' : 'Create New Character'}
@@ -902,11 +902,65 @@ export default function CharacterFormModal({
                   </div>
                 </div>
               ) : (previewOptions.pixar || previewOptions.classic) && previewOptions.pixar !== previewOptions.classic ? (
-                /* Freshly generated - show both style options */
-                <div className="space-y-4">
-                  <p className="text-sm font-medium text-gray-700">Choose your preferred style:</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* 3D Pixar Option */}
+                /* Freshly generated - show sketch/reference + both style options in one row */
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-3">Choose your preferred style:</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Box 1: Sketch (description mode) or Reference Photo (photo mode) */}
+                    {characterMode === 'description' ? (
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-blue-700 mb-2">Character</p>
+                        {isGeneratingSketch ? (
+                          <div className="bg-blue-50 rounded-xl aspect-square flex items-center justify-center border-2 border-blue-300">
+                            <div className="text-center">
+                              <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
+                              <p className="text-blue-600 font-medium text-sm">Generating sketch...</p>
+                            </div>
+                          </div>
+                        ) : sketchGuideData ? (
+                          <button
+                            type="button"
+                            onClick={() => generateSketchGuide()}
+                            className="w-full aspect-square border-2 border-gray-300 hover:border-blue-400 rounded-xl p-4 bg-white transition-colors cursor-pointer"
+                          >
+                            <img
+                              key={sketchGuideData.guide_image_url}
+                              src={sketchGuideData.guide_image_url}
+                              alt="Simple sketch"
+                              className="w-full h-full object-contain pointer-events-none"
+                            />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (formData.name && formData.characterType) generateSketchGuide();
+                            }}
+                            disabled={isGeneratingSketch || !formData.name || !formData.characterType}
+                            className="w-full aspect-square border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-xl flex items-center justify-center bg-gray-50 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            <div className="text-center p-4">
+                              <div className="text-4xl mb-2">✏️</div>
+                              <p className="text-sm font-bold text-gray-900 mb-1">{formData.characterType || 'Character'}</p>
+                              <p className="text-xs text-blue-600 font-medium">Click to Generate Sketch</p>
+                            </div>
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Reference Photo</p>
+                        <div className="bg-gray-50 rounded-xl overflow-hidden aspect-square border border-gray-200">
+                          <img
+                            src={formData.imageUrl}
+                            alt="Reference"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Box 2: 3D Pixar Option */}
                     <div
                       className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
                         selectedStyle === 'pixar'
@@ -944,7 +998,7 @@ export default function CharacterFormModal({
                       )}
                     </div>
 
-                    {/* Classic Storybook Option */}
+                    {/* Box 3: Classic Storybook Option */}
                     <div
                       className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
                         selectedStyle === 'classic'
