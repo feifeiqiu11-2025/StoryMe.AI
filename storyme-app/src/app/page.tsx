@@ -17,10 +17,13 @@ import VideoCarousel from '@/components/landing/VideoCarousel';
 import type { YouTubeVideo } from '@/app/api/v1/youtube/playlist/route';
 
 const LANDING_PLAYLIST_ID = 'PLyDpAVbXE4SUAEuc2SnXwhsbUMg9j3dy9';
+const DEMO_PLAYLIST_ID = 'PLyDpAVbXE4SWPWFFiQUdo8FyMAhi90fA5';
 
 export default function HomePage() {
   const [videos, setVideos] = useState<YouTubeVideo[]>([]);
   const [videosLoading, setVideosLoading] = useState(true);
+  const [demoVideos, setDemoVideos] = useState<YouTubeVideo[]>([]);
+  const [demoVideosLoading, setDemoVideosLoading] = useState(true);
 
   useEffect(() => {
     async function fetchVideos() {
@@ -38,7 +41,25 @@ export default function HomePage() {
         setVideosLoading(false);
       }
     }
+
+    async function fetchDemoVideos() {
+      try {
+        const response = await fetch(`/api/v1/youtube/playlist?playlistId=${DEMO_PLAYLIST_ID}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.videos) {
+            setDemoVideos(data.videos);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching demo playlist videos:', error);
+      } finally {
+        setDemoVideosLoading(false);
+      }
+    }
+
     fetchVideos();
+    fetchDemoVideos();
   }, []);
 
   return (
@@ -287,6 +308,27 @@ export default function HomePage() {
           ) : (
             <VideoCarousel videos={videos} />
           )}
+        </div>
+
+        {/* Watch How It Works - Product Demo Video Carousel */}
+        <div className="mb-12 sm:mb-16">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              Watch How It Works
+            </h2>
+          </div>
+          {demoVideosLoading ? (
+            <div className="flex gap-6 overflow-hidden">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="w-[300px] sm:w-[380px] flex-shrink-0">
+                  <div className="aspect-video bg-gray-200 rounded-xl animate-pulse" />
+                  <div className="mt-3 h-4 bg-gray-200 rounded animate-pulse w-3/4" />
+                </div>
+              ))}
+            </div>
+          ) : demoVideos.length > 0 ? (
+            <VideoCarousel videos={demoVideos} />
+          ) : null}
         </div>
 
       </div>

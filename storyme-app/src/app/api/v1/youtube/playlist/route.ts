@@ -25,6 +25,7 @@ const cache = new Map<string, CacheEntry>();
 // Allowed playlists to prevent arbitrary API usage
 const ALLOWED_PLAYLISTS = new Set([
   'PLyDpAVbXE4SUAEuc2SnXwhsbUMg9j3dy9', // KindleWood Stories (landing page)
+  'PLyDpAVbXE4SWPWFFiQUdo8FyMAhi90fA5', // Product Demos (landing page)
   'PLyDpAVbXE4SWLTi-PwRaH5pcbSHtVi7yu', // Behind the Scenes (founder journal)
 ]);
 
