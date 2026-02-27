@@ -27,6 +27,7 @@ const ALLOWED_PLAYLISTS = new Set([
   'PLyDpAVbXE4SUAEuc2SnXwhsbUMg9j3dy9', // KindleWood Stories (landing page)
   'PLyDpAVbXE4SWPWFFiQUdo8FyMAhi90fA5', // Product Demos (landing page)
   'PLyDpAVbXE4SWLTi-PwRaH5pcbSHtVi7yu', // Behind the Scenes (founder journal)
+  'PLyDpAVbXE4SWavZNKd0RNlhDuEJqpBkY0', // Testimonial Videos (landing page)
 ]);
 
 async function fetchPlaylistFromYouTube(playlistId: string): Promise<YouTubeVideo[]> {

@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     // Use service role client to bypass RLS for public testimonials
     const supabase = createServiceRoleClient();
 
-    // Fetch top 3 five-star public testimonials
+    // Fetch public testimonials for landing page carousel
     // Prioritize: featured > rating > newest
     const { data: testimonials, error } = await supabase
       .from('user_feedback')
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       .order('is_featured', { ascending: false }) // Featured first
       .order('rating', { ascending: false }) // Then by rating
       .order('created_at', { ascending: false }) // Then by newest
-      .limit(3);
+      .limit(10);
 
     if (error) {
       console.error('Error fetching testimonials:', error);
