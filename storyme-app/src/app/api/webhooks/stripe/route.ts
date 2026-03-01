@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe/config';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import { sendWorkshopConfirmationEmail } from '@/lib/email/workshop-confirmation';
 
 // Create Supabase client with service role for admin operations
 const supabaseAdmin = createClient(
@@ -458,7 +459,32 @@ async function handleWorkshopCheckoutCompleted(session: Stripe.Checkout.Session)
   }
 
   console.log(`[WEBHOOK] Workshop registration ${registrationId} confirmed`);
-  // TODO: Send confirmation email to parent
+
+  // Fetch registration data for confirmation email
+  const { data: registration, error: fetchError } = await supabaseAdmin
+    .from('workshop_registrations')
+    .select('*')
+    .eq('id', registrationId)
+    .single();
+
+  if (fetchError || !registration) {
+    console.error('[WEBHOOK] Failed to fetch registration for email:', fetchError);
+    return;
+  }
+
+  // Send confirmation email (non-blocking — failure won't affect webhook response)
+  await sendWorkshopConfirmationEmail({
+    parentFirstName: registration.parent_first_name,
+    parentLastName: registration.parent_last_name,
+    parentEmail: registration.parent_email,
+    childFirstName: registration.child_first_name,
+    childLastName: registration.child_last_name,
+    childAge: registration.child_age,
+    partnerId: registration.partner_id,
+    selectedSessionType: registration.selected_session_type,
+    selectedWorkshopIds: registration.selected_workshop_ids,
+    amountPaid: session.amount_total || 0,
+  });
 }
 
 // Disable body parsing for webhook signature verification

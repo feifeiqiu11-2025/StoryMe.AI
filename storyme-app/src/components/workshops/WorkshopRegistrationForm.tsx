@@ -175,9 +175,14 @@ export default function WorkshopRegistrationForm({
 
       {/* Section 1: Session Type */}
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">
-          1. Choose Your Session
-        </h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold text-gray-900">
+            1. Choose Your Session
+          </h3>
+          <span className="text-xs font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">
+            Limited to {partner.capacity[sessionType]} spots per session
+          </span>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label
             className={`relative flex flex-col p-4 border-2 rounded-xl cursor-pointer transition-all ${
@@ -257,6 +262,41 @@ export default function WorkshopRegistrationForm({
           <p className={errorClassName} role="alert">
             {errors.selectedSessionType.message}
           </p>
+        )}
+
+        {/* Location info — shown after session selection */}
+        {selectedSessionType && partner.location && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-sm">
+            <div className="flex items-center gap-2 text-gray-700">
+              <svg className="w-4 h-4 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>
+                <span className="font-medium">Workshop Location:</span>{' '}
+                {partner.location.mapUrl ? (
+                  <a
+                    href={partner.location.mapUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-700 underline"
+                  >
+                    {partner.location.name}, {partner.location.address}
+                  </a>
+                ) : (
+                  `${partner.location.name}, ${partner.location.address}`
+                )}
+              </span>
+            </div>
+            {sessionType === 'afternoon' && (
+              <p className="mt-2 ml-6 text-gray-600">
+                Afternoon sessions begin with ~45 min of outdoor exploration at
+                Bridle Trails, then transition to the indoor studio at{' '}
+                {partner.location.name} for the creativity lab. Parents provide
+                transportation between locations.
+              </p>
+            )}
+          </div>
         )}
       </div>
 
@@ -723,6 +763,23 @@ export default function WorkshopRegistrationForm({
                   <strong>Drop-off/Pick-up:</strong> I am responsible for
                   ensuring my child is dropped off and picked up on time. Children
                   must be signed in and out by an authorized adult.
+                </li>
+                <li>
+                  <strong>Outdoor Exploration (Afternoon Sessions):</strong> Afternoon
+                  sessions include supervised outdoor exploration at nearby parks
+                  and nature areas. I understand my child will participate in
+                  outdoor activities and I accept risks associated with outdoor
+                  environments, including weather conditions, uneven terrain, and
+                  exposure to natural elements. I will ensure my child has
+                  appropriate clothing, footwear, and sun protection.
+                </li>
+                <li>
+                  <strong>Parent Transportation:</strong> I understand that
+                  transportation between the indoor studio location and outdoor
+                  exploration sites during afternoon sessions is the
+                  parent/guardian&apos;s responsibility. I will provide my own
+                  vehicle and ensure my child is properly secured in an
+                  age-appropriate car seat or seatbelt during transit.
                 </li>
               </ul>
             </div>

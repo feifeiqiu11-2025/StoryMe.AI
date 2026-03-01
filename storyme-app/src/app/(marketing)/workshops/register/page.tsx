@@ -132,9 +132,6 @@ function RegisterPageContent() {
         <p className="text-gray-600">
           Select your sessions and complete registration below.
         </p>
-        <p className="text-sm text-amber-700 mt-2">
-          Limited to {activePartner.capacity[defaultSession]} spots per session — register early!
-        </p>
       </div>
 
       {/* Promo Banner */}

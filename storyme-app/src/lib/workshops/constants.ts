@@ -37,6 +37,12 @@ export interface WorkshopCapacity {
   afternoon: number;
 }
 
+export interface WorkshopLocation {
+  name: string;
+  address: string;
+  mapUrl?: string;
+}
+
 export interface WorkshopPartner {
   id: string;
   slug: string;
@@ -51,6 +57,7 @@ export interface WorkshopPartner {
   sessions: WorkshopSession[];
   pricing: WorkshopPricing;
   capacity: WorkshopCapacity;
+  location?: WorkshopLocation;
 }
 
 export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
@@ -59,7 +66,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
     slug: 'steamoji',
     name: 'KindleWood × SteamOji',
     partnerName: 'SteamOji',
-    tagline: 'Where imagination becomes structured thinking, and thinking becomes innovation.',
+    tagline: 'Where every story builds a thinker, and every adventure grows a creator.',
     logoUrl: '/images/steamoji-logo.png',
     description:
       'A 5-week themed storytelling series that strengthens executive function, literacy, and creative problem-solving through structured creativity. Each week explores a new theme — Nature, Habits & Health, Innovation, Value & Choices, and Community.',
@@ -220,6 +227,11 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       currency: 'usd',
     },
     capacity: { morning: 10, afternoon: 10 },
+    location: {
+      name: 'SteamOji Bellevue Store',
+      address: '14315 NE 20th Street, Suite C-E, Bellevue, WA 98007',
+      mapUrl: 'https://maps.google.com/?q=14315+NE+20th+Street+Suite+C-E+Bellevue+WA+98007',
+    },
   },
   {
     id: 'avocado',

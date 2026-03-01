@@ -195,7 +195,7 @@ export default function WorkshopsPage() {
                         </span>
                       </div>
                       <p className="text-lg text-amber-800 font-medium mb-4">
-                        Where imagination becomes structured thinking, and thinking becomes innovation.
+                        Where every story builds a thinker, and every adventure grows a creator.
                       </p>
                       <p className="text-gray-700 leading-relaxed mb-4">
                         <span className="font-semibold">KindleWood Studio</span> is excited to partner with{' '}
@@ -211,7 +211,7 @@ export default function WorkshopsPage() {
                           href="https://www.steamoji.com/"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                          className="mt-4 inline-flex items-center text-blue-600 hover:text-blue-700 font-medium transition-colors"
                         >
                           Learn more about {partner.partnerName} →
                         </a>
