@@ -251,17 +251,22 @@ export default function HomePage() {
               {/* Right: Learning Lab */}
               <div className="p-6 sm:p-10 flex flex-col items-center text-center">
                 <h3 className="text-lg font-semibold text-gray-900 uppercase tracking-wide">
-                  In-Person Learning Lab <span className="text-sm font-medium text-amber-600 normal-case">(Coming Soon)</span>
+                  In-Person Learning Lab
                 </h3>
                 <p className="text-gray-700 leading-relaxed mt-2">
-                  In-person creative workshops at <span className="font-bold text-gray-900">partner schools</span> and <span className="font-bold text-gray-900">KindleWood Learning Lab</span>.
+                  Hands-on workshops at <span className="font-bold text-gray-900">partner schools</span> and <span className="font-bold text-gray-900">KindleWood Learning Lab</span> where storytelling meets nature exploration and making.
                 </p>
-                <p className="text-gray-700 mt-4 mb-2">Sample activities:</p>
+                <p className="text-gray-700 mt-4 mb-2">Workshop activities:</p>
                 <ul className="space-y-2 text-gray-700 text-sm sm:text-base">
-                  <li className="whitespace-nowrap">• Imagination to storybook with show & tell <span className="text-gray-500">(Ages 3-6)</span></li>
-                  <li className="whitespace-nowrap">• Bring story character into real world with 3D Modeling <span className="text-gray-500">(Ages 6-7)</span></li>
-                  <li className="whitespace-nowrap">• PBL Engineering: AI coding, complex 3D modeling <span className="text-gray-500">(Ages 7-12+)</span></li>
+                  <li className="whitespace-nowrap">• Imagination to storybook with show & tell <span className="text-gray-500">(Ages 4–6)</span></li>
+                  <li className="whitespace-nowrap">• Nature exploration & creative story making <span className="text-gray-500">(Ages 7–9)</span></li>
+                  <li className="whitespace-nowrap">• Maker projects: 3D modeling, digital storytelling <span className="text-gray-500">(Ages 7–12+)</span></li>
                 </ul>
+                <p className="mt-4">
+                  <Link href="/workshops" className="text-green-600 hover:text-green-700 font-medium transition-colors">
+                    Explore Workshops →
+                  </Link>
+                </p>
               </div>
             </div>
           </div>
@@ -278,31 +283,36 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-8 md:gap-12">
+          <div className="flex flex-wrap items-center justify-center gap-14 md:gap-20">
             {/* Avocado Montessori Academy */}
-            <div className="flex flex-col items-center">
-              <div className="h-20 mb-3 flex items-center justify-center">
-                <img
-                  src="/images/avocado-logo-cropped.png"
-                  alt="Avocado Montessori Academy"
-                  className="h-full w-auto object-contain"
-                />
-              </div>
+            <div className="flex items-center justify-center">
+              <img
+                src="/images/avocado-logo-cropped.png"
+                alt="Avocado Montessori Academy"
+                className="h-[4.5rem] w-auto object-contain"
+              />
             </div>
 
             {/* Puget Sound Foundation */}
-            <div className="flex flex-col items-center">
-              <div className="h-20 mb-3 flex items-center justify-center px-4">
-                <div className="text-center">
-                  <div className="font-bold text-amber-800 text-3xl leading-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", serif' }}>
-                    Puget Sound
-                  </div>
-                  <div className="text-amber-700 text-lg leading-tight italic" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", serif' }}>
-                    Children & Youth Foundation
-                  </div>
+            <div className="flex items-center justify-center">
+              <div className="text-center">
+                <div className="font-bold text-amber-800 text-4xl leading-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", serif' }}>
+                  Puget Sound
+                </div>
+                <div className="text-amber-700 text-xl leading-tight italic" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", serif' }}>
+                  Children & Youth Foundation
                 </div>
               </div>
             </div>
+
+            {/* SteamOji */}
+            <Link href="/workshops#steamoji" className="flex items-center justify-center group">
+              <img
+                src="/images/steamoji-logo.png"
+                alt="SteamOji Maker Academy"
+                className="h-20 w-auto object-contain group-hover:opacity-80 transition-opacity"
+              />
+            </Link>
           </div>
         </div>
 

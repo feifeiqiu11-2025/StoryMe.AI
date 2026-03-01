@@ -4,14 +4,14 @@
  * POST - Create a new character
  */
 
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createClientFromRequest } from '@/lib/supabase/server';
 import { getUserCharacters, createCharacter } from '@/lib/db/characters';
 import { characterLibrarySchema } from '@/lib/utils/validators';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientFromRequest(request);
 
     // Get current user
     const {
@@ -40,9 +40,9 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClientFromRequest(request);
 
     // Get current user
     const {

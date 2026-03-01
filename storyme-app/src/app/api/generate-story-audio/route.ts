@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { getAzureTTSClient, isAzureTTSAvailable } from '@/lib/azure-tts-client';
 
 // Maximum duration for this API route (5 minutes)
@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`🎵 Starting ${language.toUpperCase()} audio generation for project: ${projectId}`);
 
-    // Initialize Supabase client
-    const supabase = await createClient();
+    // Initialize Supabase client (supports both cookie-based and Bearer token auth)
+    const supabase = await createClientFromRequest(request);
 
     // Get user
     const { data: { user }, error: userError } = await supabase.auth.getUser();

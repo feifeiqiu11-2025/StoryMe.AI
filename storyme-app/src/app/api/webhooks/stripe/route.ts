@@ -76,9 +76,15 @@ export async function POST(request: NextRequest) {
 
   try {
     switch (event.type) {
-      case 'checkout.session.completed':
-        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.metadata?.type === 'workshop') {
+          await handleWorkshopCheckoutCompleted(session);
+        } else {
+          await handleCheckoutCompleted(session);
+        }
         break;
+      }
 
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
@@ -421,6 +427,38 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   }
 
   // TODO: Send email notification to user about failed payment
+}
+
+/**
+ * Handle workshop checkout completion (one-time payment)
+ */
+async function handleWorkshopCheckoutCompleted(session: Stripe.Checkout.Session) {
+  const registrationId = session.metadata?.registration_id;
+
+  if (!registrationId) {
+    console.error('[WEBHOOK] No registration_id in workshop checkout metadata');
+    return;
+  }
+
+  console.log(`[WEBHOOK] Workshop checkout completed for registration ${registrationId}`);
+
+  const { error } = await supabaseAdmin
+    .from('workshop_registrations')
+    .update({
+      payment_status: 'paid',
+      status: 'confirmed',
+      stripe_payment_intent_id: session.payment_intent as string,
+      amount_paid: session.amount_total,
+    })
+    .eq('id', registrationId);
+
+  if (error) {
+    console.error('[WEBHOOK] Error updating workshop registration:', error);
+    throw error;
+  }
+
+  console.log(`[WEBHOOK] Workshop registration ${registrationId} confirmed`);
+  // TODO: Send confirmation email to parent
 }
 
 // Disable body parsing for webhook signature verification

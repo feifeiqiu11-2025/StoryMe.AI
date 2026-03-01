@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithGemini, generateImageWithGeminiClassic, GeminiCharacterInfo, isGeminiAvailable } from '@/lib/gemini-image-client';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
 import { Character } from '@/lib/types/story';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 
 // Image provider type
 type ImageProvider = 'flux' | 'gemini';
@@ -133,7 +133,8 @@ export async function POST(request: NextRequest) {
     // Step 2: Upload the AI-generated cover directly to Supabase storage (no text overlay)
     // Note: Text overlay (author, copyright) will be added by PDF generation if needed
     console.log('☁️ Uploading cover to storage...');
-    const supabase = await createClient();
+    // Supports both cookie-based and Bearer token auth
+    const supabase = await createClientFromRequest(request);
 
     // Get user (authenticated or guest)
     const { data: { user } } = await supabase.auth.getUser();

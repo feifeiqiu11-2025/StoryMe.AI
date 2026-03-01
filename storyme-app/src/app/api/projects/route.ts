@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { ProjectService } from '@/lib/services/project.service';
 
 const DEFAULT_LIMIT = 10; // Reduced for faster initial load
@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
     // Get authenticated user
-    const supabase = await createClient();
+    // Supports both cookie-based and Bearer token auth
+    const supabase = await createClientFromRequest(request);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {

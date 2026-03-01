@@ -3,7 +3,7 @@ import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/
 import { generateImageWithGemini, generateImageWithGeminiClassic, generateImageWithGeminiColoring, isGeminiAvailable, GeminiCharacterInfo, clearOutfitCache } from '@/lib/gemini-image-client';
 import { parseScriptIntoScenes, buildConsistentSceneSettings, extractSceneLocation } from '@/lib/scene-parser';
 import { GeneratedImage, Character, CharacterRating, ClothingConsistency } from '@/lib/types/story';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { checkImageGenerationLimit, logApiUsage } from '@/lib/utils/rate-limit';
 import { StorageService } from '@/lib/services/storage.service';
 
@@ -97,8 +97,8 @@ export async function POST(request: NextRequest) {
       scenes = [coverScene, ...scenes];
     }
 
-    // Get authenticated user
-    const supabase = await createClient();
+    // Get authenticated user (supports both cookie-based and Bearer token auth)
+    const supabase = await createClientFromRequest(request);
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -394,7 +394,7 @@ export async function POST(request: NextRequest) {
     console.error('Generate images error:', error);
 
     // Log error
-    const supabase = await createClient();
+    const supabase = await createClientFromRequest(request);
     const { data: { user } } = await supabase.auth.getUser();
 
     if (user) {

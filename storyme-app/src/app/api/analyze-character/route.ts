@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { analyzeCharacterImage, isGeminiAvailable } from '@/lib/gemini-image-client';
 
 export const maxDuration = 30; // 30 seconds timeout
@@ -24,8 +24,8 @@ interface AnalyzeCharacterRequest {
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const supabase = await createClient();
+    // Check authentication (supports both cookie-based and Bearer token auth)
+    const supabase = await createClientFromRequest(request);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
