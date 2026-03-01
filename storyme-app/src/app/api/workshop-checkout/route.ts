@@ -11,6 +11,7 @@ import { stripe } from '@/lib/stripe/config';
 import { WorkshopRegistrationSchema } from '@/lib/workshops/schemas';
 import { WORKSHOP_PARTNERS, formatWorkshopPrice } from '@/lib/workshops/constants';
 import { createClient } from '@supabase/supabase-js';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 
 // Service role client for public inserts (bypasses RLS)
 const supabaseAdmin = createClient(
@@ -42,6 +43,50 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid or unavailable partner program' },
         { status: 400 },
+      );
+    }
+
+    // Check spot availability before proceeding
+    const supabaseAvailability = createServiceRoleClient();
+    const { data: currentCounts, error: rpcError } = await supabaseAvailability.rpc(
+      'get_workshop_registration_counts',
+      {
+        p_partner_id: validated.partnerId,
+        p_session_type: validated.selectedSessionType,
+      },
+    );
+
+    if (rpcError) {
+      console.error('[WORKSHOP-CHECKOUT] Availability check failed:', rpcError);
+      return NextResponse.json(
+        { error: 'Failed to verify availability' },
+        { status: 500 },
+      );
+    }
+
+    const countMap: Record<string, number> = {};
+    for (const row of currentCounts || []) {
+      countMap[row.workshop_id] = Number(row.registration_count);
+    }
+
+    const capacity = partner.capacity[validated.selectedSessionType];
+    const fullSessions: string[] = [];
+
+    for (const workshopId of validated.selectedWorkshopIds) {
+      const currentCount = countMap[workshopId] || 0;
+      if (currentCount >= capacity) {
+        fullSessions.push(workshopId);
+      }
+    }
+
+    if (fullSessions.length > 0) {
+      return NextResponse.json(
+        {
+          error: 'Some sessions are fully booked',
+          code: 'SESSIONS_FULL',
+          fullSessions,
+        },
+        { status: 409 },
       );
     }
 

@@ -18,15 +18,20 @@ import {
   type WorkshopPartner,
   formatWorkshopPrice,
 } from '@/lib/workshops/constants';
+import type { WorkshopAvailabilityData } from '@/lib/workshops/types';
 
 interface WorkshopRegistrationFormProps {
   partner: WorkshopPartner;
   defaultSessionType?: 'morning' | 'afternoon';
+  availability?: WorkshopAvailabilityData | null;
+  availabilityLoading?: boolean;
 }
 
 export default function WorkshopRegistrationForm({
   partner,
   defaultSessionType,
+  availability,
+  availabilityLoading,
 }: WorkshopRegistrationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -73,6 +78,13 @@ export default function WorkshopRegistrationForm({
   const totalPrice = workshopCount * pricePerSession;
   const totalOriginal = workshopCount * originalPricePerSession;
 
+  // Spot availability helper
+  const getSpotsLeft = (sessionId: string): number | null => {
+    if (!availability || availabilityLoading) return null;
+    const count = availability.counts[sessionId]?.[sessionType] ?? 0;
+    return Math.max(0, partner.capacity[sessionType] - count);
+  };
+
   // --- Bundle pricing (commented out for future use) ---
   // const isBundle = workshopCount >= partner.pricing.bundleCount;
   // const totalPrice = isBundle
@@ -91,10 +103,15 @@ export default function WorkshopRegistrationForm({
     setValue('selectedWorkshopIds', updated, { shouldValidate: true });
   };
 
-  // Select all workshops
+  // Select all available workshops (skip sold-out)
   const selectAll = () => {
-    const allIds = partner.sessions.map((s) => s.id);
-    setValue('selectedWorkshopIds', allIds, { shouldValidate: true });
+    const availableIds = partner.sessions
+      .filter((s) => {
+        const spots = getSpotsLeft(s.id);
+        return spots === null || spots > 0;
+      })
+      .map((s) => s.id);
+    setValue('selectedWorkshopIds', availableIds, { shouldValidate: true });
   };
 
   // Clear all selections
@@ -116,6 +133,17 @@ export default function WorkshopRegistrationForm({
       const result = await response.json();
 
       if (!response.ok) {
+        if (response.status === 409 && result.code === 'SESSIONS_FULL') {
+          const fullNames = (result.fullSessions as string[])
+            .map((id: string) => {
+              const idx = partner.sessions.findIndex((s) => s.id === id);
+              return idx >= 0 ? `Week ${idx + 1}` : id;
+            })
+            .join(', ');
+          throw new Error(
+            `The following sessions are now fully booked: ${fullNames}. Please deselect them and try again.`,
+          );
+        }
         throw new Error(result.error || 'Failed to create checkout session');
       }
 
@@ -257,60 +285,91 @@ export default function WorkshopRegistrationForm({
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           {partner.sessions.map((session, index) => {
             const isSelected = selectedWorkshopIds?.includes(session.id);
+            const spotsLeft = getSpotsLeft(session.id);
+            const isSoldOut = spotsLeft !== null && spotsLeft <= 0;
+            const isLowStock = spotsLeft !== null && spotsLeft > 0 && spotsLeft <= 3;
+
             return (
               <label
                 key={session.id}
-                className={`flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                  isSelected
-                    ? 'border-green-500 bg-green-50'
-                    : 'border-gray-200 hover:border-gray-300'
+                className={`block p-4 border-2 rounded-xl transition-all ${
+                  isSoldOut
+                    ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                    : isSelected
+                      ? 'border-green-500 bg-green-50 cursor-pointer'
+                      : 'border-gray-200 hover:border-gray-300 cursor-pointer'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                    isSelected
-                      ? 'bg-green-600 border-green-600'
-                      : 'border-gray-300 bg-white'
-                  }`}>
-                    {isSelected && (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleWorkshop(session.id)}
-                    className="sr-only"
-                  />
-                  <div>
-                    <span className="font-medium text-gray-900">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => !isSoldOut && toggleWorkshop(session.id)}
+                  disabled={isSoldOut}
+                  className="sr-only"
+                />
+                {/* Row 1: Checkbox + Week # + Theme + Price */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                      isSoldOut
+                        ? 'bg-gray-200 border-gray-300'
+                        : isSelected
+                          ? 'bg-green-600 border-green-600'
+                          : 'border-gray-300 bg-white'
+                    }`}>
+                      {isSelected && !isSoldOut && (
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="font-semibold text-gray-900">
                       Week {index + 1}
                     </span>
-                    <span className="text-gray-500 ml-2 text-sm">
-                      {session.dateLabel}
-                    </span>
-                    <span className="ml-2 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
                       {session.theme}
                     </span>
                   </div>
-                </div>
-                <div className="text-sm text-right">
-                  {hasDiscount && (
-                    <span className="line-through text-gray-400 mr-1">
-                      {formatWorkshopPrice(originalPricePerSession)}
+                  <div className="text-sm">
+                    {hasDiscount && (
+                      <span className="line-through text-gray-400 mr-1">
+                        {formatWorkshopPrice(originalPricePerSession)}
+                      </span>
+                    )}
+                    <span className="font-semibold text-gray-900">
+                      {formatWorkshopPrice(pricePerSession)}
                     </span>
-                  )}
-                  <span className="font-semibold text-gray-900">
-                    {formatWorkshopPrice(pricePerSession)}
+                  </div>
+                </div>
+                {/* Row 2: Date + Time + Spots left */}
+                <div className="flex items-center justify-between mt-1.5 ml-8">
+                  <span className="text-sm text-gray-500">
+                    {session.dateLabel} · {sessionTimeLabel}
                   </span>
-                  <span className="text-gray-400 ml-1 hidden sm:inline">
-                    · {sessionTimeLabel}
-                  </span>
+                  <div className="text-sm">
+                    {spotsLeft !== null ? (
+                      isSoldOut ? (
+                        <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+                          Sold out
+                        </span>
+                      ) : isLowStock ? (
+                        <span className="text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+                          {spotsLeft} spot{spotsLeft !== 1 ? 's' : ''} left
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-500">
+                          {spotsLeft} spots left
+                        </span>
+                      )
+                    ) : availabilityLoading ? (
+                      <span className="text-xs text-gray-400 animate-pulse">
+                        checking...
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               </label>
             );

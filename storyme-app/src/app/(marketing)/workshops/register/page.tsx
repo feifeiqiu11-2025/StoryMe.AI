@@ -13,12 +13,13 @@
 
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import LandingNav from '@/components/navigation/LandingNav';
 import WorkshopRegistrationForm from '@/components/workshops/WorkshopRegistrationForm';
 import { WORKSHOP_PARTNERS } from '@/lib/workshops/constants';
+import type { WorkshopAvailabilityData } from '@/lib/workshops/types';
 
 function RegistrationBanner() {
   const searchParams = useSearchParams();
@@ -62,6 +63,33 @@ function RegisterPageContent() {
   // Find the active partner (extensible: future ?partner= param)
   const activePartner = WORKSHOP_PARTNERS.find((p) => !p.comingSoon);
 
+  // Fetch spot availability on page load
+  const [availability, setAvailability] =
+    useState<WorkshopAvailabilityData | null>(null);
+  const [availabilityLoading, setAvailabilityLoading] = useState(true);
+
+  useEffect(() => {
+    if (!activePartner) return;
+
+    async function fetchAvailability() {
+      try {
+        const res = await fetch(
+          `/api/v1/workshops/availability?partnerId=${activePartner!.id}`,
+        );
+        const json = await res.json();
+        if (json.success && json.data) {
+          setAvailability(json.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch availability:', error);
+      } finally {
+        setAvailabilityLoading(false);
+      }
+    }
+
+    fetchAvailability();
+  }, [activePartner]);
+
   if (!activePartner) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-12 text-center">
@@ -104,6 +132,9 @@ function RegisterPageContent() {
         <p className="text-gray-600">
           Select your sessions and complete registration below.
         </p>
+        <p className="text-sm text-amber-700 mt-2">
+          Limited to {activePartner.capacity[defaultSession]} spots per session — register early!
+        </p>
       </div>
 
       {/* Promo Banner */}
@@ -124,6 +155,8 @@ function RegisterPageContent() {
         <WorkshopRegistrationForm
           partner={activePartner}
           defaultSessionType={defaultSession}
+          availability={availability}
+          availabilityLoading={availabilityLoading}
         />
       </div>
     </div>

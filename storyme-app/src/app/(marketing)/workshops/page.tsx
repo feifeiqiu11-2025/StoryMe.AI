@@ -18,6 +18,7 @@ import Reveal from '@/components/ui/Reveal';
 import {
   WORKSHOP_PARTNERS,
   WORKSHOP_FAQS,
+  formatWorkshopPrice,
 } from '@/lib/workshops/constants';
 
 export default function WorkshopsPage() {
@@ -251,12 +252,24 @@ export default function WorkshopsPage() {
                         ),
                       )}
                     </ul>
-                    <Link
-                      href="/workshops/register?session=morning"
-                      className="inline-block px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg"
-                    >
-                      Register
-                    </Link>
+                    {/* Register CTA + Pricing */}
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <Link
+                        href="/workshops/register?session=morning"
+                        className="inline-block px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg"
+                      >
+                        Register
+                      </Link>
+                      <div>
+                        <span className="line-through text-gray-400 text-lg">
+                          {formatWorkshopPrice(partner.pricing.morning.originalPrice)}
+                        </span>
+                        <span className="text-2xl font-bold text-amber-700 ml-2">
+                          {formatWorkshopPrice(partner.pricing.morning.promoPrice)}
+                        </span>
+                        <span className="text-gray-500 text-sm ml-1">/ session</span>
+                      </div>
+                    </div>
                   </Reveal>
 
                   {/* Right: Image + Outcomes */}
@@ -320,12 +333,24 @@ export default function WorkshopsPage() {
                         ),
                       )}
                     </ul>
-                    <Link
-                      href="/workshops/register?session=afternoon"
-                      className="inline-block px-6 py-3 bg-green-700 hover:bg-green-800 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg"
-                    >
-                      Register
-                    </Link>
+                    {/* Register CTA + Pricing */}
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <Link
+                        href="/workshops/register?session=afternoon"
+                        className="inline-block px-6 py-3 bg-green-700 hover:bg-green-800 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg"
+                      >
+                        Register
+                      </Link>
+                      <div>
+                        <span className="line-through text-gray-400 text-lg">
+                          {formatWorkshopPrice(partner.pricing.afternoon.originalPrice)}
+                        </span>
+                        <span className="text-2xl font-bold text-green-700 ml-2">
+                          {formatWorkshopPrice(partner.pricing.afternoon.promoPrice)}
+                        </span>
+                        <span className="text-gray-500 text-sm ml-1">/ session</span>
+                      </div>
+                    </div>
                   </Reveal>
 
                   {/* Left visually: Image + Outcomes */}

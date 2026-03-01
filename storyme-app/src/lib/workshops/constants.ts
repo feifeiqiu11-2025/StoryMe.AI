@@ -32,6 +32,11 @@ export interface WorkshopPricing {
   currency: string;
 }
 
+export interface WorkshopCapacity {
+  morning: number;
+  afternoon: number;
+}
+
 export interface WorkshopPartner {
   id: string;
   slug: string;
@@ -45,6 +50,7 @@ export interface WorkshopPartner {
   comingSoon: boolean;
   sessions: WorkshopSession[];
   pricing: WorkshopPricing;
+  capacity: WorkshopCapacity;
 }
 
 export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
@@ -122,7 +128,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       },
       {
         id: 'steamoji-wk3',
-        dateLabel: 'Sunday, March 22, 2026',
+        dateLabel: 'Sunday, March 29, 2026',
         theme: 'Innovation',
         morning: {
           time: '10:00 – 11:00 AM',
@@ -151,7 +157,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       },
       {
         id: 'steamoji-wk4',
-        dateLabel: 'Sunday, March 29, 2026',
+        dateLabel: 'Sunday, April 12, 2026',
         theme: 'Value & Choices',
         morning: {
           time: '10:00 – 11:00 AM',
@@ -180,7 +186,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       },
       {
         id: 'steamoji-wk5',
-        dateLabel: 'Sunday, April 5, 2026',
+        dateLabel: 'Sunday, April 19, 2026',
         theme: 'Community',
         morning: {
           time: '10:00 – 11:00 AM',
@@ -213,6 +219,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       afternoon: { originalPrice: 7500, promoPrice: 6000 }, // $75 → $60
       currency: 'usd',
     },
+    capacity: { morning: 10, afternoon: 10 },
   },
   {
     id: 'avocado',
@@ -230,6 +237,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       afternoon: { originalPrice: 0, promoPrice: 0 },
       currency: 'usd',
     },
+    capacity: { morning: 0, afternoon: 0 },
   },
 ];
 
