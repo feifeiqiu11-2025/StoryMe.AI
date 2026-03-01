@@ -14,6 +14,7 @@ import LandingNav from '@/components/navigation/LandingNav';
 import HeroCarousel from '@/components/landing/HeroCarousel';
 import WhyCreativitySection from '@/components/landing/WhyCreativitySection';
 import VideoShowcase from '@/components/landing/VideoShowcase';
+import Reveal from '@/components/ui/Reveal';
 import type { YouTubeVideo } from '@/app/api/v1/youtube/playlist/route';
 
 const LANDING_PLAYLIST_ID = 'PLyDpAVbXE4SUAEuc2SnXwhsbUMg9j3dy9';
@@ -98,274 +99,289 @@ export default function HomePage() {
         </div>
 
         {/* Why Creativity Matters Section */}
-        <WhyCreativitySection />
+        <Reveal>
+          <WhyCreativitySection />
+        </Reveal>
 
         {/* The Creation Journey Section */}
-        <div className="mb-12 sm:mb-16">
-          {/* Section Title */}
-          <div className="text-center mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              The Creation Journey
-            </h2>
-          </div>
+        <Reveal>
+          <div className="mb-12 sm:mb-16">
+            {/* Section Title */}
+            <div className="text-center mb-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                The Creation Journey
+              </h2>
+            </div>
 
-          {/* Clean Journey Flow - Inspired by Slides */}
-          <div className="mb-12">
-            {/* Three Column Grid with Arrows */}
-            <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-2 mb-8">
+            {/* Clean Journey Flow - Inspired by Slides */}
+            <div className="mb-12">
+              {/* Three Column Grid with Arrows */}
+              <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-2 mb-8">
 
-              {/* Column 1: Spark */}
-              <div className="bg-white rounded-xl p-6 shadow-md border border-yellow-200 flex-1 max-w-sm">
-                {/* Title - Top Center */}
-                <h4 className="text-xl font-bold text-gray-900 text-center mb-4">Spark</h4>
+                {/* Column 1: Spark */}
+                <Reveal delay={0}>
+                  <div className="bg-white rounded-xl p-6 shadow-md border border-yellow-200 flex-1 max-w-sm">
+                    <h4 className="text-xl font-bold text-gray-900 text-center mb-4">Spark</h4>
+                    <div className="mb-4 rounded-lg overflow-hidden">
+                      <img
+                        src="/images/crayon-drawing.jpg"
+                        alt="Child's crayon drawing of a dragon and house"
+                        className="w-full h-52 object-cover"
+                      />
+                    </div>
+                    <p className="text-gray-700 leading-relaxed text-center">
+                      A wild idea whispered at bedtime, a curious question, a drawing on a napkin.
+                    </p>
+                  </div>
+                </Reveal>
 
-                {/* Image */}
-                <div className="mb-4 rounded-lg overflow-hidden">
-                  <img
-                    src="/images/crayon-drawing.jpg"
-                    alt="Child's crayon drawing of a dragon and house"
-                    className="w-full h-52 object-cover"
-                  />
+                {/* Arrow 1 */}
+                <div className="hidden md:flex items-center justify-center px-2">
+                  <span className="text-2xl text-gray-400">→</span>
+                </div>
+                <div className="md:hidden flex items-center justify-center py-2">
+                  <span className="text-2xl text-gray-400">↓</span>
                 </div>
 
-                {/* Simplified Copy */}
-                <p className="text-gray-700 leading-relaxed text-center">
-                  A wild idea whispered at bedtime, a curious question, a drawing on a napkin.
-                </p>
-              </div>
+                {/* Column 2: Create */}
+                <Reveal delay={150}>
+                  <div className="bg-white rounded-xl p-6 shadow-md border border-pink-200 flex-1 max-w-sm">
+                    <h4 className="text-xl font-bold text-gray-900 text-center mb-4">Create</h4>
+                    <div className="mb-4 rounded-lg overflow-hidden">
+                      <img
+                        src="/images/ipad-storytelling.jpg"
+                        alt="iPad app turning drawing into interactive story"
+                        className="w-full h-52 object-cover object-center"
+                      />
+                    </div>
+                    <p className="text-gray-700 leading-relaxed text-center">
+                      Turn sparks into real creations—personalized storybooks, art projects, and 3D models that kids proudly share.
+                    </p>
+                  </div>
+                </Reveal>
 
-              {/* Arrow 1 */}
-              <div className="hidden md:flex items-center justify-center px-2">
-                <span className="text-2xl text-gray-400">→</span>
-              </div>
-              <div className="md:hidden flex items-center justify-center py-2">
-                <span className="text-2xl text-gray-400">↓</span>
-              </div>
-
-              {/* Column 2: Create */}
-              <div className="bg-white rounded-xl p-6 shadow-md border border-pink-200 flex-1 max-w-sm">
-                {/* Title - Top Center */}
-                <h4 className="text-xl font-bold text-gray-900 text-center mb-4">Create</h4>
-
-                {/* Image - iPad storytelling app */}
-                <div className="mb-4 rounded-lg overflow-hidden">
-                  <img
-                    src="/images/ipad-storytelling.jpg"
-                    alt="iPad app turning drawing into interactive story"
-                    className="w-full h-52 object-cover object-center"
-                  />
+                {/* Arrow 2 */}
+                <div className="hidden md:flex items-center justify-center px-2">
+                  <span className="text-2xl text-gray-400">→</span>
+                </div>
+                <div className="md:hidden flex items-center justify-center py-2">
+                  <span className="text-2xl text-gray-400">↓</span>
                 </div>
 
-                {/* Simplified Copy */}
-                <p className="text-gray-700 leading-relaxed text-center">
-                  Turn sparks into real creations—personalized storybooks, art projects, and 3D models that kids proudly share.
-                </p>
+                {/* Column 3: Grow */}
+                <Reveal delay={300}>
+                  <div className="bg-white rounded-xl p-6 shadow-md border border-green-200 flex-1 max-w-sm">
+                    <h4 className="text-xl font-bold text-gray-900 text-center mb-4">Grow</h4>
+                    <div className="mb-4 rounded-lg overflow-hidden">
+                      <img
+                        src="/images/handmade-storybooks.jpg"
+                        alt="Stack of handmade storybooks with child's hand"
+                        className="w-full h-52 object-cover"
+                      />
+                    </div>
+                    <p className="text-gray-700 leading-relaxed text-center">
+                      Through creating, children become confident, resilient, and empathetic thinkers.
+                    </p>
+                  </div>
+                </Reveal>
+
               </div>
-
-              {/* Arrow 2 */}
-              <div className="hidden md:flex items-center justify-center px-2">
-                <span className="text-2xl text-gray-400">→</span>
-              </div>
-              <div className="md:hidden flex items-center justify-center py-2">
-                <span className="text-2xl text-gray-400">↓</span>
-              </div>
-
-              {/* Column 3: Grow */}
-              <div className="bg-white rounded-xl p-6 shadow-md border border-green-200 flex-1 max-w-sm">
-                {/* Title - Top Center */}
-                <h4 className="text-xl font-bold text-gray-900 text-center mb-4">Grow</h4>
-
-                {/* Image - handmade storybooks */}
-                <div className="mb-4 rounded-lg overflow-hidden">
-                  <img
-                    src="/images/handmade-storybooks.jpg"
-                    alt="Stack of handmade storybooks with child's hand"
-                    className="w-full h-52 object-cover"
-                  />
-                </div>
-
-                {/* Simplified Copy */}
-                <p className="text-gray-700 leading-relaxed text-center">
-                  Through creating, children become confident, resilient, and empathetic thinkers.
-                </p>
-              </div>
-
             </div>
           </div>
-        </div>
+        </Reveal>
 
         {/* How We Do It - With Background Image */}
-        <div className="mb-12 sm:mb-16">
-          <div className="text-center mb-2">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              How We Do It
-            </h2>
-          </div>
+        <Reveal>
+          <div className="mb-12 sm:mb-16">
+            <div className="text-center mb-2">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                How We Do It
+              </h2>
+            </div>
 
-          {/* Container with hands background image */}
-          <div
-            className="relative max-w-5xl mx-auto bg-no-repeat bg-center bg-contain"
-            style={{ backgroundImage: 'url(/images/HowWeDoBackground.png)' }}
-          >
-            <div className="relative grid md:grid-cols-2 gap-4 md:gap-8">
-              {/* Left: Online Tools */}
-              <div className="p-6 sm:p-10 flex flex-col items-center text-center">
-                <h3 className="text-lg font-semibold text-gray-900 uppercase tracking-wide">
-                  Online Tools
-                </h3>
+            {/* Container with hands background image */}
+            <div
+              className="relative max-w-5xl mx-auto bg-no-repeat bg-center bg-contain"
+              style={{ backgroundImage: 'url(/images/HowWeDoBackground.png)' }}
+            >
+              <div className="relative grid md:grid-cols-2 gap-4 md:gap-8">
+                {/* Left: Online Tools */}
+                <Reveal delay={0}>
+                  <div className="p-6 sm:p-10 flex flex-col items-center text-center">
+                    <h3 className="text-lg font-semibold text-gray-900 uppercase tracking-wide">
+                      Online Tools
+                    </h3>
 
-                <div className="space-y-5 mt-2">
-                  {/* KindleWood Studio */}
-                  <div>
-                    <h4 className="text-xl font-bold text-gray-900">
-                      KindleWood Studio <span className="text-sm font-normal text-gray-500">For Parents & Educators</span>
-                    </h4>
+                    <div className="space-y-5 mt-2">
+                      {/* KindleWood Studio */}
+                      <div>
+                        <h4 className="text-xl font-bold text-gray-900">
+                          KindleWood Studio <span className="text-sm font-normal text-gray-500">For Parents & Educators</span>
+                        </h4>
+                        <p className="text-gray-700 leading-relaxed mt-2">
+                          The creator platform that turns imagination—wild ideas, drawings, and photos—into digital storybooks and creative projects.{' '}
+                          <Link href="/signup" className="text-purple-600 hover:text-purple-700 font-medium transition-colors">
+                            Visit Studio →
+                          </Link>
+                        </p>
+                      </div>
+
+                      {/* KindleWood Kids */}
+                      <div>
+                        <h4 className="text-xl font-bold text-gray-900">
+                          KindleWood Kids <span className="text-sm font-normal text-gray-500">For Children</span>
+                        </h4>
+                        <p className="text-gray-700 leading-relaxed mt-2">
+                          A fun, engaging reading and learning app where kids enjoy their own stories and track their creative progress.{' '}
+                          <a
+                            href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                          >
+                            Download App →
+                          </a>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </Reveal>
+
+                {/* Right: Learning Lab */}
+                <Reveal delay={150}>
+                  <div className="p-6 sm:p-10 flex flex-col items-center text-center">
+                    <h3 className="text-lg font-semibold text-gray-900 uppercase tracking-wide">
+                      In-Person Learning Lab
+                    </h3>
                     <p className="text-gray-700 leading-relaxed mt-2">
-                      The creator platform that turns imagination—wild ideas, drawings, and photos—into digital storybooks and creative projects.{' '}
-                      <Link href="/signup" className="text-purple-600 hover:text-purple-700 font-medium transition-colors">
-                        Visit Studio →
+                      Hands-on workshops at <span className="font-bold text-gray-900">partner schools</span> and <span className="font-bold text-gray-900">KindleWood Learning Lab</span> where storytelling meets nature exploration and making.
+                    </p>
+                    <p className="text-gray-700 mt-4 mb-2">Workshop activities:</p>
+                    <ul className="space-y-2 text-gray-700 text-sm sm:text-base">
+                      <li className="whitespace-nowrap">• Imagination to storybook with show & tell <span className="text-gray-500">(Ages 4–6)</span></li>
+                      <li className="whitespace-nowrap">• Nature exploration & creative story making <span className="text-gray-500">(Ages 7–9)</span></li>
+                      <li className="whitespace-nowrap">• Maker projects: 3D modeling, digital storytelling <span className="text-gray-500">(Ages 7–12+)</span></li>
+                    </ul>
+                    <p className="mt-4">
+                      <Link href="/workshops" className="text-green-600 hover:text-green-700 font-medium transition-colors">
+                        Explore Workshops →
                       </Link>
                     </p>
                   </div>
-
-                  {/* KindleWood Kids */}
-                  <div>
-                    <h4 className="text-xl font-bold text-gray-900">
-                      KindleWood Kids <span className="text-sm font-normal text-gray-500">For Children</span>
-                    </h4>
-                    <p className="text-gray-700 leading-relaxed mt-2">
-                      A fun, engaging reading and learning app where kids enjoy their own stories and track their creative progress.{' '}
-                      <a
-                        href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                      >
-                        Download App →
-                      </a>
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right: Learning Lab */}
-              <div className="p-6 sm:p-10 flex flex-col items-center text-center">
-                <h3 className="text-lg font-semibold text-gray-900 uppercase tracking-wide">
-                  In-Person Learning Lab
-                </h3>
-                <p className="text-gray-700 leading-relaxed mt-2">
-                  Hands-on workshops at <span className="font-bold text-gray-900">partner schools</span> and <span className="font-bold text-gray-900">KindleWood Learning Lab</span> where storytelling meets nature exploration and making.
-                </p>
-                <p className="text-gray-700 mt-4 mb-2">Workshop activities:</p>
-                <ul className="space-y-2 text-gray-700 text-sm sm:text-base">
-                  <li className="whitespace-nowrap">• Imagination to storybook with show & tell <span className="text-gray-500">(Ages 4–6)</span></li>
-                  <li className="whitespace-nowrap">• Nature exploration & creative story making <span className="text-gray-500">(Ages 7–9)</span></li>
-                  <li className="whitespace-nowrap">• Maker projects: 3D modeling, digital storytelling <span className="text-gray-500">(Ages 7–12+)</span></li>
-                </ul>
-                <p className="mt-4">
-                  <Link href="/workshops" className="text-green-600 hover:text-green-700 font-medium transition-colors">
-                    Explore Workshops →
-                  </Link>
-                </p>
+                </Reveal>
               </div>
             </div>
           </div>
-        </div>
+        </Reveal>
 
         {/* Partnership Section */}
-        <div className="mb-12 sm:mb-16">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
-              Partnering with Schools & Educators
-            </h2>
-            <p className="text-gray-600 leading-relaxed max-w-3xl mx-auto">
-              We partner with schools, educators, and community organizations to bring creativity-driven storytelling and learning into classrooms and homes.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-14 md:gap-20">
-            {/* Avocado Montessori Academy */}
-            <div className="flex items-center justify-center">
-              <img
-                src="/images/avocado-logo-cropped.png"
-                alt="Avocado Montessori Academy"
-                className="h-[4.5rem] w-auto object-contain"
-              />
+        <Reveal>
+          <div className="mb-12 sm:mb-16">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
+                Partnering with Schools & Educators
+              </h2>
+              <p className="text-gray-600 leading-relaxed max-w-3xl mx-auto">
+                We partner with schools, educators, and community organizations to bring creativity-driven storytelling and learning into classrooms and homes.
+              </p>
             </div>
 
-            {/* Puget Sound Foundation */}
-            <div className="flex items-center justify-center">
-              <div className="text-center">
-                <div className="font-bold text-amber-800 text-4xl leading-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", serif' }}>
-                  Puget Sound
+            <div className="flex flex-wrap items-center justify-center gap-14 md:gap-20">
+              {/* Avocado Montessori Academy */}
+              <Reveal delay={0}>
+                <div className="flex items-center justify-center -mt-3">
+                  <img
+                    src="/images/avocado-logo-cropped.png"
+                    alt="Avocado Montessori Academy"
+                    className="h-[4.5rem] w-auto object-contain"
+                  />
                 </div>
-                <div className="text-amber-700 text-xl leading-tight italic" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", serif' }}>
-                  Children & Youth Foundation
-                </div>
-              </div>
-            </div>
+              </Reveal>
 
-            {/* SteamOji */}
-            <Link href="/workshops#steamoji" className="flex items-center justify-center group">
-              <img
-                src="/images/steamoji-logo.png"
-                alt="SteamOji Maker Academy"
-                className="h-20 w-auto object-contain group-hover:opacity-80 transition-opacity"
-              />
-            </Link>
+              {/* Puget Sound Foundation */}
+              <Reveal delay={150}>
+                <div className="flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="font-bold text-amber-800 text-4xl leading-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", serif' }}>
+                      Puget Sound
+                    </div>
+                    <div className="text-amber-700 text-xl leading-tight italic" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", serif' }}>
+                      Children & Youth Foundation
+                    </div>
+                  </div>
+                </div>
+              </Reveal>
+
+              {/* SteamOji */}
+              <Reveal delay={300}>
+                <Link href="/workshops#steamoji" className="flex items-center justify-center group">
+                  <img
+                    src="/images/steamoji-logo.png"
+                    alt="SteamOji Maker Academy"
+                    className="h-20 w-auto object-contain group-hover:opacity-80 transition-opacity"
+                  />
+                </Link>
+              </Reveal>
+            </div>
           </div>
-        </div>
+        </Reveal>
 
         {/* Our Stories - Video Showcase (video left, text right) */}
-        {videosLoading ? (
-          <div className="mb-12 sm:mb-16">
-            <div className="flex flex-col md:flex-row gap-8 md:gap-12 items-center">
-              <div className="w-full md:w-[55%]">
-                <div className="aspect-video bg-gray-200 rounded-xl animate-pulse" />
-              </div>
-              <div className="w-full md:w-[45%] space-y-4">
-                <div className="h-8 bg-gray-200 rounded animate-pulse w-1/2" />
-                <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
-                <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
+        <Reveal>
+          {videosLoading ? (
+            <div className="mb-12 sm:mb-16">
+              <div className="flex flex-col md:flex-row gap-8 md:gap-12 items-center">
+                <div className="w-full md:w-[55%]">
+                  <div className="aspect-video bg-gray-200 rounded-xl animate-pulse" />
+                </div>
+                <div className="w-full md:w-[45%] space-y-4">
+                  <div className="h-8 bg-gray-200 rounded animate-pulse w-1/2" />
+                  <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
+                  <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
+                </div>
               </div>
             </div>
-          </div>
-        ) : videos.length > 0 ? (
-          <VideoShowcase
-            videos={videos}
-            title="Our Stories"
-            introText="Learn about the vision, mission, and the story behind KindleWood Studio."
-            layout="video-left"
-          />
-        ) : null}
+          ) : videos.length > 0 ? (
+            <VideoShowcase
+              videos={videos}
+              title="Our Stories"
+              introText="Learn about the vision, mission, and the story behind KindleWood Studio."
+              layout="video-left"
+            />
+          ) : null}
+        </Reveal>
 
         {/* Watch How It Works - Video Showcase (text left, video right) */}
-        {demoVideosLoading ? (
-          <div className="mb-12 sm:mb-16">
-            <div className="flex flex-col md:flex-row-reverse gap-8 md:gap-12 items-center">
-              <div className="w-full md:w-[55%]">
-                <div className="aspect-video bg-gray-200 rounded-xl animate-pulse" />
-              </div>
-              <div className="w-full md:w-[45%] space-y-4">
-                <div className="h-8 bg-gray-200 rounded animate-pulse w-1/2" />
-                <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
-                <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
+        <Reveal>
+          {demoVideosLoading ? (
+            <div className="mb-12 sm:mb-16">
+              <div className="flex flex-col md:flex-row-reverse gap-8 md:gap-12 items-center">
+                <div className="w-full md:w-[55%]">
+                  <div className="aspect-video bg-gray-200 rounded-xl animate-pulse" />
+                </div>
+                <div className="w-full md:w-[45%] space-y-4">
+                  <div className="h-8 bg-gray-200 rounded animate-pulse w-1/2" />
+                  <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
+                  <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
+                </div>
               </div>
             </div>
-          </div>
-        ) : demoVideos.length > 0 ? (
-          <VideoShowcase
-            videos={demoVideos}
-            title="Watch How It Works"
-            introText="See how kids and parents create personalized stories, characters, and more."
-            layout="video-right"
-          />
-        ) : null}
+          ) : demoVideos.length > 0 ? (
+            <VideoShowcase
+              videos={demoVideos}
+              title="Watch How It Works"
+              introText="See how kids and parents create personalized stories, characters, and more."
+              layout="video-right"
+            />
+          ) : null}
+        </Reveal>
 
       </div>
 
       {/* Testimonials Section */}
-      <Testimonials videoTestimonials={testimonialVideos} />
+      <Reveal>
+        <Testimonials videoTestimonials={testimonialVideos} />
+      </Reveal>
 
       {/* Footer */}
       <div className="bg-gradient-to-b from-blue-50 to-white border-t border-blue-100">
