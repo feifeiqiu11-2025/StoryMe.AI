@@ -223,7 +223,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
     ],
     pricing: {
       morning: { originalPrice: 5000, promoPrice: 4000 }, // $50 → $40
-      afternoon: { originalPrice: 7500, promoPrice: 6000 }, // $75 → $60
+      afternoon: { originalPrice: 8000, promoPrice: 7000 }, // $80 → $70
       currency: 'usd',
     },
     capacity: { morning: 10, afternoon: 10 },
@@ -262,7 +262,7 @@ export const WORKSHOP_FAQS = [
   {
     question: 'Can I stay and watch during the workshop?',
     answer:
-      'Parents are welcome to stay during the workshop sessions. For the final Show & Tell / Maker Showcase sessions (Week 5), we especially encourage family attendance to celebrate your child\'s creative journey.',
+      'Parents are welcome to stay during the workshop sessions. The last 10 minutes of each session is a Show & Tell where children share what they created — we encourage families to join for this special moment!',
   },
   {
     question: 'How does pricing work?',
