@@ -11,7 +11,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import LandingNav from '@/components/navigation/LandingNav';
 import Reveal from '@/components/ui/Reveal';
@@ -23,6 +23,25 @@ import {
 
 export default function WorkshopsPage() {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+
+  // Morning session slideshow
+  const morningImages = [
+    { src: '/images/workshop-morning.png', alt: 'Morning workshop — kids crafting and storytelling', fit: 'cover' as const },
+    { src: '/images/workshop-morning-bookshow.jpg', alt: 'Collection of KindleWood storybooks created by kids', fit: 'cover' as const },
+    { src: '/images/workshop-morning-samplebook.jpg', alt: 'Printed storybooks from the workshop', fit: 'cover' as const },
+    { src: '/images/workshop-morning-donut.png', alt: 'Character design — kids drawings become animated characters', fit: 'contain' as const },
+    { src: '/images/workshop-morning-garden.png', alt: 'Character design — Happy Family and Butterfly Garden', fit: 'contain' as const },
+  ];
+  const [morningSlide, setMorningSlide] = useState(0);
+
+  const nextMorningSlide = useCallback(() => {
+    setMorningSlide((prev) => (prev + 1) % morningImages.length);
+  }, [morningImages.length]);
+
+  useEffect(() => {
+    const timer = setInterval(nextMorningSlide, 4000);
+    return () => clearInterval(timer);
+  }, [nextMorningSlide]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
@@ -272,13 +291,35 @@ export default function WorkshopsPage() {
                     </div>
                   </Reveal>
 
-                  {/* Right: Image + Outcomes */}
+                  {/* Right: Image Slideshow + Outcomes */}
                   <Reveal className="w-full md:w-[45%] space-y-4" delay={150}>
-                    <img
-                      src="/images/workshop-morning.png"
-                      alt="Morning workshop — kids crafting and storytelling"
-                      className="aspect-video w-full object-cover rounded-2xl shadow-md"
-                    />
+                    <div className="relative aspect-video w-full rounded-2xl shadow-md overflow-hidden bg-gray-100">
+                      {morningImages.map((img, i) => (
+                        <img
+                          key={img.src}
+                          src={img.src}
+                          alt={img.alt}
+                          className={`absolute inset-0 w-full h-full transition-opacity duration-700 ${
+                            img.fit === 'contain' ? 'object-contain' : 'object-cover'
+                          } ${i === morningSlide ? 'opacity-100' : 'opacity-0'}`}
+                        />
+                      ))}
+                      {/* Dot indicators */}
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                        {morningImages.map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setMorningSlide(i)}
+                            className={`w-2 h-2 rounded-full transition-all ${
+                              i === morningSlide
+                                ? 'bg-white scale-110'
+                                : 'bg-white/50 hover:bg-white/75'
+                            }`}
+                            aria-label={`Show image ${i + 1}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
                     <div className="rounded-xl p-4">
                       <p className="text-sm font-semibold text-amber-900 mb-2">What Your Child Takes Home</p>
                       <ul className="space-y-1.5 text-sm text-gray-600">
