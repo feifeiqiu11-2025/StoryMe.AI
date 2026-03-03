@@ -68,6 +68,11 @@ export const WorkshopRegistrationSchema = z.object({
   waiverAccepted: z.literal(true, {
     message: 'You must accept the digital waiver to register',
   }),
+
+  // Code of Conduct
+  codeOfConductAccepted: z.literal(true, {
+    message: 'You must agree to follow the SteamOji Code of Conduct',
+  }),
 });
 
 export type WorkshopRegistrationData = z.infer<typeof WorkshopRegistrationSchema>;

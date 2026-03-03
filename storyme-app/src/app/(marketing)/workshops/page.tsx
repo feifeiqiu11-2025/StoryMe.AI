@@ -43,6 +43,22 @@ export default function WorkshopsPage() {
     return () => clearInterval(timer);
   }, [nextMorningSlide]);
 
+  // Afternoon session slideshow
+  const afternoonImages = [
+    { src: '/images/workshop-afternoon.png', alt: 'Afternoon workshop — nature exploration and creativity lab' },
+    { src: '/images/workshop-afternoon-outdoor.jpg', alt: 'Kids exploring nature at Bridle Trails' },
+  ];
+  const [afternoonSlide, setAfternoonSlide] = useState(0);
+
+  const nextAfternoonSlide = useCallback(() => {
+    setAfternoonSlide((prev) => (prev + 1) % afternoonImages.length);
+  }, [afternoonImages.length]);
+
+  useEffect(() => {
+    const timer = setInterval(nextAfternoonSlide, 4000);
+    return () => clearInterval(timer);
+  }, [nextAfternoonSlide]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       <LandingNav />
@@ -394,13 +410,34 @@ export default function WorkshopsPage() {
                     </div>
                   </Reveal>
 
-                  {/* Left visually: Image + Outcomes */}
+                  {/* Left visually: Image Slideshow + Outcomes */}
                   <Reveal className="w-full md:w-[45%] space-y-4" delay={150}>
-                    <img
-                      src="/images/workshop-afternoon.png"
-                      alt="Afternoon workshop — nature exploration and creativity lab"
-                      className="aspect-video w-full object-cover rounded-2xl shadow-md"
-                    />
+                    <div className="relative aspect-video w-full rounded-2xl shadow-md overflow-hidden bg-gray-100">
+                      {afternoonImages.map((img, i) => (
+                        <img
+                          key={img.src}
+                          src={img.src}
+                          alt={img.alt}
+                          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
+                            i === afternoonSlide ? 'opacity-100' : 'opacity-0'
+                          }`}
+                        />
+                      ))}
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                        {afternoonImages.map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setAfternoonSlide(i)}
+                            className={`w-2 h-2 rounded-full transition-all ${
+                              i === afternoonSlide
+                                ? 'bg-white scale-110'
+                                : 'bg-white/50 hover:bg-white/75'
+                            }`}
+                            aria-label={`Show afternoon image ${i + 1}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
                     <div className="rounded-xl p-4">
                       <p className="text-sm font-semibold text-green-900 mb-2">What Your Child Takes Home</p>
                       <ul className="space-y-1.5 text-sm text-gray-600">

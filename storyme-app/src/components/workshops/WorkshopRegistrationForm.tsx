@@ -61,6 +61,7 @@ export default function WorkshopRegistrationForm({
       emergencyContactPhone: '',
       emergencyContactRelation: '',
       waiverAccepted: undefined as unknown as true,
+      codeOfConductAccepted: undefined as unknown as true,
     },
   });
 
@@ -783,6 +784,40 @@ export default function WorkshopRegistrationForm({
                 </li>
               </ul>
             </div>
+          )}
+        </div>
+
+        {/* Code of Conduct */}
+        <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              {...register('codeOfConductAccepted')}
+              className="sr-only peer"
+            />
+            <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 border-gray-300 bg-white peer-checked:bg-green-600 peer-checked:border-green-600 flex items-center justify-center transition-colors">
+              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <span className="text-sm text-gray-700">
+              I have read and agree to follow the{' '}
+              <a
+                href="https://docs.google.com/document/d/1ADh0zqwZEogHO1uxJo7aAcSS0dyhTmzf3MjGbr4qhSc/edit?tab=t.0"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-green-600 hover:text-green-700 font-medium underline"
+              >
+                SteamOji Code of Conduct
+              </a>
+              .{' '}
+              <span className="text-red-500">*</span>
+            </span>
+          </label>
+          {errors.codeOfConductAccepted && (
+            <p className={`${errorClassName} ml-8`} role="alert">
+              {errors.codeOfConductAccepted.message}
+            </p>
           )}
         </div>
       </div>
