@@ -652,10 +652,9 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
 
       // Check if it's a rate limit error (429)
       if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate')) {
-        // Extract retry delay if available
         const retryMatch = errorMessage.match(/retry in (\d+)/i);
-        const retryDelay = retryMatch ? parseInt(retryMatch[1], 10) * 1000 : 60000; // Default 60s
-        const waitTime = Math.min(retryDelay, 120000); // Cap at 2 minutes
+        const retryDelay = retryMatch ? parseInt(retryMatch[1], 10) * 1000 : 60000;
+        const waitTime = Math.min(retryDelay, 120000);
 
         if (attempt < maxRetries) {
           console.warn(`[Gemini] Rate limited (attempt ${attempt}/${maxRetries}). Waiting ${waitTime / 1000}s before retry...`);
@@ -664,7 +663,13 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
         }
       }
 
-      // For non-rate-limit errors or final attempt, throw immediately
+      // Retry on empty response / content filter (non-deterministic)
+      if (attempt < maxRetries && (errorMessage.includes('No parts') || errorMessage.includes('No candidates'))) {
+        console.warn(`[Gemini] Empty response (attempt ${attempt}/${maxRetries}), retrying in 3s...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        continue;
+      }
+
       console.error(`[Gemini] Generation error (attempt ${attempt}/${maxRetries}):`, error);
       if (attempt === maxRetries) {
         throw lastError;

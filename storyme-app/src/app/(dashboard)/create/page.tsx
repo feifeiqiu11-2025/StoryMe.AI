@@ -1482,6 +1482,9 @@ export default function CreateStoryPage() {
               generatedImages={imageGenerationStatus}
               characters={characters}
               artStyle={ART_STYLE}
+              imageProvider={imageProvider}
+              illustrationStyle={artStyle}
+              clothingConsistency={clothingConsistency}
               onRegenerateScene={(imageId, newImageData) => {
                 // Replace the image in the status array
                 setImageGenerationStatus(prev =>

@@ -170,6 +170,7 @@ export async function POST(request: NextRequest) {
       imageProvider: requestedProvider,
       illustrationStyle,
       clothingConsistency: requestedClothingConsistency,
+      skipRefinement,
     } = body;
 
     // Determine clothing consistency mode (default to 'consistent')
@@ -222,7 +223,11 @@ export async function POST(request: NextRequest) {
     // Use edited prompt if provided, otherwise refine based on user feedback
     let refinedPrompt: string;
 
-    if (editedPrompt && editedPrompt.trim() !== originalPrompt.trim()) {
+    if (skipRefinement) {
+      // Skip AI refinement — use edited or original prompt directly
+      refinedPrompt = (editedPrompt || originalPrompt).trim();
+      console.log(`[Regenerate] Using prompt directly (skipRefinement): ${refinedPrompt.substring(0, 100)}...`);
+    } else if (editedPrompt && editedPrompt.trim() !== originalPrompt.trim()) {
       // User manually edited the prompt - use it directly
       refinedPrompt = editedPrompt.trim();
       console.log(`[Regenerate] Using user-edited prompt: ${refinedPrompt.substring(0, 100)}...`);
