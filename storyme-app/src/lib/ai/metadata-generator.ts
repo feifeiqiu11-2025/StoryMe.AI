@@ -46,7 +46,7 @@ export async function generateStoryMetadata(
 
   // Build the prompt based on language
   const prompt = language === 'zh'
-    ? `你是一位富有创意的儿童图书编辑。根据以下故事，生成一个吸引人的、适合年龄的标题和简短描述。
+    ? `你是一位富有创意的儿童图书编辑。根据以下故事，生成一个独特的、适合年龄的标题和简短描述。
 
 故事详情：
 - 阅读年龄：${readingLevel} 岁
@@ -57,18 +57,24 @@ export async function generateStoryMetadata(
 ${script}
 
 请生成：
-1. 一个吸引人、令人难忘的标题（3-8个字）来捕捉故事的精髓
-2. 一个简短、引人入胜的描述（1-2句话，20-40个字）来吸引家长或孩子阅读这个故事
+1. 一个独特、令人难忘的标题（3-8个字）
+2. 一个简短、引人入胜的描述（1-2句话，20-40个字）
 
-重要事项：
-- 标题要令人兴奋，适合${readingLevel}岁的孩子
-- 描述应突出主要冒险或主题
-- 保持简单有趣
+标题创作要求：
+- 先找出这个故事里最独特的元素：一个关键物品、一个转折点、一个特别的地方、一种情感，或一个只有这个故事才有的细节
+- 围绕这个独特元素来构建标题，而不是用通用的描述
+- 每次变换不同的标题风格，例如：
+  * 故事中的关键物品或地点（如"月亮上的小花园"）
+  * 角色的独特特征或情感（如"最勇敢的小蜗牛"）
+  * 故事的转折点或悬念（如"当星星掉进了池塘"）
+  * 有趣的画面或场景（如"穿雨靴的猫"）
+- 避免每次都用"XX的冒险"、"XX的旅程"这类套路
+- 适合${readingLevel}岁的孩子
 - 标题和描述中不要使用引号
 
 仅以这种确切格式的JSON对象响应：
 {"title": "建议的标题", "description": "简短的描述"}`
-    : `You are a creative children's book editor. Based on the following story, generate a catchy, age-appropriate title and a brief description.
+    : `You are a creative children's book editor. Based on the following story, generate a unique, age-appropriate title and a brief description.
 
 Story Details:
 - Reading Age: ${readingLevel} years old
@@ -79,13 +85,21 @@ Story Script:
 ${script}
 
 Please generate:
-1. A catchy, memorable title (3-8 words) that captures the essence of the story
+1. A unique, memorable title (3-8 words) rooted in what makes THIS story specific
 2. A brief, engaging description (1-2 sentences, 20-40 words) that would entice a parent or child to read the story
 
-Important:
-- Make the title exciting and age-appropriate for ${readingLevel}-year-olds
-- The description should highlight the main adventure or theme
-- Keep it simple and fun
+How to create the title:
+- First, identify what is SPECIFIC and UNIQUE to this story: a key object, a turning point, a special place, an emotion, or a detail that only this story has
+- Build the title around that specific element, not around a generic theme
+- Vary the title style each time. Consider approaches like:
+  * A key object or place from the story (e.g., "The Moonlit Treehouse", "Green Eggs and Ham")
+  * A character's unique trait or feeling (e.g., "The Very Hungry Caterpillar", "Curious George")
+  * The story's turning point or a surprising moment (e.g., "When the Stars Fell into the Pond")
+  * A vivid image or scene (e.g., "Cloudy with a Chance of Meatballs", "The Snowy Day")
+  * A playful question or phrase (e.g., "If You Give a Mouse a Cookie", "Where the Wild Things Are")
+- The title should make you curious about THIS story — it should NOT sound like it could be about any children's story
+- Do NOT always fall back on "[Name]'s Adventure" or "[Name]'s Quest" patterns
+- Age-appropriate for ${readingLevel}-year-olds
 - Do NOT use quotation marks in the title or description
 
 Respond with ONLY a JSON object in this exact format:
