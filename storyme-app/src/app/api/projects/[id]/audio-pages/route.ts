@@ -60,15 +60,26 @@ export async function GET(
     if (hasEnglishAudio) availableLanguages.push('en');
     if (hasChineseAudio) availableLanguages.push('zh');
 
-    // Format response for kids app
-    // Includes: story pages, quiz_transition, and quiz_question pages
-    // Now also includes Chinese audio URLs and available languages
+    // Detect if audio generation is currently in progress
+    // Rows with generation_status='generating' older than 10 minutes are considered stale
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const isGeneratingEnglish = (audioPages || []).some(
+      (page: any) => page.generation_status === 'generating' && !page.audio_url && page.created_at > tenMinutesAgo
+    );
+    const isGeneratingChinese = (audioPages || []).some(
+      (page: any) => page.generation_status === 'generating' && !page.audio_url_zh && page.text_content_zh && page.created_at > tenMinutesAgo
+    );
+    const isGenerating = isGeneratingEnglish || isGeneratingChinese;
+
     const response = NextResponse.json({
       pages: audioPages || [],
       hasAudio: (audioPages || []).length > 0,
       hasEnglishAudio,
       hasChineseAudio,
       availableLanguages,
+      isGenerating,
+      isGeneratingEnglish,
+      isGeneratingChinese,
     });
 
     // Add CORS headers for kids app

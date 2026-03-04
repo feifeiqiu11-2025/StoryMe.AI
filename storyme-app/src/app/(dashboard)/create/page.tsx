@@ -844,6 +844,14 @@ export default function CreateStoryPage() {
       clearGuestStory();
       console.log('✓ Cleared guest story from sessionStorage');
 
+      // Auto-trigger audio generation (fire-and-forget)
+      const savedId = data.project.id;
+      fetch(`/api/projects/${savedId}/auto-generate-audio`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }).catch(err => console.error('Auto-audio trigger failed (non-blocking):', err));
+      console.log(`🎵 Auto-audio generation triggered for project ${savedId}`);
+
       // Close save modal
       setShowSaveModal(false);
 

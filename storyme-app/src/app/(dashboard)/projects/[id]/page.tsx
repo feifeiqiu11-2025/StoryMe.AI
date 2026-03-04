@@ -114,6 +114,8 @@ export default function StoryViewerPage() {
     };
 
     loadData();
+
+    return () => stopAudioPoll();
   }, [router, projectId]);
 
   // Close PDF dropdown when clicking outside
@@ -175,6 +177,36 @@ export default function StoryViewerPage() {
     }
   };
 
+  // Polling ref for audio generation status
+  const audioPollRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopAudioPoll = () => {
+    if (audioPollRef.current) {
+      clearInterval(audioPollRef.current);
+      audioPollRef.current = null;
+    }
+  };
+
+  const startAudioPoll = () => {
+    stopAudioPoll();
+    audioPollRef.current = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/audio-pages`);
+        const data = await response.json();
+        setHasAudio(data.hasAudio || false);
+        setHasEnglishAudio(data.hasEnglishAudio || false);
+        setHasChineseAudio(data.hasChineseAudio || false);
+
+        if (!data.isGenerating) {
+          setGeneratingAudio(false);
+          stopAudioPoll();
+        }
+      } catch (error) {
+        console.error('Error polling audio status:', error);
+      }
+    }, 5000);
+  };
+
   const checkAudioExists = async () => {
     try {
       const response = await fetch(`/api/projects/${projectId}/audio-pages`);
@@ -182,6 +214,12 @@ export default function StoryViewerPage() {
       setHasAudio(data.hasAudio || false);
       setHasEnglishAudio(data.hasEnglishAudio || false);
       setHasChineseAudio(data.hasChineseAudio || false);
+
+      // Detect if audio is currently being generated in the background
+      if (data.isGenerating) {
+        setGeneratingAudio(true);
+        startAudioPoll();
+      }
     } catch (error) {
       console.error('Error checking audio:', error);
       setHasAudio(false);
