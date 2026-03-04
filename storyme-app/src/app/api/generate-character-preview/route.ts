@@ -30,7 +30,8 @@ import {
   detectSubjectType,
   isGeminiAvailable,
 } from '@/lib/gemini-image-client';
-import { CharacterDescription, SubjectType } from '@/lib/types/story';
+import { CharacterDescription, SubjectType, normalizeImageProvider } from '@/lib/types/story';
+import { resolveGeminiImageModel } from '@/lib/gemini-image-client';
 
 export const maxDuration = 120; // 2 minutes timeout
 
@@ -40,6 +41,7 @@ interface GeneratePreviewRequest {
   characterType?: string; // For description-only mode: "baby eagle", "friendly dragon", etc.
   subjectType?: SubjectType; // Pre-detected subject type from UI (avoids redundant detection)
   subjectDescription?: string; // Pre-detected description from UI
+  imageProvider?: string; // Image provider for Gemini model selection
   description: {
     hairColor?: string;
     skinTone?: string;
@@ -73,7 +75,10 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: GeneratePreviewRequest = await request.json();
-    const { name, referenceImageUrl, characterType, subjectType: preDetectedType, subjectDescription: preDetectedDescription, description } = body;
+    const { name, referenceImageUrl, characterType, subjectType: preDetectedType, subjectDescription: preDetectedDescription, description, imageProvider: requestedProvider } = body;
+
+    // Resolve Gemini model ID from the provider selection
+    const geminiModelId = resolveGeminiImageModel(normalizeImageProvider(requestedProvider));
 
     // Validate required fields
     if (!name || !name.trim()) {
@@ -114,6 +119,7 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         characterType: characterType!,
         description: descriptionText,
+        modelId: geminiModelId,
       };
 
       console.log(`[API] Generating from description: ${characterType} - ${descriptionText}`);
@@ -169,6 +175,7 @@ export async function POST(request: NextRequest) {
           name: name.trim(),
           referenceImageUrl: referenceImageUrl!,
           description: charDescription,
+          modelId: geminiModelId,
         };
 
         console.log(`[API] Using human preview generation`);
@@ -186,6 +193,7 @@ export async function POST(request: NextRequest) {
           subjectType: detectedSubjectType,
           briefDescription: detectedDescription,
           additionalDetails: description?.otherFeatures,
+          modelId: geminiModelId,
         };
 
         console.log(`[API] Using non-human preview generation for ${detectedSubjectType}`);

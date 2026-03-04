@@ -258,6 +258,7 @@ export default function ImageGallery({
                         imageId={image.id}
                         illustrationStyle={artStyle === 'classic' ? 'classic' : artStyle === 'coloring' ? 'coloring' : 'pixar'}
                         sceneDescription={image.sceneDescription}
+                        characters={characters}
                         onEditComplete={(newImageUrl) => onRegenerateScene(image.id, {
                           ...image,
                           imageUrl: newImageUrl,

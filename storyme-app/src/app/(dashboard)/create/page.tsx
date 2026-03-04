@@ -17,7 +17,7 @@ import { ArtStyleType } from '@/components/story/StyleSelector';
 import GenerationProgress from '@/components/story/GenerationProgress';
 import ImageGallery from '@/components/story/ImageGallery';
 import FeedbackModal from '@/components/feedback/FeedbackModal';
-import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScene, ExpansionLevel, ClothingConsistency } from '@/lib/types/story';
+import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScene, ExpansionLevel, ClothingConsistency, ImageProvider, DEFAULT_IMAGE_PROVIDER } from '@/lib/types/story';
 import { StoryTemplateId, STORY_TEMPLATES } from '@/lib/ai/story-templates';
 import { parseScriptIntoScenes } from '@/lib/scene-parser';
 import Link from 'next/link';
@@ -68,7 +68,7 @@ export default function CreateStoryPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [imageGenerationStatus, setImageGenerationStatus] = useState<GeneratedImage[]>([]);
-  const [imageProvider, setImageProvider] = useState<'flux' | 'gemini'>('gemini'); // Default to Gemini for better consistency
+  const [imageProvider, setImageProvider] = useState<ImageProvider>(DEFAULT_IMAGE_PROVIDER);
 
   // Art style selection (3D Pixar default for better quality)
   const [artStyle, setArtStyle] = useState<ArtStyleType>('pixar');
@@ -1227,6 +1227,7 @@ export default function CreateStoryPage() {
         <CharacterFormModal
           isOpen={showAddCharacterModal}
           onClose={() => setShowAddCharacterModal(false)}
+          imageProvider={imageProvider}
           onSave={(character) => {
             const newCharacter = {
               ...character,
@@ -1714,6 +1715,8 @@ export default function CreateStoryPage() {
                         imageType="cover"
                         imageId="cover"
                         onEditComplete={(newUrl) => setCoverImageUrl(newUrl)}
+                        imageProvider={imageProvider}
+                        characters={characters}
                       />
                     </div>
 

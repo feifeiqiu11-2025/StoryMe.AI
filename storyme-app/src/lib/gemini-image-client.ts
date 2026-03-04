@@ -9,7 +9,7 @@
  */
 
 import { GoogleGenAI, Modality } from '@google/genai';
-import { CharacterDescription, ClothingConsistency, SubjectType } from './types/story';
+import { CharacterDescription, ClothingConsistency, SubjectType, ImageProvider, GEMINI_IMAGE_MODELS, DEFAULT_IMAGE_PROVIDER } from './types/story';
 
 export interface GeminiCharacterInfo {
   name: string;
@@ -23,6 +23,8 @@ export interface GeminiGenerateParams {
   artStyle?: string;
   /** Controls whether character clothing stays consistent or adapts to scene context */
   clothingConsistency?: ClothingConsistency;
+  /** Override Gemini model ID (resolved from ImageProvider on the backend) */
+  modelId?: string;
 }
 
 export interface GeminiGenerateResult {
@@ -30,6 +32,17 @@ export interface GeminiGenerateResult {
   generationTime: number;
   seed: number;
   prompt: string;
+}
+
+/**
+ * Resolve the Gemini image model ID from an ImageProvider value.
+ * Defaults to the latest model if not specified.
+ */
+export function resolveGeminiImageModel(provider?: ImageProvider): string {
+  if (!provider || provider === 'flux') {
+    return GEMINI_IMAGE_MODELS[DEFAULT_IMAGE_PROVIDER as Exclude<ImageProvider, 'flux'>];
+  }
+  return GEMINI_IMAGE_MODELS[provider] || GEMINI_IMAGE_MODELS[DEFAULT_IMAGE_PROVIDER as Exclude<ImageProvider, 'flux'>];
 }
 
 /**
@@ -463,6 +476,7 @@ export async function generateImageWithGemini({
   sceneDescription,
   artStyle = "children's book illustration, colorful, whimsical",
   clothingConsistency = 'consistent',
+  modelId,
 }: GeminiGenerateParams): Promise<GeminiGenerateResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -588,9 +602,8 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Use Gemini 2.5 Flash Image model (Nano Banana) - better quality and character consistency
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: modelId || resolveGeminiImageModel(),
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -675,6 +688,7 @@ export async function generateImageWithGeminiClassic({
   sceneDescription,
   artStyle = "children's book illustration, colorful, whimsical",
   clothingConsistency = 'consistent',
+  modelId,
 }: GeminiGenerateParams): Promise<GeminiGenerateResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -800,9 +814,8 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Use Gemini 2.5 Flash Image model (Nano Banana) - better quality and character consistency
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: modelId || resolveGeminiImageModel(),
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -882,6 +895,7 @@ export async function generateImageWithGeminiColoring({
   sceneDescription,
   artStyle = "children's coloring book, line art",
   clothingConsistency = 'consistent',
+  modelId,
 }: GeminiGenerateParams): Promise<GeminiGenerateResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -1021,9 +1035,8 @@ FINAL REMINDER: This is a COLORING BOOK page. Output MUST be BLACK LINES ON WHIT
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Use Gemini 2.5 Flash Image model (Nano Banana) - better quality and character consistency
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: modelId || resolveGeminiImageModel(),
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -1471,6 +1484,8 @@ export interface CharacterPreviewParams {
   name: string;
   referenceImageUrl: string;
   description: CharacterDescription;
+  /** Override Gemini model ID */
+  modelId?: string;
 }
 
 export interface CharacterPreviewResult {
@@ -1490,6 +1505,7 @@ export async function generateCharacterPreview({
   name,
   referenceImageUrl,
   description,
+  modelId,
 }: CharacterPreviewParams): Promise<CharacterPreviewResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -1573,9 +1589,8 @@ This is a CHARACTER PREVIEW for a children's storybook app. The character should
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Use Gemini 2.5 Flash Image model (Nano Banana) - better quality and character consistency
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: modelId || resolveGeminiImageModel(),
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -1653,6 +1668,7 @@ export async function generateCharacterPreviewClassic({
   name,
   referenceImageUrl,
   description,
+  modelId,
 }: CharacterPreviewParams): Promise<CharacterPreviewResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -1733,9 +1749,8 @@ This is a CHARACTER PREVIEW for a children's storybook app. The style should fee
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Use Gemini 2.5 Flash Image model (Nano Banana) - better quality and character consistency
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: modelId || resolveGeminiImageModel(),
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -1816,6 +1831,8 @@ export interface NonHumanPreviewParams {
   subjectType: SubjectType; // 'animal' | 'creature' | 'object' | 'scenery'
   briefDescription: string; // AI-detected description of key features
   additionalDetails?: string; // User-provided additional details
+  /** Override Gemini model ID */
+  modelId?: string;
 }
 
 export interface NonHumanPreviewResult {
@@ -1837,6 +1854,7 @@ export async function generateNonHumanPreview({
   subjectType,
   briefDescription,
   additionalDetails,
+  modelId,
 }: NonHumanPreviewParams): Promise<NonHumanPreviewResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -1922,7 +1940,7 @@ This is for a children's storybook app. The result should be appealing, memorabl
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: modelId || resolveGeminiImageModel(),
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -1996,6 +2014,7 @@ export async function generateNonHumanPreviewClassic({
   subjectType,
   briefDescription,
   additionalDetails,
+  modelId,
 }: NonHumanPreviewParams): Promise<NonHumanPreviewResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -2077,7 +2096,7 @@ This is for a children's storybook app. The result should be appealing, memorabl
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: modelId || resolveGeminiImageModel(),
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -2187,6 +2206,8 @@ export interface DescriptionOnlyPreviewParams {
   name: string;
   characterType: string; // e.g., "baby eagle", "friendly dragon", "talking cat"
   description: string; // Additional description like "fluffy feathers, big curious eyes"
+  /** Override Gemini model ID */
+  modelId?: string;
 }
 
 export interface DescriptionOnlyPreviewResult {
@@ -2203,6 +2224,7 @@ export async function generateDescriptionOnlyPreview({
   name,
   characterType,
   description,
+  modelId,
 }: DescriptionOnlyPreviewParams): Promise<DescriptionOnlyPreviewResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -2265,7 +2287,7 @@ This is a CHARACTER PREVIEW for a children's storybook app. The character should
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: modelId || resolveGeminiImageModel(),
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -2339,6 +2361,7 @@ export async function generateDescriptionOnlyPreviewClassic({
   name,
   characterType,
   description,
+  modelId,
 }: DescriptionOnlyPreviewParams): Promise<DescriptionOnlyPreviewResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -2404,7 +2427,7 @@ This is a CHARACTER PREVIEW for a children's storybook app. The style should fee
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: modelId || resolveGeminiImageModel(),
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -2486,6 +2509,16 @@ export interface GeminiEditParams {
   sceneDescription?: string;
   /** Illustration style to maintain */
   illustrationStyle?: 'pixar' | 'classic' | 'coloring';
+  /** Override Gemini model ID */
+  modelId?: string;
+  /** Auto-detected character references (URLs fetched server-side) */
+  characterReferences?: Array<{
+    name: string;
+    description?: string;
+    referenceImageUrl: string;
+  }>;
+  /** User-uploaded reference image (base64 data URL, already resized client-side) */
+  manualReferenceImageBase64?: string;
 }
 
 /**
@@ -2518,6 +2551,9 @@ export async function editImageWithGemini({
   editInstruction,
   sceneDescription,
   illustrationStyle = 'pixar',
+  modelId,
+  characterReferences,
+  manualReferenceImageBase64,
 }: GeminiEditParams): Promise<GeminiEditResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -2545,13 +2581,24 @@ export async function editImageWithGemini({
   const styleLabel = illustrationStyle === 'coloring' ? 'B&W coloring book line art' :
                      illustrationStyle === 'pixar' ? '3D Pixar' : '2D cartoon';
 
+  // Build character reference section for the prompt
+  const hasCharacterRefs = characterReferences && characterReferences.length > 0;
+  const hasManualRef = manualReferenceImageBase64 && manualReferenceImageBase64.trim().length > 0;
+  let characterSection = '';
+  if (hasCharacterRefs) {
+    const charLines = characterReferences.slice(0, 3).map(ref =>
+      `- ${ref.name}${ref.description ? `: ${ref.description}` : ''}`
+    ).join('\n');
+    characterSection = `\nCHARACTER REFERENCES (match these characters exactly):\n${charLines}\nReference images for these characters are attached below.\n`;
+  }
+
   // Construct the edit prompt
   const editPrompt = `Edit this children's book illustration with the following change:
 
 EDIT REQUEST: ${editInstruction}
 
 ${sceneDescription ? `SCENE CONTEXT: ${sceneDescription}` : ''}
-
+${characterSection}
 STYLE TO MAINTAIN: ${styleDescription}
 
 PROPORTIONS TO MAINTAIN: Normal, healthy body proportions - not overly fat or chubby. If "big" is mentioned, interpret as LARGE/TALL in size, NOT fat. Maintain natural proportions for the species/character type.
@@ -2559,7 +2606,7 @@ PROPORTIONS TO MAINTAIN: Normal, healthy body proportions - not overly fat or ch
 IMPORTANT RULES:
 - Apply ONLY the requested edit
 - Keep the same illustration style (${styleLabel})
-- Preserve character appearances and expressions unless specifically asked to change them
+${hasCharacterRefs ? '- Characters MUST match their attached reference images in appearance\n' : ''}- Preserve character appearances and expressions unless specifically asked to change them
 ${illustrationStyle === 'coloring'
   ? '- MUST remain black and white line art ONLY - NO colors, NO shading, NO gradients\n- Keep clean outlines on white background'
   : '- Maintain the same color palette and lighting'}
@@ -2580,7 +2627,7 @@ ${illustrationStyle === 'coloring'
     throw new Error(`Failed to fetch current image for editing: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
   }
 
-  // Build content parts: text prompt + current image
+  // Build content parts: text prompt + current image + character references
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const contentParts: any[] = [
     { text: editPrompt },
@@ -2593,6 +2640,44 @@ ${illustrationStyle === 'coloring'
     { text: '[Image to edit - apply the requested changes while maintaining style]' },
   ];
 
+  // Append character reference images (max 3, fetched server-side from URLs)
+  if (hasCharacterRefs) {
+    for (const ref of characterReferences!.slice(0, 3)) {
+      const url = ref.referenceImageUrl?.trim();
+      if (!url) continue;
+      try {
+        const refImageData = await fetchImageAsBase64(url);
+        contentParts.push({
+          inlineData: {
+            mimeType: refImageData.mimeType,
+            data: refImageData.base64,
+          },
+        });
+        contentParts.push({ text: `[Reference image for ${ref.name} - match this character's appearance]` });
+        console.log(`[Gemini Edit] Attached character reference for "${ref.name}"`);
+      } catch (refError) {
+        console.warn(`[Gemini Edit] Failed to fetch reference image for "${ref.name}":`, refError);
+        // Continue without this reference — non-fatal
+      }
+    }
+  }
+
+  // Append manual reference image (already base64 from client)
+  if (hasManualRef) {
+    // Extract mime type and data from data URL
+    const dataUrlMatch = manualReferenceImageBase64!.match(/^data:([^;]+);base64,(.+)$/);
+    if (dataUrlMatch) {
+      contentParts.push({
+        inlineData: {
+          mimeType: dataUrlMatch[1],
+          data: dataUrlMatch[2],
+        },
+      });
+      contentParts.push({ text: '[User-provided reference image - use this as visual guide for the edit]' });
+      console.log('[Gemini Edit] Attached manual reference image');
+    }
+  }
+
   // Retry logic for rate limits
   const maxRetries = 3;
   let lastError: Error | null = null;
@@ -2600,7 +2685,7 @@ ${illustrationStyle === 'coloring'
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: modelId || resolveGeminiImageModel(),
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],

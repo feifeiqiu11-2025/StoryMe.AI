@@ -245,6 +245,66 @@ export interface ProjectScene {
   createdAt: string;
 }
 
+// ============================================================================
+// Image Provider / Model Selection
+// ============================================================================
+
+/** Image generation provider — selects both the service and model version */
+export type ImageProvider = 'flux' | 'gemini-2.5' | 'gemini-3.1';
+
+/** Default image provider for new stories */
+export const DEFAULT_IMAGE_PROVIDER: ImageProvider = 'gemini-3.1';
+
+/** Mapping from Gemini provider values to actual Google model IDs */
+export const GEMINI_IMAGE_MODELS: Record<Exclude<ImageProvider, 'flux'>, string> = {
+  'gemini-2.5': 'gemini-2.5-flash-image',
+  'gemini-3.1': 'gemini-3.1-flash-image-preview',
+} as const;
+
+/** UI options for the image provider selector */
+export const IMAGE_PROVIDER_OPTIONS: Array<{
+  value: ImageProvider;
+  label: string;
+  description: string;
+  isNew?: boolean;
+}> = [
+  {
+    value: 'gemini-3.1',
+    label: 'Nano Banana 2',
+    description: 'Latest — best quality & consistency',
+    isNew: true,
+  },
+  {
+    value: 'gemini-2.5',
+    label: 'Nano Banana',
+    description: 'Proven quality, stable',
+  },
+  {
+    value: 'flux',
+    label: 'Fal.ai FLUX',
+    description: 'Fast, text-based descriptions',
+  },
+];
+
+/** Normalize legacy 'gemini' value and validate provider strings */
+export function normalizeImageProvider(provider?: string): ImageProvider {
+  if (!provider) return DEFAULT_IMAGE_PROVIDER;
+  if (provider === 'gemini') return DEFAULT_IMAGE_PROVIDER;
+  if (provider === 'flux' || provider === 'gemini-2.5' || provider === 'gemini-3.1') {
+    return provider;
+  }
+  return DEFAULT_IMAGE_PROVIDER;
+}
+
+/** Check if a provider uses the Gemini backend */
+export function isGeminiProvider(provider: ImageProvider): boolean {
+  return provider === 'gemini-2.5' || provider === 'gemini-3.1';
+}
+
+// ============================================================================
+// Fal.ai Response Types
+// ============================================================================
+
 export interface FalImageResponse {
   images: Array<{
     url: string;

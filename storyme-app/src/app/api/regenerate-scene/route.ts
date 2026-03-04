@@ -11,15 +11,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo, sceneContainsAnimals } from '@/lib/fal-client';
-import { generateImageWithGemini, generateImageWithGeminiClassic, isGeminiAvailable, GeminiCharacterInfo } from '@/lib/gemini-image-client';
+import { generateImageWithGemini, generateImageWithGeminiClassic, isGeminiAvailable, GeminiCharacterInfo, resolveGeminiImageModel } from '@/lib/gemini-image-client';
 import { extractSceneLocation } from '@/lib/scene-parser';
-import { Character, ClothingConsistency } from '@/lib/types/story';
+import { Character, ClothingConsistency, ImageProvider, normalizeImageProvider, isGeminiProvider } from '@/lib/types/story';
 import { createClient } from '@/lib/supabase/server';
 import { StorageService } from '@/lib/services/storage.service';
 import OpenAI from 'openai';
-
-// Image provider type
-type ImageProvider = 'flux' | 'gemini';
 
 // Illustration style type
 type IllustrationStyle = 'pixar' | 'classic';
@@ -182,9 +179,10 @@ export async function POST(request: NextRequest) {
     const selectedIllustrationStyle: IllustrationStyle = illustrationStyle || 'classic';
 
     // Determine which image provider to use
-    const defaultProvider = (process.env.IMAGE_PROVIDER as ImageProvider) || 'flux';
-    const imageProvider: ImageProvider = requestedProvider || defaultProvider;
-    const useGemini = imageProvider === 'gemini' && isGeminiAvailable();
+    const defaultProvider = normalizeImageProvider(process.env.IMAGE_PROVIDER);
+    const imageProvider: ImageProvider = normalizeImageProvider(requestedProvider) || defaultProvider;
+    const useGemini = isGeminiProvider(imageProvider) && isGeminiAvailable();
+    const geminiModelId = useGemini ? resolveGeminiImageModel(imageProvider) : undefined;
 
     console.log(`[Regenerate] Using provider: ${useGemini ? 'Gemini' : 'FLUX'}, style: ${selectedIllustrationStyle}`);
 
@@ -294,6 +292,7 @@ export async function POST(request: NextRequest) {
           sceneDescription: refinedPrompt,
           artStyle: artStyle || "children's book illustration, colorful, whimsical",
           clothingConsistency,
+          modelId: geminiModelId,
         });
       } else {
         result = await generateImageWithGemini({
@@ -301,6 +300,7 @@ export async function POST(request: NextRequest) {
           sceneDescription: refinedPrompt,
           artStyle: artStyle || "children's book illustration, colorful, whimsical",
           clothingConsistency,
+          modelId: geminiModelId,
         });
       }
 

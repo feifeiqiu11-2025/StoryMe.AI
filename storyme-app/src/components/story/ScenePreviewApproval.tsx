@@ -7,7 +7,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { EnhancedScene } from '@/lib/types/story';
+import { EnhancedScene, ImageProvider, IMAGE_PROVIDER_OPTIONS, DEFAULT_IMAGE_PROVIDER } from '@/lib/types/story';
 
 // Art style type
 type ArtStyleType = 'pixar' | 'classic' | 'coloring';
@@ -35,8 +35,8 @@ interface ScenePreviewApprovalProps {
   // Art style and image provider settings
   artStyle?: ArtStyleType;
   onArtStyleChange?: (style: ArtStyleType) => void;
-  imageProvider?: 'flux' | 'gemini';
-  onImageProviderChange?: (provider: 'flux' | 'gemini') => void;
+  imageProvider?: ImageProvider;
+  onImageProviderChange?: (provider: ImageProvider) => void;
 }
 
 export default function ScenePreviewApproval({
@@ -59,7 +59,7 @@ export default function ScenePreviewApproval({
   generateChineseTranslation = false,
   artStyle = 'classic',
   onArtStyleChange,
-  imageProvider = 'gemini',
+  imageProvider = DEFAULT_IMAGE_PROVIDER,
   onImageProviderChange,
 }: ScenePreviewApprovalProps) {
   // Add Scene Modal State
@@ -705,40 +705,71 @@ export default function ScenePreviewApproval({
             </div>
           )}
 
-          {/* Image Generation Engine Toggle - For comparing Fal.ai vs Gemini */}
+          {/* Image Generation Engine Selector */}
           {onImageProviderChange && (
-            <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900">Image Generation Engine</h4>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {imageProvider === 'gemini'
-                      ? 'Gemini Nano Banana: Better quality and character consistency from photos'
-                      : 'Fal.ai FLUX: Fast generation with text-based character descriptions'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-medium ${imageProvider === 'flux' ? 'text-purple-600' : 'text-gray-400'}`}>
-                    Fal.ai
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onImageProviderChange(imageProvider === 'gemini' ? 'flux' : 'gemini')}
-                    disabled={isGenerating}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 ${
-                      imageProvider === 'gemini' ? 'bg-purple-600' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        imageProvider === 'gemini' ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                  <span className={`text-xs font-medium ${imageProvider === 'gemini' ? 'text-purple-600' : 'text-gray-400'}`}>
-                    Gemini
-                  </span>
-                </div>
+            <div className="mb-6">
+              <h4 id="image-engine-label" className="text-sm font-semibold text-gray-900 mb-3">Image Generation Engine</h4>
+              <div
+                role="radiogroup"
+                aria-labelledby="image-engine-label"
+                className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+                onKeyDown={(e) => {
+                  if (isGenerating) return;
+                  const keys = ['ArrowLeft', 'ArrowRight'];
+                  if (!keys.includes(e.key)) return;
+                  e.preventDefault();
+                  const currentIndex = IMAGE_PROVIDER_OPTIONS.findIndex(o => o.value === imageProvider);
+                  const nextIndex = e.key === 'ArrowRight'
+                    ? (currentIndex + 1) % IMAGE_PROVIDER_OPTIONS.length
+                    : (currentIndex - 1 + IMAGE_PROVIDER_OPTIONS.length) % IMAGE_PROVIDER_OPTIONS.length;
+                  onImageProviderChange(IMAGE_PROVIDER_OPTIONS[nextIndex].value);
+                  // Focus the newly selected radio button
+                  const container = e.currentTarget;
+                  const buttons = container.querySelectorAll<HTMLButtonElement>('[role="radio"]');
+                  buttons[nextIndex]?.focus();
+                }}
+              >
+                {IMAGE_PROVIDER_OPTIONS.map((option) => {
+                  const isSelected = imageProvider === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      aria-label={`${option.label}: ${option.description}`}
+                      tabIndex={isSelected ? 0 : -1}
+                      onClick={() => !isGenerating && onImageProviderChange(option.value)}
+                      disabled={isGenerating}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all text-left ${
+                        isSelected
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-gray-200 bg-white hover:border-purple-300 hover:bg-purple-50/30'
+                      } ${isGenerating ? 'opacity-50 cursor-not-allowed border-gray-300' : ''}`}
+                    >
+                      <div className={`flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        isSelected
+                          ? 'border-purple-500 bg-purple-500'
+                          : 'border-gray-300 bg-white'
+                      }`}>
+                        {isSelected && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-medium text-gray-900 text-sm flex items-center gap-1.5">
+                          <span className="truncate">{option.label}</span>
+                          {option.isNew && (
+                            <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700 uppercase">
+                              New
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 truncate">{option.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
-import { generateImageWithGemini, generateImageWithGeminiClassic, generateImageWithGeminiColoring, isGeminiAvailable, GeminiCharacterInfo, clearOutfitCache } from '@/lib/gemini-image-client';
+import { generateImageWithGemini, generateImageWithGeminiClassic, generateImageWithGeminiColoring, isGeminiAvailable, GeminiCharacterInfo, clearOutfitCache, resolveGeminiImageModel } from '@/lib/gemini-image-client';
 import { parseScriptIntoScenes, buildConsistentSceneSettings, extractSceneLocation } from '@/lib/scene-parser';
-import { GeneratedImage, Character, CharacterRating, ClothingConsistency } from '@/lib/types/story';
+import { GeneratedImage, Character, CharacterRating, ClothingConsistency, ImageProvider, normalizeImageProvider, isGeminiProvider, DEFAULT_IMAGE_PROVIDER } from '@/lib/types/story';
 import { createClientFromRequest } from '@/lib/supabase/server';
 import { checkImageGenerationLimit, logApiUsage } from '@/lib/utils/rate-limit';
 import { StorageService } from '@/lib/services/storage.service';
-
-// Image provider type
-type ImageProvider = 'flux' | 'gemini';
 
 // Illustration style type
 type IllustrationStyle = 'pixar' | 'classic' | 'coloring';
@@ -44,17 +41,18 @@ export async function POST(request: NextRequest) {
     console.log(`🎨 Illustration style: ${selectedIllustrationStyle === 'pixar' ? '3D Pixar' : 'Classic Storybook 2D'}`);
 
     // Determine which image provider to use
-    // Priority: request param > env var > default (flux)
-    const defaultProvider = (process.env.IMAGE_PROVIDER as ImageProvider) || 'flux';
-    const imageProvider: ImageProvider = requestedProvider || defaultProvider;
+    // Priority: request param > env var > default
+    const defaultProvider = normalizeImageProvider(process.env.IMAGE_PROVIDER);
+    const imageProvider: ImageProvider = normalizeImageProvider(requestedProvider) || defaultProvider;
 
     // Validate Gemini is available if requested
-    if (imageProvider === 'gemini' && !isGeminiAvailable()) {
-      console.warn('Gemini requested but not available, falling back to FLUX');
+    if (isGeminiProvider(imageProvider) && !isGeminiAvailable()) {
+      console.warn(`${imageProvider} requested but Gemini not available, falling back to FLUX`);
     }
 
-    const useGemini = imageProvider === 'gemini' && isGeminiAvailable();
-    console.log(`🎨 Using image provider: ${useGemini ? 'Gemini' : 'FLUX'}`);
+    const useGemini = isGeminiProvider(imageProvider) && isGeminiAvailable();
+    const geminiModelId = useGemini ? resolveGeminiImageModel(imageProvider) : undefined;
+    console.log(`🎨 Using image provider: ${useGemini ? `Gemini (${geminiModelId})` : 'FLUX'}`);
 
 
     // Validate inputs
@@ -236,6 +234,7 @@ export async function POST(request: NextRequest) {
               sceneDescription: scene.description,
               artStyle: artStyle || "children's coloring book, line art",
               clothingConsistency,
+              modelId: geminiModelId,
             });
           } else if (effectiveStyle === 'classic') {
             // Classic Storybook - 2D hand-drawn/watercolor style
@@ -244,6 +243,7 @@ export async function POST(request: NextRequest) {
               sceneDescription: scene.description,
               artStyle: artStyle || "children's book illustration, colorful, whimsical",
               clothingConsistency,
+              modelId: geminiModelId,
             });
           } else {
             // 3D Pixar style (default Gemini behavior)
@@ -255,6 +255,7 @@ export async function POST(request: NextRequest) {
               sceneDescription: scene.description,
               artStyle: artStyle || "children's book illustration, colorful, whimsical",
               clothingConsistency,
+              modelId: geminiModelId,
             });
           }
 

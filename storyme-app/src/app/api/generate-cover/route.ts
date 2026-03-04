@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateImageWithGemini, generateImageWithGeminiClassic, GeminiCharacterInfo, isGeminiAvailable } from '@/lib/gemini-image-client';
+import { generateImageWithGemini, generateImageWithGeminiClassic, GeminiCharacterInfo, isGeminiAvailable, resolveGeminiImageModel } from '@/lib/gemini-image-client';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
-import { Character } from '@/lib/types/story';
+import { Character, ImageProvider, normalizeImageProvider, isGeminiProvider } from '@/lib/types/story';
 import { createClientFromRequest } from '@/lib/supabase/server';
-
-// Image provider type
-type ImageProvider = 'flux' | 'gemini';
 
 export const maxDuration = 300; // 5 minutes timeout for Vercel
 
@@ -33,9 +30,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine which image provider to use
-    const defaultProvider: ImageProvider = (process.env.IMAGE_PROVIDER as ImageProvider) || 'gemini';
-    const imageProvider: ImageProvider = requestedProvider || defaultProvider;
-    const useGemini = imageProvider === 'gemini' && isGeminiAvailable();
+    const defaultProvider = normalizeImageProvider(process.env.IMAGE_PROVIDER);
+    const imageProvider: ImageProvider = normalizeImageProvider(requestedProvider) || defaultProvider;
+    const useGemini = isGeminiProvider(imageProvider) && isGeminiAvailable();
+    const geminiModelId = useGemini ? resolveGeminiImageModel(imageProvider) : undefined;
 
     console.log(`📚 Generating cover for: "${title}"`);
     console.log(`Author: ${author || 'Unknown'}`);
@@ -109,10 +107,12 @@ export async function POST(request: NextRequest) {
         ? await generateImageWithGemini({
             characters: geminiCharacters,
             sceneDescription: coverDescription,
+            modelId: geminiModelId,
           })
         : await generateImageWithGeminiClassic({
             characters: geminiCharacters,
             sceneDescription: coverDescription,
+            modelId: geminiModelId,
           });
     } else {
       // Use Fal.ai FLUX (text-based prompts)

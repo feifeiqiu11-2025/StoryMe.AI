@@ -13,6 +13,7 @@
  */
 
 import { GoogleGenAI } from '@google/genai';
+import { resolveGeminiImageModel } from './gemini-image-client';
 import { isGeminiAvailable } from './gemini-image-client';
 
 export interface DrawingStep {
@@ -246,7 +247,7 @@ async function generateSketchImage(
 ): Promise<string> {
   try {
     const result = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: resolveGeminiImageModel(),
       contents: [{ text: prompt }],
       config: {
         responseModalities: ['image'],

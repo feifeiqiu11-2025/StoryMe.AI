@@ -25,13 +25,20 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { editImageWithGemini, isGeminiEditAvailable } from '@/lib/gemini-image-client';
+import { editImageWithGemini, isGeminiEditAvailable, resolveGeminiImageModel } from '@/lib/gemini-image-client';
 import { editImageWithQwen, isQwenAvailable } from '@/lib/qwen-image-client';
 import { createClient } from '@/lib/supabase/server';
+import { ImageProvider as GenerationImageProvider, normalizeImageProvider } from '@/lib/types/story';
 
 export const maxDuration = 300; // 5 minutes timeout for Vercel
 
-type ImageProvider = 'gemini' | 'segmind';
+type EditProvider = 'gemini' | 'segmind';
+
+interface CharacterReference {
+  name: string;
+  description?: string;
+  referenceImageUrl: string;
+}
 
 interface EditImageRequest {
   imageUrl: string;
@@ -40,7 +47,10 @@ interface EditImageRequest {
   imageId: string;
   illustrationStyle?: 'pixar' | 'classic' | 'coloring';
   sceneDescription?: string;
-  useProvider?: ImageProvider;
+  useProvider?: EditProvider;
+  imageProvider?: string; // Generation-level provider for Gemini model selection
+  characterReferences?: CharacterReference[];     // Auto-detected character refs (URLs)
+  manualReferenceImageBase64?: string;             // User-uploaded reference (base64, max ~2MB)
 }
 
 export async function POST(request: NextRequest) {
@@ -56,7 +66,22 @@ export async function POST(request: NextRequest) {
       illustrationStyle = 'pixar',
       sceneDescription,
       useProvider,
+      imageProvider: requestedImageProvider,
+      characterReferences: rawCharacterRefs,
+      manualReferenceImageBase64,
     } = body;
+
+    // Validate and cap character references (max 3)
+    const characterReferences = Array.isArray(rawCharacterRefs)
+      ? rawCharacterRefs.slice(0, 3).filter(
+          (ref): ref is CharacterReference =>
+            typeof ref.name === 'string' && typeof ref.referenceImageUrl === 'string'
+        )
+      : undefined;
+
+    // Resolve Gemini model ID from the generation-level provider
+    const generationProvider = normalizeImageProvider(requestedImageProvider);
+    const geminiModelId = resolveGeminiImageModel(generationProvider);
 
     // Validate inputs
     if (!imageUrl) {
@@ -93,7 +118,7 @@ export async function POST(request: NextRequest) {
 
     // Determine which provider to use
     // Priority: explicit preference > Gemini (if available) > Segmind (fallback)
-    let provider: ImageProvider;
+    let provider: EditProvider;
     if (useProvider === 'segmind' && isQwenAvailable()) {
       provider = 'segmind';
     } else if (isGeminiEditAvailable()) {
@@ -120,6 +145,9 @@ export async function POST(request: NextRequest) {
         editInstruction: instruction.trim(),
         sceneDescription,
         illustrationStyle,
+        modelId: geminiModelId,
+        characterReferences,
+        manualReferenceImageBase64,
       });
       resultImageUrl = result.imageUrl;
       generationTime = result.generationTime;

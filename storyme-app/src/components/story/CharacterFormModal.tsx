@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Character, SubjectType } from '@/lib/types/story';
+import { Character, SubjectType, ImageProvider } from '@/lib/types/story';
 import { SketchStep } from '@/components/characters/SketchGuideViewer';
 
 /**
@@ -34,6 +34,7 @@ interface CharacterFormModalProps {
   onClose: () => void;
   onSave: (character: Character) => void;
   editingCharacter?: Character | null;
+  imageProvider?: ImageProvider;
 }
 
 interface FormData {
@@ -54,6 +55,7 @@ export default function CharacterFormModal({
   onClose,
   onSave,
   editingCharacter = null,
+  imageProvider,
 }: CharacterFormModalProps) {
   const [formData, setFormData] = useState<FormData>(() => {
     if (editingCharacter) {
@@ -289,7 +291,7 @@ export default function CharacterFormModal({
       const response = await fetch('/api/generate-character-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({ ...requestBody, imageProvider }),
       });
 
       if (!response.ok) {
