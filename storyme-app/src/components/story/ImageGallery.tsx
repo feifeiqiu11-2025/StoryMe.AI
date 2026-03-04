@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { GeneratedImage, Character, ImageProvider, ClothingConsistency } from '@/lib/types/story';
+import { detectCharactersInInstruction } from '@/lib/utils/character-matcher';
 import SceneRatingCard from './SceneRatingCard';
 import EditImageControl from './EditImageControl';
 // ============================================================
@@ -50,12 +51,17 @@ export default function ImageGallery({
 
   // Track retry state for failed scenes
   const [regeneratingScenes, setRegeneratingScenes] = useState<Record<string, boolean>>({});
-  const [retryFailed, setRetryFailed] = useState<Record<string, boolean>>({});
+  const [retryErrors, setRetryErrors] = useState<Record<string, string>>({});
+  const [showEditForm, setShowEditForm] = useState<Record<string, boolean>>({});
   const [editPrompts, setEditPrompts] = useState<Record<string, string>>({});
+  const [dismissedCharsMap, setDismissedCharsMap] = useState<Record<string, Set<string>>>({});
 
   // Retry/regenerate a failed scene image
-  const handleRetryScene = async (image: GeneratedImage, customPrompt?: string) => {
+  const handleRetryScene = async (image: GeneratedImage, customPrompt?: string, filteredCharacters?: Character[]) => {
     if (!onRegenerateScene) return;
+
+    // Clear previous error for this scene
+    setRetryErrors(prev => { const n = { ...prev }; delete n[image.id]; return n; });
     setRegeneratingScenes(prev => ({ ...prev, [image.id]: true }));
 
     try {
@@ -70,7 +76,7 @@ export default function ImageGallery({
           originalSceneDescription: image.sceneDescription,
           editedPrompt: customPrompt || undefined,
           skipRefinement: true,
-          characters,
+          characters: filteredCharacters || characters,
           artStyle,
           imageProvider,
           illustrationStyle,
@@ -82,19 +88,29 @@ export default function ImageGallery({
       if (data.success && data.generatedImage) {
         onRegenerateScene(image.id, {
           ...data.generatedImage,
-          sceneDescription: image.sceneDescription, // Keep original caption
+          sceneDescription: image.sceneDescription,
           status: 'completed',
         });
-        // Clear retry state on success
-        setRetryFailed(prev => { const n = { ...prev }; delete n[image.id]; return n; });
+        // Clear all retry state on success
+        setRetryErrors(prev => { const n = { ...prev }; delete n[image.id]; return n; });
+        setShowEditForm(prev => { const n = { ...prev }; delete n[image.id]; return n; });
         setEditPrompts(prev => { const n = { ...prev }; delete n[image.id]; return n; });
+        setDismissedCharsMap(prev => { const n = { ...prev }; delete n[image.id]; return n; });
       } else {
-        setRetryFailed(prev => ({ ...prev, [image.id]: true }));
+        const errorMsg = data.error || data.details || 'Generation failed';
+        setRetryErrors(prev => ({ ...prev, [image.id]: errorMsg }));
+        setShowEditForm(prev => ({ ...prev, [image.id]: true }));
+        if (!editPrompts[image.id]) {
+          setEditPrompts(prev => ({ ...prev, [image.id]: image.prompt || image.sceneDescription }));
+        }
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Generation failed';
+      setRetryErrors(prev => ({ ...prev, [image.id]: errorMsg }));
+      setShowEditForm(prev => ({ ...prev, [image.id]: true }));
+      if (!editPrompts[image.id]) {
         setEditPrompts(prev => ({ ...prev, [image.id]: image.prompt || image.sceneDescription }));
       }
-    } catch {
-      setRetryFailed(prev => ({ ...prev, [image.id]: true }));
-      setEditPrompts(prev => ({ ...prev, [image.id]: image.prompt || image.sceneDescription }));
     } finally {
       setRegeneratingScenes(prev => ({ ...prev, [image.id]: false }));
     }
@@ -411,58 +427,133 @@ export default function ImageGallery({
 
                 {image.status === 'failed' && (
                   <div className="space-y-3">
-                    {image.error && (
+                    {/* Error message - show latest only (retry error overrides initial) */}
+                    {(retryErrors[image.id] || image.error) && !regeneratingScenes[image.id] && (
                       <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3">
                         <p className="font-medium">Error:</p>
-                        <p>{image.error}</p>
+                        <p>{retryErrors[image.id] || image.error}</p>
                       </div>
                     )}
 
-                    {/* Tier 2: Edit prompt form (shown after retry fails) */}
-                    {retryFailed[image.id] && (
-                      <div className="bg-amber-50 border border-amber-200 rounded p-3 space-y-2">
-                        <p className="text-sm text-amber-800 font-medium">
-                          Retry failed. Edit the prompt below and try again.
+                    {/* Regenerating status */}
+                    {regeneratingScenes[image.id] && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                        <p className="text-sm text-blue-700">
+                          Regenerating image... This may take 10-30 seconds.
                         </p>
-                        <textarea
-                          className="w-full text-sm border border-gray-300 rounded p-2 min-h-[80px] focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"
-                          value={editPrompts[image.id] || ''}
-                          onChange={(e) => setEditPrompts(prev => ({ ...prev, [image.id]: e.target.value }))}
-                          placeholder="Edit the scene generation prompt..."
-                        />
+                      </div>
+                    )}
+
+                    {/* Edit form (shown after retry fails) - matches EditImageControl style */}
+                    {showEditForm[image.id] && !regeneratingScenes[image.id] && (
+                      <div className="bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-3 space-y-2.5 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-semibold text-gray-900">
+                            Edit prompt and retry
+                          </h4>
+                          <button
+                            onClick={() => {
+                              setShowEditForm(prev => { const n = { ...prev }; delete n[image.id]; return n; });
+                              setEditPrompts(prev => { const n = { ...prev }; delete n[image.id]; return n; });
+                              setDismissedCharsMap(prev => { const n = { ...prev }; delete n[image.id]; return n; });
+                            }}
+                            className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+
+                        <div>
+                          <textarea
+                            value={editPrompts[image.id] || ''}
+                            onChange={(e) => setEditPrompts(prev => ({ ...prev, [image.id]: e.target.value }))}
+                            rows={3}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
+                            placeholder="Edit the generation prompt..."
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Try changing words that might trigger content filters
+                          </p>
+                        </div>
+
+                        {/* Auto-detected characters with reference photos */}
+                        {(() => {
+                          const detected = detectCharactersInInstruction(
+                            editPrompts[image.id] || '',
+                            characters,
+                            dismissedCharsMap[image.id]
+                          );
+                          if (detected.length === 0) return null;
+                          return (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-xs text-gray-500">Characters:</span>
+                              {detected.map(({ character }) => (
+                                <span
+                                  key={character.id}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium"
+                                >
+                                  {(character.animatedPreviewUrl || character.referenceImage?.url) && (
+                                    <img
+                                      src={character.animatedPreviewUrl || character.referenceImage.url}
+                                      alt={character.name}
+                                      className="w-4 h-4 rounded-full object-cover"
+                                    />
+                                  )}
+                                  {character.name}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDismissedCharsMap(prev => ({
+                                        ...prev,
+                                        [image.id]: new Set([...(prev[image.id] || [])]).add(character.id),
+                                      }));
+                                    }}
+                                    className="text-purple-400 hover:text-purple-600 ml-0.5"
+                                    aria-label={`Remove ${character.name}`}
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
+
                         <button
-                          onClick={() => handleRetryScene(image, editPrompts[image.id])}
-                          disabled={regeneratingScenes[image.id] || !editPrompts[image.id]?.trim()}
-                          className="px-4 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                          onClick={() => {
+                            const detected = detectCharactersInInstruction(
+                              editPrompts[image.id] || '',
+                              characters,
+                              dismissedCharsMap[image.id]
+                            );
+                            const filteredChars = detected.length > 0
+                              ? characters.filter(c => detected.some(d => d.character.id === c.id))
+                              : characters;
+                            handleRetryScene(image, editPrompts[image.id], filteredChars);
+                          }}
+                          disabled={!editPrompts[image.id]?.trim()}
+                          className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-md hover:from-blue-700 hover:to-purple-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                         >
-                          {regeneratingScenes[image.id] ? 'Retrying...' : 'Retry with Changes'}
+                          Retry with Changes
                         </button>
                       </div>
                     )}
 
-                    {/* Tier 1: Quick retry button */}
-                    {onRegenerateScene && (
+                    {/* Retry Generation button */}
+                    {onRegenerateScene && !regeneratingScenes[image.id] && (
                       <button
                         onClick={() => handleRetryScene(image)}
                         disabled={regeneratingScenes[image.id]}
                         className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-2"
                       >
-                        {regeneratingScenes[image.id] ? (
-                          <>
-                            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Retrying...
-                          </>
-                        ) : (
-                          <>
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Retry Generation
-                          </>
-                        )}
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Retry Generation
                       </button>
                     )}
                   </div>
