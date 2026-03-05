@@ -715,9 +715,9 @@ export default function CreateStoryPage() {
         console.log('⚠️ No cover image generated, saving without cover');
       }
 
-      // Prepare scenes data (exclude cover/Scene 0, only regular scenes)
+      // Prepare scenes data (exclude cover/Scene 0, keep all scenes including failed ones)
       const scenesData = imageGenerationStatus
-        .filter(img => img.status === 'completed' && img.sceneNumber > 0)  // Exclude Scene 0
+        .filter(img => img.sceneNumber > 0)  // Exclude Scene 0 (cover handled separately)
         .map(img => {
           const enhancedScene = enhancedScenes.find(es => es.sceneNumber === img.sceneNumber);
           return {
@@ -727,14 +727,14 @@ export default function CreateStoryPage() {
             enhanced_prompt: enhancedScene?.enhanced_prompt || img.sceneDescription,
             caption: enhancedScene?.caption || img.sceneDescription,
             caption_chinese: enhancedScene?.caption_chinese,  // NEW: Bilingual Support
-            imageUrl: img.imageUrl,
+            imageUrl: img.imageUrl || null,  // null for failed scenes
             prompt: img.prompt,
             generationTime: img.generationTime,
           };
         });
 
       if (scenesData.length === 0) {
-        setSaveError('No completed scenes to save');
+        setSaveError('No scenes to save');
         setIsSaving(false);
         return;
       }
@@ -1882,7 +1882,7 @@ export default function CreateStoryPage() {
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-sm text-blue-700">
-                    This will save your story with {imageGenerationStatus.filter(img => img.status === 'completed').length} scenes{quizData ? ` and ${quizData.length} quiz questions` : ''} to your library.
+                    This will save your story with {imageGenerationStatus.filter(img => img.sceneNumber > 0).length} scenes ({imageGenerationStatus.filter(img => img.status === 'completed' && img.sceneNumber > 0).length} with images){quizData ? ` and ${quizData.length} quiz questions` : ''} to your library.
                   </p>
                 </div>
               </div>

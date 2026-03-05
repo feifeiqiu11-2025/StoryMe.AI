@@ -83,16 +83,16 @@ export async function POST(request: NextRequest) {
 
     if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
       return NextResponse.json(
-        { error: 'At least one scene with image is required' },
+        { error: 'At least one scene is required' },
         { status: 400 }
       );
     }
 
-    // Validate scene data
+    // Validate scene data (imageUrl is optional — failed scenes may not have one)
     for (const scene of scenes) {
-      if (!scene.imageUrl || !scene.description || typeof scene.sceneNumber !== 'number') {
+      if (!scene.description || typeof scene.sceneNumber !== 'number') {
         return NextResponse.json(
-          { error: 'Invalid scene data: each scene must have imageUrl, description, and sceneNumber' },
+          { error: 'Invalid scene data: each scene must have description and sceneNumber' },
           { status: 400 }
         );
       }

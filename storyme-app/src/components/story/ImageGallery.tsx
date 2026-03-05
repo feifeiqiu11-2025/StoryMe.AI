@@ -97,7 +97,7 @@ export default function ImageGallery({
         setEditPrompts(prev => { const n = { ...prev }; delete n[image.id]; return n; });
         setDismissedCharsMap(prev => { const n = { ...prev }; delete n[image.id]; return n; });
       } else {
-        const errorMsg = data.error || data.details || 'Generation failed';
+        const errorMsg = data.details || data.error || 'Generation failed';
         setRetryErrors(prev => ({ ...prev, [image.id]: errorMsg }));
         setShowEditForm(prev => ({ ...prev, [image.id]: true }));
         if (!editPrompts[image.id]) {
@@ -543,8 +543,8 @@ export default function ImageGallery({
                       </div>
                     )}
 
-                    {/* Retry Generation button */}
-                    {onRegenerateScene && !regeneratingScenes[image.id] && (
+                    {/* Retry Generation button (hidden when edit form is open) */}
+                    {onRegenerateScene && !regeneratingScenes[image.id] && !showEditForm[image.id] && (
                       <button
                         onClick={() => handleRetryScene(image)}
                         disabled={regeneratingScenes[image.id]}

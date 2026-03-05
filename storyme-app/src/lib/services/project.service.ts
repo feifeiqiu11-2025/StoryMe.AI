@@ -334,7 +334,7 @@ export class ProjectService {
         enhanced_prompt?: string;
         caption?: string;
         caption_chinese?: string;  // NEW: Bilingual Support
-        imageUrl: string;
+        imageUrl: string | null;
         prompt: string;
         generationTime: number;
       }>;
@@ -397,20 +397,22 @@ export class ProjectService {
         throw new Error(`Failed to save scene ${sceneData.sceneNumber}: ${sceneError.message}`);
       }
 
-      // Save generated image
-      const { error: imageError } = await supabase
-        .from('generated_images')
-        .insert({
-          scene_id: scene.id,
-          project_id: project.id,
-          image_url: sceneData.imageUrl,
-          prompt: sceneData.prompt,
-          generation_time: sceneData.generationTime,
-          status: 'completed',
-        });
+      // Save generated image (only if scene has an image)
+      if (sceneData.imageUrl) {
+        const { error: imageError } = await supabase
+          .from('generated_images')
+          .insert({
+            scene_id: scene.id,
+            project_id: project.id,
+            image_url: sceneData.imageUrl,
+            prompt: sceneData.prompt,
+            generation_time: sceneData.generationTime,
+            status: 'completed',
+          });
 
-      if (imageError) {
-        throw new Error(`Failed to save image for scene ${sceneData.sceneNumber}: ${imageError.message}`);
+        if (imageError) {
+          throw new Error(`Failed to save image for scene ${sceneData.sceneNumber}: ${imageError.message}`);
+        }
       }
     }
 
