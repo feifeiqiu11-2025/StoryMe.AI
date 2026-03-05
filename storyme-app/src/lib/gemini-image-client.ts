@@ -8,8 +8,22 @@
  * for aspect ratio control (1:1 square images to match Fal.ai).
  */
 
-import { GoogleGenAI, Modality } from '@google/genai';
+import { GoogleGenAI, Modality, HarmCategory, HarmBlockThreshold } from '@google/genai';
 import { CharacterDescription, ClothingConsistency, SubjectType, ImageProvider, GEMINI_IMAGE_MODELS, DEFAULT_IMAGE_PROVIDER } from './types/story';
+
+/**
+ * Safety settings for image generation calls.
+ * Relaxes HARASSMENT, HATE_SPEECH, and DANGEROUS_CONTENT to reduce false positives
+ * for innocent children's story content (e.g., "ninja", "bandit", "fight").
+ * SEXUALLY_EXPLICIT is intentionally omitted — keeps Google's default blocking.
+ * Layer 2 protections (CSAM, PROHIBITED_CONTENT, IMAGE_SAFETY) are always active
+ * and cannot be disabled via API.
+ */
+const IMAGE_SAFETY_SETTINGS = [
+  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+];
 
 export interface GeminiCharacterInfo {
   name: string;
@@ -607,6 +621,7 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          safetySettings: IMAGE_SAFETY_SETTINGS,
           imageConfig: {
             aspectRatio: '1:1', // Square images for consistent display
           },
@@ -824,6 +839,7 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          safetySettings: IMAGE_SAFETY_SETTINGS,
           imageConfig: {
             aspectRatio: '1:1', // Square images for consistent display
           },
@@ -1045,6 +1061,7 @@ FINAL REMINDER: This is a COLORING BOOK page. Output MUST be BLACK LINES ON WHIT
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          safetySettings: IMAGE_SAFETY_SETTINGS,
           imageConfig: {
             aspectRatio: '1:1', // Square images for consistent display
           },
@@ -1599,6 +1616,7 @@ This is a CHARACTER PREVIEW for a children's storybook app. The character should
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          safetySettings: IMAGE_SAFETY_SETTINGS,
           imageConfig: {
             aspectRatio: '1:1', // Square portrait images
           },
@@ -1759,6 +1777,7 @@ This is a CHARACTER PREVIEW for a children's storybook app. The style should fee
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          safetySettings: IMAGE_SAFETY_SETTINGS,
           imageConfig: {
             aspectRatio: '1:1', // Square portrait images
           },
@@ -1949,6 +1968,7 @@ This is for a children's storybook app. The result should be appealing, memorabl
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          safetySettings: IMAGE_SAFETY_SETTINGS,
           imageConfig: {
             aspectRatio: '1:1', // Square portrait images
           },
@@ -2105,6 +2125,7 @@ This is for a children's storybook app. The result should be appealing, memorabl
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          safetySettings: IMAGE_SAFETY_SETTINGS,
           imageConfig: {
             aspectRatio: '1:1', // Square portrait images
           },
@@ -2296,6 +2317,7 @@ This is a CHARACTER PREVIEW for a children's storybook app. The character should
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          safetySettings: IMAGE_SAFETY_SETTINGS,
           imageConfig: {
             aspectRatio: '1:1', // Square portrait images
           },
@@ -2436,6 +2458,7 @@ This is a CHARACTER PREVIEW for a children's storybook app. The style should fee
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          safetySettings: IMAGE_SAFETY_SETTINGS,
           imageConfig: {
             aspectRatio: '1:1', // Square portrait images
           },
@@ -2694,6 +2717,7 @@ ${illustrationStyle === 'coloring'
         contents: contentParts,
         config: {
           responseModalities: [Modality.TEXT, Modality.IMAGE],
+          safetySettings: IMAGE_SAFETY_SETTINGS,
           imageConfig: {
             aspectRatio: '1:1', // Square images for consistent display
           },

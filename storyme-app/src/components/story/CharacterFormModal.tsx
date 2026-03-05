@@ -756,12 +756,12 @@ export default function CharacterFormModal({
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Additional Details (optional)</label>
-                  <input
-                    type="text"
+                  <textarea
+                    rows={2}
                     value={formData.otherFeatures}
                     onChange={(e) => setFormData({ ...formData, otherFeatures: e.target.value })}
                     placeholder="colors, special features, personality traits..."
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
                   />
                   <p className="mt-1 text-xs text-gray-500">
                     Add any specific features you want to preserve
@@ -826,12 +826,12 @@ export default function CharacterFormModal({
                   </div>
                   <div className="col-span-2">
                     <label className="block text-xs font-medium text-gray-600 mb-1">Other Features</label>
-                    <input
-                      type="text"
+                    <textarea
+                      rows={2}
                       value={formData.otherFeatures}
                       onChange={(e) => setFormData({ ...formData, otherFeatures: e.target.value })}
                       placeholder="glasses, freckles, curly hair..."
-                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
                     />
                   </div>
                 </div>
@@ -840,12 +840,12 @@ export default function CharacterFormModal({
           ) : (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Additional Details (optional)</label>
-              <input
-                type="text"
+              <textarea
+                rows={2}
                 value={formData.otherFeatures}
                 onChange={(e) => setFormData({ ...formData, otherFeatures: e.target.value })}
                 placeholder="fluffy golden feathers, big curious eyes, wearing a tiny red scarf..."
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none"
               />
               <p className="mt-1 text-xs text-gray-500">
                 Add any specific features, colors, or accessories

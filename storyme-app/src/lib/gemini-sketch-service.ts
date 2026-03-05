@@ -12,7 +12,7 @@
  * Follows Principle 5: Reuse Before Rebuild (uses existing Gemini client)
  */
 
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from '@google/genai';
 import { resolveGeminiImageModel } from './gemini-image-client';
 import { isGeminiAvailable } from './gemini-image-client';
 
@@ -251,6 +251,11 @@ async function generateSketchImage(
       contents: [{ text: prompt }],
       config: {
         responseModalities: ['image'],
+        safetySettings: [
+          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ],
         imageConfig: {
           aspectRatio: '1:1',
         },
