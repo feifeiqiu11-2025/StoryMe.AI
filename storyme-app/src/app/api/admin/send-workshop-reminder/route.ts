@@ -315,8 +315,10 @@ function buildAfternoonReminderHtml(parentFirstName: string, childFirstName: str
 
 // ─── Route Handler ───────────────────────────────────────────────────────
 
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export async function POST(req: NextRequest) {
-  const { mode } = await req.json();
+  const { mode, sessionType } = await req.json();
 
   if (mode === 'test') {
     const results = [];
@@ -345,11 +347,18 @@ export async function POST(req: NextRequest) {
   }
 
   if (mode === 'send') {
-    const { data: registrations, error } = await supabase
+    // sessionType filter: 'morning', 'afternoon', or undefined (both)
+    const query = supabase
       .from('workshop_registrations')
       .select('parent_first_name, parent_email, child_first_name, selected_session_type')
       .eq('status', 'confirmed')
       .contains('selected_workshop_ids', ['steamoji-wk1']);
+
+    if (sessionType === 'morning' || sessionType === 'afternoon') {
+      query.eq('selected_session_type', sessionType);
+    }
+
+    const { data: registrations, error } = await query;
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -361,7 +370,11 @@ export async function POST(req: NextRequest) {
 
     const results = [];
 
-    for (const reg of registrations) {
+    for (let i = 0; i < registrations.length; i++) {
+      const reg = registrations[i];
+      // Rate limit: wait 600ms between sends (Resend allows 2/sec)
+      if (i > 0) await delay(600);
+
       const isMorning = reg.selected_session_type === 'morning';
       const { error: sendErr } = await resend.emails.send({
         from: EMAIL_FROM,
