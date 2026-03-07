@@ -57,6 +57,11 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'kindlewood-studio.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'qxeiajnmprinwydlozlq.supabase.co',
         pathname: '/storage/v1/object/public/**',
       },
