@@ -24,21 +24,21 @@ function buildWelcomeHtml(firstName: string): string {
       <td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
 
-          <!-- Logo Header -->
+          <!-- Logo + Welcome Header -->
           <tr>
-            <td style="background-color: #6d28d9; background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: 32px; text-align: center;">
+            <td style="padding: 32px 24px 16px; text-align: center;">
               <a href="https://www.kindlewoodstudio.ai" style="text-decoration: none;">
-                <img src="${LOGO_URL}" alt="KindleWood Studio" width="200" style="display: inline-block; max-width: 200px; height: auto;" />
+                <img src="${LOGO_URL}" alt="KindleWood Studio" width="160" style="display: inline-block; max-width: 160px; height: auto;" />
               </a>
+              <h1 style="color: #374151; font-size: 22px; margin: 12px 0 0; font-weight: 700;">
+                Welcome to KindleWood!
+              </h1>
             </td>
           </tr>
 
-          <!-- Welcome Greeting -->
+          <!-- Greeting -->
           <tr>
-            <td style="padding: 32px 24px 16px;">
-              <h1 style="color: #374151; font-size: 22px; margin: 0 0 16px; font-weight: 700;">
-                Welcome to KindleWood!
-              </h1>
+            <td style="padding: 16px 24px 16px;">
               <p style="color: #6b7280; font-size: 15px; margin: 0; line-height: 1.7;">
                 Hi ${firstName},
               </p>
