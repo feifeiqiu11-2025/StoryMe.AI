@@ -210,8 +210,8 @@ IMPORTANT: Use this architecture as a GUIDE. If the user's script already has go
 
     return `
 EXPANSION LEVEL: LIGHT EXPANSION
-- Original scenes: ${originalSceneCount}
-- Target scenes: ${targetSceneCount} (10-12 scenes)
+- Original input lines: ${originalSceneCount} (some may be instructions rather than scenes)
+- Target scenes: approximately ${targetSceneCount} (10-12 scenes based on actual scene content)
 - Enhance captions to be age-appropriate, clear, and engaging
 - Add transitional scenes to improve story flow and complete narrative arc
 - You MAY add minor supporting characters if needed (parents, friends, pets)
@@ -263,8 +263,8 @@ Examples of BAD logical flow (avoid these):
 
   return `
 EXPANSION LEVEL: RICH (Full Creative Expansion)
-- Original scenes: ${originalSceneCount}
-- Target scenes: ${targetSceneCount} (EXACTLY 15 scenes for deeper plot and more images)
+- Original input lines: ${originalSceneCount} (some may be instructions rather than scenes)
+- Target scenes: approximately ${targetSceneCount} (aim for 15 scenes based on actual scene content)
 - Create a fully developed narrative with rich storytelling and clear cause-effect flow
 - Add dialogue, character development, emotional moments
 - You MAY add supporting characters (label with "(NEW)")
@@ -297,7 +297,8 @@ export function buildEnhancementPrompt(
   storyTone: StoryTone,
   expansionLevel: ExpansionLevel = 'as_written',
   templateBasePrompt?: string,
-  storyArchitecture?: StoryArchitecture
+  storyArchitecture?: StoryArchitecture,
+  rawScript?: string
 ): string {
   const characterNames = characters.map(c => c.name).join(', ');
   const characterDescriptions = characters
@@ -376,7 +377,25 @@ CRITICAL RULES:
    - HUMAN = people, boys, girls, mothers, fathers, grandparents, etc.
    - This is used to generate correct clothing in images (animals don't wear human clothes)
 
-INPUT SCENES:
+${rawScript && expansionLevel !== 'as_written' ? `USER'S RAW INPUT (for context):
+"""
+${rawScript}
+"""
+
+IMPORTANT - INSTRUCTION DETECTION:
+The user's input above may contain a mix of:
+1. SCENE DESCRIPTIONS — narrative content describing what happens (e.g., "Connor finds a treasure map")
+2. META-INSTRUCTIONS — directives about how to create the story (e.g., "only use these two characters", "make it a bedtime story", "keep scenes short")
+3. STORY CONCEPTS — a general idea without specific scenes (e.g., "a fun story about exploring nature")
+
+Your task:
+- Identify any meta-instructions and apply them as HIGH-PRIORITY CONSTRAINTS for the entire story
+- Only generate scenes from lines that are actual story/scene content
+- If the input is mostly a story concept with few or no specific scenes, generate a well-structured story from that concept
+- The scene count may differ from the number of input lines if some lines are instructions rather than scenes
+- Meta-instructions OVERRIDE other settings (e.g., if user says "keep it short", prioritize that over target scene count)
+
+` : ''}INPUT SCENES:
 ${scenes.map((s, i) => `Scene ${s.sceneNumber}: "${s.rawDescription}" (Characters: ${s.characterNames.join(', ') || 'all'})`).join('\n')}
 
 OUTPUT FORMAT:
@@ -401,7 +420,7 @@ Return a valid JSON array with ${targetSceneCount} scenes in this exact structur
 ]
 
 IMPORTANT:
-- Return EXACTLY ${targetSceneCount} scenes in the array
+- Return approximately ${targetSceneCount} scenes in the array (adjust if some input lines are instructions rather than scenes)
 - Include "title" for each scene (helps users preview)
 - List all character names appearing in each scene
 - Mark new characters with "(NEW)" suffix if you added them

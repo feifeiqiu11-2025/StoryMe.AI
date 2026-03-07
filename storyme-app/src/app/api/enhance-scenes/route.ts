@@ -106,7 +106,8 @@ export async function POST(request: NextRequest) {
           storyTone as StoryTone,
           expansionLevel as ExpansionLevel,
           templateBasePrompt,
-          storyArchitecture
+          storyArchitecture,
+          script
         )
       : buildChineseEnhancementPrompt(
           scenes as SceneToEnhance[],
@@ -115,7 +116,8 @@ export async function POST(request: NextRequest) {
           storyTone as StoryTone,
           expansionLevel as ExpansionLevel,
           templateBasePrompt,
-          storyArchitecture
+          storyArchitecture,
+          script
         );
 
     // Get appropriate AI model for language

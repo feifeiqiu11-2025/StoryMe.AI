@@ -177,8 +177,8 @@ ${architecture.pedagogicalCheckpoints.map((cp, i) => `• ${cp}`).join('\n')}
 
     return `
 扩展级别：轻度扩展
-- 原始场景数：${originalSceneCount}
-- 目标场景数：${targetSceneCount}（10-12个场景）
+- 原始输入行数：${originalSceneCount}（部分可能是指令而非场景）
+- 目标场景数：约${targetSceneCount}（根据实际场景内容生成10-12个场景）
 - 增强字幕使其适合年龄、清晰、引人入胜
 - 添加过渡场景以改善故事流畅性并完成叙事弧
 - 如果需要，可以添加次要配角（父母、朋友、宠物）
@@ -230,8 +230,8 @@ ${architecture.pedagogicalCheckpoints.map((cp, i) => `✓ ${cp}`).join('\n')}
 
   return `
 扩展级别：丰富（完整的创意扩展）
-- 原始场景数：${originalSceneCount}
-- 目标场景数：${targetSceneCount}（恰好15个场景，以获得更深入的情节和更多图像）
+- 原始输入行数：${originalSceneCount}（部分可能是指令而非场景）
+- 目标场景数：约${targetSceneCount}（根据实际场景内容生成约15个场景）
 - 创建具有丰富叙事和清晰因果流程的完整故事
 - 添加对话、角色发展、情感时刻
 - 可以添加配角（用"(NEW)"标记）
@@ -255,7 +255,8 @@ export function buildChineseEnhancementPrompt(
   storyTone: StoryTone,
   expansionLevel: ExpansionLevel = 'as_written',
   templateBasePrompt?: string,
-  storyArchitecture?: StoryArchitecture
+  storyArchitecture?: StoryArchitecture,
+  rawScript?: string
 ): string {
   const characterNames = characters.map(c => c.name).join('、');
   const characterDescriptions = characters
@@ -330,11 +331,29 @@ ${getChineseReadingLevelGuidelines(readingLevel)}
 - 这两个输出服务于不同的目的 - 保持它们的区别
 - 在故事的所有场景中保持一致性
 
-输入场景：
+${rawScript && expansionLevel !== 'as_written' ? `用户原始输入（供参考）：
+"""
+${rawScript}
+"""
+
+重要 - 指令检测：
+用户的输入可能包含以下混合内容：
+1. 场景描述 — 描述故事中发生什么的叙事内容（例如："Connor发现了一张藏宝图"）
+2. 元指令 — 关于如何创建故事的指令（例如："只使用这两个角色"、"做成睡前故事"、"保持场景简短"）
+3. 故事概念 — 没有具体场景的一般想法（例如："一个关于探索自然的有趣故事"）
+
+你的任务：
+- 识别任何元指令并将其作为整个故事的高优先级约束
+- 只从实际的故事/场景内容生成场景
+- 如果输入主要是故事概念，几乎没有具体场景，则从该概念生成结构良好的故事
+- 场景数量可能与输入行数不同，如果某些行是指令而非场景
+- 元指令优先于其他设置（例如，如果用户说"保持简短"，优先于目标场景数）
+
+` : ''}输入场景：
 ${scenes.map((s, i) => `场景 ${s.sceneNumber}："${s.rawDescription}"（角色：${s.characterNames.join('、') || '全部'}）`).join('\n')}
 
 输出格式：
-返回一个包含 ${targetSceneCount} 个场景的有效JSON数组，使用这个确切的结构：
+返回一个包含约 ${targetSceneCount} 个场景的有效JSON数组（根据实际场景内容调整），使用这个确切的结构：
 [
   {
     "sceneNumber": 1,
@@ -353,7 +372,7 @@ ${scenes.map((s, i) => `场景 ${s.sceneNumber}："${s.rawDescription}"（角色
 ]
 
 重要提醒：
-- 返回数组中恰好 ${targetSceneCount} 个场景
+- 返回数组中约 ${targetSceneCount} 个场景（根据实际场景内容调整数量）
 - 为每个场景包含"title"（中文标题）
 - enhanced_prompt 必须是英文（用于图像生成）
 - caption 必须是中文（用于故事书）
