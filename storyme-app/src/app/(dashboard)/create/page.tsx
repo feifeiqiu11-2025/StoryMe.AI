@@ -24,7 +24,7 @@ import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import { getGuestStory, clearGuestStory } from '@/lib/utils/guest-story-storage';
 import EditImageControl from '@/components/story/EditImageControl';
-import WritingCoachModal from '@/components/story/WritingCoachModal';
+import { WritingCoachContent } from '@/components/story/WritingCoachModal';
 import { buildCoverPrompt } from '@/lib/ai/cover-prompt-builder';
 
 const CHARACTERS_STORAGE_KEY = 'storyme_character_library';
@@ -1098,6 +1098,7 @@ export default function CreateStoryPage() {
         loading={feedbackLoading}
       />
 
+      {/* OLD MODAL — commented out, replaced by inline side panel + mobile modal below
       <WritingCoachModal
         isOpen={isCoachModalOpen}
         onClose={() => setIsCoachModalOpen(false)}
@@ -1110,6 +1111,7 @@ export default function CreateStoryPage() {
           setIsCoachModalOpen(false);
         }}
       />
+      */}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
@@ -1354,14 +1356,61 @@ export default function CreateStoryPage() {
                 '描述您故事的每个场景。为故事的每个部分写简单的描述。'
               )}
             </p>
-            <ScriptInput
-              value={scriptInput}
-              onChange={setScriptInput}
-              characters={characters}
-              selectedTemplate={selectedTemplate}
-              onTemplateChange={setSelectedTemplate}
-              onCoachClick={() => setIsCoachModalOpen(true)}
-            />
+            <div className="flex gap-4 items-end">
+              {/* Script — shrinks to 60% on desktop when coach open */}
+              <div className={`transition-all duration-300 w-full ${
+                isCoachModalOpen ? 'md:w-3/5' : ''
+              }`}>
+                <ScriptInput
+                  value={scriptInput}
+                  onChange={setScriptInput}
+                  characters={characters}
+                  selectedTemplate={selectedTemplate}
+                  onTemplateChange={setSelectedTemplate}
+                  onCoachClick={() => setIsCoachModalOpen(true)}
+                />
+              </div>
+
+              {/* Desktop side panel — 40%, sticky */}
+              {isCoachModalOpen && (
+                <div className="hidden md:block w-2/5 min-w-0 sticky top-4">
+                  <WritingCoachContent
+                    onClose={() => setIsCoachModalOpen(false)}
+                    script={scriptInput}
+                    templateId={selectedTemplate}
+                    characters={characters}
+                    readingLevel={readingLevel}
+                    onAcceptPolish={(newScript) => {
+                      setScriptInput(newScript);
+                    }}
+                    className="max-h-[80vh]"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Mobile modal overlay — only on small screens */}
+            {isCoachModalOpen && (
+              <div className="md:hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div
+                  className="absolute inset-0 bg-black/50"
+                  onClick={() => setIsCoachModalOpen(false)}
+                />
+                <div className="relative w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+                  <WritingCoachContent
+                    onClose={() => setIsCoachModalOpen(false)}
+                    script={scriptInput}
+                    templateId={selectedTemplate}
+                    characters={characters}
+                    readingLevel={readingLevel}
+                    onAcceptPolish={(newScript) => {
+                      setScriptInput(newScript);
+                      setIsCoachModalOpen(false);
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
