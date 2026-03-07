@@ -49,6 +49,64 @@ export interface GeminiGenerateResult {
 }
 
 /**
+ * Extract and validate image data from a Gemini API response.
+ * Provides detailed diagnostic logging when the response is empty or blocked.
+ * Throws descriptive errors instead of generic "No parts in Gemini response".
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractImageFromGeminiResponse(result: any, context: string = 'image'): { mimeType: string; data: string } {
+  const candidates = result.candidates;
+  if (!candidates || candidates.length === 0) {
+    console.error(`[Gemini:${context}] No candidates. Full response keys:`, Object.keys(result || {}));
+    // Check for promptFeedback which indicates the prompt itself was blocked
+    if (result?.promptFeedback) {
+      console.error(`[Gemini:${context}] promptFeedback:`, JSON.stringify(result.promptFeedback));
+      const blockReason = result.promptFeedback.blockReason || 'UNKNOWN';
+      throw new Error(`Gemini blocked prompt (${blockReason})`);
+    }
+    throw new Error('No candidates in Gemini response');
+  }
+
+  const candidate = candidates[0];
+
+  // Check for block/finish reasons before looking at content
+  if (candidate.finishReason && candidate.finishReason !== 'STOP' && candidate.finishReason !== 'MAX_TOKENS') {
+    console.error(`[Gemini:${context}] Unexpected finishReason: ${candidate.finishReason}`);
+    console.error(`[Gemini:${context}] Candidate:`, JSON.stringify(candidate, null, 2));
+    throw new Error(`Gemini generation stopped: ${candidate.finishReason}`);
+  }
+
+  const parts = candidate.content?.parts;
+  if (!parts || parts.length === 0) {
+    // Log detailed diagnostics
+    console.error(`[Gemini:${context}] No parts in candidate. finishReason: ${candidate.finishReason || 'none'}`);
+    console.error(`[Gemini:${context}] Candidate content:`, JSON.stringify(candidate.content));
+    console.error(`[Gemini:${context}] Full candidate keys:`, Object.keys(candidate));
+    if (candidate.safetyRatings) {
+      console.error(`[Gemini:${context}] Safety ratings:`, JSON.stringify(candidate.safetyRatings));
+    }
+    throw new Error(`No parts in Gemini response (finishReason: ${candidate.finishReason || 'unknown'})`);
+  }
+
+  // Find the image part
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const imagePart = parts.find((p: any) => p.inlineData);
+  if (!imagePart || !imagePart.inlineData) {
+    // Check for text explaining why no image was generated
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const textPart = parts.find((p: any) => p.text);
+    const textContent = textPart?.text || '';
+    console.error(`[Gemini:${context}] No image in parts. Text response: ${textContent.substring(0, 500)}`);
+    throw new Error(`Gemini returned text instead of image: ${textContent.substring(0, 200) || 'No image generated'}`);
+  }
+
+  return {
+    mimeType: imagePart.inlineData.mimeType || 'image/png',
+    data: imagePart.inlineData.data,
+  };
+}
+
+/**
  * Resolve the Gemini image model ID from an ImageProvider value.
  * Defaults to the latest model if not specified.
  */
@@ -610,7 +668,7 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
   console.log(`[Gemini] Generating with ${characters.length} characters`);
   console.log(`[Gemini] Prompt preview: ${fullPrompt.substring(0, 200)}...`);
 
-  // Retry logic for rate limits
+  // Retry logic for rate limits and empty responses
   const maxRetries = 3;
   let lastError: Error | null = null;
 
@@ -628,32 +686,14 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
         },
       });
 
-      // Extract image from response
-      const candidates = result.candidates;
-      if (!candidates || candidates.length === 0) {
-        throw new Error('No candidates in Gemini response');
-      }
-
-      const parts = candidates[0].content?.parts;
-      if (!parts) {
-        throw new Error('No parts in Gemini response');
-      }
-
-      // Find the image part
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const imagePart = parts.find((p: any) => p.inlineData);
-      if (!imagePart || !imagePart.inlineData) {
-        // Check for text response explaining why no image
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const textPart = parts.find((p: any) => p.text);
-        throw new Error(`Gemini image generation failed: ${textPart?.text || 'No image generated'}`);
-      }
+      // Extract image from response (with detailed diagnostics)
+      const imageData = extractImageFromGeminiResponse(result, 'scene');
 
       const generationTime = (Date.now() - startTime) / 1000;
       console.log(`[Gemini] Generated in ${generationTime.toFixed(1)}s`);
 
       // Return as data URL
-      const imageDataUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+      const imageDataUrl = `data:${imageData.mimeType};base64,${imageData.data}`;
 
       return {
         imageUrl: imageDataUrl,
@@ -678,9 +718,15 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
         }
       }
 
-      // Retry on empty response / content filter (non-deterministic)
-      if (attempt < maxRetries && (errorMessage.includes('No parts') || errorMessage.includes('No candidates'))) {
-        console.warn(`[Gemini] Empty response (attempt ${attempt}/${maxRetries}), retrying in 3s...`);
+      // Retry on empty/blocked responses (known Gemini API intermittent issue)
+      const isRetryable = errorMessage.includes('No parts') ||
+        errorMessage.includes('No candidates') ||
+        errorMessage.includes('generation stopped') ||
+        errorMessage.includes('blocked prompt') ||
+        errorMessage.includes('returned text instead of image');
+
+      if (attempt < maxRetries && isRetryable) {
+        console.warn(`[Gemini] Empty/blocked response (attempt ${attempt}/${maxRetries}), retrying in 3s...`);
         await new Promise(resolve => setTimeout(resolve, 3000));
         continue;
       }
@@ -846,29 +892,13 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
         },
       });
 
-      // Extract image from response
-      const candidates = result.candidates;
-      if (!candidates || candidates.length === 0) {
-        throw new Error('No candidates in Gemini response');
-      }
-
-      const parts = candidates[0].content?.parts;
-      if (!parts) {
-        throw new Error('No parts in Gemini response');
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const imagePart = parts.find((p: any) => p.inlineData);
-      if (!imagePart || !imagePart.inlineData) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const textPart = parts.find((p: any) => p.text);
-        throw new Error(`Gemini Classic image generation failed: ${textPart?.text || 'No image generated'}`);
-      }
+      // Extract image from response (with detailed diagnostics)
+      const imageData = extractImageFromGeminiResponse(result, 'classic');
 
       const generationTime = (Date.now() - startTime) / 1000;
       console.log(`[Gemini Classic] Generated in ${generationTime.toFixed(1)}s`);
 
-      const imageDataUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+      const imageDataUrl = `data:${imageData.mimeType};base64,${imageData.data}`;
 
       return {
         imageUrl: imageDataUrl,
@@ -1068,29 +1098,13 @@ FINAL REMINDER: This is a COLORING BOOK page. Output MUST be BLACK LINES ON WHIT
         },
       });
 
-      // Extract image from response
-      const candidates = result.candidates;
-      if (!candidates || candidates.length === 0) {
-        throw new Error('No candidates in Gemini response');
-      }
-
-      const parts = candidates[0].content?.parts;
-      if (!parts) {
-        throw new Error('No parts in Gemini response');
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const imagePart = parts.find((p: any) => p.inlineData);
-      if (!imagePart || !imagePart.inlineData) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const textPart = parts.find((p: any) => p.text);
-        throw new Error(`Gemini Coloring image generation failed: ${textPart?.text || 'No image generated'}`);
-      }
+      // Extract image from response (with detailed diagnostics)
+      const imageData = extractImageFromGeminiResponse(result, 'coloring');
 
       const generationTime = (Date.now() - startTime) / 1000;
       console.log(`[Gemini Coloring] Generated in ${generationTime.toFixed(1)}s`);
 
-      const imageDataUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+      const imageDataUrl = `data:${imageData.mimeType};base64,${imageData.data}`;
 
       return {
         imageUrl: imageDataUrl,
@@ -1623,30 +1637,14 @@ This is a CHARACTER PREVIEW for a children's storybook app. The character should
         },
       });
 
-      const candidates = result.candidates;
-      if (!candidates || candidates.length === 0) {
-        throw new Error('No candidates in Gemini response');
-      }
-
-      const parts = candidates[0].content?.parts;
-      if (!parts) {
-        throw new Error('No parts in Gemini response');
-      }
-
-      // Find the image part
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const imagePart = parts.find((p: any) => p.inlineData);
-      if (!imagePart || !imagePart.inlineData) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const textPart = parts.find((p: any) => p.text);
-        throw new Error(`Gemini preview generation failed: ${textPart?.text || 'No image generated'}`);
-      }
+      // Extract image from response (with detailed diagnostics)
+      const imageData = extractImageFromGeminiResponse(result, 'preview');
 
       const generationTime = (Date.now() - startTime) / 1000;
       console.log(`[Gemini Preview] Generated portrait for ${name} in ${generationTime.toFixed(1)}s`);
 
       // Return as data URL
-      const imageDataUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+      const imageDataUrl = `data:${imageData.mimeType};base64,${imageData.data}`;
 
       return {
         imageUrl: imageDataUrl,
@@ -1784,30 +1782,14 @@ This is a CHARACTER PREVIEW for a children's storybook app. The style should fee
         },
       });
 
-      const candidates = result.candidates;
-      if (!candidates || candidates.length === 0) {
-        throw new Error('No candidates in Gemini response');
-      }
-
-      const parts = candidates[0].content?.parts;
-      if (!parts) {
-        throw new Error('No parts in Gemini response');
-      }
-
-      // Find the image part
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const imagePart = parts.find((p: any) => p.inlineData);
-      if (!imagePart || !imagePart.inlineData) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const textPart = parts.find((p: any) => p.text);
-        throw new Error(`Gemini classic preview generation failed: ${textPart?.text || 'No image generated'}`);
-      }
+      // Extract image from response (with detailed diagnostics)
+      const imageData = extractImageFromGeminiResponse(result, 'classic');
 
       const generationTime = (Date.now() - startTime) / 1000;
       console.log(`[Gemini Classic] Generated portrait for ${name} in ${generationTime.toFixed(1)}s`);
 
       // Return as data URL
-      const imageDataUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+      const imageDataUrl = `data:${imageData.mimeType};base64,${imageData.data}`;
 
       return {
         imageUrl: imageDataUrl,
@@ -1975,28 +1957,13 @@ This is for a children's storybook app. The result should be appealing, memorabl
         },
       });
 
-      const candidates = result.candidates;
-      if (!candidates || candidates.length === 0) {
-        throw new Error('No candidates in Gemini response');
-      }
-
-      const parts = candidates[0].content?.parts;
-      if (!parts) {
-        throw new Error('No parts in Gemini response');
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const imagePart = parts.find((p: any) => p.inlineData);
-      if (!imagePart || !imagePart.inlineData) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const textPart = parts.find((p: any) => p.text);
-        throw new Error(`Gemini preview generation failed: ${textPart?.text || 'No image generated'}`);
-      }
+      // Extract image from response (with detailed diagnostics)
+      const imageData = extractImageFromGeminiResponse(result, 'nonhuman-preview');
 
       const generationTime = (Date.now() - startTime) / 1000;
       console.log(`[Gemini NonHuman Preview] Generated ${subjectType} portrait for ${name} in ${generationTime.toFixed(1)}s`);
 
-      const imageDataUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+      const imageDataUrl = `data:${imageData.mimeType};base64,${imageData.data}`;
 
       return {
         imageUrl: imageDataUrl,
@@ -2132,28 +2099,13 @@ This is for a children's storybook app. The result should be appealing, memorabl
         },
       });
 
-      const candidates = result.candidates;
-      if (!candidates || candidates.length === 0) {
-        throw new Error('No candidates in Gemini response');
-      }
-
-      const parts = candidates[0].content?.parts;
-      if (!parts) {
-        throw new Error('No parts in Gemini response');
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const imagePart = parts.find((p: any) => p.inlineData);
-      if (!imagePart || !imagePart.inlineData) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const textPart = parts.find((p: any) => p.text);
-        throw new Error(`Gemini classic preview generation failed: ${textPart?.text || 'No image generated'}`);
-      }
+      // Extract image from response (with detailed diagnostics)
+      const imageData = extractImageFromGeminiResponse(result, 'nonhuman-classic');
 
       const generationTime = (Date.now() - startTime) / 1000;
       console.log(`[Gemini NonHuman Classic] Generated ${subjectType} portrait for ${name} in ${generationTime.toFixed(1)}s`);
 
-      const imageDataUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+      const imageDataUrl = `data:${imageData.mimeType};base64,${imageData.data}`;
 
       return {
         imageUrl: imageDataUrl,
@@ -2324,30 +2276,14 @@ This is a CHARACTER PREVIEW for a children's storybook app. The character should
         },
       });
 
-      const candidates = result.candidates;
-      if (!candidates || candidates.length === 0) {
-        throw new Error('No candidates in Gemini response');
-      }
-
-      const parts = candidates[0].content?.parts;
-      if (!parts) {
-        throw new Error('No parts in Gemini response');
-      }
-
-      // Find the image part
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const imagePart = parts.find((p: any) => p.inlineData);
-      if (!imagePart || !imagePart.inlineData) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const textPart = parts.find((p: any) => p.text);
-        throw new Error(`Gemini preview generation failed: ${textPart?.text || 'No image generated'}`);
-      }
+      // Extract image from response (with detailed diagnostics)
+      const imageData = extractImageFromGeminiResponse(result, 'preview');
 
       const generationTime = (Date.now() - startTime) / 1000;
       console.log(`[Gemini Preview] Generated description-only portrait for ${name} in ${generationTime.toFixed(1)}s`);
 
       // Return as data URL
-      const imageDataUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+      const imageDataUrl = `data:${imageData.mimeType};base64,${imageData.data}`;
 
       return {
         imageUrl: imageDataUrl,
@@ -2465,30 +2401,14 @@ This is a CHARACTER PREVIEW for a children's storybook app. The style should fee
         },
       });
 
-      const candidates = result.candidates;
-      if (!candidates || candidates.length === 0) {
-        throw new Error('No candidates in Gemini response');
-      }
-
-      const parts = candidates[0].content?.parts;
-      if (!parts) {
-        throw new Error('No parts in Gemini response');
-      }
-
-      // Find the image part
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const imagePart = parts.find((p: any) => p.inlineData);
-      if (!imagePart || !imagePart.inlineData) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const textPart = parts.find((p: any) => p.text);
-        throw new Error(`Gemini classic preview generation failed: ${textPart?.text || 'No image generated'}`);
-      }
+      // Extract image from response (with detailed diagnostics)
+      const imageData = extractImageFromGeminiResponse(result, 'classic');
 
       const generationTime = (Date.now() - startTime) / 1000;
       console.log(`[Gemini Classic] Generated description-only portrait for ${name} in ${generationTime.toFixed(1)}s`);
 
       // Return as data URL
-      const imageDataUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+      const imageDataUrl = `data:${imageData.mimeType};base64,${imageData.data}`;
 
       return {
         imageUrl: imageDataUrl,
@@ -2724,32 +2644,14 @@ ${illustrationStyle === 'coloring'
         },
       });
 
-      // Extract image from response
-      const candidates = result.candidates;
-      if (!candidates || candidates.length === 0) {
-        throw new Error('No candidates in Gemini edit response');
-      }
-
-      const parts = candidates[0].content?.parts;
-      if (!parts) {
-        throw new Error('No parts in Gemini edit response');
-      }
-
-      // Find the image part
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const imagePart = parts.find((p: any) => p.inlineData);
-      if (!imagePart || !imagePart.inlineData) {
-        // Check for text response explaining why no image
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const textPart = parts.find((p: any) => p.text);
-        throw new Error(`Gemini edit failed: ${textPart?.text || 'No edited image generated'}`);
-      }
+      // Extract image from response (with detailed diagnostics)
+      const imageData = extractImageFromGeminiResponse(result, 'edit');
 
       const generationTime = (Date.now() - startTime) / 1000;
       console.log(`[Gemini Edit] Edited image in ${generationTime.toFixed(1)}s`);
 
       // Return as data URL
-      const imageDataUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+      const imageDataUrl = `data:${imageData.mimeType};base64,${imageData.data}`;
 
       return {
         imageUrl: imageDataUrl,
