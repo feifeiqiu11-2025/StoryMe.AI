@@ -900,7 +900,7 @@ export default function StoryViewerPage() {
     }
   };
 
-  const handleDownloadPDF = async (format: 'a5' | 'large') => {
+  const handleDownloadPDF = async (format: 'a5' | 'a4' | 'large') => {
     if (!project || !project.scenes || project.scenes.length === 0) {
       alert('No scenes to generate PDF');
       return;
@@ -1596,6 +1596,13 @@ export default function StoryViewerPage() {
                         >
                           <div className="font-medium text-gray-900">A5 Format</div>
                           <div className="text-xs text-gray-500 mt-0.5">8.3" × 5.8" (Compact)</div>
+                        </button>
+                        <button
+                          onClick={() => handleDownloadPDF('a4')}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-orange-50 transition-colors border-b border-gray-200"
+                        >
+                          <div className="font-medium text-gray-900">A4 Format</div>
+                          <div className="text-xs text-gray-500 mt-0.5">8.3" × 11.7" (Standard Print)</div>
                         </button>
                         <button
                           onClick={() => handleDownloadPDF('large')}

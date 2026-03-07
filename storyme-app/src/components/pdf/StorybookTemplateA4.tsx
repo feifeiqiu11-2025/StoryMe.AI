@@ -1,15 +1,15 @@
 /**
- * Large Storybook PDF Template - 7" x 8.5" Portrait (Legal Booklet)
- * Uses @react-pdf/renderer to create a large-format children's book
+ * A4 Storybook PDF Template - 8.3" x 11.7" Portrait (Standard A4)
+ * Uses @react-pdf/renderer to create an A4-format children's book
  *
- * Page Size: 7" x 8.5" (504pt x 612pt) - Portrait Format
- * Optimized for booklet-style printing on 8.5" x 14" (Legal) paper folded in half
+ * Page Size: 8.3" x 11.7" (595pt x 842pt) - Standard A4 Portrait
+ * Optimized for direct printing on A4 paper without scaling
  *
  * Layout:
- * - Cover: 85% image + 15% author/copyright footer
- * - Scenes: 65% image + 35% bilingual captions
+ * - Cover: 80% image + 20% author/copyright footer
+ * - Scenes: 75% image + 25% bilingual captions (~211pt caption area)
  * - Fonts: 14-20px (optimized for bilingual text)
- * - Perfect for display or reading aloud to groups
+ * - Book-style page numbers: odd=left, even=right
  */
 
 import React from 'react';
@@ -32,17 +32,17 @@ Font.register({
   ],
 });
 
-// Define styles for large format PDF
+// Define styles for A4 format PDF
 const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
     backgroundColor: '#ffffff',
     padding: 0,
   },
-  // Cover page with AI image (85% image, 15% footer)
+  // Cover page with AI image (80% image, 20% footer)
   coverImageContainer: {
     width: '100%',
-    height: '85%',
+    height: '80%',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     objectFit: 'cover',
   },
   coverFooter: {
-    height: '15%',
+    height: '20%',
     width: '100%',
     display: 'flex',
     flexDirection: 'column',
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   coverAuthor: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: 'Noto Sans SC',
     color: '#1F2937',
     fontWeight: 'bold',
@@ -113,14 +113,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFD700',
     marginVertical: 40,
   },
-  // Scene pages (75% image, 25% captions - optimized for less cropping)
+  // Scene pages (75% image, 25% captions)
   scenePage: {
     flex: 1,
     flexDirection: 'column',
   },
   sceneImageContainer: {
     width: '100%',
-    height: '75%',  // Increased from 70% to further reduce image cropping
+    height: '75%',
     backgroundColor: '#FFFFFF',
     display: 'flex',
     justifyContent: 'center',
@@ -137,8 +137,8 @@ const styles = StyleSheet.create({
     height: '25%',
     paddingTop: 8,
     paddingBottom: 12,
-    paddingLeft: 15,
-    paddingRight: 15,
+    paddingLeft: 20,
+    paddingRight: 20,
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
   },
 });
 
-interface StorybookTemplateLargeProps {
+interface StorybookTemplateA4Props {
   title: string;
   description?: string;
   author?: string;
@@ -178,7 +178,7 @@ function containsChinese(text: string): boolean {
 /**
  * Helper function to wrap Chinese text
  */
-function wrapChineseText(text: string, maxCharsPerLine: number = 25): string {
+function wrapChineseText(text: string, maxCharsPerLine: number = 30): string {
   if (!containsChinese(text)) {
     return text;
   }
@@ -202,9 +202,9 @@ function wrapChineseText(text: string, maxCharsPerLine: number = 25): string {
 }
 
 /**
- * Smart font sizing for large format - optimized for 35% caption area
+ * Smart font sizing for A4 format
  */
-function getSmartFontSizeLarge(text: string): { fontSize: number; lineHeight: number } {
+function getSmartFontSizeA4(text: string): { fontSize: number; lineHeight: number } {
   const length = text.length;
 
   if (length <= 80) {
@@ -220,8 +220,7 @@ function getSmartFontSizeLarge(text: string): { fontSize: number; lineHeight: nu
   }
 }
 
-
-export const StorybookTemplateLarge: React.FC<StorybookTemplateLargeProps> = ({
+export const StorybookTemplateA4: React.FC<StorybookTemplateA4Props> = ({
   title,
   description,
   author = 'My Family',
@@ -229,28 +228,28 @@ export const StorybookTemplateLarge: React.FC<StorybookTemplateLargeProps> = ({
   scenes,
   createdDate,
 }) => {
-  console.log('📖 Large Format PDF Template (7" x 8.5"):');
+  console.log('📖 A4 Format PDF Template (8.3" x 11.7"):');
   console.log('  - coverImageUrl:', coverImageUrl);
-  console.log('  - Will use:', coverImageUrl ? 'AI Cover (85% image)' : 'Fallback Cover');
+  console.log('  - Will use:', coverImageUrl ? 'AI Cover (80% image)' : 'Fallback Cover');
 
   return (
     <Document>
-      {/* Cover Page - 7" x 8.5" portrait (504pt x 612pt) */}
+      {/* Cover Page - A4 portrait (595pt x 842pt) */}
       {coverImageUrl ? (
-        <Page size={{ width: 504, height: 612 }} style={styles.page}>
-          {/* 85% Image Section */}
+        <Page size="A4" style={styles.page}>
+          {/* 80% Image Section */}
           <View style={styles.coverImageContainer}>
             <Image src={coverImageUrl} style={styles.coverImage} />
           </View>
 
-          {/* 15% Footer Section */}
+          {/* 20% Footer Section */}
           <View style={styles.coverFooter}>
             <Text style={styles.coverAuthor}>By {author}</Text>
             <Text style={styles.coverCopyright}>© 2025 KindleWood Studio</Text>
           </View>
         </Page>
       ) : (
-        <Page size={{ width: 504, height: 612 }} style={styles.page}>
+        <Page size="A4" style={styles.page}>
           <View style={styles.coverPageFallback}>
             <View style={styles.coverDecoration} />
             <Text style={styles.coverTitle}>{title}</Text>
@@ -263,20 +262,20 @@ export const StorybookTemplateLarge: React.FC<StorybookTemplateLargeProps> = ({
         </Page>
       )}
 
-      {/* Scene Pages - 70% image, 30% captions */}
+      {/* Scene Pages - 75% image, 25% captions */}
       {scenes.map((scene, index) => {
         const caption = scene.caption || scene.description || '';
-        const { fontSize, lineHeight } = getSmartFontSizeLarge(caption);
+        const { fontSize, lineHeight } = getSmartFontSizeA4(caption);
 
         return (
-          <Page key={index} size={{ width: 504, height: 612 }} style={styles.page}>
+          <Page key={index} size="A4" style={styles.page}>
             <View style={styles.scenePage}>
-              {/* 70% Image Section */}
+              {/* 75% Image Section */}
               <View style={styles.sceneImageContainer}>
                 <Image src={scene.imageUrl} style={styles.sceneImage} />
               </View>
 
-              {/* 30% Text Section */}
+              {/* 25% Text Section */}
               <View style={styles.sceneTextContainer}>
                 <View style={styles.sceneTextWrapper}>
                   {/* English Caption */}
@@ -310,8 +309,8 @@ export const StorybookTemplateLarge: React.FC<StorybookTemplateLargeProps> = ({
                 <Text style={{
                   position: 'absolute',
                   bottom: 8,
-                  ...(scene.sceneNumber % 2 === 1 ? { left: 15 } : { right: 15 }),
-                  fontSize: 12,
+                  ...(scene.sceneNumber % 2 === 1 ? { left: 25 } : { right: 25 }),
+                  fontSize: 10,
                   fontFamily: 'Noto Sans SC',
                   color: '#9CA3AF',
                 }}>
@@ -324,13 +323,13 @@ export const StorybookTemplateLarge: React.FC<StorybookTemplateLargeProps> = ({
       })}
 
       {/* Back Cover */}
-      <Page size={{ width: 504, height: 612 }} style={{ ...styles.page, backgroundColor: '#F9FAFB' }}>
+      <Page size="A4" style={{ ...styles.page, backgroundColor: '#F9FAFB' }}>
         <Image
           src="/images/pdf-back-cover.png"
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'contain',  // Use contain to prevent cropping
+            objectFit: 'contain',
           }}
         />
       </Page>

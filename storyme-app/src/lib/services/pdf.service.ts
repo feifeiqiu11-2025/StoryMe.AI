@@ -5,9 +5,10 @@
 
 import { pdf } from '@react-pdf/renderer';
 import { StorybookTemplate } from '@/components/pdf/StorybookTemplate';
+import { StorybookTemplateA4 } from '@/components/pdf/StorybookTemplateA4';
 import { StorybookTemplateLarge } from '@/components/pdf/StorybookTemplateLarge';
 
-export type PDFFormat = 'a5' | 'large';
+export type PDFFormat = 'a5' | 'a4' | 'large';
 
 export interface StoryData {
   title: string;
@@ -27,12 +28,15 @@ export interface StoryData {
 /**
  * Generate PDF from story data
  * Returns a Blob that can be downloaded
- * @param format - 'a5' for A5 booklet (420x595pt) or 'large' for Legal booklet (504x612pt)
+ * @param format - 'a5' for A5 booklet (420x595pt), 'a4' for A4 standard (595x842pt), or 'large' for Legal booklet (504x612pt)
  */
 export async function generateStoryPDF(storyData: StoryData, format: PDFFormat = 'a5'): Promise<Blob> {
   try {
     // Select template based on format
-    const Template = format === 'large' ? StorybookTemplateLarge : StorybookTemplate;
+    const Template =
+      format === 'a4' ? StorybookTemplateA4 :
+      format === 'large' ? StorybookTemplateLarge :
+      StorybookTemplate;
 
     // Create PDF document
     const doc = Template({
@@ -70,7 +74,7 @@ export function downloadPDF(blob: Blob, filename: string) {
 
 /**
  * Generate and download PDF in one step
- * @param format - 'a5' for A5 booklet or 'large' for Legal booklet (7"x8.5")
+ * @param format - 'a5' for A5 booklet, 'a4' for A4 standard, or 'large' for Legal booklet
  */
 export async function generateAndDownloadStoryPDF(
   storyData: StoryData,
