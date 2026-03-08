@@ -313,6 +313,119 @@ function buildAfternoonReminderHtml(parentFirstName: string, childFirstName: str
 </html>`;
 }
 
+// ─── Weather Update Email (Afternoon Only) ──────────────────────────────
+
+function buildWeatherUpdateHtml(parentFirstName: string, childFirstName: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #6d28d9; background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: 32px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;">
+                Sunday Weather Update
+              </h1>
+              <p style="color: #e0e7ff; margin: 8px 0 0; font-size: 15px;">
+                Nature Explorer + Creativity Lab
+              </p>
+            </td>
+          </tr>
+
+          <!-- Greeting -->
+          <tr>
+            <td style="padding: 32px 24px 16px;">
+              <p style="color: #374151; font-size: 16px; margin: 0;">
+                Hi ${parentFirstName},
+              </p>
+              <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
+                We&rsquo;re excited to see <strong>${childFirstName}</strong> this Sunday for our Nature Explorer + Creativity Lab workshop!
+              </p>
+              <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
+                We&rsquo;re keeping a close eye on tomorrow&rsquo;s weather forecast. In case of heavy rain, we may need to skip the outdoor nature walk (1:00 &ndash; 1:45 PM) and hold the entire session indoors at SteamOji Academy.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Plan Details -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                Here&rsquo;s the Plan
+              </h2>
+
+              <!-- Good Weather -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; overflow: hidden; margin-bottom: 12px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <strong style="color: #166534; font-size: 15px;">&#9728;&#65039; If weather is good</strong>
+                    <p style="color: #6b7280; font-size: 14px; margin: 8px 0 0; line-height: 1.6;">
+                      We proceed as planned with the outdoor nature walk at Bridle Trails State Park (arrive by 12:50 PM), followed by the indoor session at SteamOji (2:00 &ndash; 3:00 PM).
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Heavy Rain -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <strong style="color: #1e40af; font-size: 15px;">&#127783;&#65039; If heavy rain</strong>
+                    <p style="color: #6b7280; font-size: 14px; margin: 8px 0 0; line-height: 1.6;">
+                      We&rsquo;ll move everything indoors at SteamOji Academy. Please drop off at <strong style="color: #374151;">1:00 PM</strong> directly at SteamOji.<br />
+                      <strong style="color: #374151;">Steamoji Academy &ndash; Bellevue</strong><br />
+                      14315 NE 20th St, Suite C&ndash;E, Bellevue, WA 98007<br />
+                      <span style="color: #9ca3af; font-size: 13px; font-style: italic;">(Steamoji is at the very right side of the plaza, next to StretchLab)</span><br />
+                      The session will run <strong style="color: #374151;">1:00 &ndash; 2:00 PM</strong>.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Final Notice -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 14px 16px;">
+                <p style="color: #92400e; font-size: 14px; margin: 0; line-height: 1.6;">
+                  <strong>&#128232; We will send a final notice tomorrow morning</strong>, so please keep an eye on your email or text messages for the confirmed plan.
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px; background-color: #f9fafb; text-align: center;">
+              <p style="color: #374151; font-size: 14px; margin: 0; font-weight: 600;">
+                Looking forward to a fun and creative afternoon either way!
+              </p>
+              <p style="color: #6b7280; font-size: 14px; margin: 12px 0 0; line-height: 1.6;">
+                If you have any questions, simply reply to this email.
+              </p>
+              <p style="color: #9ca3af; font-size: 13px; margin: 8px 0 0;">
+                &mdash; The KindleWood &times; SteamOji Team
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
 // ─── Route Handler ───────────────────────────────────────────────────────
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -405,5 +518,52 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({ success: false, error: 'Invalid mode. Use "test" or "send".' }, { status: 400 });
+  if (mode === 'weather-update') {
+    // Send weather update to afternoon Wk1 parents
+    const { data: registrations, error } = await supabase
+      .from('workshop_registrations')
+      .select('parent_first_name, parent_email, child_first_name')
+      .eq('status', 'confirmed')
+      .eq('selected_session_type', 'afternoon')
+      .contains('selected_workshop_ids', ['steamoji-wk1']);
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    if (!registrations || registrations.length === 0) {
+      return NextResponse.json({ success: true, message: 'No afternoon Wk1 registrations found', sent: 0 });
+    }
+
+    const results = [];
+
+    for (let i = 0; i < registrations.length; i++) {
+      const reg = registrations[i];
+      if (i > 0) await delay(600);
+
+      const { error: sendErr } = await resend.emails.send({
+        from: EMAIL_FROM,
+        to: reg.parent_email,
+        subject: 'Sunday Weather Update — Nature Explorer + Creativity Lab',
+        html: buildWeatherUpdateHtml(reg.parent_first_name, reg.child_first_name),
+        replyTo: REPLY_TO,
+      });
+      results.push({
+        to: reg.parent_email,
+        child: reg.child_first_name,
+        error: sendErr?.message || null,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      mode: 'weather-update',
+      total: results.length,
+      sent: results.filter(r => !r.error).length,
+      failed: results.filter(r => r.error).length,
+      results,
+    });
+  }
+
+  return NextResponse.json({ success: false, error: 'Invalid mode. Use "test", "send", or "weather-update".' }, { status: 400 });
 }
