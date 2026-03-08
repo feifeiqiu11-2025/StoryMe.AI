@@ -426,6 +426,105 @@ function buildWeatherUpdateHtml(parentFirstName: string, childFirstName: string)
 </html>`;
 }
 
+// ─── Indoor-Only Final Notice (Afternoon) ───────────────────────────────
+
+function buildIndoorNoticeHtml(parentFirstName: string, childFirstName: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #6d28d9; background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: 32px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;">
+                Today&rsquo;s Workshop: Indoor Only
+              </h1>
+              <p style="color: #e0e7ff; margin: 8px 0 0; font-size: 15px;">
+                Nature Explorer + Creativity Lab
+              </p>
+            </td>
+          </tr>
+
+          <!-- Greeting -->
+          <tr>
+            <td style="padding: 32px 24px 16px;">
+              <p style="color: #374151; font-size: 16px; margin: 0;">
+                Hi ${parentFirstName},
+              </p>
+              <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
+                Due to today&rsquo;s rain, we&rsquo;ll be holding <strong>${childFirstName}</strong>&rsquo;s workshop entirely indoors at SteamOji Academy. No outdoor nature walk today.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Updated Details -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                Updated Details
+              </h2>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #374151;">Time</strong><br />
+                    <span style="color: #6b7280;">1:00 &ndash; 2:00 PM (drop off at 1:00 PM)</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 16px;">
+                    <strong style="color: #374151;">Location</strong><br />
+                    <span style="color: #6b7280;">Steamoji Academy &ndash; Bellevue</span><br />
+                    <span style="color: #6b7280;">14315 NE 20th St, Suite C&ndash;E, Bellevue, WA 98007</span><br />
+                    <span style="color: #9ca3af; font-size: 13px; font-style: italic;">(Steamoji is at the very right side of the plaza, next to StretchLab)</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Refund Notice -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 16px;">
+                <p style="color: #166534; font-size: 14px; margin: 0; line-height: 1.6;">
+                  <strong>&#128176; $30 Credit</strong><br />
+                  Since the outdoor portion is canceled, we will refund <strong>$30</strong> as credit toward a future workshop. No action needed on your end &mdash; we&rsquo;ll apply it automatically.
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px; background-color: #f9fafb; text-align: center;">
+              <p style="color: #374151; font-size: 14px; margin: 0; font-weight: 600;">
+                We&rsquo;re still going to have a great time creating stories indoors!
+              </p>
+              <p style="color: #6b7280; font-size: 14px; margin: 12px 0 0; line-height: 1.6;">
+                If you have any questions, simply reply to this email.
+              </p>
+              <p style="color: #9ca3af; font-size: 13px; margin: 8px 0 0;">
+                &mdash; The KindleWood &times; SteamOji Team
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
 // ─── Route Handler ───────────────────────────────────────────────────────
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -565,5 +664,51 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({ success: false, error: 'Invalid mode. Use "test", "send", or "weather-update".' }, { status: 400 });
+  if (mode === 'indoor-notice') {
+    const { data: registrations, error } = await supabase
+      .from('workshop_registrations')
+      .select('parent_first_name, parent_email, child_first_name')
+      .eq('status', 'confirmed')
+      .eq('selected_session_type', 'afternoon')
+      .contains('selected_workshop_ids', ['steamoji-wk1']);
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    if (!registrations || registrations.length === 0) {
+      return NextResponse.json({ success: true, message: 'No afternoon Wk1 registrations found', sent: 0 });
+    }
+
+    const results = [];
+
+    for (let i = 0; i < registrations.length; i++) {
+      const reg = registrations[i];
+      if (i > 0) await delay(600);
+
+      const { error: sendErr } = await resend.emails.send({
+        from: EMAIL_FROM,
+        to: reg.parent_email,
+        subject: "Today's Workshop: Indoor Only — 1:00-2:00 PM at SteamOji",
+        html: buildIndoorNoticeHtml(reg.parent_first_name, reg.child_first_name),
+        replyTo: REPLY_TO,
+      });
+      results.push({
+        to: reg.parent_email,
+        child: reg.child_first_name,
+        error: sendErr?.message || null,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      mode: 'indoor-notice',
+      total: results.length,
+      sent: results.filter(r => !r.error).length,
+      failed: results.filter(r => r.error).length,
+      results,
+    });
+  }
+
+  return NextResponse.json({ success: false, error: 'Invalid mode.' }, { status: 400 });
 }
