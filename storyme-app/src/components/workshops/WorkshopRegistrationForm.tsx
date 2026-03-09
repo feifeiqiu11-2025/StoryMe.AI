@@ -79,6 +79,14 @@ export default function WorkshopRegistrationForm({
   const totalPrice = workshopCount * pricePerSession;
   const totalOriginal = workshopCount * originalPricePerSession;
 
+  // Check if a session date has passed
+  const isSessionPast = (dateLabel: string): boolean => {
+    const sessionDate = new Date(dateLabel);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return sessionDate < today;
+  };
+
   // Spot availability helper
   const getSpotsLeft = (sessionId: string): number | null => {
     if (!availability || availabilityLoading) return null;
@@ -104,10 +112,11 @@ export default function WorkshopRegistrationForm({
     setValue('selectedWorkshopIds', updated, { shouldValidate: true });
   };
 
-  // Select all available workshops (skip sold-out)
+  // Select all available workshops (skip sold-out and past sessions)
   const selectAll = () => {
     const availableIds = partner.sessions
       .filter((s) => {
+        if (isSessionPast(s.dateLabel)) return false;
         const spots = getSpotsLeft(s.id);
         return spots === null || spots > 0;
       })
@@ -332,12 +341,14 @@ export default function WorkshopRegistrationForm({
             const spotsLeft = getSpotsLeft(session.id);
             const isSoldOut = spotsLeft !== null && spotsLeft <= 0;
             const isLowStock = spotsLeft !== null && spotsLeft > 0 && spotsLeft <= 3;
+            const isPast = isSessionPast(session.dateLabel);
+            const isDisabled = isPast || isSoldOut;
 
             return (
               <label
                 key={session.id}
                 className={`block p-4 border-2 rounded-xl transition-all ${
-                  isSoldOut
+                  isDisabled
                     ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
                     : isSelected
                       ? 'border-green-500 bg-green-50 cursor-pointer'
@@ -347,51 +358,58 @@ export default function WorkshopRegistrationForm({
                 <input
                   type="checkbox"
                   checked={isSelected}
-                  onChange={() => !isSoldOut && toggleWorkshop(session.id)}
-                  disabled={isSoldOut}
+                  onChange={() => !isDisabled && toggleWorkshop(session.id)}
+                  disabled={isDisabled}
                   className="sr-only"
                 />
                 {/* Row 1: Checkbox + Week # + Theme + Price */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                      isSoldOut
+                      isDisabled
                         ? 'bg-gray-200 border-gray-300'
                         : isSelected
                           ? 'bg-green-600 border-green-600'
                           : 'border-gray-300 bg-white'
                     }`}>
-                      {isSelected && !isSoldOut && (
+                      {isSelected && !isDisabled && (
                         <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                         </svg>
                       )}
                     </div>
-                    <span className="font-semibold text-gray-900">
+                    <span className={`font-semibold ${isPast ? 'line-through text-gray-400' : 'text-gray-900'}`}>
                       Week {index + 1}
                     </span>
-                    <span className="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      isPast ? 'text-gray-400 bg-gray-100 line-through' : 'text-amber-700 bg-amber-50'
+                    }`}>
                       {session.theme}
                     </span>
+                    {isPast && (
+                      <span className="text-xs font-semibold text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+                        Completed
+                      </span>
+                    )}
                   </div>
                   <div className="text-sm">
-                    {hasDiscount && (
+                    {!isPast && hasDiscount && (
                       <span className="line-through text-gray-400 mr-1">
                         {formatWorkshopPrice(originalPricePerSession)}
                       </span>
                     )}
-                    <span className="font-semibold text-gray-900">
+                    <span className={`font-semibold ${isPast ? 'line-through text-gray-400' : 'text-gray-900'}`}>
                       {formatWorkshopPrice(pricePerSession)}
                     </span>
                   </div>
                 </div>
-                {/* Row 2: Date + Time + Spots left */}
+                {/* Row 2: Date + Time + Status */}
                 <div className="flex items-center justify-between mt-1.5 ml-8">
-                  <span className="text-sm text-gray-500">
+                  <span className={`text-sm ${isPast ? 'line-through text-gray-400' : 'text-gray-500'}`}>
                     {session.dateLabel} · {sessionTimeLabel}
                   </span>
                   <div className="text-sm">
-                    {spotsLeft !== null ? (
+                    {isPast ? null : spotsLeft !== null ? (
                       isSoldOut ? (
                         <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
                           Sold out
