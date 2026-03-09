@@ -525,6 +525,210 @@ function buildIndoorNoticeHtml(parentFirstName: string, childFirstName: string):
 </html>`;
 }
 
+// ─── Thank You + Promo Email ─────────────────────────────────────────────
+
+const LOGO_URL = 'https://www.kindlewoodstudio.ai/Logo_New.png';
+
+function buildThankYouHtml(parentFirstName: string, childFirstName: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #6d28d9; background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: 32px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;">
+                Your Workshop Comes With a Gift!
+              </h1>
+              <p style="color: #e0e7ff; margin: 8px 0 0; font-size: 15px;">
+                1 Month Free &mdash; KindleWood Studio Casual Creator Plan
+              </p>
+            </td>
+          </tr>
+
+          <!-- Greeting + Story Link -->
+          <tr>
+            <td style="padding: 32px 24px 16px;">
+              <p style="color: #374151; font-size: 16px; margin: 0;">
+                Hi ${parentFirstName},
+              </p>
+              <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
+                Thank you for bringing <strong>${childFirstName}</strong> to our Creative Explorers Workshop today! We had such a wonderful time creating together.
+              </p>
+              <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
+                <strong>${childFirstName}</strong>&rsquo;s digital storybook is ready &mdash; you can view it anytime at <a href="https://www.kindlewoodstudio.ai/stories" style="color: #7c3aed; text-decoration: underline; font-weight: 600;">kindlewoodstudio.ai/stories</a>. For an even better reading and learning experience, download the <strong>KindleWood Kids</strong> iOS app &mdash; where your child can read along, learn new vocabulary, based on their own story.
+              </p>
+              <p style="margin: 12px 0 0;">
+                <a href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039" style="color: #2563eb; font-size: 14px; font-weight: 600; text-decoration: underline;">
+                  Download KindleWood Kids on the App Store &rarr;
+                </a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- Promo Section -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                &#127873; Claim Your Free Month
+              </h2>
+              <p style="color: #6b7280; font-size: 14px; margin: 0 0 16px; line-height: 1.6;">
+                As a workshop participant, your family gets <strong style="color: #374151;">1 month of free access</strong> to KindleWood Studio&rsquo;s online tools &mdash; so the creativity doesn&rsquo;t stop when class ends.
+              </p>
+
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #374151;">1.</strong> <span style="color: #6b7280;">Go to <a href="https://www.kindlewoodstudio.ai/signup" style="color: #7c3aed; text-decoration: underline;">kindlewoodstudio.ai/signup</a></span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #374151;">2.</strong> <span style="color: #6b7280;">Create your free account</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #374151;">3.</strong> <span style="color: #6b7280;">Enter promo code: </span><strong style="color: #7c3aed; font-size: 16px; letter-spacing: 1px;">EXTENDEDTRIAL30</strong>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px;">
+                    <strong style="color: #374151;">4.</strong> <span style="color: #6b7280;">Start creating!</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- Studio Features -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                &#9997;&#65039; What You Can Do with KindleWood Studio
+              </h2>
+              <p style="color: #9ca3af; font-size: 13px; margin: 0 0 8px; font-style: italic;">For parents &amp; teachers</p>
+              <ul style="color: #6b7280; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 20px;">
+                <li><strong style="color: #374151;">Turn ideas into storybooks</strong> &mdash; From your child&rsquo;s voice, drawings, or text</li>
+                <li><strong style="color: #374151;">Your child becomes the hero</strong> &mdash; Upload a photo, and they appear in every scene with consistent characters</li>
+                <li><strong style="color: #374151;">Bilingual stories</strong> &mdash; English &amp; Chinese with professional illustrations</li>
+                <li><strong style="color: #374151;">Voice narration</strong> &mdash; Record your own voice or use AI narration</li>
+                <li><strong style="color: #374151;">Print-ready PDFs</strong> &mdash; Download and print keepsake storybooks</li>
+                <li><strong style="color: #374151;">Publish to Spotify</strong> &mdash; Share stories as audio podcasts</li>
+              </ul>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- Kids App -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 4px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                &#128241; KindleWood Kids App
+              </h2>
+              <div style="display: inline-block; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 2px 8px; margin: 4px 0 8px;">
+                <span style="color: #166534; font-size: 12px; font-weight: 600;">For children &mdash; always free!</span>
+              </div>
+              <ul style="color: #6b7280; font-size: 14px; line-height: 1.8; margin: 0 0 12px; padding-left: 20px;">
+                <li>Read &amp; listen to their personalized story library &mdash; ad-free, 100% safe</li>
+                <li>Tap-to-learn vocabulary &mdash; hear pronunciation in English or Chinese</li>
+                <li>Fun quizzes that adapt to their reading level</li>
+                <li>Goal setting &amp; progress tracking &mdash; earn badges, celebrate milestones</li>
+              </ul>
+              <p style="margin: 0;">
+                <a href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039" style="color: #2563eb; font-size: 14px; font-weight: 600; text-decoration: underline;">
+                  Download free on the App Store &rarr;
+                </a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- YouTube -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                &#127916; Watch How It Works
+              </h2>
+              <p style="margin: 0 0 8px;">
+                <a href="https://www.youtube.com/playlist?list=PLyDpAVbXE4SWPWFFiQUdo8FyMAhi90fA5" style="color: #2563eb; font-size: 14px; font-weight: 600; text-decoration: underline;">
+                  Watch Product Demo Playlist &rarr;
+                </a>
+              </p>
+              <ul style="color: #6b7280; font-size: 13px; line-height: 1.8; margin: 0; padding-left: 20px;">
+                <li>Parts 1&ndash;3: KindleWood Studio walkthrough (creating stories, characters, illustrations)</li>
+                <li>Part 4: KindleWood Kids app demo (reading, quizzes, vocabulary)</li>
+              </ul>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px; background-color: #f9fafb; text-align: center;">
+              <p style="color: #374151; font-size: 15px; margin: 0; font-weight: 600;">
+                We can&rsquo;t wait to see what ${childFirstName} creates next!
+              </p>
+              <p style="color: #6b7280; font-size: 14px; margin: 12px 0 0; line-height: 1.6;">
+                Happy storytelling!
+              </p>
+              <p style="color: #9ca3af; font-size: 13px; margin: 8px 0 0;">
+                &mdash; The KindleWood Studio Team
+              </p>
+              <p style="margin: 20px 0 0;">
+                <a href="https://www.kindlewoodstudio.ai" style="text-decoration: none;">
+                  <img src="${LOGO_URL}" alt="KindleWood Studio" width="80" style="display: inline-block; max-width: 80px; height: auto;" />
+                </a>
+              </p>
+              <p style="margin: 12px 0 0;">
+                <a href="https://www.youtube.com/@KindleWoodStudio" style="color: #9ca3af; font-size: 13px; text-decoration: underline;">
+                  YouTube
+                </a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
 // ─── Route Handler ───────────────────────────────────────────────────────
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -703,6 +907,71 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       mode: 'indoor-notice',
+      total: results.length,
+      sent: results.filter(r => !r.error).length,
+      failed: results.filter(r => r.error).length,
+      results,
+    });
+  }
+
+  if (mode === 'thank-you-test') {
+    const { error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: 'feifei_qiu@hotmail.com',
+      subject: 'Your Workshop Comes With a Gift — 1 Month Free!',
+      html: buildThankYouHtml('Feifei', 'Connor'),
+      replyTo: REPLY_TO,
+    });
+    return NextResponse.json({ success: !error, error: error?.message || null, mode: 'thank-you-test' });
+  }
+
+  if (mode === 'thank-you') {
+    const { data: registrations, error } = await supabase
+      .from('workshop_registrations')
+      .select('parent_first_name, parent_email, child_first_name, selected_session_type')
+      .eq('status', 'confirmed')
+      .contains('selected_workshop_ids', ['steamoji-wk1']);
+
+    if (sessionType === 'morning' || sessionType === 'afternoon') {
+      // Already filtered above, need to re-query with filter
+    }
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    if (!registrations || registrations.length === 0) {
+      return NextResponse.json({ success: true, message: 'No Wk1 registrations found', sent: 0 });
+    }
+
+    const filtered = sessionType
+      ? registrations.filter(r => r.selected_session_type === sessionType)
+      : registrations;
+
+    const results = [];
+
+    for (let i = 0; i < filtered.length; i++) {
+      const reg = filtered[i];
+      if (i > 0) await delay(600);
+
+      const { error: sendErr } = await resend.emails.send({
+        from: EMAIL_FROM,
+        to: reg.parent_email,
+        subject: 'Your Workshop Comes With a Gift — 1 Month Free!',
+        html: buildThankYouHtml(reg.parent_first_name, reg.child_first_name),
+        replyTo: REPLY_TO,
+      });
+      results.push({
+        to: reg.parent_email,
+        child: reg.child_first_name,
+        session: reg.selected_session_type,
+        error: sendErr?.message || null,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      mode: 'thank-you',
       total: results.length,
       sent: results.filter(r => !r.error).length,
       failed: results.filter(r => r.error).length,
