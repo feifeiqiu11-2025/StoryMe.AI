@@ -59,6 +59,8 @@ export default function AdminWorkshopsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'paid' | 'pending'>('all');
+  const [sessionFilter, setSessionFilter] = useState<'all' | 'morning' | 'afternoon'>('all');
+  const [weekFilter, setWeekFilter] = useState<'all' | string>('all');
   const [authorized, setAuthorized] = useState(false);
 
   // Auth check
@@ -110,10 +112,15 @@ export default function AdminWorkshopsPage() {
     );
   }
 
-  // Filter registrations
+  // Get partner for week filter options
+  const partner = WORKSHOP_PARTNERS.find((p) => !p.comingSoon);
+
+  // Filter registrations (all 3 filters work together)
   const filtered = registrations.filter((r) => {
-    if (filter === 'paid') return r.payment_status === 'paid';
-    if (filter === 'pending') return r.payment_status === 'pending';
+    if (filter === 'paid' && r.payment_status !== 'paid') return false;
+    if (filter === 'pending' && r.payment_status !== 'pending') return false;
+    if (sessionFilter !== 'all' && r.selected_session_type !== sessionFilter) return false;
+    if (weekFilter !== 'all' && !r.selected_workshop_ids.includes(weekFilter)) return false;
     return true;
   });
 
@@ -169,25 +176,79 @@ export default function AdminWorkshopsPage() {
         </div>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-2 mb-4">
-        {(['all', 'paid', 'pending'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
-              filter === f
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-            {f === 'all' ? ` (${totalRegistrations})` : ''}
-            {f === 'paid' ? ` (${paidRegistrations.length})` : ''}
-            {f === 'pending' ? ` (${pendingRegistrations.length})` : ''}
-          </button>
-        ))}
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4">
+        {/* Payment status */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Payment</span>
+          {(['all', 'paid', 'pending'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                filter === f
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {/* Session type */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Session</span>
+          {(['all', 'morning', 'afternoon'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setSessionFilter(f)}
+              className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                sessionFilter === f
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {f === 'all' ? 'All' : f === 'morning' ? 'AM' : 'PM'}
+            </button>
+          ))}
+        </div>
+
+        {/* Week */}
+        {partner && partner.sessions.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Week</span>
+            <button
+              onClick={() => setWeekFilter('all')}
+              className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                weekFilter === 'all'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              All
+            </button>
+            {partner.sessions.map((s, i) => (
+              <button
+                key={s.id}
+                onClick={() => setWeekFilter(s.id)}
+                className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                  weekFilter === s.id
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Wk{i + 1}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Result count */}
+      <p className="text-xs text-gray-400 mb-3">
+        Showing {filtered.length} of {totalRegistrations} registrations
+      </p>
 
       {/* Table */}
       {loading ? (
