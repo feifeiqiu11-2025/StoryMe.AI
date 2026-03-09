@@ -92,6 +92,7 @@ export interface ProjectDTO {
   viewCount?: number;
   shareCount?: number;
   tags?: StoryTag[];
+  draftMetadata?: Record<string, any>;
 }
 
 export interface CreateProjectDTO {

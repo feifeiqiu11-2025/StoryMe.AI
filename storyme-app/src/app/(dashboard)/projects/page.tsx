@@ -552,16 +552,19 @@ function ProjectsContent() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {projects.map((project) => {
+              const isDraft = project.status === 'draft';
               const storyData: StoryCardData = {
                 id: project.id,
-                title: project.title,
+                title: project.title || 'Untitled Draft',
                 description: project.description,
                 coverImageUrl: project.coverImageUrl,
                 visibility: project.visibility,
+                status: project.status,
                 viewCount: project.viewCount,
                 featured: project.featured,
                 sceneCount: project.scenes?.length || 0,
                 createdAt: project.createdAt,
+                updatedAt: project.updatedAt,
                 scenes: project.scenes,
               };
 
@@ -569,9 +572,15 @@ function ProjectsContent() {
                 <StoryCard
                   key={project.id}
                   story={storyData}
-                  onClick={() => router.push(`/projects/${project.id}`)}
+                  onClick={() => {
+                    if (isDraft) {
+                      router.push(`/create?projectId=${project.id}`);
+                    } else {
+                      router.push(`/projects/${project.id}`);
+                    }
+                  }}
                   variant="myStories"
-                  onPrivacyToggle={handlePrivacyToggle}
+                  onPrivacyToggle={isDraft ? undefined : handlePrivacyToggle}
                   onDelete={() => setDeleteConfirm(project.id)}
                   isUpdatingPrivacy={updatingPrivacy === project.id}
                 />

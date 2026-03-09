@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
+import { shuffleQuizOptions } from '@/lib/utils/quiz';
 
 export const maxDuration = 300; // 5 minutes for quiz + audio generation
 
@@ -155,18 +156,33 @@ Format your response as JSON:
       .delete()
       .eq('project_id', projectId);
 
-    // 6. Save questions to database
+    // 6. Convert to option_a/b/c/d format, shuffle, and save to database
+    const shuffledRows = questions.map(q => {
+      const row = {
+        option_a: q.correct_answer,
+        option_b: q.wrong_answer_1,
+        option_c: q.wrong_answer_2,
+        option_d: q.wrong_answer_3 || null,
+        correct_answer: 'A', // correct_answer starts at A before shuffle
+        question_order: q.question_order,
+        question_text: q.question_text,
+        explanation: q.explanation,
+      };
+      return shuffleQuizOptions(row);
+    });
+
     const { data: savedQuestions, error: saveError } = await supabase
       .from('quiz_questions')
       .insert(
-        questions.map(q => ({
+        shuffledRows.map(q => ({
           project_id: projectId,
           question_order: q.question_order,
           question_text: q.question_text,
+          option_a: q.option_a,
+          option_b: q.option_b,
+          option_c: q.option_c,
+          option_d: q.option_d,
           correct_answer: q.correct_answer,
-          wrong_answer_1: q.wrong_answer_1,
-          wrong_answer_2: q.wrong_answer_2,
-          wrong_answer_3: q.wrong_answer_3,
           explanation: q.explanation,
           audio_generated: false,
         }))
@@ -241,12 +257,12 @@ Format your response as JSON:
             .from('story-audio-files')
             .getPublicUrl(questionFilename);
 
-          // Generate audio for each answer option
+          // Generate audio for each answer option (reads shuffled option_a/b/c/d from DB)
           const answers = [
-            { text: question.correct_answer, field: 'correct_answer' },
-            { text: question.wrong_answer_1, field: 'option_a' },
-            { text: question.wrong_answer_2, field: 'option_b' },
-            { text: question.wrong_answer_3, field: 'option_c' },
+            { text: question.option_a, field: 'option_a' },
+            { text: question.option_b, field: 'option_b' },
+            { text: question.option_c, field: 'option_c' },
+            { text: question.option_d, field: 'option_d' },
           ].filter(a => a.text);
 
           const audioUrls: any = { question_audio_url: questionUrl };

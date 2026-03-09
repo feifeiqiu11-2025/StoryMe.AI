@@ -95,6 +95,20 @@ export async function PATCH(
       );
     }
 
+    // Reject visibility changes for draft projects
+    const { data: project } = await supabase
+      .from('projects')
+      .select('status')
+      .eq('id', id)
+      .single();
+
+    if (project?.status === 'draft') {
+      return NextResponse.json(
+        { error: 'Draft stories cannot be made public. Complete the story first.' },
+        { status: 400 }
+      );
+    }
+
     // Update project visibility
     const projectService = new ProjectService(supabase);
     await projectService.updateProject(id, user.id, { visibility });

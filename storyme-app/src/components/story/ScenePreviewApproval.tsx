@@ -37,6 +37,11 @@ interface ScenePreviewApprovalProps {
   onArtStyleChange?: (style: ArtStyleType) => void;
   imageProvider?: ImageProvider;
   onImageProviderChange?: (provider: ImageProvider) => void;
+  // Draft save
+  onSaveDraft?: () => void;
+  savingDraft?: boolean;
+  draftSaveLabel?: string;
+  draftSaveMessage?: string;
 }
 
 export default function ScenePreviewApproval({
@@ -61,6 +66,10 @@ export default function ScenePreviewApproval({
   onArtStyleChange,
   imageProvider = DEFAULT_IMAGE_PROVIDER,
   onImageProviderChange,
+  onSaveDraft,
+  savingDraft = false,
+  draftSaveLabel = 'Save as Draft',
+  draftSaveMessage,
 }: ScenePreviewApprovalProps) {
   // Add Scene Modal State
   const [showAddSceneModal, setShowAddSceneModal] = useState(false);
@@ -783,22 +792,41 @@ export default function ScenePreviewApproval({
               ← Back to Edit
             </button>
 
-            <button
-              onClick={onApprove}
-              disabled={isGenerating}
-              className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-xl hover:from-green-700 hover:to-teal-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isGenerating ? (
-                <span className="flex items-center gap-2">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  Generating Images...
-                </span>
-              ) : (
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              {onSaveDraft && (
                 <>
-                  ✓ Approve & Generate {enhancedScenes.length} Images →
+                  <button
+                    onClick={onSaveDraft}
+                    disabled={savingDraft || isGenerating}
+                    className="w-full sm:w-auto px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+                    aria-label="Save story as draft to continue later"
+                  >
+                    {savingDraft ? 'Saving...' : draftSaveLabel}
+                  </button>
+                  {draftSaveMessage && (
+                    <span className={`text-sm font-medium whitespace-nowrap ${draftSaveMessage === 'Draft saved!' ? 'text-green-600' : 'text-red-600'}`}>
+                      {draftSaveMessage}
+                    </span>
+                  )}
                 </>
               )}
-            </button>
+              <button
+                onClick={onApprove}
+                disabled={isGenerating}
+                className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-xl hover:from-green-700 hover:to-teal-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGenerating ? (
+                  <span className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    Generating Images...
+                  </span>
+                ) : (
+                  <>
+                    ✓ Approve & Generate {enhancedScenes.length} Images →
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="mt-4 text-center text-sm text-gray-500">

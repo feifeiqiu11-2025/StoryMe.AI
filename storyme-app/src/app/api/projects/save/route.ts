@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
     // Parse request body
     const body = await request.json();
     const {
+      projectId,        // Optional: draft→completed transition
       title,
       description,
       authorName,
@@ -58,6 +59,36 @@ export async function POST(request: NextRequest) {
       visibility = 'private', // DEFAULT to private for safety
       language = 'en' // NEW: Language for the story (en or zh)
     } = body;
+
+    // If projectId provided, verify it's a draft owned by this user
+    if (projectId) {
+      const { data: existingProject } = await supabase
+        .from('projects')
+        .select('id, status, user_id')
+        .eq('id', projectId)
+        .single();
+
+      if (!existingProject) {
+        return NextResponse.json(
+          { error: 'Draft project not found' },
+          { status: 404 }
+        );
+      }
+
+      if (existingProject.user_id !== user.id) {
+        return NextResponse.json(
+          { error: 'Unauthorized: Project does not belong to you' },
+          { status: 403 }
+        );
+      }
+
+      if (existingProject.status !== 'draft') {
+        return NextResponse.json(
+          { error: 'Only draft projects can be completed via this endpoint' },
+          { status: 400 }
+        );
+      }
+    }
 
     // Validate required fields
     if (!title || !title.trim()) {
@@ -162,9 +193,10 @@ export async function POST(request: NextRequest) {
 
     const shouldShowFeedbackModal = isFirstStory && !feedbackData;
 
-    // Save story
+    // Save story (supports both new creation and draft→completed transition)
     const projectService = new ProjectService(supabase);
     const project = await projectService.saveCompletedStory(user.id, {
+      projectId,         // If provided, transitions draft→completed
       title: title.trim(),
       description: description?.trim(),
       authorName: authorName?.trim(),
@@ -173,11 +205,11 @@ export async function POST(request: NextRequest) {
       originalScript,
       readingLevel: readingLevel,
       storyTone: storyTone,
-      visibility: visibility as 'private' | 'public', // NEW: Privacy control (defaults to private)
-      language: language as 'en' | 'zh', // NEW: Language for the story
+      visibility: visibility as 'private' | 'public',
+      language: language as 'en' | 'zh',
       characterIds,
       scenes,
-      quizData, // NEW: Pass quiz questions if provided
+      quizData,
     });
 
     // INCREMENT STORY COUNT - Phase 2A subscription system

@@ -20,9 +20,11 @@ export interface StoryCardData {
   viewCount?: number;
   featured?: boolean;
   visibility?: 'public' | 'private';
+  status?: 'draft' | 'processing' | 'completed' | 'error';
   sceneCount?: number;
   createdAt?: string;
-  tags?: StoryTag[]; // NEW: Story tags
+  updatedAt?: string;
+  tags?: StoryTag[];
   // Fallback for legacy data
   scenes?: Array<{
     imageUrl?: string | null;
@@ -81,6 +83,7 @@ export function StoryCard({
     story.scenes?.[0]?.images?.[0]?.imageUrl ||
     story.scenes?.[0]?.imageUrl;
 
+  const isDraft = story.status === 'draft';
   const isPublic = story.visibility === 'public';
   const viewCount = story.viewCount || 0;
 
@@ -113,10 +116,15 @@ export function StoryCard({
           </div>
         )}
 
-        {/* Top Left - Privacy Badge (My Stories only) */}
+        {/* Top Left - Status Badge */}
         {showPrivacyBadge && (
           <div className="absolute top-2 left-2">
-            {isPublic ? (
+            {isDraft ? (
+              <div className="flex items-center gap-1 bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                <span>✏️</span>
+                <span>Draft</span>
+              </div>
+            ) : isPublic ? (
               <div className="flex items-center gap-1 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                 <span>🌍</span>
                 <span>Public</span>
@@ -232,26 +240,33 @@ export function StoryCard({
         {/* Action Buttons (My Stories only) */}
         {variant === 'myStories' && (onPrivacyToggle || onDelete) && (
           <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-            {/* Privacy Toggle */}
-            {onPrivacyToggle && (
-              <div className="flex items-center gap-1.5 flex-1">
-                <span className="text-xs font-medium text-gray-600">Public:</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onPrivacyToggle(story.id, story.visibility || 'private');
-                  }}
-                  disabled={isUpdatingPrivacy}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-                    isPublic
-                      ? 'bg-green-500 text-white hover:bg-green-600'
-                      : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-                  } ${isUpdatingPrivacy ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  title={isPublic ? 'Make Private' : 'Make Public'}
-                >
-                  {isUpdatingPrivacy ? '...' : isPublic ? 'Yes' : 'No'}
-                </button>
-              </div>
+            {isDraft ? (
+              /* Draft: Show "Continue Editing" label instead of privacy toggle */
+              <span className="flex-1 text-xs font-medium text-amber-600">
+                Continue editing →
+              </span>
+            ) : (
+              /* Completed: Show privacy toggle */
+              onPrivacyToggle && (
+                <div className="flex items-center gap-1.5 flex-1">
+                  <span className="text-xs font-medium text-gray-600">Public:</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPrivacyToggle(story.id, story.visibility || 'private');
+                    }}
+                    disabled={isUpdatingPrivacy}
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                      isPublic
+                        ? 'bg-green-500 text-white hover:bg-green-600'
+                        : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                    } ${isUpdatingPrivacy ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title={isPublic ? 'Make Private' : 'Make Public'}
+                  >
+                    {isUpdatingPrivacy ? '...' : isPublic ? 'Yes' : 'No'}
+                  </button>
+                </div>
+              )
             )}
 
             {/* Delete Button */}
@@ -262,7 +277,7 @@ export function StoryCard({
                   onDelete(story.id);
                 }}
                 className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                title="Delete Story"
+                title={isDraft ? 'Delete Draft' : 'Delete Story'}
               >
                 <svg
                   className="w-4 h-4"

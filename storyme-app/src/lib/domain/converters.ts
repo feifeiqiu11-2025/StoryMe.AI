@@ -117,6 +117,7 @@ export function projectToDTO(project: Project): ProjectDTO {
     featured: project.featured,
     viewCount: project.view_count,
     shareCount: project.share_count,
+    draftMetadata: project.draft_metadata,
   };
 }
 

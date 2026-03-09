@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { getModelForLanguage, logModelUsage } from '@/lib/ai/deepseek-client';
+import { shuffleQuizOptions } from '@/lib/utils/quiz';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -181,11 +182,14 @@ IMPORTANT:
       }
     }
 
-    console.log(`✅ Generated ${questions.length} quiz questions successfully`);
+    // Shuffle answer options so the correct answer isn't always at position A
+    const shuffledQuestions = questions.map(shuffleQuizOptions);
+
+    console.log(`✅ Generated ${shuffledQuestions.length} quiz questions successfully (options shuffled)`);
 
     return NextResponse.json({
       success: true,
-      questions,
+      questions: shuffledQuestions,
       metadata: {
         difficulty,
         questionCount,

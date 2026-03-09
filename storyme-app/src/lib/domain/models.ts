@@ -119,6 +119,9 @@ export interface Project {
     gemini_model_used?: string;
   };
 
+  // Draft state (UI-specific data not in structured columns)
+  draft_metadata?: Record<string, any>;
+
   created_at: string;
   updated_at: string;
 }

@@ -5,8 +5,8 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import CharacterManager from '@/components/story/CharacterManager';
 import CharacterFormModal from '@/components/story/CharacterFormModal';
@@ -30,8 +30,9 @@ import { buildCoverPrompt } from '@/lib/ai/cover-prompt-builder';
 const CHARACTERS_STORAGE_KEY = 'storyme_character_library';
 const ART_STYLE = "children's book illustration, colorful, whimsical";
 
-export default function CreateStoryPage() {
+function CreateStoryPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -105,6 +106,12 @@ export default function CreateStoryPage() {
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [quizDifficulty, setQuizDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
   const [quizQuestionCount, setQuizQuestionCount] = useState<number>(3);
+
+  // Draft state
+  const [draftProjectId, setDraftProjectId] = useState<string | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
+  const [restoringDraft, setRestoringDraft] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -203,6 +210,109 @@ export default function CreateStoryPage() {
       }
     }
   }, [user]);
+
+  // Resume from draft via ?projectId= URL parameter
+  useEffect(() => {
+    const resumeProjectId = searchParams.get('projectId');
+    if (!user || !resumeProjectId || restoringDraft) return;
+
+    const restoreDraft = async () => {
+      setRestoringDraft(true);
+      try {
+        console.log(`Resuming draft: ${resumeProjectId}`);
+        const response = await fetch(`/api/projects/${resumeProjectId}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          console.error('Failed to load draft:', data.error);
+          setRestoringDraft(false);
+          return;
+        }
+
+        const project = data.project;
+        if (project.status !== 'draft') {
+          console.log('Project is not a draft, skipping restore');
+          setRestoringDraft(false);
+          return;
+        }
+
+        setDraftProjectId(resumeProjectId);
+        const meta = project.draftMetadata || {};
+
+        // Restore characters from draft metadata (has full client-side Character shape)
+        if (meta.characters && meta.characters.length > 0) {
+          setCharacters(meta.characters);
+        }
+
+        // Restore script
+        if (project.originalScript) {
+          setScriptInput(project.originalScript);
+        }
+
+        // Restore settings from project columns + metadata
+        if (project.readingLevel) setReadingLevel(project.readingLevel);
+        if (meta.storyTone) setStoryTone(meta.storyTone as StoryTone);
+        if (meta.clothingConsistency) setClothingConsistency(meta.clothingConsistency as ClothingConsistency);
+        if (meta.expansionLevel) setExpansionLevel(meta.expansionLevel as ExpansionLevel);
+        if (meta.artStyle) setArtStyle(meta.artStyle as ArtStyleType);
+        if (meta.imageProvider) setImageProvider(meta.imageProvider as ImageProvider);
+        if (meta.generateChineseTranslation !== undefined) setGenerateChineseTranslation(meta.generateChineseTranslation);
+        if (meta.selectedTemplate) setSelectedTemplate(meta.selectedTemplate);
+        if (meta.contentLanguage) setContentLanguage(meta.contentLanguage);
+
+        // Restore enhanced scenes from metadata
+        if (meta.enhancedScenes && meta.enhancedScenes.length > 0) {
+          setEnhancedScenes(meta.enhancedScenes);
+        }
+
+        // Restore story metadata
+        if (project.title && project.title !== 'Untitled Draft') setStoryTitle(project.title);
+        if (project.description) setStoryDescription(project.description);
+
+        // Restore image generation status from metadata
+        if (meta.imageGenerationStatus && meta.imageGenerationStatus.length > 0) {
+          setImageGenerationStatus(meta.imageGenerationStatus);
+          // Extract image URLs for the generatedImages array
+          const urls = meta.imageGenerationStatus
+            .filter((img: any) => img.imageUrl && img.status === 'completed')
+            .map((img: any) => img.imageUrl);
+          if (urls.length > 0) setGeneratedImages(urls);
+
+          // Set session to completed state if images exist
+          setSession({
+            characters: meta.characters || [],
+            script: project.originalScript || '',
+            scenes: [],
+            generatedImages: meta.imageGenerationStatus,
+            status: 'completed',
+          });
+        }
+
+        // Restore cover state
+        if (meta.coverImagePrompt) setCoverImagePrompt(meta.coverImagePrompt);
+        if (meta.customCoverPrompt) setCustomCoverPrompt(meta.customCoverPrompt);
+        if (meta.coverApproved !== undefined) setCoverApproved(meta.coverApproved);
+        if (project.coverImageUrl) setCoverImageUrl(project.coverImageUrl);
+
+        // Restore quiz state
+        if (meta.quizData) setQuizData(meta.quizData);
+        if (meta.quizDifficulty) setQuizDifficulty(meta.quizDifficulty);
+        if (meta.quizQuestionCount) setQuizQuestionCount(meta.quizQuestionCount);
+
+        // Restore author info
+        if (meta.authorName) setAuthorName(meta.authorName);
+        if (meta.authorAge) setAuthorAge(meta.authorAge);
+
+        console.log('Draft restored successfully');
+      } catch (error) {
+        console.error('Error restoring draft:', error);
+      } finally {
+        setRestoringDraft(false);
+      }
+    };
+
+    restoreDraft();
+  }, [user, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCharactersChange = (newCharacters: Character[]) => {
     setCharacters(newCharacters);
@@ -695,6 +805,163 @@ export default function CreateStoryPage() {
     setSaveError('');
   };
 
+  /**
+   * Save current story state as a draft
+   * Stores structured data in DB tables + UI state in draft_metadata JSONB
+   */
+  const handleSaveDraft = async () => {
+    setSavingDraft(true);
+    setDraftSaveMessage(null);
+
+    try {
+      // Build scenes data from current state (if we have enhanced scenes or generated images)
+      let scenesPayload: any[] | undefined;
+
+      if (imageGenerationStatus.length > 0) {
+        // After image generation — use imageGenerationStatus merged with enhancedScenes
+        scenesPayload = imageGenerationStatus
+          .filter(img => img.sceneNumber > 0) // Exclude cover
+          .map(img => {
+            const enhancedScene = enhancedScenes.find(es => es.sceneNumber === img.sceneNumber);
+            return {
+              sceneNumber: img.sceneNumber,
+              description: img.sceneDescription,
+              raw_description: enhancedScene?.raw_description || img.sceneDescription,
+              enhanced_prompt: enhancedScene?.enhanced_prompt || img.sceneDescription,
+              caption: enhancedScene?.caption || img.sceneDescription,
+              caption_chinese: enhancedScene?.caption_chinese,
+              imageUrl: img.imageUrl || null,
+              prompt: img.prompt,
+              generationTime: img.generationTime,
+            };
+          });
+      } else if (enhancedScenes.length > 0) {
+        // After enhancement but before image generation
+        scenesPayload = enhancedScenes
+          .filter(es => es.sceneNumber > 0) // Exclude cover
+          .map(es => ({
+            sceneNumber: es.sceneNumber,
+            description: es.raw_description || es.enhanced_prompt || '',
+            raw_description: es.raw_description,
+            enhanced_prompt: es.enhanced_prompt,
+            caption: es.caption,
+            caption_chinese: es.caption_chinese,
+          }));
+      }
+
+      // Resolve character IDs (handle temp IDs from guest mode)
+      let characterIds: string[] | undefined;
+      if (characters.length > 0) {
+        const hasTemporaryIds = characters.some(c => c.id.startsWith('char-'));
+
+        if (hasTemporaryIds) {
+          // Create characters in library first
+          const characterIdMap: Record<string, string> = {};
+          for (const character of characters) {
+            if (character.id.startsWith('char-')) {
+              const characterPayload: Record<string, any> = { name: character.name };
+              if (character.referenceImage?.url) {
+                characterPayload.reference_image_url = character.referenceImage.url;
+                characterPayload.reference_image_filename = character.referenceImage.fileName;
+              }
+              if (character.animatedPreviewUrl) {
+                characterPayload.animated_preview_url = character.animatedPreviewUrl;
+              }
+              if (character.description?.hairColor) characterPayload.hair_color = character.description.hairColor;
+              if (character.description?.skinTone) characterPayload.skin_tone = character.description.skinTone;
+              if (character.description?.clothing) characterPayload.clothing = character.description.clothing;
+              if (character.description?.age) characterPayload.age = character.description.age;
+              if (character.description?.otherFeatures) characterPayload.other_features = character.description.otherFeatures;
+
+              const charResponse = await fetch('/api/characters', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(characterPayload),
+              });
+              if (!charResponse.ok) throw new Error(`Failed to create character ${character.name}`);
+              const charData = await charResponse.json();
+              characterIdMap[character.id] = charData.character.id;
+
+              // Update the character's ID in local state to the real UUID
+              character.id = charData.character.id;
+            } else {
+              characterIdMap[character.id] = character.id;
+            }
+          }
+          characterIds = characters.map(c => characterIdMap[c.id] || c.id);
+          // Update characters state with real IDs
+          setCharacters([...characters]);
+        } else {
+          characterIds = characters.map(c => c.id);
+        }
+      }
+
+      // Build draft metadata (UI-specific state not in DB columns)
+      const draftMetadata: Record<string, any> = {
+        characters, // Full client-side Character objects
+        clothingConsistency,
+        expansionLevel,
+        imageProvider,
+        artStyle,
+        generateChineseTranslation,
+        storyTone,
+        selectedTemplate,
+        contentLanguage,
+        enhancedScenes,
+        imageGenerationStatus,
+        coverImagePrompt,
+        customCoverPrompt,
+        coverApproved,
+        quizData: quizData || undefined,
+        quizDifficulty,
+        quizQuestionCount,
+        authorName,
+        authorAge,
+      };
+
+      // Get cover image from imageGenerationStatus or coverImageUrl
+      const coverImage = imageGenerationStatus.find(img => img.sceneNumber === 0 && img.status === 'completed');
+      const coverImageUrlToSave = coverImage?.imageUrl || coverImageUrl || undefined;
+
+      const response = await fetch('/api/projects/save-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: draftProjectId || undefined,
+          title: storyTitle || saveTitle || undefined,
+          description: storyDescription || saveDescription || undefined,
+          authorName: authorName || undefined,
+          authorAge: authorAge ? parseInt(authorAge) : undefined,
+          coverImageUrl: coverImageUrlToSave,
+          originalScript: scriptInput || undefined,
+          readingLevel,
+          storyTone,
+          language: contentLanguage,
+          characterIds,
+          scenes: scenesPayload,
+          draftMetadata,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to save draft');
+
+      // Store the projectId for subsequent saves
+      setDraftProjectId(data.projectId);
+      setDraftSaveMessage('Draft saved!');
+
+      // Clear message after 3 seconds
+      setTimeout(() => setDraftSaveMessage(null), 3000);
+
+    } catch (error) {
+      console.error('Draft save error:', error);
+      setDraftSaveMessage(error instanceof Error ? error.message : 'Failed to save draft');
+      setTimeout(() => setDraftSaveMessage(null), 5000);
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
   const handleSaveStory = async () => {
     if (!saveTitle.trim()) {
       setSaveError('Please enter a title for your story');
@@ -814,23 +1081,24 @@ export default function CreateStoryPage() {
         console.log('✓ All characters created, using real UUIDs:', characterIds);
       }
 
-      // Call save API
+      // Call save API (supports both new creation and draft→completed transition)
       const response = await fetch('/api/projects/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          projectId: draftProjectId || undefined, // Pass draft ID for draft→completed
           title: saveTitle.trim(),
           description: saveDescription.trim() || undefined,
           authorName: authorName.trim() || undefined,
           authorAge: authorAge ? parseInt(authorAge) : undefined,
           coverImageUrl: coverImageUrlToSave,
           originalScript: scriptInput,
-          readingLevel: readingLevel, // NEW
-          storyTone: storyTone,       // NEW
-          contentLanguage: contentLanguage, // NEW: Store content language (en or zh)
+          readingLevel: readingLevel,
+          storyTone: storyTone,
+          contentLanguage: contentLanguage,
           characterIds: characterIds,
           scenes: scenesData,
-          quizData: quizData || undefined, // Include quiz if generated
+          quizData: quizData || undefined,
         }),
       });
 
@@ -1073,12 +1341,12 @@ export default function CreateStoryPage() {
     }
   };
 
-  if (loading) {
+  if (loading || restoringDraft) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">{restoringDraft ? 'Restoring your draft...' : 'Loading...'}</p>
         </div>
       </div>
     );
@@ -1114,6 +1382,13 @@ export default function CreateStoryPage() {
       */}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {draftProjectId && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
+            <span className="inline-block w-2 h-2 bg-amber-500 rounded-full"></span>
+            <span className="text-sm text-amber-800 font-medium">Editing Draft</span>
+            <span className="text-sm text-amber-600">— Changes are saved when you click &quot;Save as Draft&quot;</span>
+          </div>
+        )}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Your Story</h1>
           <p className="text-gray-600">
@@ -1449,20 +1724,35 @@ export default function CreateStoryPage() {
               <p className="text-gray-600 mb-6">
                 AI will create detailed image prompts and age-appropriate captions for your {scriptInput.split('\n').filter(l => l.trim()).length} scenes.
               </p>
-              <button
-                onClick={handleEnhanceScenes}
-                disabled={isEnhancing}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isEnhancing ? (
-                  <>
-                    <span className="inline-block animate-spin mr-2">⏳</span>
-                    Enhancing Scenes...
-                  </>
-                ) : (
-                  'Enhance Scenes & Captions'
+              <div className="flex gap-4 items-center flex-wrap">
+                <button
+                  onClick={handleEnhanceScenes}
+                  disabled={isEnhancing}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isEnhancing ? (
+                    <>
+                      <span className="inline-block animate-spin mr-2">⏳</span>
+                      Enhancing Scenes...
+                    </>
+                  ) : (
+                    'Enhance Scenes & Captions'
+                  )}
+                </button>
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={savingDraft || isEnhancing}
+                  className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-4 rounded-xl font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+                  aria-label="Save story as draft to continue later"
+                >
+                  {savingDraft ? 'Saving...' : (draftProjectId ? 'Update Draft' : 'Save as Draft')}
+                </button>
+                {draftSaveMessage && (
+                  <span className={`text-sm font-medium ${draftSaveMessage === 'Draft saved!' ? 'text-green-600' : 'text-red-600'}`}>
+                    {draftSaveMessage}
+                  </span>
                 )}
-              </button>
+              </div>
             </div>
           </div>
         )}
@@ -1501,6 +1791,10 @@ export default function CreateStoryPage() {
               onArtStyleChange={setArtStyle}
               imageProvider={imageProvider}
               onImageProviderChange={setImageProvider}
+              onSaveDraft={handleSaveDraft}
+              savingDraft={savingDraft}
+              draftSaveLabel={draftProjectId ? 'Update Draft' : 'Save as Draft'}
+              draftSaveMessage={draftSaveMessage || undefined}
             />
           </div>
         )}
@@ -1589,6 +1883,14 @@ export default function CreateStoryPage() {
                     '📄 Download PDF'
                   )}
                 </button>
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={savingDraft}
+                  className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+                  aria-label="Save story as draft to continue later"
+                >
+                  {savingDraft ? 'Saving...' : (draftProjectId ? 'Update Draft' : 'Save as Draft')}
+                </button>
                 <Link
                   href="/dashboard"
                   className="bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 font-semibold transition-all flex items-center"
@@ -1596,6 +1898,11 @@ export default function CreateStoryPage() {
                   ← Back to Dashboard
                 </Link>
               </div>
+              {draftSaveMessage && (
+                <p className={`mt-3 text-sm font-medium ${draftSaveMessage === 'Draft saved!' ? 'text-green-600' : 'text-red-600'}`}>
+                  {draftSaveMessage}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -1972,5 +2279,18 @@ export default function CreateStoryPage() {
       </div>
       </div>
     </>
+  );
+}
+
+// Wrap with Suspense for useSearchParams
+export default function CreateStoryPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <CreateStoryPageInner />
+    </Suspense>
   );
 }
