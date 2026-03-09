@@ -14,10 +14,12 @@ import { createClient } from '@supabase/supabase-js';
 
 const REPLY_TO = 'Admin@KindleWoodStudio.ai';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 // ─── Morning Session Email ───────────────────────────────────────────────
 
@@ -585,31 +587,34 @@ function buildThankYouHtml(parentFirstName: string, childFirstName: string): str
           <tr>
             <td style="padding: 16px 24px;">
               <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
-                &#127873; Claim Your Free Month
+                &#127873; Keep the Creativity Going &mdash; Free!
               </h2>
               <p style="color: #6b7280; font-size: 14px; margin: 0 0 16px; line-height: 1.6;">
-                As a workshop participant, your family gets <strong style="color: #374151;">1 month of free access</strong> to KindleWood Studio&rsquo;s online tools &mdash; so the creativity doesn&rsquo;t stop when class ends.
+                As a workshop family, you can keep creating stories at home &mdash; no payment needed to get started.
               </p>
 
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; overflow: hidden;">
                 <tr>
                   <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
-                    <strong style="color: #374151;">1.</strong> <span style="color: #6b7280;">Go to <a href="https://www.kindlewoodstudio.ai/signup" style="color: #7c3aed; text-decoration: underline;">kindlewoodstudio.ai/signup</a></span>
+                    <strong style="color: #374151;">1.</strong> <span style="color: #6b7280;">Sign up free at <a href="https://www.kindlewoodstudio.ai/signup" style="color: #7c3aed; text-decoration: underline;">kindlewoodstudio.ai/signup</a></span>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
-                    <strong style="color: #374151;">2.</strong> <span style="color: #6b7280;">Create your free account</span>
+                    <strong style="color: #374151;">2.</strong> <span style="color: #6b7280;">Enjoy your <strong style="color: #374151;">7-day free trial</strong> with <strong style="color: #374151;">2 free stories</strong></span>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
-                    <strong style="color: #374151;">3.</strong> <span style="color: #6b7280;">Enter promo code: </span><strong style="color: #7c3aed; font-size: 16px; letter-spacing: 1px;">EXTENDEDTRIAL30</strong>
+                    <strong style="color: #374151;">3.</strong> <span style="color: #6b7280;">When you&rsquo;re ready to upgrade to the <strong style="color: #374151;">Casual Creator</strong> plan, use promo code:</span><br />
+                    <span style="display: inline-block; margin-top: 6px; background-color: #f3e8ff; border: 1px dashed #7c3aed; border-radius: 6px; padding: 6px 14px;">
+                      <strong style="color: #7c3aed; font-size: 16px; letter-spacing: 1px;">EXTENDEDTRIAL30</strong>
+                    </span>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding: 14px 16px;">
-                    <strong style="color: #374151;">4.</strong> <span style="color: #6b7280;">Start creating!</span>
+                    <strong style="color: #374151;">4.</strong> <span style="color: #6b7280;">Get <strong style="color: #374151;">1 month free</strong> on Casual Creator!</span>
                   </td>
                 </tr>
               </table>
@@ -684,15 +689,32 @@ function buildThankYouHtml(parentFirstName: string, childFirstName: string): str
               <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
                 &#127916; Watch How It Works
               </h2>
-              <p style="margin: 0 0 8px;">
-                <a href="https://www.youtube.com/playlist?list=PLyDpAVbXE4SWPWFFiQUdo8FyMAhi90fA5" style="color: #2563eb; font-size: 14px; font-weight: 600; text-decoration: underline;">
-                  Watch Product Demo Playlist &rarr;
-                </a>
-              </p>
-              <ul style="color: #6b7280; font-size: 13px; line-height: 1.8; margin: 0; padding-left: 20px;">
-                <li>Parts 1&ndash;3: KindleWood Studio walkthrough (creating stories, characters, illustrations)</li>
-                <li>Part 4: KindleWood Kids app demo (reading, quizzes, vocabulary)</li>
-              </ul>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td width="50%" style="padding: 0 6px 12px 0;">
+                    <a href="https://www.youtube.com/watch?v=4wA7NmmD-4g" style="text-decoration: none;">
+                      <img src="https://img.youtube.com/vi/4wA7NmmD-4g/hqdefault.jpg" alt="Product Demo Part 1" width="270" style="display: block; width: 100%; max-width: 270px; border-radius: 8px; border: 1px solid #e5e7eb;" />
+                    </a>
+                  </td>
+                  <td width="50%" style="padding: 0 0 12px 6px;">
+                    <a href="https://www.youtube.com/watch?v=Sngj7wdkgSw" style="text-decoration: none;">
+                      <img src="https://img.youtube.com/vi/Sngj7wdkgSw/hqdefault.jpg" alt="Product Demo Part 2" width="270" style="display: block; width: 100%; max-width: 270px; border-radius: 8px; border: 1px solid #e5e7eb;" />
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td width="50%" style="padding: 0 6px 0 0;">
+                    <a href="https://www.youtube.com/watch?v=EAYKm_gPZwQ" style="text-decoration: none;">
+                      <img src="https://img.youtube.com/vi/EAYKm_gPZwQ/hqdefault.jpg" alt="Product Demo Part 3" width="270" style="display: block; width: 100%; max-width: 270px; border-radius: 8px; border: 1px solid #e5e7eb;" />
+                    </a>
+                  </td>
+                  <td width="50%" style="padding: 0 0 0 6px;">
+                    <a href="https://www.youtube.com/watch?v=h1aPfdIeoKI" style="text-decoration: none;">
+                      <img src="https://img.youtube.com/vi/h1aPfdIeoKI/hqdefault.jpg" alt="KindleWood Kids App Demo" width="270" style="display: block; width: 100%; max-width: 270px; border-radius: 8px; border: 1px solid #e5e7eb;" />
+                    </a>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
@@ -764,7 +786,7 @@ export async function POST(req: NextRequest) {
 
   if (mode === 'send') {
     // sessionType filter: 'morning', 'afternoon', or undefined (both)
-    const query = supabase
+    const query = getSupabase()
       .from('workshop_registrations')
       .select('parent_first_name, parent_email, child_first_name, selected_session_type')
       .eq('status', 'confirmed')
@@ -823,7 +845,7 @@ export async function POST(req: NextRequest) {
 
   if (mode === 'weather-update') {
     // Send weather update to afternoon Wk1 parents
-    const { data: registrations, error } = await supabase
+    const { data: registrations, error } = await getSupabase()
       .from('workshop_registrations')
       .select('parent_first_name, parent_email, child_first_name')
       .eq('status', 'confirmed')
@@ -869,7 +891,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (mode === 'indoor-notice') {
-    const { data: registrations, error } = await supabase
+    const { data: registrations, error } = await getSupabase()
       .from('workshop_registrations')
       .select('parent_first_name, parent_email, child_first_name')
       .eq('status', 'confirmed')
@@ -926,7 +948,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (mode === 'thank-you') {
-    const { data: registrations, error } = await supabase
+    const { data: registrations, error } = await getSupabase()
       .from('workshop_registrations')
       .select('parent_first_name, parent_email, child_first_name, selected_session_type')
       .eq('status', 'confirmed')

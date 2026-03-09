@@ -23,10 +23,12 @@ import { sendWelcomeEmail } from '@/lib/email/welcome-email';
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 export async function POST(req: NextRequest) {
   // Verify webhook secret
@@ -61,7 +63,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Update welcome_email_sent_at for observability
-    const { error: updateError } = await supabase
+    const { error: updateError } = await getSupabase()
       .from('users')
       .update({ welcome_email_sent_at: new Date().toISOString() })
       .eq('id', record.id);
