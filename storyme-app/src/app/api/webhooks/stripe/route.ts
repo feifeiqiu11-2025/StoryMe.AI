@@ -434,15 +434,11 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
  * Handle workshop checkout completion (one-time payment)
  */
 async function handleWorkshopCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const registrationId = session.metadata?.registration_id;
+  const checkoutSessionId = session.id;
 
-  if (!registrationId) {
-    console.error('[WEBHOOK] No registration_id in workshop checkout metadata');
-    return;
-  }
+  console.log(`[WEBHOOK] Workshop checkout completed for session ${checkoutSessionId}`);
 
-  console.log(`[WEBHOOK] Workshop checkout completed for registration ${registrationId}`);
-
+  // Update ALL registrations for this checkout session
   const { error } = await supabaseAdmin
     .from('workshop_registrations')
     .update({
@@ -451,38 +447,41 @@ async function handleWorkshopCheckoutCompleted(session: Stripe.Checkout.Session)
       stripe_payment_intent_id: session.payment_intent as string,
       amount_paid: session.amount_total,
     })
-    .eq('id', registrationId);
+    .eq('stripe_checkout_session_id', checkoutSessionId);
 
   if (error) {
-    console.error('[WEBHOOK] Error updating workshop registration:', error);
+    console.error('[WEBHOOK] Error updating workshop registrations:', error);
     throw error;
   }
 
-  console.log(`[WEBHOOK] Workshop registration ${registrationId} confirmed`);
-
-  // Fetch registration data for confirmation email
-  const { data: registration, error: fetchError } = await supabaseAdmin
+  // Fetch ALL registrations for this checkout (may be multiple children)
+  const { data: registrations, error: fetchError } = await supabaseAdmin
     .from('workshop_registrations')
     .select('*')
-    .eq('id', registrationId)
-    .single();
+    .eq('stripe_checkout_session_id', checkoutSessionId);
 
-  if (fetchError || !registration) {
-    console.error('[WEBHOOK] Failed to fetch registration for email:', fetchError);
+  if (fetchError || !registrations || registrations.length === 0) {
+    console.error('[WEBHOOK] Failed to fetch registrations for email:', fetchError);
     return;
   }
 
-  // Send confirmation email (non-blocking — failure won't affect webhook response)
+  console.log(`[WEBHOOK] ${registrations.length} registration(s) confirmed for session ${checkoutSessionId}`);
+
+  const first = registrations[0];
+
+  // Send ONE confirmation email with all children listed
   await sendWorkshopConfirmationEmail({
-    parentFirstName: registration.parent_first_name,
-    parentLastName: registration.parent_last_name,
-    parentEmail: registration.parent_email,
-    childFirstName: registration.child_first_name,
-    childLastName: registration.child_last_name,
-    childAge: registration.child_age,
-    partnerId: registration.partner_id,
-    selectedSessionType: registration.selected_session_type,
-    selectedWorkshopIds: registration.selected_workshop_ids,
+    parentFirstName: first.parent_first_name,
+    parentLastName: first.parent_last_name,
+    parentEmail: first.parent_email,
+    children: registrations.map((r: { child_first_name: string; child_last_name: string | null; child_age: number }) => ({
+      firstName: r.child_first_name,
+      lastName: r.child_last_name,
+      age: r.child_age,
+    })),
+    partnerId: first.partner_id,
+    selectedSessionType: first.selected_session_type,
+    selectedWorkshopIds: first.selected_workshop_ids,
     amountPaid: session.amount_total || 0,
   });
 }

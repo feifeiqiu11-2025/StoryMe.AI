@@ -8,7 +8,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   WorkshopRegistrationSchema,
@@ -42,6 +42,7 @@ export default function WorkshopRegistrationForm({
     handleSubmit,
     watch,
     setValue,
+    control,
     formState: { errors },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } = useForm<WorkshopRegistrationData>({
@@ -54,15 +55,18 @@ export default function WorkshopRegistrationForm({
       parentLastName: '',
       parentEmail: '',
       parentPhone: '',
-      childFirstName: '',
-      childLastName: '',
-      childAge: undefined as unknown as number,
+      children: [{ firstName: '', lastName: '', age: undefined as unknown as number }],
       emergencyContactName: '',
       emergencyContactPhone: '',
       emergencyContactRelation: '',
       waiverAccepted: undefined as unknown as true,
       codeOfConductAccepted: undefined as unknown as true,
     },
+  });
+
+  const { fields: childrenFields, append: addChild, remove: removeChild } = useFieldArray({
+    control,
+    name: 'children',
   });
 
   const selectedWorkshopIds = watch('selectedWorkshopIds');
@@ -76,8 +80,9 @@ export default function WorkshopRegistrationForm({
   const hasDiscount = pricePerSession > 0 && pricePerSession < originalPricePerSession;
 
   const workshopCount = selectedWorkshopIds?.length || 0;
-  const totalPrice = workshopCount * pricePerSession;
-  const totalOriginal = workshopCount * originalPricePerSession;
+  const numberOfChildren = childrenFields.length;
+  const totalPrice = workshopCount * pricePerSession * numberOfChildren;
+  const totalOriginal = workshopCount * originalPricePerSession * numberOfChildren;
 
   // Check if a session date has passed
   const isSessionPast = (dateLabel: string): boolean => {
@@ -446,7 +451,9 @@ export default function WorkshopRegistrationForm({
           <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
             <div className="flex justify-between items-center">
               <span className="text-gray-700">
-                {workshopCount} session{workshopCount !== 1 ? 's' : ''} selected
+                {numberOfChildren > 1
+                  ? `${numberOfChildren} children × ${workshopCount} session${workshopCount !== 1 ? 's' : ''}`
+                  : `${workshopCount} session${workshopCount !== 1 ? 's' : ''} selected`}
               </span>
               <div className="text-right">
                 {hasDiscount && (
@@ -579,60 +586,100 @@ export default function WorkshopRegistrationForm({
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           4. Child Information
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="childFirstName" className={labelClassName}>
-              First Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="childFirstName"
-              type="text"
-              {...register('childFirstName')}
-              className={inputClassName}
-              aria-required="true"
-              aria-invalid={!!errors.childFirstName}
-            />
-            {errors.childFirstName && (
-              <p className={errorClassName} role="alert">
-                {errors.childFirstName.message}
-              </p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="childLastName" className={labelClassName}>
-              Last Name
-            </label>
-            <input
-              id="childLastName"
-              type="text"
-              {...register('childLastName')}
-              className={inputClassName}
-            />
-          </div>
-          <div>
-            <label htmlFor="childAge" className={labelClassName}>
-              Age <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="childAge"
-              {...register('childAge', { valueAsNumber: true })}
-              className={inputClassName}
-              aria-required="true"
-              aria-invalid={!!errors.childAge}
+        <div className="space-y-4">
+          {childrenFields.map((field, index) => (
+            <div
+              key={field.id}
+              className={`${childrenFields.length > 1 ? 'p-4 bg-gray-50 rounded-xl border border-gray-200' : ''}`}
             >
-              <option value="">Select age</option>
-              {Array.from({ length: 12 }, (_, i) => i + 3).map((age) => (
-                <option key={age} value={age}>
-                  {age} years old
-                </option>
-              ))}
-            </select>
-            {errors.childAge && (
-              <p className={errorClassName} role="alert">
-                {errors.childAge.message}
-              </p>
-            )}
-          </div>
+              {childrenFields.length > 1 && (
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-semibold text-gray-700">Child {index + 1}</span>
+                  {index > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => removeChild(index)}
+                      className="text-sm text-red-500 hover:text-red-600 font-medium"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor={`children.${index}.firstName`} className={labelClassName}>
+                    First Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id={`children.${index}.firstName`}
+                    type="text"
+                    {...register(`children.${index}.firstName`)}
+                    className={inputClassName}
+                    aria-required="true"
+                    aria-invalid={!!errors.children?.[index]?.firstName}
+                  />
+                  {errors.children?.[index]?.firstName && (
+                    <p className={errorClassName} role="alert">
+                      {errors.children[index].firstName?.message}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label htmlFor={`children.${index}.lastName`} className={labelClassName}>
+                    Last Name
+                  </label>
+                  <input
+                    id={`children.${index}.lastName`}
+                    type="text"
+                    {...register(`children.${index}.lastName`)}
+                    className={inputClassName}
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`children.${index}.age`} className={labelClassName}>
+                    Age <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id={`children.${index}.age`}
+                    {...register(`children.${index}.age`, { valueAsNumber: true })}
+                    className={inputClassName}
+                    aria-required="true"
+                    aria-invalid={!!errors.children?.[index]?.age}
+                  >
+                    <option value="">Select age</option>
+                    {Array.from({ length: 12 }, (_, i) => i + 3).map((age) => (
+                      <option key={age} value={age}>
+                        {age} years old
+                      </option>
+                    ))}
+                  </select>
+                  {errors.children?.[index]?.age && (
+                    <p className={errorClassName} role="alert">
+                      {errors.children[index].age?.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+          {errors.children?.message && (
+            <p className={errorClassName} role="alert">
+              {errors.children.message}
+            </p>
+          )}
+          {childrenFields.length < 3 && (
+            <button
+              type="button"
+              onClick={() => addChild({ firstName: '', lastName: '', age: undefined as unknown as number })}
+              className="text-sm text-green-600 hover:text-green-700 font-medium flex items-center gap-1"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Another Child
+            </button>
+          )}
         </div>
       </div>
 

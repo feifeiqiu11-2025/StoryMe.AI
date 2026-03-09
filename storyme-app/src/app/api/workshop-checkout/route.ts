@@ -70,11 +70,12 @@ export async function POST(request: NextRequest) {
     }
 
     const capacity = partner.capacity[validated.selectedSessionType];
+    const numberOfChildren = validated.children.length;
     const fullSessions: string[] = [];
 
     for (const workshopId of validated.selectedWorkshopIds) {
       const currentCount = countMap[workshopId] || 0;
-      if (currentCount >= capacity) {
+      if (currentCount + numberOfChildren > capacity) {
         fullSessions.push(workshopId);
       }
     }
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
     // Per-session pricing (promo price if available, else original)
     const sessionPricing = partner.pricing[validated.selectedSessionType];
     const unitAmount = sessionPricing.promoPrice || sessionPricing.originalPrice;
-    const totalAmount = validated.selectedWorkshopIds.length * unitAmount;
+    const totalAmount = validated.selectedWorkshopIds.length * unitAmount * numberOfChildren;
 
     // --- Bundle pricing (commented out for future use) ---
     // const isBundle =
@@ -102,39 +103,43 @@ export async function POST(request: NextRequest) {
     //   ? partner.pricing.bundlePrice
     //   : validated.selectedWorkshopIds.length * partner.pricing.singleWorkshop;
 
-    // Store registration in DB (pending payment)
-    const { data: registration, error: dbError } = await supabaseAdmin
-      .from('workshop_registrations')
-      .insert({
-        parent_first_name: validated.parentFirstName,
-        parent_last_name: validated.parentLastName,
-        parent_email: validated.parentEmail,
-        parent_phone: validated.parentPhone,
-        child_first_name: validated.childFirstName,
-        child_last_name: validated.childLastName || null,
-        child_age: validated.childAge,
-        emergency_contact_name: validated.emergencyContactName,
-        emergency_contact_phone: validated.emergencyContactPhone,
-        emergency_contact_relation: validated.emergencyContactRelation,
-        partner_id: validated.partnerId,
-        selected_workshop_ids: validated.selectedWorkshopIds,
-        selected_session_type: validated.selectedSessionType,
-        is_bundle: false,
-        promo_code: null,
-        waiver_accepted: true,
-        waiver_accepted_at: new Date().toISOString(),
-        payment_status: 'pending',
-        status: 'pending',
-      })
-      .select()
-      .single();
+    // Store one registration per child in DB (pending payment)
+    const registrationIds: string[] = [];
+    for (const child of validated.children) {
+      const { data: registration, error: dbError } = await supabaseAdmin
+        .from('workshop_registrations')
+        .insert({
+          parent_first_name: validated.parentFirstName,
+          parent_last_name: validated.parentLastName,
+          parent_email: validated.parentEmail,
+          parent_phone: validated.parentPhone,
+          child_first_name: child.firstName,
+          child_last_name: child.lastName || null,
+          child_age: child.age,
+          emergency_contact_name: validated.emergencyContactName,
+          emergency_contact_phone: validated.emergencyContactPhone,
+          emergency_contact_relation: validated.emergencyContactRelation,
+          partner_id: validated.partnerId,
+          selected_workshop_ids: validated.selectedWorkshopIds,
+          selected_session_type: validated.selectedSessionType,
+          is_bundle: false,
+          promo_code: null,
+          waiver_accepted: true,
+          waiver_accepted_at: new Date().toISOString(),
+          payment_status: 'pending',
+          status: 'pending',
+        })
+        .select('id')
+        .single();
 
-    if (dbError || !registration) {
-      console.error('[WORKSHOP-CHECKOUT] DB insert error:', dbError);
-      return NextResponse.json(
-        { error: 'Failed to create registration' },
-        { status: 500 },
-      );
+      if (dbError || !registration) {
+        console.error('[WORKSHOP-CHECKOUT] DB insert error:', dbError);
+        return NextResponse.json(
+          { error: 'Failed to create registration' },
+          { status: 500 },
+        );
+      }
+      registrationIds.push(registration.id);
     }
 
     // Build Stripe line items — one per selected session
@@ -154,7 +159,7 @@ export async function POST(request: NextRequest) {
           },
           unit_amount: unitAmount,
         },
-        quantity: 1,
+        quantity: numberOfChildren,
       };
     });
 
@@ -197,23 +202,26 @@ export async function POST(request: NextRequest) {
       cancel_url: `${appUrl}/workshops/register?registration=cancelled`,
       allow_promotion_codes: true,
       metadata: {
-        registration_id: registration.id,
+        registration_id: registrationIds[0],
+        registration_ids: registrationIds.join(','),
         partner_id: validated.partnerId,
         type: 'workshop',
+        children_count: String(numberOfChildren),
       },
     });
 
-    // Update registration with Stripe session ID
+    // Update all registrations with Stripe session ID
     await supabaseAdmin
       .from('workshop_registrations')
       .update({ stripe_checkout_session_id: checkoutSession.id })
-      .eq('id', registration.id);
+      .in('id', registrationIds);
 
     console.log('[WORKSHOP-CHECKOUT] Session created:', {
-      registrationId: registration.id,
+      registrationIds,
       sessionId: checkoutSession.id,
       amount: formatWorkshopPrice(totalAmount),
       workshopCount: validated.selectedWorkshopIds.length,
+      childrenCount: numberOfChildren,
     });
 
     return NextResponse.json({

@@ -31,21 +31,28 @@ export const WorkshopRegistrationSchema = z.object({
     .min(10, 'Please enter a valid phone number')
     .max(20),
 
-  // Child
-  childFirstName: z
-    .string()
-    .min(1, 'Child\'s first name is required')
-    .max(100),
-  childLastName: z
-    .string()
-    .max(100)
-    .optional()
-    .default(''),
-  childAge: z
-    .number({ message: 'Please select child\'s age' })
-    .int()
-    .min(3, 'Minimum age is 3')
-    .max(14, 'Maximum age is 14'),
+  // Children (1-3 per registration)
+  children: z
+    .array(
+      z.object({
+        firstName: z
+          .string()
+          .min(1, 'Child\'s first name is required')
+          .max(100),
+        lastName: z
+          .string()
+          .max(100)
+          .optional()
+          .default(''),
+        age: z
+          .number({ message: 'Please select child\'s age' })
+          .int()
+          .min(3, 'Minimum age is 3')
+          .max(14, 'Maximum age is 14'),
+      }),
+    )
+    .min(1, 'At least one child is required')
+    .max(3, 'Maximum 3 children per registration'),
 
   // Emergency Contact
   emergencyContactName: z

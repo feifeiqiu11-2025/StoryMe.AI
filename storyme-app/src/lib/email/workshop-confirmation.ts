@@ -8,13 +8,17 @@
 import { resend, EMAIL_FROM } from './resend';
 import { WORKSHOP_PARTNERS } from '@/lib/workshops/constants';
 
+interface ChildInfo {
+  firstName: string;
+  lastName?: string | null;
+  age: number;
+}
+
 interface WorkshopConfirmationData {
   parentFirstName: string;
   parentLastName: string;
   parentEmail: string;
-  childFirstName: string;
-  childLastName?: string | null;
-  childAge: number;
+  children: ChildInfo[];
   partnerId: string;
   selectedSessionType: 'morning' | 'afternoon';
   selectedWorkshopIds: string[];
@@ -42,9 +46,17 @@ export async function sendWorkshopConfirmationEmail(
     .map((id) => partner.sessions.find((s) => s.id === id))
     .filter(Boolean);
 
-  const childFullName = data.childLastName
-    ? `${data.childFirstName} ${data.childLastName}`
-    : data.childFirstName;
+  // Format children names
+  const formatChildName = (c: ChildInfo) =>
+    c.lastName ? `${c.firstName} ${c.lastName}` : c.firstName;
+
+  const childrenWithAge = data.children
+    .map((c) => `<strong>${formatChildName(c)}</strong> (age ${c.age})`)
+    .join(' and ');
+
+  const childrenListText = data.children
+    .map((c) => `${formatChildName(c)}, age ${c.age}`)
+    .join('; ');
 
   const amountFormatted = `$${(data.amountPaid / 100).toFixed(2)}`;
 
@@ -119,7 +131,7 @@ export async function sendWorkshopConfirmationEmail(
                 Hi ${data.parentFirstName},
               </p>
               <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
-                Thank you for registering <strong>${childFullName}</strong> (age ${data.childAge}) for our Creative Explorers Workshop! We're excited to welcome your family.
+                Thank you for registering ${childrenWithAge} for our Creative Explorers Workshop! We're excited to welcome your family.
               </p>
             </td>
           </tr>
@@ -139,8 +151,8 @@ export async function sendWorkshopConfirmationEmail(
                 </tr>
                 <tr>
                   <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">
-                    <strong style="color: #374151;">Child</strong><br />
-                    <span style="color: #6b7280;">${childFullName}, age ${data.childAge}</span>
+                    <strong style="color: #374151;">${data.children.length > 1 ? 'Children' : 'Child'}</strong><br />
+                    <span style="color: #6b7280;">${childrenListText}</span>
                   </td>
                 </tr>
                 ${locationHtml}
@@ -218,11 +230,11 @@ export async function sendWorkshopConfirmationEmail(
 
 Hi ${data.parentFirstName},
 
-Thank you for registering ${childFullName} (age ${data.childAge}) for our Creative Explorers Workshop!
+Thank you for registering ${data.children.map((c) => `${formatChildName(c)} (age ${c.age})`).join(' and ')} for our Creative Explorers Workshop!
 
 SESSION DETAILS
 - Session: ${sessionLabel}
-- Child: ${childFullName}, age ${data.childAge}
+- ${data.children.length > 1 ? 'Children' : 'Child'}: ${childrenListText}
 ${partner.location ? `- Location: ${partner.location.name}, ${partner.location.address}` : ''}
 - Amount Paid: ${amountFormatted}
 
