@@ -1,6 +1,6 @@
 /**
  * Dashboard home page
- * Shows overview and quick start for story creation
+ * Guided flow layout: Primary CTA → Workflow steps → Demo videos → Secondary features
  */
 
 'use client';
@@ -8,23 +8,25 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { sampleStorybooks } from '@/data/sample-storybooks';
-import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
+import VideoCarousel from '@/components/landing/VideoCarousel';
+import type { YouTubeVideo } from '@/app/api/v1/youtube/playlist/route';
+
+const DEMO_PLAYLIST_ID = 'PLyDpAVbXE4SWPWFFiQUdo8FyMAhi90fA5';
 
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [demoVideos, setDemoVideos] = useState<YouTubeVideo[]>([]);
+  const [draftCount, setDraftCount] = useState(0);
 
   useEffect(() => {
     const loadUser = async () => {
-      // Check if Supabase is configured
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const isSupabaseConfigured = supabaseUrl && !supabaseUrl.includes('your-project-id');
 
       if (isSupabaseConfigured) {
-        // Use real Supabase authentication
         const supabase = createClient();
         const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
@@ -38,7 +40,6 @@ export default function DashboardPage() {
           router.push('/login');
         }
       } else {
-        // Fallback to local session
         const sessionData = localStorage.getItem('storyme_session');
         if (sessionData) {
           const session = JSON.parse(sessionData);
@@ -58,31 +59,63 @@ export default function DashboardPage() {
     loadUser();
   }, [router]);
 
+  // Fetch demo videos
+  useEffect(() => {
+    const fetchDemoVideos = async () => {
+      try {
+        const res = await fetch(`/api/v1/youtube/playlist?playlistId=${DEMO_PLAYLIST_ID}`);
+        const data = await res.json();
+        if (data.success && data.videos) {
+          setDemoVideos(data.videos);
+        }
+      } catch (error) {
+        console.error('Failed to fetch demo videos:', error);
+      }
+    };
+
+    fetchDemoVideos();
+  }, []);
+
+  // Fetch draft count
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchDraftCount = async () => {
+      try {
+        const supabase = createClient();
+        const { count } = await supabase
+          .from('projects')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'draft');
+        setDraftCount(count || 0);
+      } catch (error) {
+        console.error('Failed to fetch draft count:', error);
+      }
+    };
+
+    fetchDraftCount();
+  }, [user]);
+
   const handleCreateStoryClick = async () => {
-    // Check story creation limits before allowing navigation
     try {
       const response = await fetch('/api/usage/limits');
       const data = await response.json();
 
       if (!response.ok) {
         console.error('Failed to check limits:', data);
-        // If check fails, allow navigation (fail open)
         router.push('/create');
         return;
       }
 
-      // Check if user can create stories
       if (!data.canCreate) {
-        // Redirect to limit-reached transition page
         router.push('/limit-reached');
         return;
       }
 
-      // User can create, navigate to create page
       router.push('/create');
     } catch (error) {
       console.error('Error checking limits:', error);
-      // On error, allow navigation (fail open)
       router.push('/create');
     }
   };
@@ -99,248 +132,213 @@ export default function DashboardPage() {
   }
 
   if (!user) {
-    return null; // Will redirect in useEffect
+    return null;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-12">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="text-5xl">👋</div>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Welcome back{user.name ? `, ${user.name}` : ''}!
-              </h1>
-              <p className="text-gray-600 text-lg mt-1">
-                Ready to create magical stories today?
-              </p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-5xl mx-auto px-4 py-10">
+
+        {/* Section 1: Welcome Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Welcome back{user.name ? `, ${user.name}` : ''}!
+          </h1>
+          <p className="text-gray-500 mt-1">
+            Follow the steps below to create your story.
+          </p>
         </div>
 
-        {/* Quick Actions Grid - Row 1 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          {/* Create Story */}
-          <button
-            onClick={handleCreateStoryClick}
-            className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-blue-200 hover:border-blue-300 text-left"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-3xl group-hover:scale-110 transition-transform">✨</span>
-              <h3 className="text-xl font-bold text-gray-900">Create Story</h3>
-            </div>
-            <p className="text-gray-600 text-sm mb-4">
-              Make your child the hero of their own adventure with AI-generated illustrations
-            </p>
-            <div className="flex items-center gap-2 text-blue-600 font-semibold group-hover:gap-3 transition-all text-sm">
-              Start Creating →
-            </div>
-          </button>
+        {/* Section 2: Your Story Journey */}
+        <div className="mb-10">
+          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-5">
+            Your Story Journey
+          </h3>
 
-          {/* Character Library */}
-          <Link
-            href="/characters"
-            className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-purple-200 hover:border-purple-300"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-3xl group-hover:scale-110 transition-transform">👦👧</span>
-              <h3 className="text-xl font-bold text-gray-900">Characters</h3>
-            </div>
-            <p className="text-gray-600 text-sm mb-4">
-              Create and save characters — kids, animals, or fantasy creatures — for your stories
-            </p>
-            <div className="flex items-center gap-2 text-purple-600 font-semibold group-hover:gap-3 transition-all text-sm">
-              Manage Characters →
-            </div>
-          </Link>
-
-          {/* Photos to Storybook */}
-          <Link
-            href="/photos"
-            className="bg-gradient-to-br from-orange-50 to-pink-50 rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-orange-200 hover:border-orange-300"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-3xl group-hover:scale-110 transition-transform">📸</span>
-              <h3 className="text-xl font-bold text-gray-900">Photos to Storybook</h3>
-            </div>
-            <p className="text-gray-600 text-sm mb-4">
-              Turn family photos into enchanting Pixar-style storybooks
-            </p>
-            <div className="flex items-center gap-2 text-orange-600 font-semibold group-hover:gap-3 transition-all text-sm">
-              Upload Photos →
-            </div>
-          </Link>
-        </div>
-
-        {/* Quick Actions Grid - Row 2 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {/* Import PDF */}
-          <Link
-            href="/import"
-            className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-teal-200 hover:border-teal-300"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-3xl group-hover:scale-110 transition-transform">📄</span>
-              <h3 className="text-xl font-bold text-gray-900">Import PDF</h3>
-            </div>
-            <p className="text-gray-600 text-sm mb-4">
-              Bring any PDF storybook to life with voice narration
-            </p>
-            <div className="flex items-center gap-2 text-teal-600 font-semibold group-hover:gap-3 transition-all text-sm">
-              Import PDF →
-            </div>
-          </Link>
-
-          {/* My Stories */}
-          <Link
-            href="/projects"
-            className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-indigo-200 hover:border-indigo-300"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-3xl group-hover:scale-110 transition-transform">📚</span>
-              <h3 className="text-xl font-bold text-gray-900">My Stories</h3>
-            </div>
-            <p className="text-gray-600 text-sm mb-4">
-              All your storybooks in one place — created, imported, or from photos
-            </p>
-            <div className="flex items-center gap-2 text-indigo-600 font-semibold group-hover:gap-3 transition-all text-sm">
-              View Stories →
-            </div>
-          </Link>
-
-          {/* Community Gallery */}
-          <Link
-            href="/community-stories"
-            className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 group border-2 border-pink-200 hover:border-pink-300"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-3xl group-hover:scale-110 transition-transform">🌟</span>
-              <h3 className="text-xl font-bold text-gray-900">Community Stories</h3>
-            </div>
-            <p className="text-gray-600 text-sm mb-4">
-              Discover inspiring tales shared by other families
-            </p>
-            <div className="flex items-center gap-2 text-pink-600 font-semibold group-hover:gap-3 transition-all text-sm">
-              Browse Stories →
-            </div>
-          </Link>
-        </div>
-
-        {/* Sample Storybooks Gallery */}
-        {sampleStorybooks.length > 0 && (
-          <div className="mb-8">
-            <div className="mb-6 bg-white rounded-2xl shadow-lg p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                    <span className="text-4xl">✨</span>
-                    <span>Sample Storybooks</span>
-                  </h2>
-                  <p className="text-gray-600">
-                    Get inspired by these example storybooks from our community
-                  </p>
-                </div>
-                <Link
-                  href="/community-stories"
-                  className="hidden md:flex items-center gap-2 bg-gradient-to-r from-pink-500 to-purple-500 text-white px-6 py-3 rounded-xl hover:from-pink-600 hover:to-purple-600 font-semibold shadow-lg transition-all"
-                >
-                  <span>View All</span>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </Link>
+          {/* Desktop: horizontal stepper */}
+          <div className="hidden md:block">
+            {/* Step indicators + connecting line */}
+            <div className="relative flex items-center justify-between mb-6 px-[60px]">
+              {/* Connecting line behind the circles */}
+              <div className="absolute left-[60px] right-[60px] top-1/2 -translate-y-1/2 h-0.5 bg-blue-200" />
+              {/* Arrow on the line (between step 1 and 2) */}
+              <div className="absolute left-[calc(33%-8px)] top-1/2 -translate-y-1/2 z-10">
+                <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sampleStorybooks.map((storybook) => (
-                <div
-                  key={storybook.id}
-                  className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all transform hover:-translate-y-2 border border-gray-200 hover:border-purple-300"
-                >
-                  {/* Cover Image */}
-                  <div className="relative h-64 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 overflow-hidden group">
-                    <Image
-                      src={storybook.coverImage}
-                      alt={storybook.title}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  </div>
-
-                  {/* Content */}
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-xl font-bold text-gray-900 flex-1 line-clamp-2">
-                        {storybook.title}
-                      </h3>
-                      <span className="text-xs bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 px-3 py-1 rounded-full font-semibold ml-2 whitespace-nowrap">
-                        {storybook.ageGroup}
-                      </span>
-                    </div>
-
-                    <p className="text-gray-600 text-sm mb-4 leading-relaxed line-clamp-2">
-                      {storybook.description}
-                    </p>
-
-                    {/* Characters */}
-                    <div className="flex items-center gap-2 mb-4 flex-wrap">
-                      <span className="text-xs text-gray-500 font-medium">Characters:</span>
-                      {storybook.characters.slice(0, 3).map((character, idx) => (
-                        <span
-                          key={idx}
-                          className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full font-medium"
-                        >
-                          {character}
-                        </span>
-                      ))}
-                      {storybook.characters.length > 3 && (
-                        <span className="text-xs text-gray-400">
-                          +{storybook.characters.length - 3}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Scene Preview */}
-                    <div className="grid grid-cols-3 gap-2 mb-4">
-                      {storybook.scenes.slice(0, 3).map((scene, idx) => (
-                        <div
-                          key={idx}
-                          className="relative h-20 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-200"
-                        >
-                          <Image
-                            src={scene.imageUrl}
-                            alt={`Scene ${idx + 1}`}
-                            fill
-                            className="object-cover hover:scale-110 transition-transform duration-200"
-                          />
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Footer */}
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                        </svg>
-                        <span className="font-medium">{storybook.scenes.length} scenes</span>
-                      </div>
-                      {storybook.isCustomerSubmission && storybook.customerName && (
-                        <span className="text-xs text-gray-500 italic">
-                          by {storybook.customerName}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+              {/* Arrow on the line (between step 2 and 3) */}
+              <div className="absolute left-[calc(66%-8px)] top-1/2 -translate-y-1/2 z-10">
+                <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </div>
+              {/* Step circles */}
+              {[1, 2, 3].map((step) => (
+                <div key={step} className="relative z-20 flex items-center justify-center w-10 h-10 rounded-full bg-blue-600 text-white font-bold text-sm shadow-md">
+                  {step}
                 </div>
               ))}
             </div>
+
+            {/* Cards below the stepper */}
+            <div className="grid grid-cols-3 gap-5">
+              <Link
+                href="/characters"
+                className="bg-white border border-gray-200 rounded-xl p-5 hover:border-blue-400 hover:shadow-md transition-all group"
+              >
+                <h4 className="font-semibold text-gray-900 mb-1">Characters</h4>
+                <p className="text-sm text-gray-500">
+                  Create your characters first
+                </p>
+                <p className="text-sm text-blue-600 font-medium mt-3 group-hover:underline">
+                  Manage Characters
+                </p>
+              </Link>
+
+              <button
+                onClick={handleCreateStoryClick}
+                className="bg-white border border-gray-200 rounded-xl p-5 hover:border-blue-400 hover:shadow-md transition-all group text-left"
+              >
+                <h4 className="font-semibold text-gray-900 mb-1">Create Story</h4>
+                <p className="text-sm text-gray-500">
+                  Write and illustrate your story
+                </p>
+                <p className="text-sm text-blue-600 font-medium mt-3 group-hover:underline">
+                  Start Writing
+                </p>
+              </button>
+
+              <Link
+                href="/projects"
+                className="bg-white border border-gray-200 rounded-xl p-5 hover:border-blue-400 hover:shadow-md transition-all group"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="font-semibold text-gray-900">My Stories</h4>
+                  {draftCount > 0 && (
+                    <span className="bg-amber-100 text-amber-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                      {draftCount} {draftCount === 1 ? 'draft' : 'drafts'}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500">
+                  View all your storybooks
+                </p>
+                <p className="text-sm text-blue-600 font-medium mt-3 group-hover:underline">
+                  View Stories
+                </p>
+              </Link>
+            </div>
+          </div>
+
+          {/* Mobile: vertical stepper */}
+          <div className="md:hidden space-y-0">
+            {[
+              { step: 1, title: 'Characters', desc: 'Create your characters first', link: '/characters', cta: 'Manage Characters' },
+              { step: 2, title: 'Create Story', desc: 'Write and illustrate your story', link: null, cta: 'Start Writing' },
+              { step: 3, title: 'My Stories', desc: 'View all your storybooks', link: '/projects', cta: 'View Stories' },
+            ].map((item, idx) => (
+              <div key={item.step} className="flex gap-4">
+                {/* Vertical line + circle */}
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center justify-center w-9 h-9 rounded-full bg-blue-600 text-white font-bold text-sm shadow-md flex-shrink-0">
+                    {item.step}
+                  </div>
+                  {idx < 2 && (
+                    <div className="w-0.5 h-6 bg-blue-200 my-1" />
+                  )}
+                </div>
+                {/* Card */}
+                {item.link ? (
+                  <Link
+                    href={item.link}
+                    className="flex-1 bg-white border border-gray-200 rounded-xl p-4 mb-3 hover:border-blue-400 hover:shadow-md transition-all group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold text-gray-900">{item.title}</h4>
+                      {item.step === 3 && draftCount > 0 && (
+                        <span className="bg-amber-100 text-amber-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                          {draftCount} {draftCount === 1 ? 'draft' : 'drafts'}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">{item.desc}</p>
+                    <p className="text-sm text-blue-600 font-medium mt-2 group-hover:underline">{item.cta}</p>
+                  </Link>
+                ) : (
+                  <button
+                    onClick={handleCreateStoryClick}
+                    className="flex-1 bg-white border border-gray-200 rounded-xl p-4 mb-3 hover:border-blue-400 hover:shadow-md transition-all group text-left"
+                  >
+                    <h4 className="font-semibold text-gray-900">{item.title}</h4>
+                    <p className="text-sm text-gray-500 mt-1">{item.desc}</p>
+                    <p className="text-sm text-blue-600 font-medium mt-2 group-hover:underline">{item.cta}</p>
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Section 4: Demo Videos */}
+        {demoVideos.length > 0 && (
+          <div className="mb-10">
+            <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-4">
+              Need Help? Watch How It Works
+            </h3>
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <VideoCarousel videos={demoVideos} />
+            </div>
           </div>
         )}
+
+        {/* Section 5: More to Explore */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-4">
+            More to Explore
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Link
+              href="/photos"
+              className="bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300 hover:shadow-sm transition-all group"
+            >
+              <h4 className="font-semibold text-gray-900">Photos to Storybook</h4>
+              <p className="text-sm text-gray-500 mt-1">
+                Turn family photos into illustrated stories
+              </p>
+              <p className="text-sm text-blue-600 font-medium mt-3 group-hover:underline">
+                Upload Photos
+              </p>
+            </Link>
+
+            <Link
+              href="/import"
+              className="bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300 hover:shadow-sm transition-all group"
+            >
+              <h4 className="font-semibold text-gray-900">Import PDF</h4>
+              <p className="text-sm text-gray-500 mt-1">
+                Bring any PDF storybook to life with narration
+              </p>
+              <p className="text-sm text-blue-600 font-medium mt-3 group-hover:underline">
+                Import PDF
+              </p>
+            </Link>
+
+            <Link
+              href="/community-stories"
+              className="bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300 hover:shadow-sm transition-all group"
+            >
+              <h4 className="font-semibold text-gray-900">Community Stories</h4>
+              <p className="text-sm text-gray-500 mt-1">
+                Discover inspiring tales shared by other families
+              </p>
+              <p className="text-sm text-blue-600 font-medium mt-3 group-hover:underline">
+                Browse Stories
+              </p>
+            </Link>
+          </div>
+        </div>
+
       </div>
     </div>
   );
