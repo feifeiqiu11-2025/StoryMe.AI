@@ -44,6 +44,9 @@ export interface CharacterLibrary {
   reference_image_url?: string;
   reference_image_filename?: string;
 
+  // Animated Preview (AI-generated story version)
+  animated_preview_url?: string;
+
   // Description Fields
   hair_color?: string;
   skin_tone?: string;

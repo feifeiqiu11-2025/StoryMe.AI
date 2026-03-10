@@ -10,6 +10,12 @@ import { StorybookTemplateLarge } from '@/components/pdf/StorybookTemplateLarge'
 
 export type PDFFormat = 'a5' | 'a4' | 'large';
 
+export interface StoryCharacterData {
+  name: string;
+  originalCreationUrl?: string;   // reference_image_url (child's original artwork/craft)
+  storyVersionUrl?: string;       // animated_preview_url (how character looks in the story)
+}
+
 export interface StoryData {
   title: string;
   description?: string;
@@ -21,6 +27,7 @@ export interface StoryData {
     description?: string;      // Fallback for backward compatibility
     imageUrl: string;
   }>;
+  characters?: StoryCharacterData[];  // Characters for "Meet the Character Designers" page
   createdDate?: string;
   author?: string;
 }
@@ -45,6 +52,7 @@ export async function generateStoryPDF(storyData: StoryData, format: PDFFormat =
       author: storyData.author,
       coverImageUrl: storyData.coverImageUrl,
       scenes: storyData.scenes,
+      characters: storyData.characters,
       createdDate: storyData.createdDate,
     });
 

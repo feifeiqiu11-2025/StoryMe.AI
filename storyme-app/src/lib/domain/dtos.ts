@@ -31,6 +31,9 @@ export interface CharacterDTO {
     fileName: string;
   };
 
+  // Animated Preview (AI-generated story version)
+  animatedPreviewUrl?: string;
+
   // Description
   description: CharacterDescriptionDTO;
   personalityTraits?: string[];

@@ -26,9 +26,9 @@ export async function GET(
       );
     }
 
-    // Get project with scenes and images
+    // Get project with scenes, images, and characters
     const projectService = new ProjectService(supabase);
-    const project = await projectService.getProjectWithScenes(id, user.id);
+    const project = await projectService.getProjectFull(id, user.id);
 
     if (!project) {
       return NextResponse.json(

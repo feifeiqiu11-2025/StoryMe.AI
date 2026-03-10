@@ -928,12 +928,10 @@ export default function StoryViewerPage() {
         return;
       }
 
-      // Format author string from project data or fallback to user
+      // Format author string from project data (leave empty if not set — kids sign the printed book)
       let authorString = project.authorName || '';
       if (authorString && project.authorAge) {
         authorString += `, age ${project.authorAge}`;
-      } else if (!authorString) {
-        authorString = user?.name || 'My Family';
       }
 
       console.log('📄 PDF Download Data:');
@@ -943,12 +941,20 @@ export default function StoryViewerPage() {
       console.log('  - Scenes:', scenesData.length);
       console.log('  - Format:', format);
 
+      // Map character data for PDF designer page
+      const charactersData = (project.characters || []).map((pc: any) => ({
+        name: pc.character?.name || pc.name || 'Unknown',
+        originalCreationUrl: pc.character?.referenceImage?.url || undefined,
+        storyVersionUrl: pc.character?.animatedPreviewUrl || undefined,
+      }));
+
       // Generate and download PDF with selected format
       await generateAndDownloadStoryPDF({
         title: project.title,
         description: project.description,
         coverImageUrl: project.coverImageUrl,
         scenes: scenesData,
+        characters: charactersData,
         createdDate: new Date(project.createdAt).toLocaleDateString(),
         author: authorString,
       }, undefined, format);

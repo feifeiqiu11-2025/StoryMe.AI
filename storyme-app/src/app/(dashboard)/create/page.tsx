@@ -1208,18 +1208,24 @@ function CreateStoryPageInner() {
         };
       });
 
-      // Format author string: "Name, age X" or just "Name" or fallback
+      // Format author string (leave empty if not set — kids sign the printed book)
       let authorString = authorName.trim();
       if (authorString && authorAge) {
         authorString += `, age ${authorAge}`;
-      } else if (!authorString) {
-        authorString = user?.name || 'My Family';
       }
+
+      // Map character data for PDF designer page
+      const charactersData = characters.map(c => ({
+        name: c.name,
+        originalCreationUrl: c.referenceImage?.url || undefined,
+        storyVersionUrl: c.animatedPreviewUrl || undefined,
+      }));
 
       await generateAndDownloadStoryPDF({
         title,
         description: saveDescription,
         scenes: scenesData,
+        characters: charactersData,
         author: authorString,
       });
 

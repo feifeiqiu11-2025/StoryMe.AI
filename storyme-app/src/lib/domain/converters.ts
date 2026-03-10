@@ -11,6 +11,7 @@ import type {
   GeneratedImage,
   ProjectWithCharacters,
   ProjectWithScenes,
+  ProjectFull,
   SceneWithImages,
 } from './models';
 
@@ -22,6 +23,7 @@ import type {
   ProjectDTO,
   ProjectWithCharactersDTO,
   ProjectWithScenesDTO,
+  ProjectFullDTO,
   ProjectCharacterDTO,
   SceneDTO,
   SceneWithImagesDTO,
@@ -44,6 +46,7 @@ export function characterToDTO(character: CharacterLibrary): CharacterDTO {
       url: character.reference_image_url || '',
       fileName: character.reference_image_filename || '',
     },
+    animatedPreviewUrl: character.animated_preview_url,
     description: {
       hairColor: character.hair_color,
       skinTone: character.skin_tone,
@@ -150,6 +153,26 @@ export function projectWithScenesToDTO(project: ProjectWithScenes): ProjectWithS
     ...projectToDTO(project),
     scenes: (project.scenes || []).map(sceneWithImagesToDTO),
     tags,
+  };
+}
+
+export function projectFullToDTO(project: ProjectFull): ProjectFullDTO {
+  return {
+    ...projectToDTO(project),
+    characters: (project.characters || []).map(pc => ({
+      id: pc.id,
+      projectId: pc.project_id,
+      characterLibraryId: pc.character_library_id,
+      character: characterToDTO(pc.character),
+      isPrimary: pc.is_primary,
+      orderIndex: pc.order_index,
+      role: pc.role,
+      overrideClothing: pc.override_clothing,
+      overrideAge: pc.override_age,
+      overrideDescription: pc.override_description,
+      createdAt: pc.created_at,
+    })),
+    scenes: (project.scenes || []).map(sceneWithImagesToDTO),
   };
 }
 

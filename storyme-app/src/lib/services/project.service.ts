@@ -14,12 +14,14 @@ import type {
   ProjectDTO,
   ProjectWithCharactersDTO,
   ProjectWithScenesDTO,
+  ProjectFullDTO,
   SceneDTO,
 } from '../domain/dtos';
 import {
   projectToDTO,
   projectWithCharactersToDTO,
   projectWithScenesToDTO,
+  projectFullToDTO,
 } from '../domain/converters';
 
 export class ProjectService {
@@ -202,6 +204,27 @@ export class ProjectService {
     }
 
     return projectWithScenesToDTO(project);
+  }
+
+  /**
+   * Get project with scenes, images, and characters
+   */
+  async getProjectFull(
+    projectId: string,
+    userId: string
+  ): Promise<ProjectFullDTO | null> {
+    const project = await this.projectRepo.findByIdFull(projectId);
+
+    if (!project) {
+      return null;
+    }
+
+    // Verify ownership
+    if (project.user_id !== userId) {
+      throw new Error('Unauthorized: Project does not belong to you');
+    }
+
+    return projectFullToDTO(project);
   }
 
   /**

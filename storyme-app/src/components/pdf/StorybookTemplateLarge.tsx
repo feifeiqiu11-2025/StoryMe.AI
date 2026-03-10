@@ -153,6 +153,12 @@ const styles = StyleSheet.create({
   },
 });
 
+interface CharacterForPDF {
+  name: string;
+  originalCreationUrl?: string;
+  storyVersionUrl?: string;
+}
+
 interface StorybookTemplateLargeProps {
   title: string;
   description?: string;
@@ -165,7 +171,16 @@ interface StorybookTemplateLargeProps {
     description?: string;
     imageUrl: string;
   }>;
+  characters?: CharacterForPDF[];
   createdDate?: string;
+}
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
 }
 
 /**
@@ -224,13 +239,20 @@ function getSmartFontSizeLarge(text: string): { fontSize: number; lineHeight: nu
 export const StorybookTemplateLarge: React.FC<StorybookTemplateLargeProps> = ({
   title,
   description,
-  author = 'My Family',
+  author,
   coverImageUrl,
   scenes,
+  characters,
   createdDate,
 }) => {
+  const displayCharacters = (characters || []).filter(
+    c => c.originalCreationUrl || c.storyVersionUrl
+  );
+  const characterPages = chunkArray(displayCharacters, 2);
+
   console.log('📖 Large Format PDF Template (7" x 8.5"):');
   console.log('  - coverImageUrl:', coverImageUrl);
+  console.log('  - Characters:', displayCharacters.length);
   console.log('  - Will use:', coverImageUrl ? 'AI Cover (85% image)' : 'Fallback Cover');
 
   return (
@@ -245,8 +267,8 @@ export const StorybookTemplateLarge: React.FC<StorybookTemplateLargeProps> = ({
 
           {/* 15% Footer Section */}
           <View style={styles.coverFooter}>
-            <Text style={styles.coverAuthor}>By {author}</Text>
-            <Text style={styles.coverCopyright}>© 2025 KindleWood Studio</Text>
+            {author && <Text style={styles.coverAuthor}>By {author}</Text>}
+            <Text style={styles.coverCopyright}>© 2026 KindleWood Studio</Text>
           </View>
         </Page>
       ) : (
@@ -258,10 +280,87 @@ export const StorybookTemplateLarge: React.FC<StorybookTemplateLargeProps> = ({
               <Text style={styles.coverSubtitle}>{description}</Text>
             )}
             <View style={styles.coverDecoration} />
-            <Text style={styles.coverAuthorFallback}>By {author}</Text>
+            {author && <Text style={styles.coverAuthorFallback}>By {author}</Text>}
           </View>
         </Page>
       )}
+
+      {/* Character Designer Pages */}
+      {characterPages.map((pageChars, pageIndex) => (
+        <Page key={`char-page-${pageIndex}`} size={{ width: 504, height: 612 }} style={styles.page}>
+          <View style={{ flex: 1, padding: 25, paddingTop: 30 }}>
+            {pageIndex === 0 && (
+              <View style={{ alignItems: 'center', marginBottom: 15 }}>
+                <Text style={{
+                  fontSize: 18,
+                  fontWeight: 'bold',
+                  fontFamily: 'Noto Sans SC',
+                  color: '#4F46E5',
+                  textAlign: 'center',
+                  marginBottom: 4,
+                }}>
+                  Meet the Character Designers
+                </Text>
+                <View style={{ width: 80, height: 2, backgroundColor: '#E5E7EB', marginTop: 6 }} />
+              </View>
+            )}
+
+            {pageChars.map((char, charIndex) => {
+              const hasBothImages = !!char.originalCreationUrl && !!char.storyVersionUrl;
+              const singleImageUrl = char.originalCreationUrl || char.storyVersionUrl;
+
+              return (
+                <View key={charIndex} style={{
+                  flex: 1,
+                  marginBottom: charIndex === 0 && pageChars.length > 1 ? 10 : 0,
+                  alignItems: 'center',
+                }}>
+                  {hasBothImages ? (
+                    <View style={{ flexDirection: 'row', width: '100%', marginBottom: 6 }}>
+                      <Text style={{ flex: 1, fontSize: 9, fontFamily: 'Noto Sans SC', color: '#6B7280', textAlign: 'center' }}>
+                        Original Creation
+                      </Text>
+                      <Text style={{ flex: 1, fontSize: 9, fontFamily: 'Noto Sans SC', color: '#6B7280', textAlign: 'center' }}>
+                        In the Story
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={{ fontSize: 9, fontFamily: 'Noto Sans SC', color: '#6B7280', textAlign: 'center', marginBottom: 6 }}>
+                      {char.originalCreationUrl ? 'Original Creation' : 'In the Story'}
+                    </Text>
+                  )}
+
+                  {hasBothImages ? (
+                    <View style={{ flexDirection: 'row', width: '100%', gap: 10 }}>
+                      <View style={{ flex: 1, height: 190, borderRadius: 8, overflow: 'hidden', backgroundColor: '#F9FAFB' }}>
+                        <Image src={char.originalCreationUrl!} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </View>
+                      <View style={{ flex: 1, height: 190, borderRadius: 8, overflow: 'hidden', backgroundColor: '#F9FAFB' }}>
+                        <Image src={char.storyVersionUrl!} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={{ width: '60%', height: 190, borderRadius: 8, overflow: 'hidden', backgroundColor: '#F9FAFB' }}>
+                      <Image src={singleImageUrl!} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </View>
+                  )}
+
+                  <Text style={{
+                    fontSize: 12,
+                    fontFamily: 'Noto Sans SC',
+                    color: '#1F2937',
+                    textAlign: 'center',
+                    marginTop: 8,
+                    fontWeight: 'bold',
+                  }}>
+                    &ldquo;{char.name}&rdquo; — Designed by __________
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </Page>
+      ))}
 
       {/* Scene Pages - 70% image, 30% captions */}
       {scenes.map((scene, index) => {

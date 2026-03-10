@@ -194,6 +194,12 @@ const styles = StyleSheet.create({
   },
 });
 
+interface CharacterForPDF {
+  name: string;
+  originalCreationUrl?: string;
+  storyVersionUrl?: string;
+}
+
 interface StorybookTemplateProps {
   title: string;
   description?: string;
@@ -206,7 +212,19 @@ interface StorybookTemplateProps {
     description?: string;      // Fallback for backward compatibility
     imageUrl: string;
   }>;
+  characters?: CharacterForPDF[];
   createdDate?: string;
+}
+
+/**
+ * Chunk an array into groups of a specified size
+ */
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
 }
 
 /**
@@ -269,15 +287,23 @@ function getSmartFontSize(text: string): { fontSize: number; lineHeight: number 
 export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
   title,
   description,
-  author = 'My Family',
+  author,
   coverImageUrl,
   scenes,
+  characters,
   createdDate,
 }) => {
+  // Filter characters that have at least one image
+  const displayCharacters = (characters || []).filter(
+    c => c.originalCreationUrl || c.storyVersionUrl
+  );
+  const characterPages = chunkArray(displayCharacters, 2);
+
   // Debug logging
   console.log('📖 PDF Template Received:');
   console.log('  - coverImageUrl:', coverImageUrl);
   console.log('  - Will use:', coverImageUrl ? 'AI Cover' : 'Fallback Cover');
+  console.log('  - Characters:', displayCharacters.length);
   console.log('  - Scenes data:', scenes.map(s => ({
     sceneNumber: s.sceneNumber,
     hasCaption: !!s.caption,
@@ -321,21 +347,23 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
             backgroundColor: '#ffffff',
             paddingTop: 15,
           }}>
-            <Text style={{
-              fontSize: 14,
-              fontFamily: 'Noto Sans SC',
-              color: '#1F2937',
-              fontWeight: 'bold',
-              marginBottom: 6,
-            }}>
-              By {author}
-            </Text>
+            {author && (
+              <Text style={{
+                fontSize: 14,
+                fontFamily: 'Noto Sans SC',
+                color: '#1F2937',
+                fontWeight: 'bold',
+                marginBottom: 6,
+              }}>
+                By {author}
+              </Text>
+            )}
             <Text style={{
               fontSize: 10,
               fontFamily: 'Noto Sans SC',
               color: '#6B7280',
             }}>
-              © 2025 KindleWood Studio
+              © 2026 KindleWood Studio
             </Text>
           </View>
         </Page>
@@ -349,13 +377,140 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
             )}
             <Text style={styles.coverTagline}>A StoryMe Adventure</Text>
             <View style={styles.coverDecorationBottom} />
-            <Text style={styles.coverAuthor}>By {author}</Text>
+            {author && <Text style={styles.coverAuthor}>By {author}</Text>}
             {createdDate && (
               <Text style={styles.coverDate}>{createdDate}</Text>
             )}
           </View>
         </Page>
       )}
+
+      {/* Character Designer Pages - after cover, before scenes */}
+      {characterPages.map((pageChars, pageIndex) => (
+        <Page key={`char-page-${pageIndex}`} size={{ width: 420, height: 595 }} style={styles.page}>
+          <View style={{ flex: 1, padding: 25, paddingTop: 30 }}>
+            {/* Page Title - only on first designer page */}
+            {pageIndex === 0 && (
+              <View style={{ alignItems: 'center', marginBottom: 15 }}>
+                <Text style={{
+                  fontSize: 18,
+                  fontWeight: 'bold',
+                  fontFamily: 'Noto Sans SC',
+                  color: '#4F46E5',
+                  textAlign: 'center',
+                  marginBottom: 4,
+                }}>
+                  Meet the Character Designers
+                </Text>
+                <View style={{ width: 80, height: 2, backgroundColor: '#E5E7EB', marginTop: 6 }} />
+              </View>
+            )}
+
+            {/* Character blocks - 2 per page */}
+            {pageChars.map((char, charIndex) => {
+              const hasBothImages = !!char.originalCreationUrl && !!char.storyVersionUrl;
+              const singleImageUrl = char.originalCreationUrl || char.storyVersionUrl;
+
+              return (
+                <View key={charIndex} style={{
+                  flex: 1,
+                  marginBottom: charIndex === 0 && pageChars.length > 1 ? 10 : 0,
+                  alignItems: 'center',
+                }}>
+                  {/* Column headers */}
+                  {hasBothImages ? (
+                    <View style={{ flexDirection: 'row', width: '100%', marginBottom: 6 }}>
+                      <Text style={{
+                        flex: 1,
+                        fontSize: 8,
+                        fontFamily: 'Noto Sans SC',
+                        color: '#6B7280',
+                        textAlign: 'center',
+                      }}>
+                        Original Creation
+                      </Text>
+                      <Text style={{
+                        flex: 1,
+                        fontSize: 8,
+                        fontFamily: 'Noto Sans SC',
+                        color: '#6B7280',
+                        textAlign: 'center',
+                      }}>
+                        In the Story
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={{
+                      fontSize: 8,
+                      fontFamily: 'Noto Sans SC',
+                      color: '#6B7280',
+                      textAlign: 'center',
+                      marginBottom: 6,
+                    }}>
+                      {char.originalCreationUrl ? 'Original Creation' : 'In the Story'}
+                    </Text>
+                  )}
+
+                  {/* Images */}
+                  {hasBothImages ? (
+                    <View style={{ flexDirection: 'row', width: '100%', gap: 8 }}>
+                      <View style={{
+                        flex: 1,
+                        height: 180,
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        backgroundColor: '#F9FAFB',
+                      }}>
+                        <Image
+                          src={char.originalCreationUrl!}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      </View>
+                      <View style={{
+                        flex: 1,
+                        height: 180,
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        backgroundColor: '#F9FAFB',
+                      }}>
+                        <Image
+                          src={char.storyVersionUrl!}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={{
+                      width: '60%',
+                      height: 180,
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      backgroundColor: '#F9FAFB',
+                    }}>
+                      <Image
+                        src={singleImageUrl!}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </View>
+                  )}
+
+                  {/* Caption */}
+                  <Text style={{
+                    fontSize: 11,
+                    fontFamily: 'Noto Sans SC',
+                    color: '#1F2937',
+                    textAlign: 'center',
+                    marginTop: 8,
+                    fontWeight: 'bold',
+                  }}>
+                    &ldquo;{char.name}&rdquo; — Designed by __________
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </Page>
+      ))}
 
       {/* Scene Pages */}
       {scenes.map((scene, index) => {
