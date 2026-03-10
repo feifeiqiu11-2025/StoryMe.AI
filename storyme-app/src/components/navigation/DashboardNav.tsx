@@ -84,7 +84,7 @@ export default function DashboardNav() {
               </div>
             </Link>
             <Link
-              href="/my-artists"
+              href="/little-artists"
               onClick={() => setCommunityDropdownOpen(false)}
               className="block px-4 py-2 hover:bg-gray-50 transition-colors"
             >
