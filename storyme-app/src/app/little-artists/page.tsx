@@ -1,31 +1,103 @@
 /**
- * Public Little Artists Gallery Page
- * Browse all published young artists and their artwork
+ * Little Artists Gallery Page
+ * Public gallery showcasing characters shared by the community
+ * Shows "Original Creation vs In the Story" side-by-side
  */
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import LandingNav from '@/components/navigation/LandingNav';
+import { createClient } from '@/lib/supabase/client';
+
+/* COMMENTED OUT - Artist profile feature (keeping for future use)
 import ArtistSectionCard from '@/components/little-artists/ArtistSectionCard';
 import type { LittleArtist, ArtistArtwork, ArtistWithArtworks } from '@/lib/types/artist';
+*/
+
+interface PublicCharacter {
+  id: string;
+  name: string;
+  reference_image_url: string;
+  animated_preview_url: string;
+  created_at: string;
+}
 
 export default function LittleArtistsGalleryPage() {
-  const [artists, setArtists] = useState<ArtistWithArtworks[]>([]);
+  const [characters, setCharacters] = useState<PublicCharacter[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCharacter, setSelectedCharacter] = useState<PublicCharacter | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  /* COMMENTED OUT - Artist profile state (keeping for future use)
+  const [artists, setArtists] = useState<ArtistWithArtworks[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const filteredArtists = artists.filter(artist => {
+    const query = searchQuery.toLowerCase();
+    return (
+      artist.name.toLowerCase().includes(query) ||
+      artist.bio?.toLowerCase().includes(query)
+    );
+  });
+
+  const featuredArtists = filteredArtists.filter(a => a.featured);
+  const regularArtists = filteredArtists.filter(a => !a.featured);
+  */
+
   useEffect(() => {
-    loadArtistsWithArtworks();
+    loadPublicCharacters();
+    checkAuthStatus();
   }, []);
 
+  // Close lightbox on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedCharacter(null);
+    };
+    if (selectedCharacter) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [selectedCharacter]);
+
+  const checkAuthStatus = async () => {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsLoggedIn(!!user);
+    } catch {
+      setIsLoggedIn(false);
+    }
+  };
+
+  const loadPublicCharacters = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch('/api/public-characters');
+      if (!response.ok) {
+        throw new Error('Failed to load characters');
+      }
+
+      const data = await response.json();
+      setCharacters(data.characters || []);
+    } catch (err) {
+      console.error('Error loading public characters:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load characters');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* COMMENTED OUT - Artist profile data loading (keeping for future use)
   const loadArtistsWithArtworks = async () => {
     try {
       setLoading(true);
 
-      // Fetch artists
       const artistsResponse = await fetch('/api/little-artists');
       if (!artistsResponse.ok) {
         throw new Error('Failed to load artists');
@@ -33,7 +105,6 @@ export default function LittleArtistsGalleryPage() {
       const artistsData = await artistsResponse.json();
       const fetchedArtists: LittleArtist[] = artistsData.artists || [];
 
-      // Fetch artworks for each artist
       const artistsWithArtworks = await Promise.all(
         fetchedArtists.map(async (artist) => {
           try {
@@ -63,39 +134,146 @@ export default function LittleArtistsGalleryPage() {
       setLoading(false);
     }
   };
-
-  // Filter artists based on search query
-  const filteredArtists = artists.filter(artist => {
-    const query = searchQuery.toLowerCase();
-    return (
-      artist.name.toLowerCase().includes(query) ||
-      artist.bio?.toLowerCase().includes(query)
-    );
-  });
-
-  // Separate featured and regular artists
-  const featuredArtists = filteredArtists.filter(a => a.featured);
-  const regularArtists = filteredArtists.filter(a => !a.featured);
+  */
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      {/* Navigation */}
       <LandingNav />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Page Title */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
-            🎨 Little Artists
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Page Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
+            Little Artists Gallery
           </h1>
-          <div className="h-1 w-24 bg-gradient-to-r from-purple-400 to-pink-500 rounded-full mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-            Got a talented little artist at home? Share their creativity with our community!
-            Their artwork characters can be featured in stories, participate in monthly art challenges (coming soon),
-            or simply showcase their imagination in our gallery.
+          <p className="text-gray-600 text-lg">
+            Celebrating creativity from young artists in our community.
+            Kids create their characters, and KindleWood brings them to life in stories!
           </p>
         </div>
-        {/* Search Bar */}
+
+        {/* Loading State */}
+        {loading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-xl shadow-lg overflow-hidden animate-pulse">
+                <div className="p-4 pb-2">
+                  <div className="h-5 bg-gray-200 rounded w-2/3" />
+                </div>
+                <div className="px-4 pb-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="h-3 bg-gray-200 rounded w-3/4 mb-2" />
+                      <div className="aspect-square bg-gray-200 rounded-lg" />
+                    </div>
+                    <div>
+                      <div className="h-3 bg-gray-200 rounded w-3/4 mb-2" />
+                      <div className="aspect-square bg-gray-200 rounded-lg" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="text-center py-12 bg-white rounded-xl shadow-md">
+            <p className="text-red-600 text-lg mb-4">Failed to load gallery</p>
+            <button
+              onClick={loadPublicCharacters}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {/* Character Grid */}
+        {!loading && !error && characters.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {characters.map((character) => (
+              <div
+                key={character.id}
+                onClick={() => setSelectedCharacter(character)}
+                className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
+              >
+                <div className="p-4 pb-2">
+                  <h3 className="text-lg font-semibold text-gray-900 truncate">
+                    {character.name}
+                  </h3>
+                </div>
+                <div className="px-4 pb-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Original Creation</p>
+                      <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                        <img
+                          src={character.reference_image_url}
+                          alt={`${character.name} - original`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">In the Story</p>
+                      <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                        <img
+                          src={character.animated_preview_url}
+                          alt={`${character.name} - in story`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && !error && characters.length === 0 && (
+          <div className="text-center py-12 bg-white rounded-xl shadow-md">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">No artworks shared yet</h3>
+            <p className="text-gray-600">
+              Be the first to share your character creations with the community!
+            </p>
+          </div>
+        )}
+
+        {/* Footer - How to share */}
+        {!loading && !error && (
+          <div className="mt-12 pt-8 border-t border-gray-200">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Want to showcase your artwork here?
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Create characters in your Character Library and tap the share icon
+                to make them visible in this gallery.
+              </p>
+              {isLoggedIn ? (
+                <Link
+                  href="/characters"
+                  className="text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Go to Character Library &rarr;
+                </Link>
+              ) : (
+                <Link
+                  href="/signup"
+                  className="text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Sign Up Free &rarr;
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* COMMENTED OUT - Artist profile search bar (keeping for future use)
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
           <div className="relative">
             <input
@@ -121,52 +299,17 @@ export default function LittleArtistsGalleryPage() {
           </div>
           {filteredArtists.length > 0 && (
             <div className="mt-4 text-sm text-gray-600">
-              🎨 {filteredArtists.length} {filteredArtists.length === 1 ? 'artist' : 'artists'}
-              {featuredArtists.length > 0 && ` · ⭐ ${featuredArtists.length} featured`}
+              {filteredArtists.length} {filteredArtists.length === 1 ? 'artist' : 'artists'}
+              {featuredArtists.length > 0 && ` · ${featuredArtists.length} featured`}
             </div>
           )}
         </div>
+        */}
 
-        {/* Loading State */}
-        {loading && (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4"></div>
-            <p className="text-gray-600">Loading amazing artists...</p>
-          </div>
-        )}
-
-        {/* Error State */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-            <svg
-              className="w-12 h-12 text-red-500 mx-auto mb-3"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <p className="text-red-800 font-semibold mb-2">Unable to load artists</p>
-            <p className="text-red-600 text-sm">{error}</p>
-            <button
-              onClick={loadArtistsWithArtworks}
-              className="mt-4 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-            >
-              Try Again
-            </button>
-          </div>
-        )}
-
-        {/* Featured Artists Section */}
+        {/* COMMENTED OUT - Featured artists section (keeping for future use)
         {!loading && !error && featuredArtists.length > 0 && (
           <div className="mb-12">
             <div className="flex items-center gap-3 mb-6">
-              <div className="text-3xl">⭐</div>
               <h2 className="text-3xl font-bold text-gray-900">Featured Artists</h2>
             </div>
             <div className="space-y-6">
@@ -181,8 +324,9 @@ export default function LittleArtistsGalleryPage() {
             </div>
           </div>
         )}
+        */}
 
-        {/* Regular Artists Section */}
+        {/* COMMENTED OUT - Regular artists section (keeping for future use)
         {!loading && !error && regularArtists.length > 0 && (
           <div>
             <h2 className="text-3xl font-bold text-gray-900 mb-6">
@@ -200,13 +344,13 @@ export default function LittleArtistsGalleryPage() {
             </div>
           </div>
         )}
+        */}
 
-        {/* Empty State */}
+        {/* COMMENTED OUT - Artist profile empty state (keeping for future use)
         {!loading && !error && filteredArtists.length === 0 && (
           <div className="text-center py-16">
             {searchQuery ? (
               <>
-                <div className="text-6xl mb-4">🔍</div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">No artists found</h3>
                 <p className="text-gray-600 mb-6">
                   Try adjusting your search or browse all artists
@@ -220,7 +364,6 @@ export default function LittleArtistsGalleryPage() {
               </>
             ) : (
               <>
-                <div className="text-6xl mb-4">🎨</div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">No artists yet</h3>
                 <p className="text-gray-600 mb-6">
                   Be the first to showcase your young artist's creativity!
@@ -235,8 +378,9 @@ export default function LittleArtistsGalleryPage() {
             )}
           </div>
         )}
+        */}
 
-        {/* Call to Action - Premium Feature */}
+        {/* COMMENTED OUT - Premium CTA footer (keeping for future use)
         {!loading && !error && artists.length > 0 && (
           <div className="mt-16 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl shadow-xl p-8 text-center border border-purple-200">
             <div className="max-w-3xl mx-auto">
@@ -261,7 +405,63 @@ export default function LittleArtistsGalleryPage() {
             </div>
           </div>
         )}
+        */}
       </div>
+
+      {/* Lightbox Modal */}
+      {selectedCharacter && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setSelectedCharacter(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-100">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {selectedCharacter.name}
+              </h2>
+              <button
+                onClick={() => setSelectedCharacter(null)}
+                className="text-gray-400 hover:text-gray-600 p-1"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-2">Original Creation</p>
+                  <div className="aspect-square rounded-xl overflow-hidden bg-gray-100">
+                    <img
+                      src={selectedCharacter.reference_image_url}
+                      alt={`${selectedCharacter.name} - original creation`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-2">In the Story</p>
+                  <div className="aspect-square rounded-xl overflow-hidden bg-gray-100">
+                    <img
+                      src={selectedCharacter.animated_preview_url}
+                      alt={`${selectedCharacter.name} - in the story`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
