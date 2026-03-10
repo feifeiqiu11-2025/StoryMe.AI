@@ -76,6 +76,11 @@ export default function CharactersPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [activeTab, setActiveTab] = useState<'mine' | 'community'>('mine');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 12;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const [showNewCharacterForm, setShowNewCharacterForm] = useState(false);
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null);
   const [formData, setFormData] = useState({
@@ -112,16 +117,29 @@ export default function CharactersPage() {
   } | null>(null);
   const [isGeneratingSketch, setIsGeneratingSketch] = useState(false);
   const [sketchError, setSketchError] = useState<string | null>(null);
+  // Public toggle confirmation modal
+  const [publicModalCharacter, setPublicModalCharacter] = useState<{ id: string; name: string; makePublic: boolean } | null>(null);
 
-  // Load characters from database
-  const loadCharacters = async (userId: string) => {
+  // Load characters from database with scope and pagination
+  const loadCharacters = async (userId: string, scope: 'mine' | 'community' = 'mine', page: number = 1) => {
     try {
       const supabase = createClient();
-      const { data, error } = await supabase
+      const offset = (page - 1) * PAGE_SIZE;
+
+      let query = supabase
         .from('character_library')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+        .select('*', { count: 'exact' });
+
+      if (scope === 'mine') {
+        query = query.eq('user_id', userId);
+      } else {
+        query = query.eq('is_public', true);
+      }
+
+      query = query.order('created_at', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      const { data, count, error } = await query;
 
       if (error) throw error;
 
@@ -144,12 +162,15 @@ export default function CharactersPage() {
         },
         isPrimary: false,
         order: 0,
+        isPublic: char.is_public ?? false,
       }));
 
       setCharacters(transformedCharacters);
+      setTotalCount(count || 0);
     } catch (error) {
       console.error('Error loading characters:', error);
       setCharacters([]);
+      setTotalCount(0);
     }
   };
 
@@ -193,6 +214,67 @@ export default function CharactersPage() {
 
     loadUser();
   }, [router]);
+
+  // Reload when tab or page changes
+  useEffect(() => {
+    if (user?.id) {
+      loadCharacters(user.id, activeTab, currentPage);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, currentPage]);
+
+  const handleConfirmTogglePublic = async () => {
+    if (!publicModalCharacter) return;
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('character_library')
+        .update({ is_public: publicModalCharacter.makePublic })
+        .eq('id', publicModalCharacter.id);
+
+      if (error) throw error;
+
+      // Refresh list
+      if (user?.id) {
+        await loadCharacters(user.id, activeTab, currentPage);
+      }
+    } catch (error) {
+      console.error('Error toggling character visibility:', error);
+      alert('Failed to update character visibility. Please try again.');
+    } finally {
+      setPublicModalCharacter(null);
+    }
+  };
+
+  // Generate page numbers with ellipsis for pagination
+  const generatePageNumbers = (current: number, total: number): (number | '...')[] => {
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+
+    const pages: (number | '...')[] = [1];
+
+    if (current > 3) {
+      pages.push('...');
+    }
+
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+
+    if (current < total - 2) {
+      pages.push('...');
+    }
+
+    if (total > 1) {
+      pages.push(total);
+    }
+
+    return pages;
+  };
 
   const handleOpenForm = (character?: Character) => {
     if (character) {
@@ -705,7 +787,7 @@ export default function CharactersPage() {
       }
 
       // Reload characters
-      await loadCharacters(user.id);
+      await loadCharacters(user.id, activeTab, currentPage);
       handleCloseForm();
     } catch (error: any) {
       console.error('Error saving character:', error);
@@ -730,7 +812,7 @@ export default function CharactersPage() {
 
       // Reload characters
       if (user?.id) {
-        await loadCharacters(user.id);
+        await loadCharacters(user.id, activeTab, currentPage);
       }
     } catch (error) {
       console.error('Error deleting character:', error);
@@ -755,35 +837,45 @@ export default function CharactersPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Character Library</h1>
             <p className="text-gray-600">
-              Save and reuse characters across multiple stories
+              Save and reuse characters across stories. Browse community characters shared by others.
             </p>
           </div>
-          <button
-            onClick={() => handleOpenForm()}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold shadow-lg hover:shadow-xl transition-all"
-          >
-            + New Character
-          </button>
+          {activeTab === 'mine' && (
+            <button
+              onClick={() => handleOpenForm()}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold shadow-lg hover:shadow-xl transition-all"
+            >
+              + New Character
+            </button>
+          )}
         </div>
 
-        {/* Info Banner */}
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-2xl p-6 mb-8">
-          <div className="flex items-start gap-4">
-            <div className="text-3xl">💡</div>
-            <div>
-              <h3 className="font-bold text-gray-900 mb-2">How Character Library Works</h3>
-              <ul className="text-gray-700 space-y-1 text-sm">
-                <li>✅ Create characters once, reuse them in multiple stories</li>
-                <li>✅ Upload photos and descriptions for consistent illustrations</li>
-                <li>✅ Track character usage across your storybooks</li>
-                <li>✅ Edit or delete characters anytime</li>
-              </ul>
-            </div>
-          </div>
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => { setActiveTab('mine'); setCurrentPage(1); }}
+            className={`px-5 py-2.5 rounded-lg font-medium text-sm transition-all ${
+              activeTab === 'mine'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            My Characters
+          </button>
+          <button
+            onClick={() => { setActiveTab('community'); setCurrentPage(1); }}
+            className={`px-5 py-2.5 rounded-lg font-medium text-sm transition-all ${
+              activeTab === 'community'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Community
+          </button>
         </div>
 
         {/* Character Form Modal */}
@@ -1491,21 +1583,26 @@ export default function CharactersPage() {
         {/* Characters Grid */}
         {characters.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
-            <div className="text-6xl mb-4">👦👧</div>
+            <div className="text-6xl mb-4">{activeTab === 'mine' ? '👦👧' : '🌍'}</div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              No Characters Yet
+              {activeTab === 'mine' ? 'No Characters Yet' : 'No Community Characters Yet'}
             </h2>
             <p className="text-gray-600 mb-6">
-              Click "New Character" above or create your first story to start building your character library!
+              {activeTab === 'mine'
+                ? 'Click "+ New Character" above or create your first story to start building your character library!'
+                : 'No one has shared characters with the community yet. Check back later!'}
             </p>
-            <Link
-              href="/create"
-              className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold text-lg shadow-lg hover:shadow-xl transition-all"
-            >
-              Create a Story
-            </Link>
+            {activeTab === 'mine' && (
+              <Link
+                href="/create"
+                className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold text-lg shadow-lg hover:shadow-xl transition-all"
+              >
+                Create a Story
+              </Link>
+            )}
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {characters.map((character) => (
               <div
@@ -1520,23 +1617,70 @@ export default function CharactersPage() {
                       alt={character.name}
                       className="w-full h-full object-cover"
                     />
-                    {character.animatedPreviewUrl && (
+                    {/* Community badge */}
+                    {activeTab === 'community' && (
+                      <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Community
+                      </div>
+                    )}
+                    {/* Preview badge (only for own characters) */}
+                    {activeTab === 'mine' && character.animatedPreviewUrl && (
                       <div className="absolute top-2 left-2 bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full">
                         Preview
                       </div>
                     )}
+                    {/* Public indicator for own characters */}
+                    {activeTab === 'mine' && character.isPublic && (
+                      <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
+                        Public
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="h-56 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
+                  <div className="h-56 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center relative">
                     <div className="text-6xl">👤</div>
+                    {activeTab === 'community' && (
+                      <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Community
+                      </div>
+                    )}
+                    {activeTab === 'mine' && character.isPublic && (
+                      <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
+                        Public
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* Character Info */}
                 <div className="p-3">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">
-                    {character.name}
-                  </h3>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-lg font-bold text-gray-900 truncate">
+                      {character.name}
+                    </h3>
+                    {/* Public toggle for own characters */}
+                    {activeTab === 'mine' && (
+                      <button
+                        onClick={() => setPublicModalCharacter({ id: character.id, name: character.name, makePublic: !character.isPublic })}
+                        title={character.isPublic ? 'Make private' : 'Share with community'}
+                        className={`ml-2 px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${
+                          character.isPublic
+                            ? 'text-green-600 bg-green-50 hover:bg-green-100'
+                            : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
 
                   {/* Actions */}
                   <div className="flex gap-2">
@@ -1546,22 +1690,121 @@ export default function CharactersPage() {
                     >
                       Use in Story
                     </Link>
-                    <button
-                      onClick={() => handleOpenForm(character)}
-                      className="flex-1 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 font-medium text-sm"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCharacter(character.id)}
-                      className="bg-red-50 text-red-600 px-3 py-2 rounded-lg hover:bg-red-100 font-medium text-sm"
-                    >
-                      🗑️
-                    </button>
+                    {activeTab === 'mine' && (
+                      <>
+                        <button
+                          onClick={() => handleOpenForm(character)}
+                          className="flex-1 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 font-medium text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCharacter(character.id)}
+                          className="bg-red-50 text-red-600 px-3 py-2 rounded-lg hover:bg-red-100 font-medium text-sm"
+                        >
+                          🗑️
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-1.5 mt-8">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              >
+                First
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              >
+                Prev
+              </button>
+
+              {generatePageNumbers(currentPage, totalPages).map((pageNum, idx) =>
+                pageNum === '...' ? (
+                  <span key={`ellipsis-${idx}`} className="px-2 py-2 text-gray-400 text-sm">...</span>
+                ) : (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      pageNum === currentPage
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                )
+              )}
+
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              >
+                Next
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              >
+                Last
+              </button>
+            </div>
+          )}
+          </>
+        )}
+
+        {/* Public/Private Confirmation Modal */}
+        {publicModalCharacter && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                {publicModalCharacter.makePublic ? 'Make Character Public?' : 'Make Character Private?'}
+              </h2>
+              <p className="text-gray-600 mb-4">
+                {publicModalCharacter.makePublic
+                  ? `"${publicModalCharacter.name}" will be visible to everyone in the community character library.`
+                  : `"${publicModalCharacter.name}" will no longer be visible to other users.`}
+              </p>
+              {publicModalCharacter.makePublic && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+                  <p className="text-yellow-800 text-sm">
+                    Warning: Make sure your character does not contain personal information like real photos, addresses, or school names.
+                  </p>
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleConfirmTogglePublic}
+                  className={`flex-1 px-6 py-3 rounded-xl font-semibold text-white shadow-lg transition-all ${
+                    publicModalCharacter.makePublic
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-orange-500 hover:bg-orange-600'
+                  }`}
+                >
+                  {publicModalCharacter.makePublic ? 'Make Public' : 'Make Private'}
+                </button>
+                <button
+                  onClick={() => setPublicModalCharacter(null)}
+                  className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

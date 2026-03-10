@@ -26,6 +26,9 @@ export const characterLibrarySchema = z.object({
 
   // Art Style
   art_style_preference: z.enum(['cartoon', 'watercolor', 'realistic']).optional(),
+
+  // Public sharing
+  is_public: z.boolean().optional(),
 }).refine(
   (data) => {
     // Either have a reference image OR at least one description field OR an animated preview

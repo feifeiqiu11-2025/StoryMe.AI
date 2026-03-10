@@ -79,6 +79,8 @@ function CreateStoryPageInner() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAddCharacterModal, setShowAddCharacterModal] = useState(false);
   const [libraryCharacters, setLibraryCharacters] = useState<Character[]>([]);
+  const [communityCharacters, setCommunityCharacters] = useState<Character[]>([]);
+  const [importTab, setImportTab] = useState<'mine' | 'community'>('mine');
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveTitle, setSaveTitle] = useState('');
   const [saveDescription, setSaveDescription] = useState('');
@@ -354,6 +356,45 @@ function CreateStoryPageInner() {
     } catch (error) {
       console.error('Error loading library characters:', error);
       setLibraryCharacters([]);
+    }
+  };
+
+  const loadCommunityCharacters = async (userId: string) => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('character_library')
+        .select('*')
+        .eq('is_public', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const transformedCharacters: Character[] = (data || []).map((char: any) => ({
+        id: char.id,
+        name: char.name,
+        referenceImage: {
+          url: char.reference_image_url || '',
+          fileName: char.reference_image_filename || '',
+        },
+        animatedPreviewUrl: char.animated_preview_url || undefined,
+        description: {
+          hairColor: char.hair_color,
+          skinTone: char.skin_tone,
+          clothing: char.clothing,
+          age: char.age,
+          otherFeatures: char.other_features,
+        },
+        isPrimary: false,
+        order: 0,
+        isFromLibrary: true,
+        isPublic: true,
+      }));
+
+      setCommunityCharacters(transformedCharacters);
+    } catch (error) {
+      console.error('Error loading community characters:', error);
+      setCommunityCharacters([]);
     }
   };
 
@@ -1420,6 +1461,8 @@ function CreateStoryPageInner() {
                 onClick={async () => {
                   if (user?.id) {
                     await loadLibraryCharacters(user.id);
+                    await loadCommunityCharacters(user.id);
+                    setImportTab('mine');
                     setShowImportModal(true);
                   }
                 }}
@@ -1448,8 +1491,8 @@ function CreateStoryPageInner() {
         {/* Import Character Modal */}
         {showImportModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-y-auto p-8">
-              <div className="flex items-center justify-between mb-6">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full h-[80vh] overflow-y-auto p-8">
+              <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold text-gray-900">Import from Character Library</h2>
                 <button
                   onClick={() => setShowImportModal(false)}
@@ -1459,57 +1502,104 @@ function CreateStoryPageInner() {
                 </button>
               </div>
 
-              {libraryCharacters.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="text-6xl mb-4">👦👧</div>
-                  <p className="text-gray-600 mb-4">No characters in your library yet!</p>
-                  <Link
-                    href="/characters"
-                    className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold shadow-lg transition-all"
-                  >
-                    Go to Character Library
-                  </Link>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {libraryCharacters.map((character) => (
-                    <div
-                      key={character.id}
-                      className="bg-white border-2 border-gray-200 rounded-xl overflow-hidden hover:border-blue-400 transition-all"
-                    >
-                      {/* Show animated preview if available, otherwise reference image */}
-                      {character.animatedPreviewUrl || character.referenceImage.url ? (
-                        <div className="h-40 bg-gradient-to-br from-blue-100 to-purple-100 relative">
-                          <img
-                            src={character.animatedPreviewUrl || character.referenceImage.url}
-                            alt={character.name}
-                            className="w-full h-full object-cover"
-                          />
-                          {character.animatedPreviewUrl && (
-                            <div className="absolute top-2 left-2 bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full">
-                              Preview
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="h-40 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-                          <div className="text-4xl">👤</div>
-                        </div>
-                      )}
-                      <div className="p-2">
-                        <h3 className="font-bold text-gray-900 text-sm mb-2 truncate">{character.name}</h3>
-                        <button
-                          onClick={() => handleImportCharacter(character)}
-                          disabled={characters.some(c => c.id === character.id)}
-                          className="w-full bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium text-xs disabled:bg-gray-300 disabled:cursor-not-allowed transition-all"
+              {/* Tabs */}
+              <div className="flex gap-2 mb-6">
+                <button
+                  onClick={() => setImportTab('mine')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    importTab === 'mine'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  My Characters
+                </button>
+                <button
+                  onClick={() => setImportTab('community')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    importTab === 'community'
+                      ? 'bg-purple-600 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Community
+                </button>
+              </div>
+
+              {(() => {
+                const displayChars = importTab === 'mine' ? libraryCharacters : communityCharacters;
+
+                if (displayChars.length === 0) {
+                  return (
+                    <div className="text-center py-12">
+                      <div className="text-6xl mb-4">{importTab === 'mine' ? '👦👧' : '🌍'}</div>
+                      <p className="text-gray-600 mb-4">
+                        {importTab === 'mine'
+                          ? 'No characters in your library yet!'
+                          : 'No community characters available yet.'}
+                      </p>
+                      {importTab === 'mine' && (
+                        <Link
+                          href="/characters"
+                          className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold shadow-lg transition-all"
                         >
-                          {characters.some(c => c.id === character.id) ? 'Added' : 'Import'}
-                        </button>
-                      </div>
+                          Go to Character Library
+                        </Link>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {displayChars.map((character) => (
+                      <div
+                        key={character.id}
+                        className="bg-white border-2 border-gray-200 rounded-xl overflow-hidden hover:border-blue-400 transition-all"
+                      >
+                        {character.animatedPreviewUrl || character.referenceImage.url ? (
+                          <div className="h-40 bg-gradient-to-br from-blue-100 to-purple-100 relative">
+                            <img
+                              src={character.animatedPreviewUrl || character.referenceImage.url}
+                              alt={character.name}
+                              className="w-full h-full object-cover"
+                            />
+                            {importTab === 'community' && (
+                              <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                Community
+                              </div>
+                            )}
+                            {importTab === 'mine' && character.animatedPreviewUrl && (
+                              <div className="absolute top-2 left-2 bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                Preview
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="h-40 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center relative">
+                            <div className="text-4xl">👤</div>
+                            {importTab === 'community' && (
+                              <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                Community
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <div className="p-2">
+                          <h3 className="font-bold text-gray-900 text-sm mb-2 truncate">{character.name}</h3>
+                          <button
+                            onClick={() => handleImportCharacter(character)}
+                            disabled={characters.some(c => c.id === character.id)}
+                            className="w-full bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium text-xs disabled:bg-gray-300 disabled:cursor-not-allowed transition-all"
+                          >
+                            {characters.some(c => c.id === character.id) ? 'Added' : 'Import'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}

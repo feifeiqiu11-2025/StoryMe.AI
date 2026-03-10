@@ -120,6 +120,7 @@ export interface Character {
   isPrimary: boolean; // Primary character uses reference image in generation
   order: number; // Display order
   isFromLibrary?: boolean; // Track if character was imported from library
+  isPublic?: boolean; // Whether this character is shared publicly
 }
 
 export interface Scene {
