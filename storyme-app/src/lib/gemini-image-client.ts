@@ -1343,7 +1343,7 @@ IF HUMAN, return:
     "hairColor": "description of hair color and style",
     "skinTone": "description of skin tone",
     "age": "approximate age or age range",
-    "clothing": "description of visible clothing",
+    "clothing": "description of visible clothing style and colors only — do NOT mention brand names, logos, or copyrighted characters (e.g. say 'red and blue superhero t-shirt' instead of 'Spider-Man shirt')",
     "otherFeatures": "notable features like glasses, freckles, dimples"
   }
 }
@@ -1359,6 +1359,7 @@ Important guidelines:
 - For children's drawings: Identify what the drawing REPRESENTS (a dragon drawing = "creature")
 - Be specific and descriptive for storybook character consistency
 - For gender: Use child-friendly terms (boy, girl) for children; man, woman for adults
+- NEVER mention brand names, logos, or copyrighted characters (Disney, Marvel, Spider-Man, etc.) in any field — describe the visual appearance generically instead
 - Return ONLY raw JSON, no markdown code blocks
 
 Return the JSON now:`;

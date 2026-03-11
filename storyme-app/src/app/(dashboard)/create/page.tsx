@@ -1924,6 +1924,12 @@ function CreateStoryPageInner() {
               imageProvider={imageProvider}
               illustrationStyle={artStyle}
               clothingConsistency={clothingConsistency}
+              enhancedScenes={enhancedScenes}
+              onCaptionEdit={handleCaptionEdit}
+              onCaptionChineseEdit={handleCaptionChineseEdit}
+              onTitleEdit={handleTitleEdit}
+              onDescriptionEdit={handleDescriptionEdit}
+              generateChineseTranslation={generateChineseTranslation}
               onRegenerateScene={(imageId, newImageData) => {
                 // Replace the image in the status array
                 setImageGenerationStatus(prev =>

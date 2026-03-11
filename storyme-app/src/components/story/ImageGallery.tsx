@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { GeneratedImage, Character, ImageProvider, ClothingConsistency } from '@/lib/types/story';
+import { GeneratedImage, Character, ImageProvider, ClothingConsistency, EnhancedScene } from '@/lib/types/story';
 import { detectCharactersInInstruction } from '@/lib/utils/character-matcher';
 import SceneRatingCard from './SceneRatingCard';
 import EditImageControl from './EditImageControl';
@@ -22,6 +22,12 @@ interface ImageGalleryProps {
   illustrationStyle?: 'pixar' | 'classic' | 'coloring';
   clothingConsistency?: ClothingConsistency;
   isGuestMode?: boolean; // Hide individual downloads in guest mode
+  enhancedScenes?: EnhancedScene[];
+  onCaptionEdit?: (sceneNumber: number, newCaption: string) => void;
+  onCaptionChineseEdit?: (sceneNumber: number, newCaptionChinese: string) => void;
+  onTitleEdit?: (newTitle: string) => void;
+  onDescriptionEdit?: (newDescription: string) => void;
+  generateChineseTranslation?: boolean;
 }
 
 export default function ImageGallery({
@@ -36,6 +42,12 @@ export default function ImageGallery({
   illustrationStyle,
   clothingConsistency,
   isGuestMode = false,
+  enhancedScenes,
+  onCaptionEdit,
+  onCaptionChineseEdit,
+  onTitleEdit,
+  onDescriptionEdit,
+  generateChineseTranslation,
 }: ImageGalleryProps) {
   // Debug logging
   console.log('[ImageGallery] Rendering with', {
@@ -319,12 +331,116 @@ export default function ImageGallery({
               {/* Details */}
               <div className="flex-1 space-y-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Scene {image.sceneNumber}
-                  </h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {image.sceneDescription}
-                  </p>
+                  {(() => {
+                    const enhancedScene = enhancedScenes?.find(s => s.sceneNumber === image.sceneNumber);
+                    const isCover = image.sceneNumber === 0;
+
+                    return (
+                      <>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {isCover ? 'Cover' : `Scene ${image.sceneNumber}`}
+                        </h3>
+
+                        {isCover && enhancedScene ? (
+                          <>
+                            {/* Cover: Editable Title */}
+                            <div className="mt-2">
+                              <label className="text-xs font-medium text-blue-700 mb-1 block">Title:</label>
+                              {onTitleEdit ? (
+                                <input
+                                  type="text"
+                                  defaultValue={enhancedScene.storyTitle || ''}
+                                  onBlur={(e) => {
+                                    const newValue = e.target.value.trim();
+                                    if (newValue !== enhancedScene.storyTitle) {
+                                      onTitleEdit(newValue);
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-semibold text-sm"
+                                  placeholder="Enter story title..."
+                                />
+                              ) : (
+                                <p className="text-sm font-semibold text-gray-900">{enhancedScene.storyTitle || 'Untitled Story'}</p>
+                              )}
+                            </div>
+                            {/* Cover: Editable Description */}
+                            <div className="mt-2">
+                              <label className="text-xs font-medium text-purple-700 mb-1 block">Description:</label>
+                              {onDescriptionEdit ? (
+                                <textarea
+                                  defaultValue={enhancedScene.storyDescription || ''}
+                                  onBlur={(e) => {
+                                    const newValue = e.target.value.trim();
+                                    if (newValue !== enhancedScene.storyDescription) {
+                                      onDescriptionEdit(newValue);
+                                    }
+                                  }}
+                                  rows={2}
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm"
+                                  placeholder="Enter story description..."
+                                />
+                              ) : (
+                                <p className="text-sm text-gray-600">{enhancedScene.storyDescription || image.sceneDescription}</p>
+                              )}
+                            </div>
+                          </>
+                        ) : !isCover && enhancedScene && onCaptionEdit ? (
+                          <>
+                            {/* Regular Scene: Editable English Caption */}
+                            <textarea
+                              value={enhancedScene.caption}
+                              onChange={(e) => {
+                                onCaptionEdit(image.sceneNumber, e.target.value);
+                                e.target.style.height = 'auto';
+                                e.target.style.height = e.target.scrollHeight + 'px';
+                              }}
+                              onFocus={(e) => {
+                                e.target.style.height = 'auto';
+                                e.target.style.height = e.target.scrollHeight + 'px';
+                              }}
+                              className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm text-gray-600 leading-relaxed overflow-hidden"
+                              rows={1}
+                              style={{ minHeight: '2.5rem' }}
+                            />
+                            {/* Regular Scene: Editable Chinese Caption (if bilingual) */}
+                            {generateChineseTranslation && (
+                              <div className="mt-2 bg-purple-50 rounded-lg p-2 border border-purple-200">
+                                <label className="text-xs font-medium text-purple-700 mb-1 flex items-center gap-1">
+                                  <span>🇨🇳</span>
+                                  <span>Chinese (中文):</span>
+                                </label>
+                                {onCaptionChineseEdit ? (
+                                  <textarea
+                                    value={enhancedScene.caption_chinese || ''}
+                                    onChange={(e) => {
+                                      onCaptionChineseEdit(image.sceneNumber, e.target.value);
+                                      e.target.style.height = 'auto';
+                                      e.target.style.height = e.target.scrollHeight + 'px';
+                                    }}
+                                    onFocus={(e) => {
+                                      e.target.style.height = 'auto';
+                                      e.target.style.height = e.target.scrollHeight + 'px';
+                                    }}
+                                    placeholder="Chinese translation..."
+                                    className="w-full px-3 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm text-gray-600 leading-relaxed overflow-hidden"
+                                    rows={1}
+                                    style={{ minHeight: '2.5rem' }}
+                                  />
+                                ) : (
+                                  <p className="text-sm text-gray-600">{enhancedScene.caption_chinese || ''}</p>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          /* Fallback: read-only scene description */
+                          <p className="text-sm text-gray-600 mt-1">
+                            {image.sceneDescription}
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                   {image.characterRatings && image.characterRatings.length > 0 && (
                     <p className="text-xs text-blue-600 mt-2">
                       Characters: {image.characterRatings.map(r => r.characterName).join(', ')}

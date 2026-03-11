@@ -219,6 +219,12 @@ EXPANSION LEVEL: LIGHT EXPANSION
 - Add sensory details (colors, sounds, feelings)
 - Add simple dialogue appropriate for the age
 - MUST preserve user's main characters: ${characterNames}
+
+SCENE FLOW & PACING:
+- Ensure smooth logical flow between consecutive scenes — the reader should never feel confused about what happened between scenes
+- If the user's script has gaps in flow, add bridging scenes to connect them naturally
+- Spend fewer scenes on setup and ending; dedicate more scenes to the middle — rising action, deepening conflict, and climax
+- Each scene should feel like a natural continuation of the previous one, not an abrupt topic change
 ${architectureGuidance}`;
   }
 
@@ -250,15 +256,6 @@ CRITICAL: ENFORCE CAUSE-AND-EFFECT LOGIC
 - Show character MOTIVATION before actions (why does the character decide to do something?)
 - Show the PROCESS, not just the outcome (if magic fixes something, show HOW it's used)
 - Each scene should logically lead to the next - no abrupt jumps
-
-Examples of GOOD logical flow:
-✓ "Dragon breathes fire → flames touch water → water changes color → characters notice change"
-✓ "Character sees problem → feels concerned → decides to help → takes action"
-
-Examples of BAD logical flow (avoid these):
-✗ "Dragon blew fire. Ocean turned purple." (missing: how fire affects water)
-✗ "Dragon felt sad. Ocean turned blue." (missing: what did dragon DO to fix it?)
-✗ "Characters were worried. Dragon used magic!" (missing: why/how did dragon know to use magic?)
 ` : '';
 
   return `
@@ -274,6 +271,13 @@ EXPANSION LEVEL: RICH (Full Creative Expansion)
 - Show the PROCESS of events, not just outcomes
 - MUST preserve user's main characters: ${characterNames}
 - Keep core theme from original script
+
+SCENE FLOW & PACING:
+- Ensure smooth logical flow between consecutive scenes — the reader should never feel confused or lost about what happened between scenes
+- If one scene introduces a wonder, discovery, or challenge, the following scene must acknowledge it before moving on
+- Spend fewer scenes on the beginning setup and the ending wrap-up; dedicate more scenes to the middle of the story — the rising action, deepening conflict, and climax
+- Avoid repetitive endings: once the resolution is reached, wrap up concisely rather than restating the outcome across multiple scenes
+- Each scene should feel like a natural continuation of the previous one, not an abrupt topic change
 ${architectureGuidance}`;
 }
 
