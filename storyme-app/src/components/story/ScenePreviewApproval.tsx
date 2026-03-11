@@ -453,33 +453,31 @@ export default function ScenePreviewApproval({
 
                   {/* Chinese Caption - Editable (NEW - Bilingual Support) - Skip for cover */}
                   {!scene.isCover && generateChineseTranslation && (
-                    <div className="bg-purple-50 rounded-lg p-3 mb-3 border border-purple-200">
-                      {onCaptionChineseEdit ? (
-                        <textarea
-                          value={scene.caption_chinese || ''}
-                          onChange={(e) => {
-                            onCaptionChineseEdit(scene.sceneNumber, e.target.value);
-                            // Auto-resize textarea based on content
-                            e.target.style.height = 'auto';
-                            e.target.style.height = e.target.scrollHeight + 'px';
-                          }}
-                          onFocus={(e) => {
-                            // Set initial height on focus
-                            e.target.style.height = 'auto';
-                            e.target.style.height = e.target.scrollHeight + 'px';
-                          }}
-                          disabled={isGenerating}
-                          placeholder="Chinese translation will appear here..."
-                          className="w-full px-3 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 leading-relaxed overflow-hidden"
-                          rows={1}
-                          style={{ minHeight: '2.5rem' }}
-                        />
-                      ) : (
-                        <p className="text-gray-900 leading-relaxed">
-                          {scene.caption_chinese || <span className="text-gray-400 italic">No Chinese translation</span>}
-                        </p>
-                      )}
-                    </div>
+                    onCaptionChineseEdit ? (
+                      <textarea
+                        value={scene.caption_chinese || ''}
+                        onChange={(e) => {
+                          onCaptionChineseEdit(scene.sceneNumber, e.target.value);
+                          // Auto-resize textarea based on content
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                        onFocus={(e) => {
+                          // Set initial height on focus
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                        disabled={isGenerating}
+                        placeholder="Chinese translation will appear here..."
+                        className="w-full px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 leading-relaxed overflow-hidden mb-3"
+                        rows={1}
+                        style={{ minHeight: '2.5rem' }}
+                      />
+                    ) : (
+                      <p className="text-gray-900 leading-relaxed bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 mb-3">
+                        {scene.caption_chinese || <span className="text-gray-400 italic">No Chinese translation</span>}
+                      </p>
+                    )
                   )}
 
                   {/* Characters in Scene */}

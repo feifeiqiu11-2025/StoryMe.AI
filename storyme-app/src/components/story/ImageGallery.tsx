@@ -404,28 +404,26 @@ export default function ImageGallery({
                             />
                             {/* Regular Scene: Editable Chinese Caption (if bilingual) */}
                             {generateChineseTranslation && (
-                              <div className="mt-2 bg-purple-50 rounded-lg p-2 border border-purple-200">
-                                {onCaptionChineseEdit ? (
-                                  <textarea
-                                    value={enhancedScene.caption_chinese || ''}
-                                    onChange={(e) => {
-                                      onCaptionChineseEdit(image.sceneNumber, e.target.value);
-                                      e.target.style.height = 'auto';
-                                      e.target.style.height = e.target.scrollHeight + 'px';
-                                    }}
-                                    onFocus={(e) => {
-                                      e.target.style.height = 'auto';
-                                      e.target.style.height = e.target.scrollHeight + 'px';
-                                    }}
-                                    placeholder="Chinese translation..."
-                                    className="w-full px-3 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm text-gray-600 leading-relaxed overflow-hidden"
-                                    rows={1}
-                                    style={{ minHeight: '2.5rem' }}
-                                  />
-                                ) : (
-                                  <p className="text-sm text-gray-600">{enhancedScene.caption_chinese || ''}</p>
-                                )}
-                              </div>
+                              onCaptionChineseEdit ? (
+                                <textarea
+                                  value={enhancedScene.caption_chinese || ''}
+                                  onChange={(e) => {
+                                    onCaptionChineseEdit(image.sceneNumber, e.target.value);
+                                    e.target.style.height = 'auto';
+                                    e.target.style.height = e.target.scrollHeight + 'px';
+                                  }}
+                                  onFocus={(e) => {
+                                    e.target.style.height = 'auto';
+                                    e.target.style.height = e.target.scrollHeight + 'px';
+                                  }}
+                                  placeholder="Chinese translation..."
+                                  className="w-full mt-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm text-gray-600 leading-relaxed overflow-hidden"
+                                  rows={1}
+                                  style={{ minHeight: '2.5rem' }}
+                                />
+                              ) : (
+                                <p className="mt-2 text-sm text-gray-600 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">{enhancedScene.caption_chinese || ''}</p>
+                              )
                             )}
                           </>
                         ) : (
