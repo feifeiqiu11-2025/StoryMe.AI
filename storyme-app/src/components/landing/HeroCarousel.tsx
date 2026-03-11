@@ -220,18 +220,19 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
     } else if (Math.abs(position) === 1) {
       // Adjacent cards - responsive spacing
       if (isMobile) {
-        translateXPx = position * 130; // Tighter on mobile
+        translateXPx = position * 145; // Tighter on mobile
       } else if (isTablet) {
-        translateXPx = position * 200; // Medium on tablet
+        translateXPx = position * 220; // Medium on tablet
       } else {
-        translateXPx = position * 268; // Full on desktop
+        translateXPx = position * 290; // Full on desktop
       }
     } else {
       // Outer cards (position ±2) - only shown on larger screens
+      // Use consistent gap: match the visual gap between center↔pos1
       if (isTablet) {
-        translateXPx = position * 180;
+        translateXPx = position * 200;
       } else {
-        translateXPx = position * 238;
+        translateXPx = position * 256;
       }
     }
 
@@ -245,16 +246,16 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
     };
   };
 
-  // Card dimensions - responsive sizes
+  // Card dimensions - responsive sizes (wider ~4:5 ratio to avoid cropping cover titles)
   const getCenterCardSize = () => {
-    if (viewportWidth < 640) return { width: 200, height: 280 }; // Mobile
-    if (viewportWidth < 1024) return { width: 260, height: 360 }; // Tablet
-    return { width: 300, height: 400 }; // Desktop
+    if (viewportWidth < 640) return { width: 220, height: 280 }; // Mobile
+    if (viewportWidth < 1024) return { width: 290, height: 360 }; // Tablet
+    return { width: 340, height: 400 }; // Desktop
   };
   const getSideCardSize = () => {
-    if (viewportWidth < 640) return { width: 160, height: 220 }; // Mobile
-    if (viewportWidth < 1024) return { width: 200, height: 280 }; // Tablet
-    return { width: 240, height: 320 }; // Desktop
+    if (viewportWidth < 640) return { width: 180, height: 220 }; // Mobile
+    if (viewportWidth < 1024) return { width: 225, height: 280 }; // Tablet
+    return { width: 270, height: 320 }; // Desktop
   };
 
   // Render a single card
@@ -342,8 +343,8 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
                 key={i}
                 className={`bg-gray-200 rounded-2xl ${
                   i === 1
-                    ? 'w-[200px] h-[280px] sm:w-[260px] sm:h-[360px] lg:w-[300px] lg:h-[400px]'
-                    : 'w-[160px] h-[220px] sm:w-[200px] sm:h-[280px] lg:w-[240px] lg:h-[320px]'
+                    ? 'w-[220px] h-[280px] sm:w-[290px] sm:h-[360px] lg:w-[340px] lg:h-[400px]'
+                    : 'w-[180px] h-[220px] sm:w-[225px] sm:h-[280px] lg:w-[270px] lg:h-[320px]'
                 }`}
               />
             ))}
