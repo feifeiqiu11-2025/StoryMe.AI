@@ -114,13 +114,15 @@ export default function ScenePreviewApproval({
       return;
     }
 
-    // Remove scene and re-number
+    // Remove scene and re-number (preserve cover at sceneNumber 0)
+    let contentIndex = 0;
     const updatedScenes = enhancedScenes
       .filter(s => s.sceneNumber !== sceneNumber)
-      .map((s, index) => ({
-        ...s,
-        sceneNumber: index + 1 // Re-number sequentially
-      }));
+      .map((s) => {
+        if (s.isCover) return { ...s, sceneNumber: 0 };
+        contentIndex++;
+        return { ...s, sceneNumber: contentIndex };
+      });
 
     onScenesUpdate(updatedScenes);
   };
@@ -452,10 +454,6 @@ export default function ScenePreviewApproval({
                   {/* Chinese Caption - Editable (NEW - Bilingual Support) - Skip for cover */}
                   {!scene.isCover && generateChineseTranslation && (
                     <div className="bg-purple-50 rounded-lg p-3 mb-3 border border-purple-200">
-                      <label className="text-sm font-medium text-purple-700 mb-1 flex items-center gap-2">
-                        <span>🇨🇳</span>
-                        <span>Chinese Caption (中文):</span>
-                      </label>
                       {onCaptionChineseEdit ? (
                         <textarea
                           value={scene.caption_chinese || ''}

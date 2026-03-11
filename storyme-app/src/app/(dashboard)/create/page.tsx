@@ -1357,13 +1357,20 @@ function CreateStoryPageInner() {
       const data = await response.json();
 
       // Update the image generation status with the actual results
-      // BUT preserve the captions from enhancedScenes
+      // Use positional matching: API renumbers scenes sequentially, so match by array position
       if (data.generatedImages) {
+        const contentScenes = enhancedScenes.filter(s => !s.isCover);
         const updatedImages = data.generatedImages.map((img: any) => {
-          const enhancedScene = enhancedScenes.find(es => es.sceneNumber === img.sceneNumber);
+          let enhancedScene;
+          if (img.sceneNumber === 0) {
+            enhancedScene = enhancedScenes.find(es => es.isCover);
+          } else {
+            // Positional match: API scene 1 = first content scene, scene 2 = second, etc.
+            enhancedScene = contentScenes[img.sceneNumber - 1];
+          }
           return {
             ...img,
-            // For Scene 0 (cover), use the short story description instead of the long system prompt
+            sceneNumber: enhancedScene?.sceneNumber ?? img.sceneNumber,
             sceneDescription: img.sceneNumber === 0
               ? (enhancedScene?.storyDescription || storyDescription || 'Story cover')
               : (enhancedScene?.caption || img.sceneDescription),

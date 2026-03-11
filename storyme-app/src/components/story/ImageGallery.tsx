@@ -405,10 +405,6 @@ export default function ImageGallery({
                             {/* Regular Scene: Editable Chinese Caption (if bilingual) */}
                             {generateChineseTranslation && (
                               <div className="mt-2 bg-purple-50 rounded-lg p-2 border border-purple-200">
-                                <label className="text-xs font-medium text-purple-700 mb-1 flex items-center gap-1">
-                                  <span>🇨🇳</span>
-                                  <span>Chinese (中文):</span>
-                                </label>
                                 {onCaptionChineseEdit ? (
                                   <textarea
                                     value={enhancedScene.caption_chinese || ''}
