@@ -20,9 +20,10 @@ interface WorkshopConfirmationData {
   parentEmail: string;
   children: ChildInfo[];
   partnerId: string;
-  selectedSessionType: 'morning' | 'afternoon';
+  selectedSessionType: 'morning' | 'afternoon' | 'single';
   selectedWorkshopIds: string[];
   amountPaid: number; // cents
+  location?: string | null; // location slug for multi-location partners
 }
 
 export async function sendWorkshopConfirmationEmail(
@@ -37,10 +38,19 @@ export async function sendWorkshopConfirmationEmail(
     return;
   }
 
-  const sessionLabel =
-    data.selectedSessionType === 'morning'
+  const isSingleMode = partner.sessionMode === 'single';
+  const isSeriesMode = partner.enrollmentMode === 'series';
+
+  const sessionLabel = isSingleMode
+    ? `${partner.sessions[0]?.morning.ageRange || 'Ages 3–6'}`
+    : data.selectedSessionType === 'morning'
       ? 'Morning Session (Ages 4-6) · 10:00 - 11:00 AM'
       : 'Afternoon Session (Ages 7-9) · 1:00 - 3:00 PM';
+
+  // Resolve location name for multi-location partners
+  const locationInfo = data.location && partner.locations
+    ? partner.locations.find((l) => l.slug === data.location)
+    : null;
 
   const selectedSessions = data.selectedWorkshopIds
     .map((id) => partner.sessions.find((s) => s.id === id))
@@ -60,8 +70,17 @@ export async function sendWorkshopConfirmationEmail(
 
   const amountFormatted = `$${(data.amountPaid / 100).toFixed(2)}`;
 
-  const locationHtml = partner.location
+  const locationHtml = locationInfo
     ? `
+      <tr>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">
+          <strong style="color: #374151;">Location</strong><br />
+          <span style="color: #6b7280;">${locationInfo.name}</span>
+          ${locationInfo.address && locationInfo.address !== 'TBD' ? `<br /><span style="color: #6b7280;">${locationInfo.address}</span>` : ''}
+        </td>
+      </tr>`
+    : partner.location
+      ? `
       <tr>
         <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">
           <strong style="color: #374151;">Location</strong><br />
@@ -69,18 +88,21 @@ export async function sendWorkshopConfirmationEmail(
           <a href="${partner.location.mapUrl || '#'}" style="color: #2563eb; text-decoration: underline;">${partner.location.address}</a>
         </td>
       </tr>`
-    : '';
+      : '';
 
   const sessionsHtml = selectedSessions
     .map((session, i) => {
       if (!session) return '';
-      const slot = session[data.selectedSessionType];
+      const slot = isSingleMode
+        ? session.morning
+        : (data.selectedSessionType === 'afternoon' && session.afternoon
+            ? session.afternoon
+            : session.morning);
       return `
       <tr>
         <td style="padding: 12px 16px; ${i < selectedSessions.length - 1 ? 'border-bottom: 1px solid #e5e7eb;' : ''}">
-          <strong style="color: #374151;">Week ${data.selectedWorkshopIds.indexOf(session.id) + 1}: ${session.theme}</strong><br />
-          <span style="color: #6b7280;">${session.dateLabel} · ${slot.time}</span><br />
-          <span style="color: #6b7280; font-size: 13px;">${slot.title}</span>
+          <strong style="color: #374151;">${session.dateLabel}: ${session.theme}</strong><br />
+          <span style="color: #6b7280;">${slot.time !== 'TBD' ? slot.time + ' · ' : ''}${slot.title}</span>
         </td>
       </tr>`;
     })
@@ -94,7 +116,11 @@ export async function sendWorkshopConfirmationEmail(
       <li>Water bottle</li>
       <li>Your car for transportation between indoor studio and outdoor locations</li>
       <li>Curiosity and creativity!</li>`
-      : `
+      : isSingleMode
+        ? `
+      <li>Comfortable clothes (may get messy from art projects)</li>
+      <li>Curiosity and creativity!</li>`
+        : `
       <li>Comfortable clothes (may get messy from art projects)</li>
       <li>Water bottle</li>
       <li>Curiosity and creativity!</li>`;
@@ -235,15 +261,19 @@ Thank you for registering ${data.children.map((c) => `${formatChildName(c)} (age
 SESSION DETAILS
 - Session: ${sessionLabel}
 - ${data.children.length > 1 ? 'Children' : 'Child'}: ${childrenListText}
-${partner.location ? `- Location: ${partner.location.name}, ${partner.location.address}` : ''}
+${locationInfo ? `- Location: ${locationInfo.name}` : partner.location ? `- Location: ${partner.location.name}, ${partner.location.address}` : ''}
 - Amount Paid: ${amountFormatted}
 
 YOUR WORKSHOP SCHEDULE
 ${selectedSessions
   .map((session) => {
     if (!session) return '';
-    const slot = session[data.selectedSessionType];
-    return `- ${session.theme}: ${session.dateLabel} · ${slot.time} — ${slot.title}`;
+    const slot = isSingleMode
+      ? session.morning
+      : (data.selectedSessionType === 'afternoon' && session.afternoon
+          ? session.afternoon
+          : session.morning);
+    return `- ${session.theme}: ${session.dateLabel}${slot.time !== 'TBD' ? ` · ${slot.time}` : ''} — ${slot.title}`;
   })
   .join('\n')}
 

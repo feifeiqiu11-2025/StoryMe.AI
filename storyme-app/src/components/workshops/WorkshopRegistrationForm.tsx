@@ -3,11 +3,15 @@
  *
  * Multi-step registration form for workshop sign-ups.
  * Uses React Hook Form + Zod for validation, Stripe for payment.
+ *
+ * Supports two enrollment modes:
+ * - Individual (SteamOji): morning/afternoon picker + date checkboxes
+ * - Series (Avocado): location picker + read-only series overview
  */
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -17,12 +21,15 @@ import {
 import {
   type WorkshopPartner,
   formatWorkshopPrice,
+  getPartnerSessionPricing,
+  getPartnerCapacity,
+  getEnrollableSessions,
 } from '@/lib/workshops/constants';
 import type { WorkshopAvailabilityData } from '@/lib/workshops/types';
 
 interface WorkshopRegistrationFormProps {
   partner: WorkshopPartner;
-  defaultSessionType?: 'morning' | 'afternoon';
+  defaultSessionType?: 'morning' | 'afternoon' | 'single';
   availability?: WorkshopAvailabilityData | null;
   availabilityLoading?: boolean;
 }
@@ -37,6 +44,20 @@ export default function WorkshopRegistrationForm({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showWaiverText, setShowWaiverText] = useState(false);
 
+  // Mode detection
+  const isSingleMode = partner.sessionMode === 'single';
+  const isSeriesMode = partner.enrollmentMode === 'series';
+  const hasLocations = (partner.locations?.length ?? 0) > 0;
+
+  // For series mode, get enrollable sessions (series 1)
+  const enrollableSessions = isSeriesMode ? getEnrollableSessions(partner, 1) : [];
+  const enrollableIds = enrollableSessions.map((s) => s.id);
+
+  // Series 2 sessions for preview
+  const previewSessions = isSeriesMode
+    ? partner.sessions.filter((s) => s.series === 2)
+    : [];
+
   const {
     register,
     handleSubmit,
@@ -44,49 +65,94 @@ export default function WorkshopRegistrationForm({
     setValue,
     control,
     formState: { errors },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } = useForm<WorkshopRegistrationData>({
     resolver: zodResolver(WorkshopRegistrationSchema) as any,
     defaultValues: {
       partnerId: partner.id,
-      selectedWorkshopIds: [],
-      selectedSessionType: defaultSessionType || undefined,
+      selectedWorkshopIds: isSeriesMode ? enrollableIds : [],
+      selectedSessionType: isSingleMode
+        ? 'single'
+        : (defaultSessionType as 'morning' | 'afternoon') || undefined,
+      selectedLocation: hasLocations ? partner.locations![0].slug : undefined,
       parentFirstName: '',
       parentLastName: '',
       parentEmail: '',
       parentPhone: '',
-      children: [{ firstName: '', lastName: '', age: undefined as unknown as number }],
+      children: [
+        { firstName: '', lastName: '', age: undefined as unknown as number },
+      ],
       emergencyContactName: '',
       emergencyContactPhone: '',
       emergencyContactRelation: '',
       waiverAccepted: undefined as unknown as true,
-      codeOfConductAccepted: undefined as unknown as true,
+      photoVideoConsentAccepted: false,
     },
   });
 
-  const { fields: childrenFields, append: addChild, remove: removeChild } = useFieldArray({
+  const {
+    fields: childrenFields,
+    append: addChild,
+    remove: removeChild,
+  } = useFieldArray({
     control,
     name: 'children',
   });
 
   const selectedWorkshopIds = watch('selectedWorkshopIds');
   const selectedSessionType = watch('selectedSessionType');
+  const selectedLocation = watch('selectedLocation');
 
-  // Per-session pricing
-  const sessionType = selectedSessionType || 'morning';
-  const sessionPricing = partner.pricing[sessionType];
+  // Auto-set workshop IDs for series mode
+  useEffect(() => {
+    if (isSeriesMode && enrollableIds.length > 0) {
+      setValue('selectedWorkshopIds', enrollableIds, { shouldValidate: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSeriesMode]);
+
+  // Auto-set session type for single mode
+  useEffect(() => {
+    if (isSingleMode) {
+      setValue('selectedSessionType', 'single');
+    }
+  }, [isSingleMode, setValue]);
+
+  // Pricing — use helpers for correct mode handling
+  const sessionPricing = getPartnerSessionPricing(
+    partner,
+    isSingleMode
+      ? 'single'
+      : (selectedSessionType as 'morning' | 'afternoon' | undefined),
+  );
   const pricePerSession = sessionPricing?.promoPrice || 0;
   const originalPricePerSession = sessionPricing?.originalPrice || 0;
-  const hasDiscount = pricePerSession > 0 && pricePerSession < originalPricePerSession;
+  const hasDiscount =
+    pricePerSession > 0 && pricePerSession < originalPricePerSession;
 
   const workshopCount = selectedWorkshopIds?.length || 0;
   const numberOfChildren = childrenFields.length;
   const totalPrice = workshopCount * pricePerSession * numberOfChildren;
-  const totalOriginal = workshopCount * originalPricePerSession * numberOfChildren;
+  const totalOriginal =
+    workshopCount * originalPricePerSession * numberOfChildren;
+
+  // Sales tax — WA state requires tax on enrichment workshops (ESSB 5814)
+  const selectedLocationData = hasLocations && selectedLocation
+    ? partner.locations!.find((l) => l.slug === selectedLocation)
+    : null;
+  const taxRate = selectedLocationData?.taxRate ?? 0;
+  const taxAmount = Math.round(totalPrice * taxRate);
+  const totalWithTax = totalPrice + taxAmount;
+
+  // Session type key for availability / capacity
+  const sessionTypeKey = isSingleMode
+    ? 'single'
+    : selectedSessionType || 'morning';
 
   // Check if a session date has passed
   const isSessionPast = (dateLabel: string): boolean => {
     const sessionDate = new Date(dateLabel);
+    if (isNaN(sessionDate.getTime())) return false; // "Week 1" etc. won't parse
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return sessionDate < today;
@@ -95,20 +161,20 @@ export default function WorkshopRegistrationForm({
   // Spot availability helper
   const getSpotsLeft = (sessionId: string): number | null => {
     if (!availability || availabilityLoading) return null;
-    const count = availability.counts[sessionId]?.[sessionType] ?? 0;
-    return Math.max(0, partner.capacity[sessionType] - count);
+    const countData = availability.counts[sessionId];
+    if (!countData) return null;
+    const count = isSingleMode
+      ? (countData.single ?? 0)
+      : (countData[sessionTypeKey as 'morning' | 'afternoon'] ?? 0);
+    const capacity = getPartnerCapacity(
+      partner,
+      sessionTypeKey as 'morning' | 'afternoon' | 'single',
+      selectedLocation || undefined,
+    );
+    return Math.max(0, capacity - count);
   };
 
-  // --- Bundle pricing (commented out for future use) ---
-  // const isBundle = workshopCount >= partner.pricing.bundleCount;
-  // const totalPrice = isBundle
-  //   ? partner.pricing.bundlePrice
-  //   : workshopCount * partner.pricing.singleWorkshop;
-  // const fullPrice = workshopCount * partner.pricing.singleWorkshop;
-  // const savings = isBundle ? fullPrice - partner.pricing.bundlePrice : 0;
-  // const savingsPercent = getBundleSavingsPercent(partner.pricing);
-
-  // Toggle workshop selection
+  // Toggle workshop selection (individual mode)
   const toggleWorkshop = (workshopId: string) => {
     const current = selectedWorkshopIds || [];
     const updated = current.includes(workshopId)
@@ -117,10 +183,11 @@ export default function WorkshopRegistrationForm({
     setValue('selectedWorkshopIds', updated, { shouldValidate: true });
   };
 
-  // Select all available workshops (skip sold-out and past sessions)
+  // Select all available workshops (individual mode)
   const selectAll = () => {
     const availableIds = partner.sessions
       .filter((s) => {
+        if (s.enrollable === false) return false;
         if (isSessionPast(s.dateLabel)) return false;
         const spots = getSpotsLeft(s.id);
         return spots === null || spots > 0;
@@ -129,7 +196,7 @@ export default function WorkshopRegistrationForm({
     setValue('selectedWorkshopIds', availableIds, { shouldValidate: true });
   };
 
-  // Clear all selections
+  // Clear all selections (individual mode)
   const clearAll = () => {
     setValue('selectedWorkshopIds', [], { shouldValidate: true });
   };
@@ -162,7 +229,6 @@ export default function WorkshopRegistrationForm({
         throw new Error(result.error || 'Failed to create checkout session');
       }
 
-      // Redirect to Stripe checkout
       if (result.url) {
         window.location.href = result.url;
       }
@@ -179,328 +245,574 @@ export default function WorkshopRegistrationForm({
   const labelClassName = 'block text-sm font-medium text-gray-700 mb-1';
   const errorClassName = 'text-red-500 text-sm mt-1';
 
-  const sessionTimeLabel = sessionType === 'morning'
-    ? '10:00 – 11:00 AM (1 hr)'
-    : '1:00 – 3:00 PM (2 hrs)';
+  const sessionTimeLabel =
+    sessionTypeKey === 'morning'
+      ? '10:00 – 11:00 AM (1 hr)'
+      : sessionTypeKey === 'afternoon'
+        ? '1:00 – 3:00 PM (2 hrs)'
+        : '';
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-      {/* Hidden partner ID */}
+    <form onSubmit={handleSubmit(onSubmit, (fieldErrors) => {
+      console.error('[REGISTRATION] Validation errors:', fieldErrors);
+      // Scroll to first error field
+      const firstErrorKey = Object.keys(fieldErrors)[0];
+      if (firstErrorKey) {
+        const el = document.querySelector(`[name="${firstErrorKey}"]`) || document.querySelector(`[name^="${firstErrorKey}"]`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    })} className="space-y-8">
+      {/* Hidden fields */}
       <input type="hidden" {...register('partnerId')} />
+      {isSingleMode && (
+        <input type="hidden" {...register('selectedSessionType')} />
+      )}
 
-      {/* Section 1: Session Type */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-gray-900">
-            1. Choose Your Session
+      {/* ═══════════════════════════════════════════════════════ */}
+      {/* Section 1 — Series: Location Picker / Dual: Session Type */}
+      {/* ═══════════════════════════════════════════════════════ */}
+      {isSeriesMode && hasLocations ? (
+        /* --- SERIES + LOCATIONS: Choose Location --- */
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">
+            1. Choose Your Location
           </h3>
-          <span className="text-xs font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">
-            Limited to {partner.capacity[sessionType]} spots per session
-          </span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <label
-            className={`relative flex flex-col p-4 border-2 rounded-xl cursor-pointer transition-all ${
-              selectedSessionType === 'morning'
-                ? 'border-amber-500 bg-amber-50'
-                : 'border-gray-200 hover:border-gray-300'
-            }`}
-          >
-            <input
-              type="radio"
-              value="morning"
-              {...register('selectedSessionType')}
-              className="sr-only"
-            />
-            <span className="text-lg font-semibold text-gray-900">
-              Morning Session
-            </span>
-            <span className="text-sm text-gray-500 mt-1">Ages 4–6 · 10:00 – 11:00 AM · 1 hour</span>
-            <div className="mt-2">
-              {hasDiscount && selectedSessionType === 'morning' ? (
-                <span className="text-sm">
-                  <span className="line-through text-gray-400 mr-1">{formatWorkshopPrice(partner.pricing.morning.originalPrice)}</span>
-                  <span className="font-bold text-amber-700">{formatWorkshopPrice(partner.pricing.morning.promoPrice)}</span>
-                  <span className="text-gray-500"> / session</span>
-                </span>
-              ) : (
-                <span className="text-sm">
-                  <span className="line-through text-gray-400 mr-1">{formatWorkshopPrice(partner.pricing.morning.originalPrice)}</span>
-                  <span className="font-semibold text-gray-700">{formatWorkshopPrice(partner.pricing.morning.promoPrice)}</span>
-                  <span className="text-gray-500"> / session</span>
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-gray-500 mt-2">
-              Turn imagination into story characters, make physical books, show & tell
-            </p>
-          </label>
-
-          <label
-            className={`relative flex flex-col p-4 border-2 rounded-xl cursor-pointer transition-all ${
-              selectedSessionType === 'afternoon'
-                ? 'border-green-500 bg-green-50'
-                : 'border-gray-200 hover:border-gray-300'
-            }`}
-          >
-            <input
-              type="radio"
-              value="afternoon"
-              {...register('selectedSessionType')}
-              className="sr-only"
-            />
-            <span className="text-lg font-semibold text-gray-900">
-              Afternoon Session
-            </span>
-            <span className="text-sm text-gray-500 mt-1">Ages 7–9 · 1:00 – 3:00 PM · 2 hours</span>
-            <div className="mt-2">
-              {hasDiscount && selectedSessionType === 'afternoon' ? (
-                <span className="text-sm">
-                  <span className="line-through text-gray-400 mr-1">{formatWorkshopPrice(partner.pricing.afternoon.originalPrice)}</span>
-                  <span className="font-bold text-green-700">{formatWorkshopPrice(partner.pricing.afternoon.promoPrice)}</span>
-                  <span className="text-gray-500"> / session</span>
-                </span>
-              ) : (
-                <span className="text-sm">
-                  <span className="line-through text-gray-400 mr-1">{formatWorkshopPrice(partner.pricing.afternoon.originalPrice)}</span>
-                  <span className="font-semibold text-gray-700">{formatWorkshopPrice(partner.pricing.afternoon.promoPrice)}</span>
-                  <span className="text-gray-500"> / session</span>
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-gray-500 mt-2">
-              Nature exploration, creative thinking & story making
-            </p>
-          </label>
-        </div>
-        {errors.selectedSessionType && (
-          <p className={errorClassName} role="alert">
-            {errors.selectedSessionType.message}
-          </p>
-        )}
-
-        {/* Location info — shown after session selection */}
-        {selectedSessionType && partner.location && (
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-sm">
-            <div className="flex items-center gap-2 text-gray-700">
-              <svg className="w-4 h-4 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span>
-                <span className="font-medium">Workshop Location:</span>{' '}
-                {partner.location.mapUrl ? (
-                  <a
-                    href={partner.location.mapUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-700 underline"
-                  >
-                    {partner.location.name}, {partner.location.address}
-                  </a>
-                ) : (
-                  `${partner.location.name}, ${partner.location.address}`
-                )}
-              </span>
-            </div>
-            {sessionType === 'afternoon' && (
-              <p className="mt-2 ml-6 text-gray-600">
-                Afternoon sessions begin with ~45 min of outdoor exploration at
-                Bridle Trails, then transition to the indoor studio at{' '}
-                {partner.location.name} for the creativity lab. Parents provide
-                transportation between locations.
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Section 2: Select Workshop Dates */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-gray-900">
-            2. Select Workshop Dates
-          </h3>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={selectAll}
-              className="text-sm text-green-600 hover:text-green-700 font-medium"
-            >
-              Select All
-            </button>
-            <span className="text-gray-300">|</span>
-            <button
-              type="button"
-              onClick={clearAll}
-              className="text-sm text-gray-500 hover:text-gray-600 font-medium"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {partner.sessions.map((session, index) => {
-            const isSelected = selectedWorkshopIds?.includes(session.id);
-            const spotsLeft = getSpotsLeft(session.id);
-            const isSoldOut = spotsLeft !== null && spotsLeft <= 0;
-            const isLowStock = spotsLeft !== null && spotsLeft > 0 && spotsLeft <= 3;
-            const isPast = isSessionPast(session.dateLabel);
-            const isDisabled = isPast || isSoldOut;
-
-            return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {partner.locations!.map((loc) => (
               <label
-                key={session.id}
-                className={`block p-4 border-2 rounded-xl transition-all ${
-                  isDisabled
-                    ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
-                    : isSelected
-                      ? 'border-green-500 bg-green-50 cursor-pointer'
-                      : 'border-gray-200 hover:border-gray-300 cursor-pointer'
+                key={loc.slug}
+                className={`relative flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                  selectedLocation === loc.slug
+                    ? 'border-amber-500 bg-amber-50'
+                    : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
                 <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => !isDisabled && toggleWorkshop(session.id)}
-                  disabled={isDisabled}
-                  className="sr-only"
+                  type="radio"
+                  value={loc.slug}
+                  {...register('selectedLocation')}
+                  className="sr-only peer"
                 />
-                {/* Row 1: Checkbox + Week # + Theme + Price */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                      isDisabled
-                        ? 'bg-gray-200 border-gray-300'
-                        : isSelected
-                          ? 'bg-green-600 border-green-600'
-                          : 'border-gray-300 bg-white'
-                    }`}>
-                      {isSelected && !isDisabled && (
-                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                    <span className={`font-semibold ${isPast ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-                      Week {index + 1}
-                    </span>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      isPast ? 'text-gray-400 bg-gray-100 line-through' : 'text-amber-700 bg-amber-50'
-                    }`}>
-                      {session.theme}
-                    </span>
-                    {isPast && (
-                      <span className="text-xs font-semibold text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
-                        Completed
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-sm">
-                    {!isPast && hasDiscount && (
-                      <span className="line-through text-gray-400 mr-1">
-                        {formatWorkshopPrice(originalPricePerSession)}
-                      </span>
-                    )}
-                    <span className={`font-semibold ${isPast ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-                      {formatWorkshopPrice(pricePerSession)}
-                    </span>
-                  </div>
+                <div className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                  selectedLocation === loc.slug
+                    ? 'bg-amber-500 border-amber-500'
+                    : 'border-gray-300 bg-white'
+                }`}>
+                  {selectedLocation === loc.slug && (
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
                 </div>
-                {/* Row 2: Date + Time + Status */}
-                <div className="flex items-center justify-between mt-1.5 ml-8">
-                  <span className={`text-sm ${isPast ? 'line-through text-gray-400' : 'text-gray-500'}`}>
-                    {session.dateLabel} · {sessionTimeLabel}
+                <div>
+                  <span className="text-base font-semibold text-gray-900">
+                    {loc.name}
                   </span>
-                  <div className="text-sm">
-                    {isPast ? null : spotsLeft !== null ? (
-                      isSoldOut ? (
-                        <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
-                          Sold out
-                        </span>
-                      ) : isLowStock ? (
-                        <span className="text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
-                          {spotsLeft} spot{spotsLeft !== 1 ? 's' : ''} left
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-500">
-                          {spotsLeft} spots left
-                        </span>
-                      )
-                    ) : availabilityLoading ? (
-                      <span className="text-xs text-gray-400 animate-pulse">
-                        checking...
-                      </span>
-                    ) : null}
-                  </div>
+                  {loc.address && loc.address !== 'TBD' && (
+                    <p className="text-sm text-gray-500">{loc.address}</p>
+                  )}
                 </div>
               </label>
-            );
-          })}
+            ))}
+          </div>
+          {errors.selectedLocation && (
+            <p className={errorClassName} role="alert">
+              {errors.selectedLocation.message}
+            </p>
+          )}
         </div>
-
-        {errors.selectedWorkshopIds && (
-          <p className={errorClassName} role="alert">
-            {errors.selectedWorkshopIds.message}
-          </p>
-        )}
-
-        {/* Price Summary */}
-        {workshopCount > 0 && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-700">
-                {numberOfChildren > 1
-                  ? `${numberOfChildren} children × ${workshopCount} session${workshopCount !== 1 ? 's' : ''}`
-                  : `${workshopCount} session${workshopCount !== 1 ? 's' : ''} selected`}
+      ) : !isSingleMode ? (
+        /* --- DUAL MODE: Morning / Afternoon Session Picker --- */
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-gray-900">
+              1. Choose Your Session
+            </h3>
+            <span className="text-xs font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">
+              Limited to{' '}
+              {partner.capacity[sessionTypeKey as 'morning' | 'afternoon']}{' '}
+              spots per session
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label
+              className={`relative flex flex-col p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                selectedSessionType === 'morning'
+                  ? 'border-amber-500 bg-amber-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <input
+                type="radio"
+                value="morning"
+                {...register('selectedSessionType')}
+                className="sr-only"
+              />
+              <span className="text-lg font-semibold text-gray-900">
+                Morning Session
               </span>
-              <div className="text-right">
-                {hasDiscount && (
-                  <span className="text-sm text-gray-400 line-through mr-2">
-                    {formatWorkshopPrice(totalOriginal)}
+              <span className="text-sm text-gray-500 mt-1">
+                Ages 4–6 · 10:00 – 11:00 AM · 1 hour
+              </span>
+              <div className="mt-2">
+                {hasDiscount && selectedSessionType === 'morning' ? (
+                  <span className="text-sm">
+                    <span className="line-through text-gray-400 mr-1">
+                      {formatWorkshopPrice(
+                        partner.pricing.morning.originalPrice,
+                      )}
+                    </span>
+                    <span className="font-bold text-amber-700">
+                      {formatWorkshopPrice(partner.pricing.morning.promoPrice)}
+                    </span>
+                    <span className="text-gray-500"> / session</span>
+                  </span>
+                ) : (
+                  <span className="text-sm">
+                    <span className="line-through text-gray-400 mr-1">
+                      {formatWorkshopPrice(
+                        partner.pricing.morning.originalPrice,
+                      )}
+                    </span>
+                    <span className="font-semibold text-gray-700">
+                      {formatWorkshopPrice(partner.pricing.morning.promoPrice)}
+                    </span>
+                    <span className="text-gray-500"> / session</span>
                   </span>
                 )}
-                <span className="text-lg font-bold text-gray-900">
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Turn imagination into story characters, make physical books,
+                show &amp; tell
+              </p>
+            </label>
+
+            <label
+              className={`relative flex flex-col p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                selectedSessionType === 'afternoon'
+                  ? 'border-green-500 bg-green-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <input
+                type="radio"
+                value="afternoon"
+                {...register('selectedSessionType')}
+                className="sr-only"
+              />
+              <span className="text-lg font-semibold text-gray-900">
+                Afternoon Session
+              </span>
+              <span className="text-sm text-gray-500 mt-1">
+                Ages 7–9 · 1:00 – 3:00 PM · 2 hours
+              </span>
+              <div className="mt-2">
+                {hasDiscount && selectedSessionType === 'afternoon' ? (
+                  <span className="text-sm">
+                    <span className="line-through text-gray-400 mr-1">
+                      {formatWorkshopPrice(
+                        partner.pricing.afternoon.originalPrice,
+                      )}
+                    </span>
+                    <span className="font-bold text-green-700">
+                      {formatWorkshopPrice(
+                        partner.pricing.afternoon.promoPrice,
+                      )}
+                    </span>
+                    <span className="text-gray-500"> / session</span>
+                  </span>
+                ) : (
+                  <span className="text-sm">
+                    <span className="line-through text-gray-400 mr-1">
+                      {formatWorkshopPrice(
+                        partner.pricing.afternoon.originalPrice,
+                      )}
+                    </span>
+                    <span className="font-semibold text-gray-700">
+                      {formatWorkshopPrice(
+                        partner.pricing.afternoon.promoPrice,
+                      )}
+                    </span>
+                    <span className="text-gray-500"> / session</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Nature exploration, creative thinking &amp; story making
+              </p>
+            </label>
+          </div>
+          {errors.selectedSessionType && (
+            <p className={errorClassName} role="alert">
+              {errors.selectedSessionType.message}
+            </p>
+          )}
+
+          {/* Location info — shown after session selection (single-location partners) */}
+          {selectedSessionType && partner.location && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-sm">
+              <div className="flex items-center gap-2 text-gray-700">
+                <svg
+                  className="w-4 h-4 text-blue-400 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
+                <span>
+                  <span className="font-medium">Workshop Location:</span>{' '}
+                  {partner.location.mapUrl ? (
+                    <a
+                      href={partner.location.mapUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-700 underline"
+                    >
+                      {partner.location.name}, {partner.location.address}
+                    </a>
+                  ) : (
+                    `${partner.location.name}, ${partner.location.address}`
+                  )}
+                </span>
+              </div>
+              {sessionTypeKey === 'afternoon' && (
+                <p className="mt-2 ml-6 text-gray-600">
+                  Afternoon sessions begin with ~45 min of outdoor exploration at
+                  Bridle Trails, then transition to the indoor studio at{' '}
+                  {partner.location.name} for the creativity lab. Parents provide
+                  transportation between locations.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {/* ═══════════════════════════════════════════════════════ */}
+      {/* Section 2 — Series: Series Overview / Dual: Workshop Dates */}
+      {/* ═══════════════════════════════════════════════════════ */}
+      {isSeriesMode ? (
+        /* --- SERIES MODE: Read-only series overview --- */
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">
+            2. Series Overview
+          </h3>
+
+          {/* Series 1 — Enrolling Now */}
+          <div className="bg-amber-50/50 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h4 className="font-semibold text-gray-900">
+                  Series 1: Core Life Skills
+                </h4>
+                <p className="text-sm text-gray-600 mt-0.5">
+                  4 sessions · 2 physical storybooks
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
+                Now Enrolling
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {enrollableSessions.map((session, index) => (
+                <div
+                  key={session.id}
+                  className="flex items-start gap-3 p-3 bg-white/70 rounded-lg"
+                >
+                  <div className="flex-shrink-0 w-7 h-7 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-sm font-bold">
+                    {index + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900">
+                        {session.theme}
+                      </span>
+                      <span className="text-xs text-gray-600 font-medium">
+                        {session.dateLabel}
+                      </span>
+                    </div>
+                    {session.themeDescription && (
+                      <p className="text-sm text-gray-500 mt-0.5">
+                        {session.themeDescription}
+                      </p>
+                    )}
+                  </div>
+                  {(index === 1 || index === 3) && (
+                    <span className="flex-shrink-0 text-xs font-medium text-amber-700 bg-amber-100/80 px-2.5 py-1 rounded-md whitespace-nowrap">
+                      Storybook {index === 1 ? 1 : 2} produced
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Series pricing */}
+            <div className="mt-4 pt-3 border-t border-amber-200/60 space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">
+                  {numberOfChildren > 1
+                    ? `${numberOfChildren} children × ${enrollableSessions.length} sessions × ${formatWorkshopPrice(pricePerSession)}`
+                    : `${enrollableSessions.length} sessions × ${formatWorkshopPrice(pricePerSession)}`}
+                </span>
+                <span className="text-sm text-gray-700">
                   {formatWorkshopPrice(totalPrice)}
                 </span>
               </div>
+              {taxRate > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">
+                    Sales tax ({(taxRate * 100).toFixed(1)}%)
+                  </span>
+                  <span className="text-sm text-gray-600">
+                    {formatWorkshopPrice(taxAmount)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between items-center pt-1.5 border-t border-amber-200/40">
+                <span className="text-sm font-semibold text-gray-800">
+                  Total
+                </span>
+                <span className="text-lg font-bold text-gray-900">
+                  {formatWorkshopPrice(totalWithTax)}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500">
+                Includes 2 physical storybooks your child creates during the series
+              </p>
             </div>
-            {hasDiscount && (
-              <p className="text-sm text-green-600 mt-1">
-                Promotional pricing applied — you save {formatWorkshopPrice(totalOriginal - totalPrice)}!
-              </p>
-            )}
-
-            {/* --- Bundle upsell (commented out for future use) ---
-            {!isBundle && workshopCount > 0 && workshopCount < partner.pricing.bundleCount && (
-              <p className="text-sm text-gray-500 mt-2">
-                Select all {partner.pricing.bundleCount} workshops for{' '}
-                {savingsPercent}% off!
-              </p>
-            )} */}
           </div>
-        )}
-      </div>
 
-      {/* Promo code section — now handled by Stripe's allow_promotion_codes at checkout
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">
-          3. Promo Code <span className="text-sm font-normal text-gray-400">(optional)</span>
-        </h3>
-        <input
-          type="text"
-          {...register('promoCode')}
-          placeholder="Enter promo code"
-          className={inputClassName}
-        />
-        <p className="text-sm text-gray-500 mt-1">
-          If you have a promo code, enter it here. It will be applied at
-          checkout for additional savings.
-        </p>
-      </div> */}
+          {/* Series 2 — Coming Soon Preview */}
+          {previewSessions.length > 0 && (
+            <div className="mt-4 bg-gray-50 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h4 className="font-semibold text-gray-700">
+                    Series 2: Nature &amp; Our World
+                  </h4>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    4 sessions · 2 physical storybooks
+                  </p>
+                </div>
+                <span className="text-xs font-semibold text-gray-600 bg-gray-200 px-2.5 py-1 rounded-full">
+                  Coming Soon
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {previewSessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className="text-sm text-gray-600 p-2 bg-white/80 rounded-lg"
+                  >
+                    {session.theme}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* --- INDIVIDUAL MODE: Select Workshop Dates --- */
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-gray-900">
+              2. Select Workshop Dates
+            </h3>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={selectAll}
+                className="text-sm text-green-600 hover:text-green-700 font-medium"
+              >
+                Select All
+              </button>
+              <span className="text-gray-300">|</span>
+              <button
+                type="button"
+                onClick={clearAll}
+                className="text-sm text-gray-500 hover:text-gray-600 font-medium"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
 
-      {/* Section 3: Parent / Guardian Info */}
+          <div className="space-y-3">
+            {partner.sessions.map((session, index) => {
+              const isSelected = selectedWorkshopIds?.includes(session.id);
+              const spotsLeft = getSpotsLeft(session.id);
+              const isSoldOut = spotsLeft !== null && spotsLeft <= 0;
+              const isLowStock =
+                spotsLeft !== null && spotsLeft > 0 && spotsLeft <= 3;
+              const isPast = isSessionPast(session.dateLabel);
+              const isDisabled = isPast || isSoldOut;
+
+              return (
+                <label
+                  key={session.id}
+                  className={`block p-4 border-2 rounded-xl transition-all ${
+                    isDisabled
+                      ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                      : isSelected
+                        ? 'border-green-500 bg-green-50 cursor-pointer'
+                        : 'border-gray-200 hover:border-gray-300 cursor-pointer'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => !isDisabled && toggleWorkshop(session.id)}
+                    disabled={isDisabled}
+                    className="sr-only"
+                  />
+                  {/* Row 1: Checkbox + Week # + Theme + Price */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                          isDisabled
+                            ? 'bg-gray-200 border-gray-300'
+                            : isSelected
+                              ? 'bg-green-600 border-green-600'
+                              : 'border-gray-300 bg-white'
+                        }`}
+                      >
+                        {isSelected && !isDisabled && (
+                          <svg
+                            className="w-3 h-3 text-white"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={3}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        )}
+                      </div>
+                      <span
+                        className={`font-semibold ${isPast ? 'line-through text-gray-400' : 'text-gray-900'}`}
+                      >
+                        Week {index + 1}
+                      </span>
+                      <span
+                        className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          isPast
+                            ? 'text-gray-400 bg-gray-100 line-through'
+                            : 'text-amber-700 bg-amber-50'
+                        }`}
+                      >
+                        {session.theme}
+                      </span>
+                      {isPast && (
+                        <span className="text-xs font-semibold text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+                          Completed
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm">
+                      {!isPast && hasDiscount && (
+                        <span className="line-through text-gray-400 mr-1">
+                          {formatWorkshopPrice(originalPricePerSession)}
+                        </span>
+                      )}
+                      <span
+                        className={`font-semibold ${isPast ? 'line-through text-gray-400' : 'text-gray-900'}`}
+                      >
+                        {formatWorkshopPrice(pricePerSession)}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Row 2: Date + Time + Status */}
+                  <div className="flex items-center justify-between mt-1.5 ml-8">
+                    <span
+                      className={`text-sm ${isPast ? 'line-through text-gray-400' : 'text-gray-500'}`}
+                    >
+                      {session.dateLabel} · {sessionTimeLabel}
+                    </span>
+                    <div className="text-sm">
+                      {isPast ? null : spotsLeft !== null ? (
+                        isSoldOut ? (
+                          <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+                            Sold out
+                          </span>
+                        ) : isLowStock ? (
+                          <span className="text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+                            {spotsLeft} spot{spotsLeft !== 1 ? 's' : ''} left
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-500">
+                            {spotsLeft} spots left
+                          </span>
+                        )
+                      ) : availabilityLoading ? (
+                        <span className="text-xs text-gray-400 animate-pulse">
+                          checking...
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+
+          {errors.selectedWorkshopIds && (
+            <p className={errorClassName} role="alert">
+              {errors.selectedWorkshopIds.message}
+            </p>
+          )}
+
+          {/* Price Summary (individual mode) */}
+          {workshopCount > 0 && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-700">
+                  {numberOfChildren > 1
+                    ? `${numberOfChildren} children × ${workshopCount} session${workshopCount !== 1 ? 's' : ''}`
+                    : `${workshopCount} session${workshopCount !== 1 ? 's' : ''} selected`}
+                </span>
+                <div className="text-right">
+                  {hasDiscount && (
+                    <span className="text-sm text-gray-400 line-through mr-2">
+                      {formatWorkshopPrice(totalOriginal)}
+                    </span>
+                  )}
+                  <span className="text-lg font-bold text-gray-900">
+                    {formatWorkshopPrice(totalPrice)}
+                  </span>
+                </div>
+              </div>
+              {hasDiscount && (
+                <p className="text-sm text-green-600 mt-1">
+                  Promotional pricing applied — you save{' '}
+                  {formatWorkshopPrice(totalOriginal - totalPrice)}!
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════ */}
+      {/* Section 3: Parent / Guardian Information */}
+      {/* ═══════════════════════════════════════════════════════ */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           3. Parent / Guardian Information
@@ -581,7 +893,9 @@ export default function WorkshopRegistrationForm({
         </div>
       </div>
 
-      {/* Section 4: Child Info */}
+      {/* ═══════════════════════════════════════════════════════ */}
+      {/* Section 4: Child Information */}
+      {/* ═══════════════════════════════════════════════════════ */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           4. Child Information
@@ -594,7 +908,9 @@ export default function WorkshopRegistrationForm({
             >
               {childrenFields.length > 1 && (
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-semibold text-gray-700">Child {index + 1}</span>
+                  <span className="text-sm font-semibold text-gray-700">
+                    Child {index + 1}
+                  </span>
                   {index > 0 && (
                     <button
                       type="button"
@@ -608,7 +924,10 @@ export default function WorkshopRegistrationForm({
               )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label htmlFor={`children.${index}.firstName`} className={labelClassName}>
+                  <label
+                    htmlFor={`children.${index}.firstName`}
+                    className={labelClassName}
+                  >
                     First Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -626,7 +945,10 @@ export default function WorkshopRegistrationForm({
                   )}
                 </div>
                 <div>
-                  <label htmlFor={`children.${index}.lastName`} className={labelClassName}>
+                  <label
+                    htmlFor={`children.${index}.lastName`}
+                    className={labelClassName}
+                  >
                     Last Name
                   </label>
                   <input
@@ -637,12 +959,17 @@ export default function WorkshopRegistrationForm({
                   />
                 </div>
                 <div>
-                  <label htmlFor={`children.${index}.age`} className={labelClassName}>
+                  <label
+                    htmlFor={`children.${index}.age`}
+                    className={labelClassName}
+                  >
                     Age <span className="text-red-500">*</span>
                   </label>
                   <select
                     id={`children.${index}.age`}
-                    {...register(`children.${index}.age`, { valueAsNumber: true })}
+                    {...register(`children.${index}.age`, {
+                      valueAsNumber: true,
+                    })}
                     className={inputClassName}
                     aria-required="true"
                     aria-invalid={!!errors.children?.[index]?.age}
@@ -671,11 +998,27 @@ export default function WorkshopRegistrationForm({
           {childrenFields.length < 3 && (
             <button
               type="button"
-              onClick={() => addChild({ firstName: '', lastName: '', age: undefined as unknown as number })}
+              onClick={() =>
+                addChild({
+                  firstName: '',
+                  lastName: '',
+                  age: undefined as unknown as number,
+                })
+              }
               className="text-sm text-green-600 hover:text-green-700 font-medium flex items-center gap-1"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
               </svg>
               Add Another Child
             </button>
@@ -683,7 +1026,9 @@ export default function WorkshopRegistrationForm({
         </div>
       </div>
 
+      {/* ═══════════════════════════════════════════════════════ */}
       {/* Section 5: Emergency Contact */}
+      {/* ═══════════════════════════════════════════════════════ */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           5. Emergency Contact
@@ -726,7 +1071,10 @@ export default function WorkshopRegistrationForm({
             )}
           </div>
           <div>
-            <label htmlFor="emergencyContactRelation" className={labelClassName}>
+            <label
+              htmlFor="emergencyContactRelation"
+              className={labelClassName}
+            >
               Relationship <span className="text-red-500">*</span>
             </label>
             <input
@@ -747,7 +1095,9 @@ export default function WorkshopRegistrationForm({
         </div>
       </div>
 
+      {/* ═══════════════════════════════════════════════════════ */}
       {/* Section 6: Digital Waiver */}
+      {/* ═══════════════════════════════════════════════════════ */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           6. Digital Waiver
@@ -760,8 +1110,18 @@ export default function WorkshopRegistrationForm({
               className="sr-only peer"
             />
             <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 border-gray-300 bg-white peer-checked:bg-green-600 peer-checked:border-green-600 flex items-center justify-center transition-colors">
-              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              <svg
+                className="w-3 h-3 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={3}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             </div>
             <span className="text-sm text-gray-700">
@@ -774,9 +1134,9 @@ export default function WorkshopRegistrationForm({
                 workshop participation waiver
               </button>
               . I understand that my child will participate in creative and
-              hands-on activities, and I consent to activity participation,
-              photo/video documentation for educational purposes, and the
-              emergency procedures outlined in the waiver.{' '}
+              hands-on activities, and I consent to the activity participation,
+              emergency procedures, and safety guidelines outlined in the
+              waiver.{' '}
               <span className="text-red-500">*</span>
             </span>
           </label>
@@ -799,14 +1159,8 @@ export default function WorkshopRegistrationForm({
                 <li>
                   <strong>Activity Participation:</strong> My child will engage
                   in creative, hands-on activities including art, storytelling,
-                  nature exploration, and maker projects. I understand these
-                  activities are age-appropriate and supervised.
-                </li>
-                <li>
-                  <strong>Photo/Video Consent:</strong> I grant permission for
-                  workshop facilitators to photograph or video-record my child
-                  during workshop activities for educational documentation and
-                  promotional purposes. I may opt out by notifying staff.
+                  and maker projects. I understand these activities are
+                  age-appropriate and supervised.
                 </li>
                 <li>
                   <strong>Emergency Authorization:</strong> In case of emergency,
@@ -825,65 +1179,65 @@ export default function WorkshopRegistrationForm({
                   workshop staff of any allergies, medical conditions, or special
                   needs my child may have prior to the first session.
                 </li>
-                <li>
-                  <strong>Drop-off/Pick-up:</strong> I am responsible for
-                  ensuring my child is dropped off and picked up on time. Children
-                  must be signed in and out by an authorized adult.
-                </li>
-                <li>
-                  <strong>Outdoor Exploration (Afternoon Sessions):</strong> Afternoon
-                  sessions include supervised outdoor exploration at nearby parks
-                  and nature areas. I understand my child will participate in
-                  outdoor activities and I accept risks associated with outdoor
-                  environments, including weather conditions, uneven terrain, and
-                  exposure to natural elements. I will ensure my child has
-                  appropriate clothing, footwear, and sun protection.
-                </li>
-                <li>
-                  <strong>Parent Transportation:</strong> I understand that
-                  transportation between the indoor studio location and outdoor
-                  exploration sites during afternoon sessions is the
-                  parent/guardian&apos;s responsibility. I will provide my own
-                  vehicle and ensure my child is properly secured in an
-                  age-appropriate car seat or seatbelt during transit.
-                </li>
+                {!isSingleMode && (
+                  <>
+                    <li>
+                      <strong>Outdoor Exploration (Afternoon Sessions):</strong>{' '}
+                      Afternoon sessions include supervised outdoor exploration at
+                      nearby parks and nature areas. I understand my child will
+                      participate in outdoor activities and I accept risks
+                      associated with outdoor environments, including weather
+                      conditions, uneven terrain, and exposure to natural
+                      elements. I will ensure my child has appropriate clothing,
+                      footwear, and sun protection.
+                    </li>
+                    <li>
+                      <strong>Parent Transportation:</strong> I understand that
+                      transportation between the indoor studio location and
+                      outdoor exploration sites during afternoon sessions is the
+                      parent/guardian&apos;s responsibility. I will provide my
+                      own vehicle and ensure my child is properly secured in an
+                      age-appropriate car seat or seatbelt during transit.
+                    </li>
+                  </>
+                )}
               </ul>
             </div>
           )}
         </div>
 
-        {/* Code of Conduct */}
+        {/* Photo/Video Consent */}
         <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
-              {...register('codeOfConductAccepted')}
+              {...register('photoVideoConsentAccepted')}
               className="sr-only peer"
             />
             <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 border-gray-300 bg-white peer-checked:bg-green-600 peer-checked:border-green-600 flex items-center justify-center transition-colors">
-              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              <svg
+                className="w-3 h-3 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={3}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             </div>
             <span className="text-sm text-gray-700">
-              I have read and agree to follow the{' '}
-              <a
-                href="https://docs.google.com/document/d/1ADh0zqwZEogHO1uxJo7aAcSS0dyhTmzf3MjGbr4qhSc/edit?tab=t.0"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-green-600 hover:text-green-700 font-medium underline"
-              >
-                SteamOji Code of Conduct
-              </a>
-              .{' '}
-              <span className="text-red-500">*</span>
+              <strong>Photo/Video Consent:</strong> I grant permission for
+              workshop facilitators to photograph or video-record my
+              child&apos;s artwork and creative process during workshop
+              activities for educational documentation and promotional
+              purposes. No photographs of children&apos;s faces will be
+              taken or shared.
             </span>
           </label>
-          {errors.codeOfConductAccepted && (
-            <p className={`${errorClassName} ml-8`} role="alert">
-              {errors.codeOfConductAccepted.message}
-            </p>
-          )}
         </div>
       </div>
 
@@ -931,7 +1285,7 @@ export default function WorkshopRegistrationForm({
           ) : workshopCount === 0 ? (
             'Select sessions to continue'
           ) : (
-            `Proceed to Payment — ${formatWorkshopPrice(totalPrice)}`
+            `Proceed to Payment — ${formatWorkshopPrice(totalWithTax)}`
           )}
         </button>
         <p className="text-center text-sm text-gray-500 mt-2">

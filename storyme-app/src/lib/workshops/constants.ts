@@ -15,10 +15,13 @@ export interface WorkshopSessionSlot {
 
 export interface WorkshopSession {
   id: string;
-  dateLabel: string; // e.g. "Sunday, March 15, 2026"
+  dateLabel: string; // e.g. "Sunday, March 15, 2026" or "Week 1"
   theme: string; // e.g. "Nature", "Innovation"
+  themeDescription?: string; // Short subtitle for curriculum overview
   morning: WorkshopSessionSlot;
-  afternoon: WorkshopSessionSlot;
+  afternoon?: WorkshopSessionSlot; // Optional for single-session partners
+  series?: number; // 1, 2, etc. — for grouping sessions into enrollable series
+  enrollable?: boolean; // defaults true; false = preview-only (not selectable)
 }
 
 export interface WorkshopSessionPricing {
@@ -29,18 +32,23 @@ export interface WorkshopSessionPricing {
 export interface WorkshopPricing {
   morning: WorkshopSessionPricing;
   afternoon: WorkshopSessionPricing;
+  single?: WorkshopSessionPricing; // For single-session partners (no morning/afternoon split)
   currency: string;
 }
 
 export interface WorkshopCapacity {
   morning: number;
   afternoon: number;
+  single?: number; // For single-session partners
+  perLocation?: Record<string, number>; // Keyed by location slug, for multi-location partners
 }
 
 export interface WorkshopLocation {
+  slug: string; // e.g. 'bellevue', 'kirkland'
   name: string;
   address: string;
   mapUrl?: string;
+  taxRate?: number; // e.g. 0.103 for 10.3% WA sales tax
 }
 
 export interface WorkshopPartner {
@@ -54,10 +62,14 @@ export interface WorkshopPartner {
   logoUrl?: string;
   theme: 'green' | 'amber' | 'blue' | 'purple';
   comingSoon: boolean;
+  sessionMode: 'single' | 'dual'; // single = one session type; dual = morning + afternoon
+  enrollmentMode?: 'individual' | 'series'; // individual = pick sessions; series = enroll in full series
   sessions: WorkshopSession[];
   pricing: WorkshopPricing;
   capacity: WorkshopCapacity;
-  location?: WorkshopLocation;
+  location?: WorkshopLocation; // Single location (SteamOji)
+  locations?: WorkshopLocation[]; // Multiple locations (Avocado)
+  partnerUrl?: string; // Link to partner website
 }
 
 export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
@@ -74,6 +86,9 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       'SteamOji is a maker academy for kids ages 6–14 that equips children with hands-on STEM skills and a maker mindset to solve real-world problems. Their curriculum spans coding, robotics, engineering, 3D printing, and digital arts — everything from the screen to the workbench.',
     theme: 'green',
     comingSoon: false,
+    sessionMode: 'dual',
+    enrollmentMode: 'individual',
+    partnerUrl: 'https://www.steamoji.com/',
     sessions: [
       {
         id: 'steamoji-wk1',
@@ -228,6 +243,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
     },
     capacity: { morning: 10, afternoon: 10 },
     location: {
+      slug: 'bellevue',
       name: 'SteamOji Bellevue Store',
       address: '14315 NE 20th Street, Suite C-E, Bellevue, WA 98007',
       mapUrl: 'https://maps.google.com/?q=14315+NE+20th+Street+Suite+C-E+Bellevue+WA+98007',
@@ -238,18 +254,197 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
     slug: 'avocado',
     name: 'KindleWood × Avocado Montessori',
     partnerName: 'Avocado Montessori Academy',
-    tagline: 'Creative Storytelling in the Montessori Classroom',
-    description: 'Workshop details coming soon. We\'re developing a creative storytelling curriculum tailored to the Montessori learning approach.',
-    partnerDescription: '',
+    tagline: 'Nurturing curious minds through stories, nature, and hands-on discovery.',
+    logoUrl: '/images/avocado-logo.png',
+    description:
+      'A Montessori-aligned storytelling program where children ages 3–6 explore real-world themes through craft, guided storytelling, and creative expression. Each 4-session series produces 2 physical storybooks — one every two sessions — that children take home as keepsakes of their learning journey.',
+    partnerDescription:
+      'Avocado Montessori Academy nurtures young learners through the Montessori philosophy of independence, hands-on discovery, and respect for each child\'s natural development. With campuses in Bellevue and Kirkland, they serve families across the Eastside.',
     theme: 'amber',
-    comingSoon: true,
-    sessions: [],
+    comingSoon: false,
+    sessionMode: 'single',
+    enrollmentMode: 'series',
+    partnerUrl: 'https://avocado-montessori.com/',
+    sessions: [
+      // Series 1: Core Life Skills (enrollable now)
+      {
+        id: 'avocado-s1-wk1',
+        dateLabel: 'Week 1',
+        theme: 'Social & Emotional Learning',
+        themeDescription: 'Feelings, friendships, communication, empathy, and boundaries',
+        series: 1,
+        enrollable: true,
+        morning: {
+          time: 'TBD',
+          ageRange: 'Ages 3–6',
+          title: 'My Feelings Story',
+          description:
+            'Children explore emotions through expressive craft, then build a simple story about feelings, friendships, and empathy in a guided share circle.',
+          highlights: [
+            'Emotion recognition through craft & storytelling',
+            'Guided narrative: beginning → feeling → resolution',
+            'Share circle with empathetic listening',
+          ],
+        },
+      },
+      {
+        id: 'avocado-s1-wk2',
+        dateLabel: 'Week 2',
+        theme: 'Daily Habits & Health',
+        themeDescription: 'Routines, self-care, safety, health, and cause-and-effect thinking',
+        series: 1,
+        enrollable: true,
+        morning: {
+          time: 'TBD',
+          ageRange: 'Ages 3–6',
+          title: 'Healthy Habits Hero',
+          description:
+            'Kids create a character who practices healthy habits, then build a story about daily routines, self-care, and making safe choices.',
+          highlights: [
+            'Healthy habits character creation',
+            'Cause-and-effect storytelling',
+            'Routine-building through narrative play',
+          ],
+        },
+      },
+      {
+        id: 'avocado-s1-wk3',
+        dateLabel: 'Week 3',
+        theme: 'STEM Thinking',
+        themeDescription: 'Logic, patterns, math sense, science reasoning, and problem-solving',
+        series: 1,
+        enrollable: true,
+        morning: {
+          time: 'TBD',
+          ageRange: 'Ages 3–6',
+          title: 'Pattern Detective Story',
+          description:
+            'Children discover patterns and logic through hands-on activities, then weave their findings into a problem-solving story.',
+          highlights: [
+            'Pattern recognition & logical thinking',
+            'Hands-on STEM exploration',
+            'Problem-solving narrative structure',
+          ],
+        },
+      },
+      {
+        id: 'avocado-s1-wk4',
+        dateLabel: 'Week 4',
+        theme: 'Financial Awareness',
+        themeDescription: 'Saving, spending, sharing, earning, planning, and value awareness',
+        series: 1,
+        enrollable: true,
+        morning: {
+          time: 'TBD',
+          ageRange: 'Ages 3–6',
+          title: 'My First Piggy Bank Story',
+          description:
+            'Kids explore the concepts of saving, spending, and sharing through creative play, then build a story about making choices with their resources.',
+          highlights: [
+            'Value awareness through creative play',
+            'Decision-making & trade-off thinking',
+            'Story about saving, sharing & planning',
+          ],
+        },
+      },
+      // Series 2: Nature & Our World (preview — not enrollable yet)
+      {
+        id: 'avocado-s2-wk1',
+        dateLabel: 'Week 5',
+        theme: 'Time Awareness & Planning',
+        themeDescription: 'Understanding time, routines, priorities, and making choices',
+        series: 2,
+        enrollable: false,
+        morning: {
+          time: 'TBD',
+          ageRange: 'Ages 3–6',
+          title: 'My Day, My Story',
+          description:
+            'Children explore the concept of time through daily routines, then create a story about planning, priorities, and making the most of their day.',
+          highlights: [
+            'Time awareness through daily routines',
+            'Sequencing & planning skills',
+            'Story about priorities & choices',
+          ],
+        },
+      },
+      {
+        id: 'avocado-s2-wk2',
+        dateLabel: 'Week 6',
+        theme: 'Plants & Trees',
+        themeDescription: 'Plant growth, structures, life cycles, and change through observation',
+        series: 2,
+        enrollable: false,
+        morning: {
+          time: 'TBD',
+          ageRange: 'Ages 3–6',
+          title: 'The Growing Garden Story',
+          description:
+            'Kids observe plant life cycles through hands-on activities, then create a story about growth, change, and the wonders of nature.',
+          highlights: [
+            'Real-world plant observation',
+            'Life cycle understanding through story',
+            'Nature-inspired craft & storytelling',
+          ],
+        },
+      },
+      {
+        id: 'avocado-s2-wk3',
+        dateLabel: 'Week 7',
+        theme: 'Animals & Habitats',
+        themeDescription: 'Animals, insects, habitats, survival needs, and relationships in nature',
+        series: 2,
+        enrollable: false,
+        morning: {
+          time: 'TBD',
+          ageRange: 'Ages 3–6',
+          title: 'Animal Friends Adventure',
+          description:
+            'Children learn about animals, their habitats, and survival needs, then create a story about animal friendships and the natural world.',
+          highlights: [
+            'Animal habitat exploration',
+            'Understanding survival & relationships',
+            'Nature-based storytelling & craft',
+          ],
+        },
+      },
+      {
+        id: 'avocado-s2-wk4',
+        dateLabel: 'Week 8',
+        theme: 'Earth & Environment',
+        themeDescription: 'Rocks, soil, water, environment, and how people interact with the Earth',
+        series: 2,
+        enrollable: false,
+        morning: {
+          time: 'TBD',
+          ageRange: 'Ages 3–6',
+          title: 'Our Earth, Our Story',
+          description:
+            'Kids explore rocks, soil, and water through hands-on discovery, then build a story about caring for the Earth and our environment.',
+          highlights: [
+            'Earth science through sensory exploration',
+            'Environmental awareness & stewardship',
+            'Story about caring for our planet',
+          ],
+        },
+      },
+    ],
     pricing: {
-      morning: { originalPrice: 0, promoPrice: 0 },
+      morning: { originalPrice: 2800, promoPrice: 2800 }, // used as fallback
       afternoon: { originalPrice: 0, promoPrice: 0 },
+      single: { originalPrice: 2800, promoPrice: 2800 }, // $28/session
       currency: 'usd',
     },
-    capacity: { morning: 0, afternoon: 0 },
+    capacity: {
+      morning: 0,
+      afternoon: 0,
+      single: 12,
+      perLocation: { bellevue: 12, kirkland: 12 },
+    },
+    locations: [
+      { slug: 'bellevue', name: 'Bellevue Campus', address: 'TBD', taxRate: 0.103 },
+      { slug: 'kirkland', name: 'Kirkland Campus', address: 'TBD', taxRate: 0.102 },
+    ],
   },
 ];
 
@@ -267,17 +462,22 @@ export const WORKSHOP_FAQS = [
   {
     question: 'How does pricing work?',
     answer:
-      'Morning sessions (1 hour) and afternoon sessions (2 hours) are priced per session. Promotional pricing is already applied to the displayed prices. If you have an additional promo code from a partner or special promotion, you can enter it on the Stripe checkout page for further savings.',
+      'Pricing varies by partner and program. SteamOji workshops are priced per session (morning and afternoon). Avocado Montessori workshops are enrolled by series — each series includes 4 sessions and 2 physical storybooks. If you have a promo code, you can enter it on the Stripe checkout page.',
   },
   {
     question: 'What is the cancellation and refund policy?',
     answer:
-      'Full refunds are available up to 48 hours before the workshop date. Within 48 hours, we offer a credit toward future workshops. Bundle purchases can be partially refunded for unattended sessions. Please contact us for specific situations.',
+      'Full refunds are available up to 48 hours before the workshop date. Within 48 hours, we offer a credit toward future workshops. Series purchases can be partially refunded for unattended sessions. Please contact us for specific situations.',
   },
   {
     question: 'What age groups are the workshops for?',
     answer:
-      'Morning sessions (10:00–11:00 AM, 1 hour) are designed for younger children (ages 4–6) with a focus on imaginative play, storytelling, and art. Afternoon sessions (1:00–3:00 PM, 2 hours) are for older children (ages 7–9) with more complex activities including nature exploration, maker projects, and digital storytelling.',
+      'SteamOji morning sessions (Ages 4–6, 1 hour) focus on imaginative play and storytelling. Afternoon sessions (Ages 7–9, 2 hours) include nature exploration and maker projects. Avocado Montessori sessions are designed for Ages 3–6 with a Montessori-aligned approach to creative storytelling.',
+  },
+  {
+    question: 'Where do the workshops take place?',
+    answer:
+      'SteamOji workshops are held at their Bellevue store (14315 NE 20th Street, Suite C-E). Avocado Montessori workshops take place at the school\'s Bellevue and Kirkland campuses — you choose your preferred location during registration.',
   },
   {
     question: 'Is there a digital waiver required?',
@@ -299,9 +499,39 @@ export function getSessionPricing(
   return pricing[sessionType];
 }
 
-// --- Bundle pricing (commented out for future use) ---
-// export function getBundleSavingsPercent(pricing: WorkshopPricing): number {
-//   if (pricing.bundleCount === 0) return 0;
-//   const fullPrice = pricing.singleWorkshop * pricing.bundleCount;
-//   return Math.round(((fullPrice - pricing.bundlePrice) / fullPrice) * 100);
-// }
+// Helper to get pricing for a partner based on session mode
+export function getPartnerSessionPricing(
+  partner: WorkshopPartner,
+  sessionType?: 'morning' | 'afternoon' | 'single',
+): WorkshopSessionPricing {
+  if (partner.sessionMode === 'single') {
+    return partner.pricing.single || partner.pricing.morning;
+  }
+  const type = sessionType === 'single' ? 'morning' : (sessionType || 'morning');
+  return partner.pricing[type];
+}
+
+// Helper to get capacity for a partner, optionally per location
+export function getPartnerCapacity(
+  partner: WorkshopPartner,
+  sessionType?: 'morning' | 'afternoon' | 'single',
+  locationSlug?: string,
+): number {
+  if (partner.sessionMode === 'single' && locationSlug && partner.capacity.perLocation) {
+    return partner.capacity.perLocation[locationSlug] || 0;
+  }
+  if (partner.sessionMode === 'single') {
+    return partner.capacity.single || 0;
+  }
+  const type = sessionType === 'single' ? 'morning' : (sessionType || 'morning');
+  return partner.capacity[type];
+}
+
+// Helper to get enrollable sessions for a series
+export function getEnrollableSessions(partner: WorkshopPartner, series?: number): WorkshopSession[] {
+  return partner.sessions.filter(s => {
+    if (s.enrollable === false) return false;
+    if (series !== undefined && s.series !== series) return false;
+    return true;
+  });
+}

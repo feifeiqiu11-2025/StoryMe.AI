@@ -9,10 +9,11 @@ export const WorkshopRegistrationSchema = z.object({
   selectedWorkshopIds: z
     .array(z.string())
     .min(1, 'Please select at least one workshop'),
-  selectedSessionType: z.enum(['morning', 'afternoon'], {
+  selectedSessionType: z.enum(['morning', 'afternoon', 'single'], {
     message: 'Please select a session type',
   }),
   partnerId: z.string().min(1, 'Partner is required'),
+  selectedLocation: z.string().max(100).optional(),
 
   // Parent / Guardian
   parentFirstName: z
@@ -76,10 +77,8 @@ export const WorkshopRegistrationSchema = z.object({
     message: 'You must accept the digital waiver to register',
   }),
 
-  // Code of Conduct
-  codeOfConductAccepted: z.literal(true, {
-    message: 'You must agree to follow the SteamOji Code of Conduct',
-  }),
+  // Photo/Video Consent (optional — awareness only, does not block registration)
+  photoVideoConsentAccepted: z.boolean().optional().default(false),
 });
 
 export type WorkshopRegistrationData = z.infer<typeof WorkshopRegistrationSchema>;

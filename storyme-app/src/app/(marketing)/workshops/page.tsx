@@ -7,6 +7,11 @@
  *
  * Zigzag layout inspired by VideoShowcase component pattern.
  * Scroll-reveal animations using Intersection Observer.
+ *
+ * Layout branches:
+ * - comingSoon: teaser with logos + contact CTA
+ * - single-mode (Avocado): partnership intro, video, curriculum grid, outcomes
+ * - dual-mode (SteamOji): morning/afternoon slideshows with register CTAs
  */
 
 'use client';
@@ -19,6 +24,7 @@ import {
   WORKSHOP_PARTNERS,
   WORKSHOP_FAQS,
   formatWorkshopPrice,
+  getPartnerSessionPricing,
 } from '@/lib/workshops/constants';
 
 export default function WorkshopsPage() {
@@ -29,7 +35,7 @@ export default function WorkshopsPage() {
     | { type: 'image'; src: string; alt: string; fit?: 'cover' | 'contain' }
     | { type: 'video'; videoId: string; alt: string };
 
-  // Morning session slideshow
+  // Morning session slideshow (SteamOji)
   const morningSlides: Slide[] = [
     { type: 'video', videoId: 'c0fbsTEjK9Q', alt: 'KindleWood morning workshop highlights' },
     { type: 'image', src: '/images/workshop-morning.png', alt: 'Morning workshop — kids crafting and storytelling', fit: 'cover' },
@@ -52,7 +58,7 @@ export default function WorkshopsPage() {
     return () => clearInterval(timer);
   }, [nextMorningSlide, morningIsVideo]);
 
-  // Afternoon session slideshow
+  // Afternoon session slideshow (SteamOji)
   const afternoonSlides: Slide[] = [
     { type: 'video', videoId: 'zNJ4sFUp-SQ', alt: 'KindleWood afternoon workshop highlights' },
     { type: 'image', src: '/images/workshop-afternoon.png', alt: 'Afternoon workshop — nature exploration and creativity lab' },
@@ -71,6 +77,26 @@ export default function WorkshopsPage() {
     const timer = setInterval(nextAfternoonSlide, 6000);
     return () => clearInterval(timer);
   }, [nextAfternoonSlide, afternoonIsVideo]);
+
+  // Avocado Montessori slideshow
+  const avocadoSlides: Slide[] = [
+    { type: 'video', videoId: 'oGIqaPkw9aw', alt: 'KindleWood × Avocado Montessori workshop preview' },
+    { type: 'image', src: '/images/workshop-morning.png', alt: 'Kids crafting and storytelling in workshop', fit: 'cover' },
+    { type: 'image', src: '/images/workshop-morning-bookshow.jpg', alt: 'Physical storybooks created by children', fit: 'cover' },
+  ];
+  const [avocadoSlide, setAvocadoSlide] = useState(0);
+
+  const avocadoIsVideo = avocadoSlides[avocadoSlide]?.type === 'video';
+
+  const nextAvocadoSlide = useCallback(() => {
+    setAvocadoSlide((prev) => (prev + 1) % avocadoSlides.length);
+  }, [avocadoSlides.length]);
+
+  useEffect(() => {
+    if (avocadoIsVideo) return;
+    const timer = setInterval(nextAvocadoSlide, 6000);
+    return () => clearInterval(timer);
+  }, [nextAvocadoSlide, avocadoIsVideo]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
@@ -110,11 +136,13 @@ export default function WorkshopsPage() {
         {WORKSHOP_PARTNERS.map((partner) => (
           <div key={partner.id} id={partner.slug} className="scroll-mt-24 border-t border-gray-200 pt-12 first:border-t-0 first:pt-0">
             {partner.comingSoon ? (
-              /* Coming Soon Partner — Zigzag Layout */
+              /* ═══════════════════════════════════════════ */
+              /* Coming Soon Partner — Teaser Layout        */
+              /* ═══════════════════════════════════════════ */
               <Reveal>
                 <div className="mb-16">
                   <div className="flex flex-col md:flex-row gap-8 md:gap-12 items-center">
-                    {/* Left: Logo pair with organic blob shape (different shape, light yellow) */}
+                    {/* Left: Logo pair with organic blob shape (light yellow) */}
                     <div className="w-full md:w-[45%] flex justify-center">
                       <div className="relative w-full max-w-sm aspect-square flex items-center justify-center">
                         <svg
@@ -186,8 +214,210 @@ export default function WorkshopsPage() {
                   </div>
                 </div>
               </Reveal>
+            ) : partner.sessionMode === 'single' ? (
+              /* ═══════════════════════════════════════════ */
+              /* Single-Mode Partner (Avocado Montessori)   */
+              /* ═══════════════════════════════════════════ */
+              <div className="mb-16">
+                {/* Row 1: Partnership Intro (logos left, text right) */}
+                <Reveal>
+                  <div className="flex flex-col md:flex-row gap-8 md:gap-12 items-center mb-16">
+                    {/* Left: Logo pair with amber blob */}
+                    <div className="w-full md:w-[45%] flex justify-center">
+                      <div className="relative w-full max-w-sm aspect-square flex items-center justify-center">
+                        <svg
+                          viewBox="0 0 600 600"
+                          className="absolute inset-0 w-full h-full"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <defs>
+                            <linearGradient id={`blobGradient-${partner.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                              <stop offset="0%" stopColor="#fef3c7" />
+                              <stop offset="40%" stopColor="#fde68a" />
+                              <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.5" />
+                            </linearGradient>
+                          </defs>
+                          <path
+                            d="M300,520 C200,540 80,480 50,380 C20,280 60,200 40,140 C20,80 80,20 180,40 C240,52 260,90 320,60 C380,30 440,10 500,60 C560,110 560,180 540,260 C520,340 530,380 500,440 C470,500 400,500 300,520 Z"
+                            fill={`url(#blobGradient-${partner.id})`}
+                          />
+                        </svg>
+                        <div className="relative z-10 flex flex-col items-center justify-center">
+                          <img
+                            src="/Logo_New.png"
+                            alt="KindleWood Studio"
+                            className="h-16 sm:h-20 w-auto object-contain"
+                          />
+                          <span className="text-2xl text-amber-800/30 font-light -my-2">+</span>
+                          {partner.logoUrl ? (
+                            <img
+                              src={partner.logoUrl}
+                              alt={partner.partnerName}
+                              className="h-44 sm:h-52 w-auto object-contain -mt-7"
+                            />
+                          ) : (
+                            <span className="text-xl sm:text-2xl font-bold text-gray-700">
+                              {partner.partnerName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Partnership announcement */}
+                    <div className="w-full md:w-[55%]">
+                      <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+                        KindleWood Studio × {partner.partnerName}
+                      </h2>
+                      <p className="text-lg text-gray-700 leading-relaxed">
+                        We&apos;re excited to bring a Montessori-aligned storytelling program
+                        into the classroom. Children ages 3–6 explore real-world themes —
+                        from emotions and healthy habits to STEM thinking and financial
+                        awareness — through hands-on craft, guided storytelling, and creative
+                        expression.
+                      </p>
+                    </div>
+                  </div>
+                </Reveal>
+
+                {/* Row 2: Session Info (text left) + Video Slideshow (right) */}
+                <div className="flex flex-col md:flex-row gap-8 md:gap-12 items-center mb-16">
+                  {/* Left: Workshop details with title + subtitle */}
+                  <Reveal className="w-full md:w-[55%]">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="text-2xl font-bold text-gray-900">
+                        Creative Storyteller Workshop
+                      </h3>
+                    </div>
+                    <p className="text-amber-800 font-medium mb-3">
+                      Where every drawing becomes a story character, and every child grows into a confident storyteller.
+                    </p>
+                    <p className="text-gray-500 mb-3">
+                      Ages 3–6 · 2 series · 4 sessions per series
+                    </p>
+                    <p className="text-gray-700 leading-relaxed mb-4">
+                      Each session follows a Montessori-inspired creative arc: Story Spark →
+                      Craft Creation → Guided Story Build → Share Circle. Every two sessions,
+                      your child takes home a professionally printed physical storybook they created.
+                    </p>
+                    <ul className="space-y-2 mb-6">
+                      {partner.sessions[0]?.morning.highlights.map(
+                        (highlight, i) => (
+                          <li
+                            key={i}
+                            className="flex items-start gap-2 text-gray-600"
+                          >
+                            <span className="text-amber-500 mt-0.5">•</span>
+                            {highlight}
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                    {/* Register CTA + Series Pricing */}
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <Link
+                        href={`/workshops/register?partner=${partner.slug}`}
+                        className="inline-block px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg"
+                      >
+                        Register for Series 1
+                      </Link>
+                      <div>
+                        {(() => {
+                          const pricing = getPartnerSessionPricing(partner, 'single');
+                          const enrollable = partner.sessions.filter(s => s.enrollable !== false && s.series === 1);
+                          const seriesTotal = pricing.promoPrice * enrollable.length;
+                          return (
+                            <>
+                              <span className="text-2xl font-bold text-amber-700">
+                                {formatWorkshopPrice(seriesTotal)}
+                              </span>
+                              <span className="text-gray-500 text-sm ml-1">
+                                / series ({enrollable.length} sessions × {formatWorkshopPrice(pricing.promoPrice)})
+                              </span>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </Reveal>
+
+                  {/* Right: Video Slideshow + What Your Child Takes Home */}
+                  <Reveal className="w-full md:w-[45%] space-y-4" delay={150}>
+                    <div className="relative aspect-video w-full rounded-2xl shadow-md overflow-hidden bg-gray-100">
+                      {avocadoSlides.map((slide, i) => (
+                        slide.type === 'video' ? (
+                          <div
+                            key={slide.videoId}
+                            className={`absolute inset-0 w-full h-full transition-opacity duration-700 ${
+                              i === avocadoSlide ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+                            }`}
+                          >
+                            <iframe
+                              src={`https://www.youtube-nocookie.com/embed/${slide.videoId}?rel=0`}
+                              title={slide.alt}
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                              className="w-full h-full"
+                            />
+                          </div>
+                        ) : (
+                          <img
+                            key={slide.src}
+                            src={slide.src}
+                            alt={slide.alt}
+                            className={`absolute inset-0 w-full h-full transition-opacity duration-700 ${
+                              slide.fit === 'contain' ? 'object-contain' : 'object-cover'
+                            } ${i === avocadoSlide ? 'opacity-100' : 'opacity-0'}`}
+                          />
+                        )
+                      ))}
+                      {/* Dot indicators */}
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+                        {avocadoSlides.map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setAvocadoSlide(i)}
+                            className={`w-2 h-2 rounded-full transition-all ${
+                              i === avocadoSlide
+                                ? 'bg-white scale-110'
+                                : 'bg-white/50 hover:bg-white/75'
+                            }`}
+                            aria-label={`Show slide ${i + 1}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    {/* What Your Child Takes Home — simple bullets */}
+                    <div className="pt-2">
+                      <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                        What Your Child Takes Home
+                      </h4>
+                      <ul className="space-y-1.5">
+                        <li className="flex items-start gap-2 text-gray-600 text-sm">
+                          <span className="text-amber-500 mt-0.5">•</span>
+                          Printed physical storybooks they created every other session
+                        </li>
+                        <li className="flex items-start gap-2 text-gray-600 text-sm">
+                          <span className="text-amber-500 mt-0.5">•</span>
+                          Original artwork and hands-on crafts from each session
+                        </li>
+                        <li className="flex items-start gap-2 text-gray-600 text-sm">
+                          <span className="text-amber-500 mt-0.5">•</span>
+                          Real-world understanding: emotional intelligence, STEM thinking, and healthy habits
+                        </li>
+                        <li className="flex items-start gap-2 text-gray-600 text-sm">
+                          <span className="text-amber-500 mt-0.5">•</span>
+                          Critical thinking, confident storytelling, and a love for learning
+                        </li>
+                      </ul>
+                    </div>
+                  </Reveal>
+                </div>
+              </div>
             ) : (
-              /* Active Partner — Zigzag Layout */
+              /* ═══════════════════════════════════════════ */
+              /* Dual-Mode Partner (SteamOji)               */
+              /* ═══════════════════════════════════════════ */
               <div className="mb-16">
                 {/* Row 1: Partnership Intro (logos left, text right) */}
                 <Reveal>
@@ -202,7 +432,7 @@ export default function WorkshopsPage() {
                           xmlns="http://www.w3.org/2000/svg"
                         >
                           <defs>
-                            <linearGradient id="blobGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <linearGradient id={`blobGradient-${partner.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
                               <stop offset="0%" stopColor="#dbeafe" />
                               <stop offset="40%" stopColor="#bfdbfe" />
                               <stop offset="100%" stopColor="#93c5fd" stopOpacity="0.7" />
@@ -210,7 +440,7 @@ export default function WorkshopsPage() {
                           </defs>
                           <path
                             d="M300,520 C200,540 80,480 50,380 C20,280 60,200 40,140 C20,80 80,20 180,40 C240,52 260,90 320,60 C380,30 440,10 500,60 C560,110 560,180 540,260 C520,340 530,380 500,440 C470,500 400,500 300,520 Z"
-                            fill="url(#blobGradient)"
+                            fill={`url(#blobGradient-${partner.id})`}
                           />
                         </svg>
                         {/* Logos stacked vertically on top of blob */}
@@ -254,7 +484,16 @@ export default function WorkshopsPage() {
                         structured creativity that builds real skills: executive function,
                         literacy, and creative problem-solving.
                       </p>
-                      {partner.partnerDescription && (
+                      {partner.partnerUrl ? (
+                        <a
+                          href={partner.partnerUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-4 inline-flex items-center text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                        >
+                          Learn more about {partner.partnerName} →
+                        </a>
+                      ) : partner.partnerDescription ? (
                         <a
                           href="https://www.steamoji.com/"
                           target="_blank"
@@ -263,7 +502,7 @@ export default function WorkshopsPage() {
                         >
                           Learn more about {partner.partnerName} →
                         </a>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </Reveal>
@@ -303,7 +542,7 @@ export default function WorkshopsPage() {
                     {/* Register CTA + Pricing */}
                     <div className="flex items-center gap-4 flex-wrap">
                       <Link
-                        href="/workshops/register?session=morning"
+                        href={`/workshops/register?session=morning&partner=${partner.slug}`}
                         className="inline-block px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg"
                       >
                         Register
@@ -408,7 +647,7 @@ export default function WorkshopsPage() {
                       problem-solving.
                     </p>
                     <ul className="space-y-2 mb-6">
-                      {partner.sessions[0]?.afternoon.highlights.map(
+                      {partner.sessions[0]?.afternoon?.highlights.map(
                         (highlight, i) => (
                           <li
                             key={i}
@@ -423,7 +662,7 @@ export default function WorkshopsPage() {
                     {/* Register CTA + Pricing */}
                     <div className="flex items-center gap-4 flex-wrap">
                       <Link
-                        href="/workshops/register?session=afternoon"
+                        href={`/workshops/register?session=afternoon&partner=${partner.slug}`}
                         className="inline-block px-6 py-3 bg-green-700 hover:bg-green-800 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg"
                       >
                         Register

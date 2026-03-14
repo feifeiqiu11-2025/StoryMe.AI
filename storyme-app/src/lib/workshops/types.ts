@@ -6,6 +6,8 @@
 export interface SessionCounts {
   morning: number;
   afternoon: number;
+  single?: number; // For single-session partners
+  byLocation?: Record<string, number>; // Keyed by location slug, for multi-location partners
 }
 
 export interface WorkshopAvailabilityData {

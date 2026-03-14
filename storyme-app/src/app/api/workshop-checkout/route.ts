@@ -3,13 +3,19 @@
  * POST /api/workshop-checkout
  *
  * Creates a Stripe checkout session for workshop registration (one-time payment).
+ * Supports both individual session selection (SteamOji) and series enrollment (Avocado).
  * No authentication required — workshops are open for public registration.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe/config';
 import { WorkshopRegistrationSchema } from '@/lib/workshops/schemas';
-import { WORKSHOP_PARTNERS, formatWorkshopPrice } from '@/lib/workshops/constants';
+import {
+  WORKSHOP_PARTNERS,
+  formatWorkshopPrice,
+  getPartnerSessionPricing,
+  getPartnerCapacity,
+} from '@/lib/workshops/constants';
 import { createClient } from '@supabase/supabase-js';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 
@@ -46,14 +52,58 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const isSingleMode = partner.sessionMode === 'single';
+    const sessionTypeForQuery = isSingleMode ? 'single' : validated.selectedSessionType;
+
+    // Validate location for multi-location partners
+    if (partner.locations && partner.locations.length > 0) {
+      if (!validated.selectedLocation) {
+        return NextResponse.json(
+          { error: 'Location selection is required for this partner' },
+          { status: 400 },
+        );
+      }
+      const validLocation = partner.locations.find(l => l.slug === validated.selectedLocation);
+      if (!validLocation) {
+        return NextResponse.json(
+          { error: 'Invalid location selected' },
+          { status: 400 },
+        );
+      }
+    }
+
+    // Reject non-enrollable sessions (e.g., Series 2 preview sessions)
+    const enrollableIds = new Set(
+      partner.sessions.filter(s => s.enrollable !== false).map(s => s.id),
+    );
+    const invalidSessions = validated.selectedWorkshopIds.filter(id => !enrollableIds.has(id));
+    if (invalidSessions.length > 0) {
+      return NextResponse.json(
+        { error: 'Selected sessions are not currently available for enrollment', invalidSessions },
+        { status: 400 },
+      );
+    }
+
     // Check spot availability before proceeding
     const supabaseAvailability = createServiceRoleClient();
+
+    // Use v2 RPC for location-aware counting when applicable
+    const useLocationRpc = isSingleMode && validated.selectedLocation;
+    const rpcName = useLocationRpc
+      ? 'get_workshop_registration_counts_v2'
+      : 'get_workshop_registration_counts';
+
+    const rpcParams: Record<string, string | null> = {
+      p_partner_id: validated.partnerId,
+      p_session_type: sessionTypeForQuery,
+    };
+    if (useLocationRpc) {
+      rpcParams.p_location = validated.selectedLocation || null;
+    }
+
     const { data: currentCounts, error: rpcError } = await supabaseAvailability.rpc(
-      'get_workshop_registration_counts',
-      {
-        p_partner_id: validated.partnerId,
-        p_session_type: validated.selectedSessionType,
-      },
+      rpcName,
+      rpcParams,
     );
 
     if (rpcError) {
@@ -69,7 +119,11 @@ export async function POST(request: NextRequest) {
       countMap[row.workshop_id] = Number(row.registration_count);
     }
 
-    const capacity = partner.capacity[validated.selectedSessionType];
+    const capacity = getPartnerCapacity(
+      partner,
+      isSingleMode ? 'single' : validated.selectedSessionType,
+      validated.selectedLocation,
+    );
     const numberOfChildren = validated.children.length;
     const fullSessions: string[] = [];
 
@@ -91,17 +145,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Per-session pricing (promo price if available, else original)
-    const sessionPricing = partner.pricing[validated.selectedSessionType];
-    const unitAmount = sessionPricing.promoPrice || sessionPricing.originalPrice;
+    // Calculate pricing
+    const sessionPricing = getPartnerSessionPricing(
+      partner,
+      isSingleMode ? 'single' : validated.selectedSessionType,
+    );
+    const unitAmount = sessionPricing.promoPrice ?? sessionPricing.originalPrice;
     const totalAmount = validated.selectedWorkshopIds.length * unitAmount * numberOfChildren;
 
-    // --- Bundle pricing (commented out for future use) ---
-    // const isBundle =
-    //   validated.selectedWorkshopIds.length >= partner.pricing.bundleCount;
-    // const totalAmount = isBundle
-    //   ? partner.pricing.bundlePrice
-    //   : validated.selectedWorkshopIds.length * partner.pricing.singleWorkshop;
+    // Calculate sales tax (WA state ESSB 5814 — enrichment workshops)
+    let taxRate = 0;
+    if (partner.locations && validated.selectedLocation) {
+      const loc = partner.locations.find(l => l.slug === validated.selectedLocation);
+      taxRate = loc?.taxRate ?? 0;
+    } else if (partner.location?.taxRate) {
+      taxRate = partner.location.taxRate;
+    }
+    const taxAmount = taxRate > 0 ? Math.round(totalAmount * taxRate) : 0;
 
     // Store one registration per child in DB (pending payment)
     const registrationIds: string[] = [];
@@ -121,11 +181,14 @@ export async function POST(request: NextRequest) {
           emergency_contact_relation: validated.emergencyContactRelation,
           partner_id: validated.partnerId,
           selected_workshop_ids: validated.selectedWorkshopIds,
-          selected_session_type: validated.selectedSessionType,
-          is_bundle: false,
+          selected_session_type: sessionTypeForQuery,
+          is_bundle: partner.enrollmentMode === 'series',
+          location: validated.selectedLocation || null,
           promo_code: null,
           waiver_accepted: true,
           waiver_accepted_at: new Date().toISOString(),
+          photo_video_consent_accepted: validated.photoVideoConsentAccepted === true,
+          photo_video_consent_accepted_at: validated.photoVideoConsentAccepted ? new Date().toISOString() : null,
           payment_status: 'pending',
           status: 'pending',
         })
@@ -142,41 +205,72 @@ export async function POST(request: NextRequest) {
       registrationIds.push(registration.id);
     }
 
-    // Build Stripe line items — one per selected session
-    const sessionDescription = validated.selectedSessionType === 'morning'
-      ? 'Morning Session (Ages 4–6) · 10:00–11:00 AM'
-      : 'Afternoon Session (Ages 7–9) · 1:00–3:00 PM';
+    // Build Stripe line items
+    let sessionDescription: string;
+    if (isSingleMode) {
+      const slot = partner.sessions[0]?.morning;
+      sessionDescription = `${slot?.ageRange || 'Ages 3–6'}`;
+      if (validated.selectedLocation) {
+        const loc = partner.locations?.find(l => l.slug === validated.selectedLocation);
+        if (loc) sessionDescription += ` · ${loc.name}`;
+      }
+    } else {
+      sessionDescription = validated.selectedSessionType === 'morning'
+        ? 'Morning Session (Ages 4–6) · 10:00–11:00 AM'
+        : 'Afternoon Session (Ages 7–9) · 1:00–3:00 PM';
+    }
 
-    const lineItems = validated.selectedWorkshopIds.map((workshopId) => {
-      const session = partner.sessions.find((s) => s.id === workshopId);
-      const dateLabel = session?.dateLabel || workshopId;
-      return {
+    // For series enrollment, create a single line item for the full series
+    const isSeriesEnrollment = partner.enrollmentMode === 'series';
+    const lineItems: Array<{
+      price_data: {
+        currency: string;
+        product_data: { name: string; description?: string };
+        unit_amount: number;
+      };
+      quantity: number;
+    }> = isSeriesEnrollment
+      ? [{
+          price_data: {
+            currency: partner.pricing.currency,
+            product_data: {
+              name: `${partner.name} — Series 1`,
+              description: `${sessionDescription} · ${validated.selectedWorkshopIds.length} sessions`,
+            },
+            unit_amount: unitAmount * validated.selectedWorkshopIds.length,
+          },
+          quantity: numberOfChildren,
+        }]
+      : validated.selectedWorkshopIds.map((workshopId) => {
+          const session = partner.sessions.find((s) => s.id === workshopId);
+          const dateLabel = session?.dateLabel || workshopId;
+          return {
+            price_data: {
+              currency: partner.pricing.currency,
+              product_data: {
+                name: `${partner.name} — Workshop`,
+                description: `${sessionDescription} · ${dateLabel}`,
+              },
+              unit_amount: unitAmount,
+            },
+            quantity: numberOfChildren,
+          };
+        });
+
+    // Add WA state sales tax as a separate line item (ESSB 5814)
+    if (taxAmount > 0) {
+      lineItems.push({
         price_data: {
           currency: partner.pricing.currency,
           product_data: {
-            name: `${partner.name} — Workshop`,
-            description: `${sessionDescription} · ${dateLabel}`,
+            name: 'WA Sales Tax',
+            description: `Washington state sales tax (${(taxRate * 100).toFixed(1)}%)`,
           },
-          unit_amount: unitAmount,
+          unit_amount: taxAmount,
         },
-        quantity: numberOfChildren,
-      };
-    });
-
-    // --- Bundle line items (commented out for future use) ---
-    // const lineItems = isBundle
-    //   ? [{
-    //       price_data: {
-    //         currency: partner.pricing.currency,
-    //         product_data: {
-    //           name: `${partner.name} — ${partner.pricing.bundleCount}-Workshop Bundle`,
-    //           description: `${sessionDescription} • All ${partner.pricing.bundleCount} Sundays`,
-    //         },
-    //         unit_amount: partner.pricing.bundlePrice,
-    //       },
-    //       quantity: 1,
-    //     }]
-    //   : validated.selectedWorkshopIds.map(...);
+        quantity: 1,
+      });
+    }
 
     // Build URLs (following existing checkout session pattern)
     const origin =
@@ -198,8 +292,8 @@ export async function POST(request: NextRequest) {
       payment_method_types: ['card'],
       customer_email: validated.parentEmail,
       line_items: lineItems,
-      success_url: `${appUrl}/workshops/register?registration=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/workshops/register?registration=cancelled`,
+      success_url: `${appUrl}/workshops/register?registration=success&session_id={CHECKOUT_SESSION_ID}&partner=${validated.partnerId}`,
+      cancel_url: `${appUrl}/workshops/register?registration=cancelled&partner=${validated.partnerId}`,
       allow_promotion_codes: true,
       metadata: {
         registration_id: registrationIds[0],
@@ -207,6 +301,9 @@ export async function POST(request: NextRequest) {
         partner_id: validated.partnerId,
         type: 'workshop',
         children_count: String(numberOfChildren),
+        location: validated.selectedLocation || '',
+        tax_rate: taxRate > 0 ? String(taxRate) : '',
+        tax_amount: taxAmount > 0 ? String(taxAmount) : '',
       },
     });
 
@@ -219,9 +316,15 @@ export async function POST(request: NextRequest) {
     console.log('[WORKSHOP-CHECKOUT] Session created:', {
       registrationIds,
       sessionId: checkoutSession.id,
-      amount: formatWorkshopPrice(totalAmount),
+      subtotal: formatWorkshopPrice(totalAmount),
+      tax: taxAmount > 0 ? formatWorkshopPrice(taxAmount) : '$0.00',
+      taxRate: taxRate > 0 ? `${(taxRate * 100).toFixed(1)}%` : 'none',
+      total: formatWorkshopPrice(totalAmount + taxAmount),
       workshopCount: validated.selectedWorkshopIds.length,
       childrenCount: numberOfChildren,
+      partner: validated.partnerId,
+      location: validated.selectedLocation || null,
+      enrollmentMode: partner.enrollmentMode || 'individual',
     });
 
     return NextResponse.json({

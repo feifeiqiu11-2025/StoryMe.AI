@@ -55,13 +55,20 @@ function RegistrationBanner() {
 function RegisterPageContent() {
   const searchParams = useSearchParams();
   const sessionParam = searchParams.get('session');
+  const partnerParam = searchParams.get('partner');
 
-  // Default to morning if invalid/missing session param
-  const defaultSession: 'morning' | 'afternoon' =
-    sessionParam === 'afternoon' ? 'afternoon' : 'morning';
+  // Find the active partner by ?partner= param, or fall back to first active
+  const activePartner = partnerParam
+    ? WORKSHOP_PARTNERS.find((p) => p.slug === partnerParam && !p.comingSoon)
+    : WORKSHOP_PARTNERS.find((p) => !p.comingSoon);
 
-  // Find the active partner (extensible: future ?partner= param)
-  const activePartner = WORKSHOP_PARTNERS.find((p) => !p.comingSoon);
+  // Determine default session type based on partner mode
+  const defaultSession: 'morning' | 'afternoon' | 'single' =
+    activePartner?.sessionMode === 'single'
+      ? 'single'
+      : sessionParam === 'afternoon'
+        ? 'afternoon'
+        : 'morning';
 
   // Fetch spot availability on page load
   const [availability, setAvailability] =
@@ -92,7 +99,7 @@ function RegisterPageContent() {
 
   if (!activePartner) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-12 text-center">
+      <div className="max-w-4xl mx-auto px-4 py-12 text-center">
         <h1 className="text-2xl font-bold text-gray-900 mb-4">
           No Active Workshops
         </h1>
@@ -110,7 +117,7 @@ function RegisterPageContent() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
+    <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Registration Status Banner */}
       <RegistrationBanner />
 
@@ -127,18 +134,15 @@ function RegisterPageContent() {
       {/* Page Title */}
       <div className="text-center mb-4">
         <h1 className="text-3xl font-bold text-gray-900 mb-1">
-          Register for Workshops
+          Register for Workshop
         </h1>
         <p className="text-gray-600">
-          Select your sessions and complete registration below.
+          Register for workshop and get 2 month free Casual Creator subscription!
         </p>
       </div>
 
       {/* Promo Banner */}
       <div className="mb-6 text-center">
-        <p className="text-purple-800 font-medium">
-          Register for any workshop and get 1 month free Casual Creator subscription!
-        </p>
         <Link
           href="/pricing"
           className="text-sm text-purple-600 hover:text-purple-700 underline transition-colors"
@@ -151,7 +155,7 @@ function RegisterPageContent() {
       <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
         <WorkshopRegistrationForm
           partner={activePartner}
-          defaultSessionType={defaultSession}
+          defaultSessionType={defaultSession as 'morning' | 'afternoon'}
           availability={availability}
           availabilityLoading={availabilityLoading}
         />
@@ -167,7 +171,7 @@ export default function WorkshopRegisterPage() {
 
       <Suspense
         fallback={
-          <div className="max-w-3xl mx-auto px-4 py-12 text-center">
+          <div className="max-w-4xl mx-auto px-4 py-12 text-center">
             <div className="animate-pulse space-y-4">
               <div className="h-8 bg-gray-200 rounded w-1/2 mx-auto" />
               <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto" />
