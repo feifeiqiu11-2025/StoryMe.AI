@@ -77,6 +77,9 @@ export const WorkshopRegistrationSchema = z.object({
     message: 'You must accept the digital waiver to register',
   }),
 
+  // Code of Conduct (required for SteamOji only)
+  codeOfConductAccepted: z.boolean().optional().default(false),
+
   // Photo/Video Consent (optional — awareness only, does not block registration)
   photoVideoConsentAccepted: z.boolean().optional().default(false),
 });
