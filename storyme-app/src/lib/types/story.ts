@@ -121,6 +121,7 @@ export interface Character {
   order: number; // Display order
   isFromLibrary?: boolean; // Track if character was imported from library
   isPublic?: boolean; // Whether this character is shared publicly
+  isFeatured?: boolean; // Admin-featured for Little Artists gallery carousel
 }
 
 export interface Scene {
