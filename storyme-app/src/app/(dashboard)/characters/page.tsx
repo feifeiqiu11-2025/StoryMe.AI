@@ -117,6 +117,7 @@ export default function CharactersPage() {
   } | null>(null);
   const [isGeneratingSketch, setIsGeneratingSketch] = useState(false);
   const [sketchError, setSketchError] = useState<string | null>(null);
+  const [regeneratingStyle, setRegeneratingStyle] = useState<'pixar' | 'classic' | null>(null);
   // Public toggle confirmation modal
   const [publicModalCharacter, setPublicModalCharacter] = useState<{ id: string; name: string; makePublic: boolean } | null>(null);
 
@@ -553,6 +554,70 @@ export default function CharactersPage() {
     if (imageUrl) {
       setSelectedStyle(style);
       setFormData((prev) => ({ ...prev, animatedPreviewUrl: imageUrl }));
+    }
+  };
+
+  // Regenerate a single style (pixar or classic) without affecting the other
+  const handleRegenerateSingleStyle = async (style: 'pixar' | 'classic') => {
+    if (characterMode === 'photo') {
+      if (!formData.imageUrl || !formData.name) return;
+    } else {
+      if (!formData.name || !formData.characterType) return;
+    }
+
+    setRegeneratingStyle(style);
+    setPreviewError(null);
+    try {
+      const requestBody = characterMode === 'photo'
+        ? {
+            name: formData.name,
+            referenceImageUrl: formData.imageUrl,
+            subjectType: detectedSubjectType || undefined,
+            subjectDescription: detectedSubjectType !== 'human' ? formData.otherFeatures : undefined,
+            description: {
+              hairColor: formData.hairColor,
+              skinTone: formData.skinTone,
+              clothing: formData.clothing,
+              age: formData.age,
+              otherFeatures: formData.otherFeatures,
+            },
+          }
+        : {
+            name: formData.name,
+            characterType: formData.characterType,
+            description: {
+              hairColor: formData.hairColor,
+              age: formData.age,
+              otherFeatures: formData.otherFeatures,
+            },
+          };
+
+      const response = await fetch('/api/generate-character-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...requestBody, style }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to regenerate');
+      }
+
+      const data = await response.json();
+      if (data.previews) {
+        const newUrl = style === 'pixar' ? data.previews.pixar?.imageUrl : data.previews.classic?.imageUrl;
+        if (newUrl) {
+          setPreviewOptions((prev) => ({ ...prev, [style]: newUrl }));
+          if (selectedStyle === style) {
+            setFormData((prev) => ({ ...prev, animatedPreviewUrl: newUrl }));
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error(`Regenerate ${style} error:`, err);
+      setPreviewError(err.message || `Failed to regenerate ${style}`);
+    } finally {
+      setRegeneratingStyle(null);
     }
   };
 
@@ -1301,7 +1366,14 @@ export default function CharactersPage() {
                           )}
 
                           {sketchGuideData && (
-                            <p className="text-xs text-gray-500 mt-1">Learn to draw!</p>
+                            <button
+                              type="button"
+                              onClick={() => generateSketchGuide()}
+                              disabled={isGeneratingSketch}
+                              className="mt-1 text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+                            >
+                              ↻ Regenerate sketch
+                            </button>
                           )}
                         </div>
 
@@ -1334,18 +1406,24 @@ export default function CharactersPage() {
                                   </div>
                                 </div>
                               ) : sketchGuideData ? (
-                                <button
-                                  type="button"
-                                  onClick={() => generateSketchGuide()}
-                                  className="w-full aspect-square border-2 border-gray-300 hover:border-blue-400 rounded-xl p-4 bg-white transition-colors cursor-pointer"
-                                >
-                                  <img
-                                    key={sketchGuideData.guide_image_url}
-                                    src={sketchGuideData.guide_image_url}
-                                    alt="Simple sketch"
-                                    className="w-full h-full object-contain pointer-events-none"
-                                  />
-                                </button>
+                                <>
+                                  <div className="aspect-square border-2 border-gray-300 rounded-xl p-4 bg-white">
+                                    <img
+                                      key={sketchGuideData.guide_image_url}
+                                      src={sketchGuideData.guide_image_url}
+                                      alt="Simple sketch"
+                                      className="w-full h-full object-contain"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => generateSketchGuide()}
+                                    disabled={isGeneratingSketch}
+                                    className="mt-1 text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+                                  >
+                                    ↻ Regenerate
+                                  </button>
+                                </>
                               ) : (
                                 <button
                                   type="button"
@@ -1377,78 +1455,116 @@ export default function CharactersPage() {
                           )}
 
                           {/* Box 2: 3D Pixar Option */}
-                          <div
-                            className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
-                              selectedStyle === 'pixar'
-                                ? 'border-purple-500 ring-2 ring-purple-200'
-                                : 'border-gray-200 hover:border-purple-300'
-                            } ${!previewOptions.pixar ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            onClick={() => previewOptions.pixar && handleSelectStyle('pixar')}
-                          >
-                            <div className="aspect-square bg-gray-50">
-                              {previewOptions.pixar ? (
-                                <img
-                                  src={previewOptions.pixar}
-                                  alt="3D Pixar Style"
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="flex items-center justify-center h-full text-gray-400">
-                                  <span className="text-sm">Failed to generate</span>
+                          <div className="text-center">
+                            <div
+                              className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
+                                selectedStyle === 'pixar'
+                                  ? 'border-purple-500 ring-2 ring-purple-200'
+                                  : 'border-gray-200 hover:border-purple-300'
+                              } ${!previewOptions.pixar ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              onClick={() => previewOptions.pixar && !regeneratingStyle && handleSelectStyle('pixar')}
+                            >
+                              <div className="aspect-square bg-gray-50">
+                                {regeneratingStyle === 'pixar' ? (
+                                  <div className="flex items-center justify-center h-full">
+                                    <div className="text-center">
+                                      <div className="w-8 h-8 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-2"></div>
+                                      <p className="text-purple-600 font-medium text-xs">Regenerating...</p>
+                                    </div>
+                                  </div>
+                                ) : previewOptions.pixar ? (
+                                  <img
+                                    src={previewOptions.pixar}
+                                    alt="3D Pixar Style"
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex items-center justify-center h-full text-gray-400">
+                                    <span className="text-sm">Failed to generate</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="p-2 bg-white border-t">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-sm text-gray-900">3D Pixar</span>
+                                  {selectedStyle === 'pixar' && (
+                                    <span className="text-purple-600 text-xs">✓ Selected</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500">Disney/Pixar CGI style</p>
+                              </div>
+                              {selectedStyle === 'pixar' && !regeneratingStyle && (
+                                <div className="absolute top-2 right-2 bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                                  ✓
                                 </div>
                               )}
                             </div>
-                            <div className="p-2 bg-white border-t">
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium text-sm text-gray-900">3D Pixar</span>
-                                {selectedStyle === 'pixar' && (
-                                  <span className="text-purple-600 text-xs">✓ Selected</span>
-                                )}
-                              </div>
-                              <p className="text-xs text-gray-500">Disney/Pixar CGI style</p>
-                            </div>
-                            {selectedStyle === 'pixar' && (
-                              <div className="absolute top-2 right-2 bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
-                                ✓
-                              </div>
+                            {previewOptions.pixar && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleRegenerateSingleStyle('pixar'); }}
+                                disabled={regeneratingStyle !== null || generatingPreview}
+                                className="mt-1 text-xs text-purple-600 hover:text-purple-800 font-medium disabled:opacity-50"
+                              >
+                                ↻ Regenerate
+                              </button>
                             )}
                           </div>
 
                           {/* Box 3: Classic Storybook Option */}
-                          <div
-                            className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
-                              selectedStyle === 'classic'
-                                ? 'border-amber-500 ring-2 ring-amber-200'
-                                : 'border-gray-200 hover:border-amber-300'
-                            } ${!previewOptions.classic ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            onClick={() => previewOptions.classic && handleSelectStyle('classic')}
-                          >
-                            <div className="aspect-square bg-gray-50">
-                              {previewOptions.classic ? (
-                                <img
-                                  src={previewOptions.classic}
-                                  alt="Classic Storybook Style"
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="flex items-center justify-center h-full text-gray-400">
-                                  <span className="text-sm">Failed to generate</span>
+                          <div className="text-center">
+                            <div
+                              className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
+                                selectedStyle === 'classic'
+                                  ? 'border-amber-500 ring-2 ring-amber-200'
+                                  : 'border-gray-200 hover:border-amber-300'
+                              } ${!previewOptions.classic ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              onClick={() => previewOptions.classic && !regeneratingStyle && handleSelectStyle('classic')}
+                            >
+                              <div className="aspect-square bg-gray-50">
+                                {regeneratingStyle === 'classic' ? (
+                                  <div className="flex items-center justify-center h-full">
+                                    <div className="text-center">
+                                      <div className="w-8 h-8 border-2 border-amber-200 border-t-amber-600 rounded-full animate-spin mx-auto mb-2"></div>
+                                      <p className="text-amber-600 font-medium text-xs">Regenerating...</p>
+                                    </div>
+                                  </div>
+                                ) : previewOptions.classic ? (
+                                  <img
+                                    src={previewOptions.classic}
+                                    alt="Classic Storybook Style"
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex items-center justify-center h-full text-gray-400">
+                                    <span className="text-sm">Failed to generate</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="p-2 bg-white border-t">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-sm text-gray-900">Classic Storybook</span>
+                                  {selectedStyle === 'classic' && (
+                                    <span className="text-amber-600 text-xs">✓ Selected</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500">Warm 2D illustration</p>
+                              </div>
+                              {selectedStyle === 'classic' && !regeneratingStyle && (
+                                <div className="absolute top-2 right-2 bg-amber-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                                  ✓
                                 </div>
                               )}
                             </div>
-                            <div className="p-2 bg-white border-t">
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium text-sm text-gray-900">Classic Storybook</span>
-                                {selectedStyle === 'classic' && (
-                                  <span className="text-amber-600 text-xs">✓ Selected</span>
-                                )}
-                              </div>
-                              <p className="text-xs text-gray-500">Warm 2D illustration</p>
-                            </div>
-                            {selectedStyle === 'classic' && (
-                              <div className="absolute top-2 right-2 bg-amber-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
-                                ✓
-                              </div>
+                            {previewOptions.classic && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleRegenerateSingleStyle('classic'); }}
+                                disabled={regeneratingStyle !== null || generatingPreview}
+                                className="mt-1 text-xs text-amber-600 hover:text-amber-800 font-medium disabled:opacity-50"
+                              >
+                                ↻ Regenerate
+                              </button>
                             )}
                           </div>
                         </div>
@@ -1508,7 +1624,14 @@ export default function CharactersPage() {
                           )}
 
                           {sketchGuideData && (
-                            <p className="text-xs text-gray-500 mt-1">Learn to draw!</p>
+                            <button
+                              type="button"
+                              onClick={() => generateSketchGuide()}
+                              disabled={isGeneratingSketch}
+                              className="mt-1 text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+                            >
+                              ↻ Regenerate sketch
+                            </button>
                           )}
                           {sketchError && (
                             <p className="text-xs text-red-600 mt-1">{sketchError}</p>

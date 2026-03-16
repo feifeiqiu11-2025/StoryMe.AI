@@ -42,6 +42,7 @@ interface GeneratePreviewRequest {
   subjectType?: SubjectType; // Pre-detected subject type from UI (avoids redundant detection)
   subjectDescription?: string; // Pre-detected description from UI
   imageProvider?: string; // Image provider for Gemini model selection
+  style?: 'pixar' | 'classic'; // Optional - regenerate only one style instead of both
   description: {
     hairColor?: string;
     skinTone?: string;
@@ -75,7 +76,10 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: GeneratePreviewRequest = await request.json();
-    const { name, referenceImageUrl, characterType, subjectType: preDetectedType, subjectDescription: preDetectedDescription, description, imageProvider: requestedProvider } = body;
+    const { name, referenceImageUrl, characterType, subjectType: preDetectedType, subjectDescription: preDetectedDescription, description, imageProvider: requestedProvider, style: rawStyle } = body;
+
+    // Validate optional style parameter
+    const singleStyle = rawStyle === 'pixar' || rawStyle === 'classic' ? rawStyle : undefined;
 
     // Resolve Gemini model ID from the provider selection
     const geminiModelId = resolveGeminiImageModel(normalizeImageProvider(requestedProvider));
@@ -128,10 +132,14 @@ export async function POST(request: NextRequest) {
       // This is a simple heuristic - the actual character creation UI handles isAnimal separately
       detectedSubjectType = inferSubjectTypeFromDescription(characterType!);
 
-      // Generate BOTH styles in parallel
+      // Generate styles (both in parallel, or single if specified)
       [pixarResult, classicResult] = await Promise.allSettled([
-        generateDescriptionOnlyPreview(descParams),
-        generateDescriptionOnlyPreviewClassic(descParams),
+        singleStyle === 'classic'
+          ? Promise.reject(new Error('skipped'))
+          : generateDescriptionOnlyPreview(descParams),
+        singleStyle === 'pixar'
+          ? Promise.reject(new Error('skipped'))
+          : generateDescriptionOnlyPreviewClassic(descParams),
       ]);
     } else {
       // Reference image mode: use pre-detected subject type from UI if available
@@ -180,10 +188,14 @@ export async function POST(request: NextRequest) {
 
         console.log(`[API] Using human preview generation`);
 
-        // Generate BOTH styles in parallel for faster response
+        // Generate styles (both in parallel, or single if specified)
         [pixarResult, classicResult] = await Promise.allSettled([
-          generateCharacterPreview(previewParams),
-          generateCharacterPreviewClassic(previewParams),
+          singleStyle === 'classic'
+            ? Promise.reject(new Error('skipped'))
+            : generateCharacterPreview(previewParams),
+          singleStyle === 'pixar'
+            ? Promise.reject(new Error('skipped'))
+            : generateCharacterPreviewClassic(previewParams),
         ]);
       } else {
         // Non-human mode: use flexible generation for animals, creatures, objects, scenery
@@ -198,10 +210,14 @@ export async function POST(request: NextRequest) {
 
         console.log(`[API] Using non-human preview generation for ${detectedSubjectType}`);
 
-        // Generate BOTH styles in parallel
+        // Generate styles (both in parallel, or single if specified)
         [pixarResult, classicResult] = await Promise.allSettled([
-          generateNonHumanPreview(nonHumanParams),
-          generateNonHumanPreviewClassic(nonHumanParams),
+          singleStyle === 'classic'
+            ? Promise.reject(new Error('skipped'))
+            : generateNonHumanPreview(nonHumanParams),
+          singleStyle === 'pixar'
+            ? Promise.reject(new Error('skipped'))
+            : generateNonHumanPreviewClassic(nonHumanParams),
         ]);
       }
     }
@@ -217,21 +233,23 @@ export async function POST(request: NextRequest) {
       generationTime: classicResult.value.generationTime,
     } : null;
 
-    // Log results
+    // Log results (skip logging for intentionally skipped styles)
     if (pixar) {
       console.log(`[API] 3D Pixar preview generated in ${pixar.generationTime.toFixed(1)}s`);
-    } else {
+    } else if (singleStyle !== 'classic') {
       console.error('[API] 3D Pixar preview failed:', (pixarResult as PromiseRejectedResult).reason);
     }
 
     if (classic) {
       console.log(`[API] Classic Storybook preview generated in ${classic.generationTime.toFixed(1)}s`);
-    } else {
+    } else if (singleStyle !== 'pixar') {
       console.error('[API] Classic Storybook preview failed:', (classicResult as PromiseRejectedResult).reason);
     }
 
-    // If both failed, return error
-    if (!pixar && !classic) {
+    // If the requested style(s) failed, return error
+    const bothFailed = !pixar && !classic;
+    const requestedStyleFailed = (singleStyle === 'pixar' && !pixar) || (singleStyle === 'classic' && !classic);
+    if (bothFailed || requestedStyleFailed) {
       return NextResponse.json(
         {
           error: 'Failed to generate any preview styles',
