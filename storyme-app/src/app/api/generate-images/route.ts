@@ -265,20 +265,32 @@ export async function POST(request: NextRequest) {
           // 2. Reduced database storage (no multi-MB base64 strings)
           // 3. Faster page loads with CDN caching
           if (result.imageUrl.startsWith('data:')) {
-            try {
-              const storageService = new StorageService(supabase);
-              // Use requestId as temporary folder path during generation
-              // The actual project folder will be created when story is saved
-              const uploaded = await storageService.uploadGeneratedImageFromBase64(
-                `temp-${requestId}`,
-                scene.id,
-                result.imageUrl
-              );
-              console.log(`[Storage] Uploaded Gemini image for scene ${scene.sceneNumber} to: ${uploaded.url}`);
-              result.imageUrl = uploaded.url;
-            } catch (uploadError) {
-              console.warn(`[Storage] Failed to upload Gemini image, keeping base64:`, uploadError);
-              // Keep the base64 data URL as fallback if upload fails
+            const storageService = new StorageService(supabase);
+            let uploaded = false;
+
+            // Try upload twice with a short delay between attempts
+            for (let attempt = 1; attempt <= 2; attempt++) {
+              try {
+                const uploadResult = await storageService.uploadGeneratedImageFromBase64(
+                  `temp-${requestId}`,
+                  scene.id,
+                  result.imageUrl
+                );
+                console.log(`[Storage] Uploaded Gemini image for scene ${scene.sceneNumber} (attempt ${attempt}): ${uploadResult.url}`);
+                result.imageUrl = uploadResult.url;
+                uploaded = true;
+                break;
+              } catch (uploadError) {
+                console.warn(`[Storage] Upload attempt ${attempt}/2 failed for scene ${scene.sceneNumber}:`, uploadError);
+                if (attempt < 2) {
+                  await new Promise(r => setTimeout(r, 2000));
+                }
+              }
+            }
+
+            if (!uploaded) {
+              console.warn(`[Storage] All upload attempts failed for scene ${scene.sceneNumber}. Base64 will be uploaded client-side before save.`);
+              // Keep base64 — the client's uploadPendingBase64Images() will handle it before save
             }
           }
         } else {

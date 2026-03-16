@@ -847,6 +847,48 @@ function CreateStoryPageInner() {
   };
 
   /**
+   * Upload any base64 images to Supabase Storage before save.
+   * Converts data:image/... URLs to CDN URLs so the save payload stays small.
+   * Returns updated image generation status with CDN URLs.
+   */
+  const uploadPendingBase64Images = async (): Promise<void> => {
+    const pendingImages = imageGenerationStatus.filter(
+      img => img.imageUrl && img.imageUrl.startsWith('data:')
+    );
+
+    if (pendingImages.length === 0) return;
+
+    console.log(`[Save] Uploading ${pendingImages.length} base64 image(s) to storage...`);
+
+    for (const img of pendingImages) {
+      try {
+        const response = await fetch('/api/upload-scene-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: img.imageUrl,
+            folderPath: draftProjectId || `temp-save-${Date.now()}`,
+            sceneId: img.sceneId || `scene-${img.sceneNumber}`,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          img.imageUrl = data.url;
+          console.log(`[Save] Uploaded scene ${img.sceneNumber} → ${data.url}`);
+        } else {
+          console.warn(`[Save] Failed to upload scene ${img.sceneNumber}, keeping as-is`);
+        }
+      } catch (error) {
+        console.warn(`[Save] Upload error for scene ${img.sceneNumber}:`, error);
+      }
+    }
+
+    // Update state with CDN URLs
+    setImageGenerationStatus([...imageGenerationStatus]);
+  };
+
+  /**
    * Save current story state as a draft
    * Stores structured data in DB tables + UI state in draft_metadata JSONB
    */
@@ -855,6 +897,9 @@ function CreateStoryPageInner() {
     setDraftSaveMessage(null);
 
     try {
+      // Upload any base64 images to storage before building the payload
+      await uploadPendingBase64Images();
+
       // Build scenes data from current state (if we have enhanced scenes or generated images)
       let scenesPayload: any[] | undefined;
 
@@ -938,8 +983,14 @@ function CreateStoryPageInner() {
       }
 
       // Build draft metadata (UI-specific state not in DB columns)
+      // Strip character reference images (already stored in character_library table)
+      const lightCharacters = characters.map(c => ({
+        ...c,
+        referenceImage: c.referenceImage ? { ...c.referenceImage, url: c.referenceImage.url?.startsWith('data:') ? '' : c.referenceImage.url } : c.referenceImage,
+        animatedPreviewUrl: c.animatedPreviewUrl?.startsWith('data:') ? '' : c.animatedPreviewUrl,
+      }));
       const draftMetadata: Record<string, any> = {
-        characters, // Full client-side Character objects
+        characters: lightCharacters, // Character objects with base64 stripped
         clothingConsistency,
         expansionLevel,
         imageProvider,
@@ -984,8 +1035,20 @@ function CreateStoryPageInner() {
         }),
       });
 
+      if (!response.ok) {
+        let errorMessage = 'Failed to save draft';
+        try {
+          const errData = await response.json();
+          errorMessage = errData.error || errData.message || errorMessage;
+        } catch {
+          errorMessage = response.status === 413
+            ? 'Draft data is too large to save. Please try regenerating the images.'
+            : `Draft save failed (${response.status}). Please try again.`;
+        }
+        throw new Error(errorMessage);
+      }
+
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to save draft');
 
       // Store the projectId for subsequent saves
       setDraftProjectId(data.projectId);
@@ -1013,6 +1076,9 @@ function CreateStoryPageInner() {
     setSaveError('');
 
     try {
+      // Upload any base64 images to storage before building the payload
+      await uploadPendingBase64Images();
+
       // NEW: Extract cover image (Scene 0) and regular scenes (Scene 1+)
       const coverImage = imageGenerationStatus.find(img => img.sceneNumber === 0 && img.status === 'completed');
       const coverImageUrlToSave = coverImage?.imageUrl || coverImageUrl || undefined;
@@ -1143,11 +1209,21 @@ function CreateStoryPageInner() {
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to save story');
+        // Handle non-JSON responses (e.g., 413 Request Entity Too Large)
+        let errorMessage = 'Failed to save story';
+        try {
+          const data = await response.json();
+          errorMessage = data.error || data.message || errorMessage;
+        } catch {
+          errorMessage = response.status === 413
+            ? 'Story data is too large to save. Please try regenerating the images.'
+            : `Save failed (${response.status}). Please try again.`;
+        }
+        throw new Error(errorMessage);
       }
+
+      const data = await response.json();
 
       // Clear guest story from sessionStorage after successful save
       clearGuestStory();
