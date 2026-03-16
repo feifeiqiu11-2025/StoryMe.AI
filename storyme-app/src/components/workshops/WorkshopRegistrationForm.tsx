@@ -207,6 +207,19 @@ export default function WorkshopRegistrationForm({
     setSubmitError(null);
 
     try {
+      // Non-school partners require emergency contact
+      if (!isSingleMode) {
+        if (!data.emergencyContactName || data.emergencyContactName.trim().length === 0) {
+          throw new Error('Emergency contact name is required.');
+        }
+        if (!data.emergencyContactPhone || data.emergencyContactPhone.trim().length < 10) {
+          throw new Error('Please enter a valid emergency contact phone number.');
+        }
+        if (!data.emergencyContactRelation || data.emergencyContactRelation.trim().length === 0) {
+          throw new Error('Emergency contact relationship is required.');
+        }
+      }
+
       // SteamOji requires Code of Conduct
       if (partner.id === 'steamoji' && !data.codeOfConductAccepted) {
         throw new Error('You must accept the Code of Conduct to register for SteamOji workshops.');
@@ -524,7 +537,7 @@ export default function WorkshopRegistrationForm({
                   Series 1: Core Life Skills
                 </h4>
                 <p className="text-sm text-gray-600 mt-0.5">
-                  4 sessions · 2 physical storybooks
+                  4 sessions · 35 mins each · 2 physical storybooks
                 </p>
               </div>
               <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
@@ -607,10 +620,10 @@ export default function WorkshopRegistrationForm({
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h4 className="font-semibold text-gray-700">
-                    Series 2: Nature &amp; Our World
+                    Series 2: Curious Minds
                   </h4>
                   <p className="text-sm text-gray-500 mt-0.5">
-                    4 sessions · 2 physical storybooks
+                    4 sessions · 35 mins each · 2 physical storybooks
                   </p>
                 </div>
                 <span className="text-xs font-semibold text-gray-600 bg-gray-200 px-2.5 py-1 rounded-full">
@@ -618,12 +631,12 @@ export default function WorkshopRegistrationForm({
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {previewSessions.map((session) => (
+                {[...new Set(previewSessions.map((s) => s.theme))].map((theme) => (
                   <div
-                    key={session.id}
+                    key={theme}
                     className="text-sm text-gray-600 p-2 bg-white/80 rounded-lg"
                   >
-                    {session.theme}
+                    {theme}
                   </div>
                 ))}
               </div>
@@ -1033,80 +1046,82 @@ export default function WorkshopRegistrationForm({
       </div>
 
       {/* ═══════════════════════════════════════════════════════ */}
-      {/* Section 5: Emergency Contact */}
+      {/* Section 5: Emergency Contact (non-school partners only) */}
       {/* ═══════════════════════════════════════════════════════ */}
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">
-          5. Emergency Contact
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="emergencyContactName" className={labelClassName}>
-              Full Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="emergencyContactName"
-              type="text"
-              {...register('emergencyContactName')}
-              className={inputClassName}
-              aria-required="true"
-              aria-invalid={!!errors.emergencyContactName}
-            />
-            {errors.emergencyContactName && (
-              <p className={errorClassName} role="alert">
-                {errors.emergencyContactName.message}
-              </p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="emergencyContactPhone" className={labelClassName}>
-              Phone <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="emergencyContactPhone"
-              type="tel"
-              {...register('emergencyContactPhone')}
-              className={inputClassName}
-              aria-required="true"
-              aria-invalid={!!errors.emergencyContactPhone}
-            />
-            {errors.emergencyContactPhone && (
-              <p className={errorClassName} role="alert">
-                {errors.emergencyContactPhone.message}
-              </p>
-            )}
-          </div>
-          <div>
-            <label
-              htmlFor="emergencyContactRelation"
-              className={labelClassName}
-            >
-              Relationship <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="emergencyContactRelation"
-              type="text"
-              placeholder="e.g. Grandparent, Aunt"
-              {...register('emergencyContactRelation')}
-              className={inputClassName}
-              aria-required="true"
-              aria-invalid={!!errors.emergencyContactRelation}
-            />
-            {errors.emergencyContactRelation && (
-              <p className={errorClassName} role="alert">
-                {errors.emergencyContactRelation.message}
-              </p>
-            )}
+      {!isSingleMode && (
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">
+            5. Emergency Contact
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="emergencyContactName" className={labelClassName}>
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="emergencyContactName"
+                type="text"
+                {...register('emergencyContactName')}
+                className={inputClassName}
+                aria-required="true"
+                aria-invalid={!!errors.emergencyContactName}
+              />
+              {errors.emergencyContactName && (
+                <p className={errorClassName} role="alert">
+                  {errors.emergencyContactName.message}
+                </p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="emergencyContactPhone" className={labelClassName}>
+                Phone <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="emergencyContactPhone"
+                type="tel"
+                {...register('emergencyContactPhone')}
+                className={inputClassName}
+                aria-required="true"
+                aria-invalid={!!errors.emergencyContactPhone}
+              />
+              {errors.emergencyContactPhone && (
+                <p className={errorClassName} role="alert">
+                  {errors.emergencyContactPhone.message}
+                </p>
+              )}
+            </div>
+            <div>
+              <label
+                htmlFor="emergencyContactRelation"
+                className={labelClassName}
+              >
+                Relationship <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="emergencyContactRelation"
+                type="text"
+                placeholder="e.g. Grandparent, Aunt"
+                {...register('emergencyContactRelation')}
+                className={inputClassName}
+                aria-required="true"
+                aria-invalid={!!errors.emergencyContactRelation}
+              />
+              {errors.emergencyContactRelation && (
+                <p className={errorClassName} role="alert">
+                  {errors.emergencyContactRelation.message}
+                </p>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════ */}
-      {/* Section 6: Digital Waiver */}
+      {/* Section 5/6: Digital Waiver */}
       {/* ═══════════════════════════════════════════════════════ */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
-          6. Digital Waiver
+          {isSingleMode ? '5' : '6'}. Digital Waiver
         </h3>
         <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
           <label className="flex items-start gap-3 cursor-pointer">
@@ -1171,8 +1186,10 @@ export default function WorkshopRegistrationForm({
                 <li>
                   <strong>Emergency Authorization:</strong> In case of emergency,
                   I authorize workshop staff to seek appropriate medical
-                  attention for my child. I have provided accurate emergency
-                  contact information.
+                  attention for my child.{' '}
+                  {isSingleMode
+                    ? 'I understand that emergency contacts on file with the school will be used.'
+                    : 'I have provided accurate emergency contact information.'}
                 </li>
                 <li>
                   <strong>Assumption of Risk:</strong> I understand that while

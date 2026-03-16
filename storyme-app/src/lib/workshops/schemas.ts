@@ -55,19 +55,22 @@ export const WorkshopRegistrationSchema = z.object({
     .min(1, 'At least one child is required')
     .max(3, 'Maximum 3 children per registration'),
 
-  // Emergency Contact
+  // Emergency Contact (required for non-school partners; skipped for school-based partners like Avocado)
   emergencyContactName: z
     .string()
-    .min(1, 'Emergency contact name is required')
-    .max(200),
+    .max(200)
+    .optional()
+    .default(''),
   emergencyContactPhone: z
     .string()
-    .min(10, 'Please enter a valid phone number')
-    .max(20),
+    .max(20)
+    .optional()
+    .default(''),
   emergencyContactRelation: z
     .string()
-    .min(1, 'Relationship is required')
-    .max(100),
+    .max(100)
+    .optional()
+    .default(''),
 
   // Promo code — now handled by Stripe's allow_promotion_codes at checkout
   // promoCode: z.string().max(50).optional().default(''),

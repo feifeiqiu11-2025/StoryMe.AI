@@ -3,6 +3,9 @@
  * /admin/workshops
  *
  * View all workshop sign-ups with payment status, session details, and revenue.
+ * Supports multi-partner filtering with contextual Level 2 filters:
+ *   - SteamOji: Payment + Session (AM/PM) + Week
+ *   - Avocado:  Payment + Location (Bellevue/Kirkland) + Series
  * Restricted to hardcoded admin emails.
  */
 
@@ -27,12 +30,13 @@ interface Registration {
   child_first_name: string;
   child_last_name: string | null;
   child_age: number;
-  emergency_contact_name: string;
-  emergency_contact_phone: string;
-  emergency_contact_relation: string;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  emergency_contact_relation: string | null;
   partner_id: string;
-  selected_session_type: 'morning' | 'afternoon';
+  selected_session_type: 'morning' | 'afternoon' | 'single';
   selected_workshop_ids: string[];
+  location: string | null;
   payment_status: string;
   status: string;
   amount_paid: number | null;
@@ -48,9 +52,9 @@ const paymentStatusColors: Record<string, string> = {
   refunded: 'bg-gray-100 text-gray-800',
 };
 
-const sessionTypeColors: Record<string, string> = {
-  morning: 'bg-amber-100 text-amber-800',
-  afternoon: 'bg-green-100 text-green-800',
+const partnerColors: Record<string, string> = {
+  steamoji: 'bg-emerald-100 text-emerald-800',
+  avocado: 'bg-amber-100 text-amber-800',
 };
 
 export default function AdminWorkshopsPage() {
@@ -58,10 +62,31 @@ export default function AdminWorkshopsPage() {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'paid' | 'pending'>('all');
+  const [authorized, setAuthorized] = useState(false);
+
+  // Level 1: Partner filter
+  const [partnerFilter, setPartnerFilter] = useState<'all' | string>('all');
+
+  // Shared filter
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'pending'>('all');
+
+  // SteamOji-specific filters
   const [sessionFilter, setSessionFilter] = useState<'all' | 'morning' | 'afternoon'>('all');
   const [weekFilter, setWeekFilter] = useState<'all' | string>('all');
-  const [authorized, setAuthorized] = useState(false);
+
+  // Avocado-specific filters
+  const [locationFilter, setLocationFilter] = useState<'all' | string>('all');
+  const [seriesFilter, setSeriesFilter] = useState<'all' | number>('all');
+
+  // Reset Level 2 filters when partner changes
+  const handlePartnerChange = (partner: 'all' | string) => {
+    setPartnerFilter(partner);
+    setPaymentFilter('all');
+    setSessionFilter('all');
+    setWeekFilter('all');
+    setLocationFilter('all');
+    setSeriesFilter('all');
+  };
 
   // Auth check
   useEffect(() => {
@@ -112,133 +137,271 @@ export default function AdminWorkshopsPage() {
     );
   }
 
-  // Get partner for week filter options
-  const partner = WORKSHOP_PARTNERS.find((p) => !p.comingSoon);
+  // Get active partners for filter buttons
+  const activePartners = WORKSHOP_PARTNERS.filter((p) => !p.comingSoon);
 
-  // Filter registrations (all 3 filters work together)
+  // Get selected partner config
+  const selectedPartner = partnerFilter !== 'all'
+    ? WORKSHOP_PARTNERS.find((p) => p.id === partnerFilter)
+    : null;
+
+  // Determine which series numbers exist for the selected partner
+  const partnerSeriesNumbers = selectedPartner
+    ? [...new Set(selectedPartner.sessions.map((s) => s.series).filter(Boolean))]
+    : [];
+
+  // Filter registrations
   const filtered = registrations.filter((r) => {
-    if (filter === 'paid' && r.payment_status !== 'paid') return false;
-    if (filter === 'pending' && r.payment_status !== 'pending') return false;
-    if (sessionFilter !== 'all' && r.selected_session_type !== sessionFilter) return false;
-    if (weekFilter !== 'all' && !r.selected_workshop_ids.includes(weekFilter)) return false;
+    // Level 1: Partner
+    if (partnerFilter !== 'all' && r.partner_id !== partnerFilter) return false;
+
+    // Shared: Payment
+    if (paymentFilter === 'paid' && r.payment_status !== 'paid') return false;
+    if (paymentFilter === 'pending' && r.payment_status !== 'pending') return false;
+
+    // SteamOji-specific
+    if (partnerFilter === 'steamoji' || (partnerFilter === 'all' && r.partner_id === 'steamoji')) {
+      if (sessionFilter !== 'all' && r.partner_id === 'steamoji' && r.selected_session_type !== sessionFilter) return false;
+      if (weekFilter !== 'all' && r.partner_id === 'steamoji' && !r.selected_workshop_ids.includes(weekFilter)) return false;
+    }
+
+    // Avocado-specific
+    if (partnerFilter === 'avocado' || (partnerFilter === 'all' && r.partner_id === 'avocado')) {
+      if (locationFilter !== 'all' && r.partner_id === 'avocado' && r.location !== locationFilter) return false;
+      if (seriesFilter !== 'all' && r.partner_id === 'avocado') {
+        const avocadoPartner = WORKSHOP_PARTNERS.find((p) => p.id === 'avocado');
+        if (avocadoPartner) {
+          const seriesSessions = avocadoPartner.sessions
+            .filter((s) => s.series === seriesFilter)
+            .map((s) => s.id);
+          const hasSeriesSession = r.selected_workshop_ids.some((id) => seriesSessions.includes(id));
+          if (!hasSeriesSession) return false;
+        }
+      }
+    }
+
     return true;
   });
 
-  // Summary stats
-  const totalRegistrations = registrations.length;
-  const paidRegistrations = registrations.filter((r) => r.payment_status === 'paid');
-  const pendingRegistrations = registrations.filter((r) => r.payment_status === 'pending');
-  const totalRevenue = paidRegistrations.reduce((sum, r) => sum + (r.amount_paid || 0), 0);
-  const morningCount = paidRegistrations.filter((r) => r.selected_session_type === 'morning').length;
-  const afternoonCount = paidRegistrations.filter((r) => r.selected_session_type === 'afternoon').length;
+  // Summary stats (based on filtered results)
+  const totalCount = filtered.length;
+  const paidRegs = filtered.filter((r) => r.payment_status === 'paid');
+  const pendingRegs = filtered.filter((r) => r.payment_status === 'pending');
+  const totalRevenue = paidRegs.reduce((sum, r) => sum + (r.amount_paid || 0), 0);
+
+  // 5th card: partner-specific breakdown
+  const isSteamojiView = partnerFilter === 'steamoji';
+  const isAvocadoView = partnerFilter === 'avocado';
+  const morningCount = paidRegs.filter((r) => r.selected_session_type === 'morning').length;
+  const afternoonCount = paidRegs.filter((r) => r.selected_session_type === 'afternoon').length;
+  const bellevueCount = paidRegs.filter((r) => r.location === 'bellevue').length;
+  const kirklandCount = paidRegs.filter((r) => r.location === 'kirkland').length;
 
   // Helper: get week labels for selected workshop IDs
   const getWeekLabels = (partnerIdVal: string, workshopIds: string[]) => {
-    const partner = WORKSHOP_PARTNERS.find((p) => p.id === partnerIdVal);
-    if (!partner) return workshopIds.join(', ');
+    const p = WORKSHOP_PARTNERS.find((p) => p.id === partnerIdVal);
+    if (!p) return workshopIds.join(', ');
     return workshopIds
       .map((id) => {
-        const session = partner.sessions.find((s) => s.id === id);
-        return session ? `Wk${partner.sessions.indexOf(session) + 1}` : id;
+        const session = p.sessions.find((s) => s.id === id);
+        return session ? `Wk${p.sessions.indexOf(session) + 1}` : id;
       })
       .join(', ');
   };
+
+  // Helper: get session/location label for table
+  const getSessionLabel = (r: Registration) => {
+    if (r.partner_id === 'avocado') {
+      if (r.location) {
+        const avocadoPartner = WORKSHOP_PARTNERS.find((p) => p.id === 'avocado');
+        const loc = avocadoPartner?.locations?.find((l) => l.slug === r.location);
+        return loc?.name || r.location;
+      }
+      return 'Single';
+    }
+    return r.selected_session_type === 'morning' ? 'AM (4-6)' : 'PM (7-9)';
+  };
+
+  const getSessionBadgeColor = (r: Registration) => {
+    if (r.partner_id === 'avocado') {
+      if (r.location === 'bellevue') return 'bg-blue-100 text-blue-800';
+      if (r.location === 'kirkland') return 'bg-purple-100 text-purple-800';
+      return 'bg-gray-100 text-gray-800';
+    }
+    return r.selected_session_type === 'morning'
+      ? 'bg-amber-100 text-amber-800'
+      : 'bg-green-100 text-green-800';
+  };
+
+  // Filter pill helper
+  const pillClass = (active: boolean) =>
+    `px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+      active
+        ? 'bg-gray-900 text-white'
+        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+    }`;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Workshop Registrations</h1>
-        <p className="text-gray-500 mt-1">View and track all workshop sign-ups</p>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
           <p className="text-sm text-gray-500">Total</p>
-          <p className="text-2xl font-bold text-gray-900">{totalRegistrations}</p>
+          <p className="text-2xl font-bold text-gray-900">{totalCount}</p>
         </div>
         <div className="bg-white rounded-xl p-4 shadow-sm border border-green-200">
           <p className="text-sm text-green-600">Paid</p>
-          <p className="text-2xl font-bold text-green-700">{paidRegistrations.length}</p>
+          <p className="text-2xl font-bold text-green-700">{paidRegs.length}</p>
         </div>
         <div className="bg-white rounded-xl p-4 shadow-sm border border-yellow-200">
           <p className="text-sm text-yellow-600">Pending</p>
-          <p className="text-2xl font-bold text-yellow-700">{pendingRegistrations.length}</p>
+          <p className="text-2xl font-bold text-yellow-700">{pendingRegs.length}</p>
         </div>
         <div className="bg-white rounded-xl p-4 shadow-sm border border-purple-200">
           <p className="text-sm text-purple-600">Revenue</p>
           <p className="text-2xl font-bold text-purple-700">${(totalRevenue / 100).toFixed(2)}</p>
         </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
-          <p className="text-sm text-blue-600">AM / PM</p>
-          <p className="text-2xl font-bold text-blue-700">{morningCount} / {afternoonCount}</p>
+        {/* 5th card: partner-specific breakdown */}
+        {isSteamojiView ? (
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
+            <p className="text-sm text-blue-600">AM / PM</p>
+            <p className="text-2xl font-bold text-blue-700">{morningCount} / {afternoonCount}</p>
+          </div>
+        ) : isAvocadoView ? (
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
+            <p className="text-sm text-blue-600">Bellevue / Kirkland</p>
+            <p className="text-2xl font-bold text-blue-700">{bellevueCount} / {kirklandCount}</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-200">
+            <p className="text-sm text-blue-600">Partners</p>
+            <p className="text-2xl font-bold text-blue-700">
+              {activePartners.length}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Level 1: Partner Filter */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Partner</span>
+          <button
+            onClick={() => handlePartnerChange('all')}
+            className={pillClass(partnerFilter === 'all')}
+          >
+            All
+          </button>
+          {activePartners.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => handlePartnerChange(p.id)}
+              className={pillClass(partnerFilter === p.id)}
+            >
+              {p.id === 'steamoji' ? 'SteamOji' : p.id === 'avocado' ? 'Avocado' : p.partnerName}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Level 2: Contextual Filters */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4">
-        {/* Payment status */}
+        {/* Payment status (always shown) */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Payment</span>
           {(['all', 'paid', 'pending'] as const).map((f) => (
             <button
               key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
-                filter === f
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              onClick={() => setPaymentFilter(f)}
+              className={pillClass(paymentFilter === f)}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
         </div>
 
-        {/* Session type */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Session</span>
-          {(['all', 'morning', 'afternoon'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setSessionFilter(f)}
-              className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
-                sessionFilter === f
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {f === 'all' ? 'All' : f === 'morning' ? 'AM' : 'PM'}
-            </button>
-          ))}
-        </div>
+        {/* SteamOji: Session type filter */}
+        {(partnerFilter === 'steamoji') && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Session</span>
+            {(['all', 'morning', 'afternoon'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setSessionFilter(f)}
+                className={pillClass(sessionFilter === f)}
+              >
+                {f === 'all' ? 'All' : f === 'morning' ? 'AM' : 'PM'}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {/* Week */}
-        {partner && partner.sessions.length > 0 && (
+        {/* SteamOji: Week filter */}
+        {partnerFilter === 'steamoji' && selectedPartner && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Week</span>
             <button
               onClick={() => setWeekFilter('all')}
-              className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
-                weekFilter === 'all'
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className={pillClass(weekFilter === 'all')}
             >
               All
             </button>
-            {partner.sessions.map((s, i) => (
+            {selectedPartner.sessions.map((s, i) => (
               <button
                 key={s.id}
                 onClick={() => setWeekFilter(s.id)}
-                className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
-                  weekFilter === s.id
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                className={pillClass(weekFilter === s.id)}
               >
                 Wk{i + 1}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Avocado: Location filter */}
+        {partnerFilter === 'avocado' && selectedPartner?.locations && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Location</span>
+            <button
+              onClick={() => setLocationFilter('all')}
+              className={pillClass(locationFilter === 'all')}
+            >
+              All
+            </button>
+            {selectedPartner.locations.map((loc) => (
+              <button
+                key={loc.slug}
+                onClick={() => setLocationFilter(loc.slug)}
+                className={pillClass(locationFilter === loc.slug)}
+              >
+                {loc.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Avocado: Series filter */}
+        {partnerFilter === 'avocado' && partnerSeriesNumbers.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Series</span>
+            <button
+              onClick={() => setSeriesFilter('all')}
+              className={pillClass(seriesFilter === 'all')}
+            >
+              All
+            </button>
+            {partnerSeriesNumbers.map((num) => (
+              <button
+                key={num}
+                onClick={() => setSeriesFilter(num!)}
+                className={pillClass(seriesFilter === num)}
+              >
+                Series {num}
               </button>
             ))}
           </div>
@@ -247,7 +410,7 @@ export default function AdminWorkshopsPage() {
 
       {/* Result count */}
       <p className="text-xs text-gray-400 mb-3">
-        Showing {filtered.length} of {totalRegistrations} registrations
+        Showing {filtered.length} of {registrations.length} registrations
       </p>
 
       {/* Table */}
@@ -263,9 +426,14 @@ export default function AdminWorkshopsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
+                  {partnerFilter === 'all' && (
+                    <th className="text-left px-4 py-3 font-semibold text-gray-600">Partner</th>
+                  )}
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Parent</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Child</th>
-                  <th className="text-left px-4 py-3 font-semibold text-gray-600">Session</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-600">
+                    {partnerFilter === 'avocado' ? 'Location' : partnerFilter === 'steamoji' ? 'Session' : 'Session'}
+                  </th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Weeks</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Payment</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Amount</th>
@@ -275,6 +443,17 @@ export default function AdminWorkshopsPage() {
               <tbody className="divide-y divide-gray-100">
                 {filtered.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
+                    {partnerFilter === 'all' && (
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                            partnerColors[r.partner_id] || 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {r.partner_id === 'steamoji' ? 'SteamOji' : r.partner_id === 'avocado' ? 'Avocado' : r.partner_id}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">
                         {r.parent_first_name} {r.parent_last_name}
@@ -290,11 +469,9 @@ export default function AdminWorkshopsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                          sessionTypeColors[r.selected_session_type] || 'bg-gray-100 text-gray-800'
-                        }`}
+                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${getSessionBadgeColor(r)}`}
                       >
-                        {r.selected_session_type === 'morning' ? 'AM (4-6)' : 'PM (7-9)'}
+                        {getSessionLabel(r)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-700">
