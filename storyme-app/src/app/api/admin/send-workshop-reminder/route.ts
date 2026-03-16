@@ -756,7 +756,7 @@ function buildThankYouHtml(parentFirstName: string, childFirstName: string): str
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function POST(req: NextRequest) {
-  const { mode, sessionType } = await req.json();
+  const { mode, sessionType, workshopId, extraRecipients } = await req.json();
 
   if (mode === 'test') {
     const results = [];
@@ -948,32 +948,51 @@ export async function POST(req: NextRequest) {
   }
 
   if (mode === 'thank-you') {
-    const { data: registrations, error } = await getSupabase()
+    // workshopId defaults to 'steamoji-wk1' for backward compatibility
+    const targetWorkshop = workshopId || 'steamoji-wk1';
+
+    const query = getSupabase()
       .from('workshop_registrations')
       .select('parent_first_name, parent_email, child_first_name, selected_session_type')
       .eq('status', 'confirmed')
-      .contains('selected_workshop_ids', ['steamoji-wk1']);
+      .contains('selected_workshop_ids', [targetWorkshop]);
 
     if (sessionType === 'morning' || sessionType === 'afternoon') {
-      // Already filtered above, need to re-query with filter
+      query.eq('selected_session_type', sessionType);
     }
+
+    const { data: registrations, error } = await query;
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
-    if (!registrations || registrations.length === 0) {
-      return NextResponse.json({ success: true, message: 'No Wk1 registrations found', sent: 0 });
+    // Build recipient list from DB results
+    const allRecipients: Array<{ parent_first_name: string; parent_email: string; child_first_name: string; selected_session_type?: string }> =
+      registrations || [];
+
+    // Append any extra recipients (e.g. manually added parents)
+    if (Array.isArray(extraRecipients)) {
+      for (const r of extraRecipients) {
+        if (r.parentEmail && r.parentFirstName && r.childFirstName) {
+          allRecipients.push({
+            parent_first_name: r.parentFirstName,
+            parent_email: r.parentEmail,
+            child_first_name: r.childFirstName,
+            selected_session_type: r.sessionType || 'manual',
+          });
+        }
+      }
     }
 
-    const filtered = sessionType
-      ? registrations.filter(r => r.selected_session_type === sessionType)
-      : registrations;
+    if (allRecipients.length === 0) {
+      return NextResponse.json({ success: true, message: `No registrations found for ${targetWorkshop}`, sent: 0 });
+    }
 
     const results = [];
 
-    for (let i = 0; i < filtered.length; i++) {
-      const reg = filtered[i];
+    for (let i = 0; i < allRecipients.length; i++) {
+      const reg = allRecipients[i];
       if (i > 0) await delay(600);
 
       const { error: sendErr } = await resend.emails.send({
@@ -994,6 +1013,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       mode: 'thank-you',
+      workshopId: targetWorkshop,
       total: results.length,
       sent: results.filter(r => !r.error).length,
       failed: results.filter(r => r.error).length,
