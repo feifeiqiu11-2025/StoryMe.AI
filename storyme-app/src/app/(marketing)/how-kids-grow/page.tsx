@@ -43,14 +43,14 @@ const growthAreas: GrowthArea[] = [
     description:
       'Children build literacy skills through fun, engaging creative projects — from storytelling to designing their own content. They learn to express ideas in words, structure narratives, and develop confident speaking and storytelling skills.',
     images: [
-      '/images/how-kids-grow/read-write-1.jpg',
-      '/images/how-kids-grow/read-write-2.jpg',
-      '/images/how-kids-grow/read-write-3.jpg',
-      '/images/how-kids-grow/read-write-4.jpg',
-      '/images/how-kids-grow/read-write-5.jpg',
-      '/images/how-kids-grow/read-write-6.jpg',
-      '/images/how-kids-grow/read-write-7.jpg',
-      '/images/how-kids-grow/read-write-8.jpg',
+      '/images/how-kids-grow/read-write-1.webp',
+      '/images/how-kids-grow/read-write-2.webp',
+      '/images/how-kids-grow/read-write-3.webp',
+      '/images/how-kids-grow/read-write-4.webp',
+      '/images/how-kids-grow/read-write-5.webp',
+      '/images/how-kids-grow/read-write-6.webp',
+      '/images/how-kids-grow/read-write-7.webp',
+      '/images/how-kids-grow/read-write-8.webp',
     ],
   },
   {
@@ -58,9 +58,9 @@ const growthAreas: GrowthArea[] = [
     description:
       'Kids practice expressing ideas, listening to others, and collaborating through shared creation. Working together on stories and projects helps them understand different perspectives and build meaningful connections.',
     images: [
-      '/images/how-kids-grow/teamwork-1.jpg',
-      '/images/how-kids-grow/teamwork-2.jpg',
-      '/images/how-kids-grow/teamwork-3.jpg',
+      '/images/how-kids-grow/teamwork-1.webp',
+      '/images/how-kids-grow/teamwork-2.webp',
+      '/images/how-kids-grow/teamwork-3.webp',
     ],
   },
   {
@@ -68,9 +68,9 @@ const growthAreas: GrowthArea[] = [
     description:
       'When something doesn\'t work as expected, kids build resilience through iteration — whether tuning a story script and image, refining a 3D model, or debugging code. They discover that mistakes are stepping stones, not setbacks, and learn to embrace imperfect results along the way.',
     images: [
-      '/images/how-kids-grow/failure-1.jpg',
-      '/images/how-kids-grow/failure-2.jpg',
-      '/images/how-kids-grow/failure-3.jpg',
+      '/images/how-kids-grow/failure-1.webp',
+      '/images/how-kids-grow/failure-2.webp',
+      '/images/how-kids-grow/failure-3.webp',
     ],
   },
   {
@@ -78,8 +78,8 @@ const growthAreas: GrowthArea[] = [
     description:
       'Children become critical thinkers and creative problem-solvers who take ownership of their ideas. They gain the confidence to imagine, create, and share with the world.',
     images: [
-      '/images/how-kids-grow/creative-1.jpg',
-      '/images/how-kids-grow/creative-2.jpg',
+      '/images/how-kids-grow/creative-1.webp',
+      '/images/how-kids-grow/creative-2.webp',
     ],
     imagePosition: 'object-contain',
   },
