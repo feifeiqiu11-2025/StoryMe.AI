@@ -156,142 +156,20 @@ export default function ProductsPage() {
           </div>
         </div>
 
-        {/* In-Person Learning Lab Section */}
-        <div className="mb-16">
-          <div className="mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center">
-              In-Person Learning Lab
-            </h2>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Partner School Enrichment */}
-            <div className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-all">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-14 h-14 bg-amber-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900">Partner School Enrichment</h3>
-                  <p className="text-sm text-gray-600">Creative classes at your school</p>
-                </div>
-              </div>
-              <p className="text-gray-700 mb-6 leading-relaxed">
-                We bring KindleWood's creative curriculum directly to partner schools. Students experience hands-on storytelling, art projects, and creative technology — all aligned with educational goals.
-              </p>
-              <ul className="space-y-2 mb-6">
-                <li className="flex items-center gap-2 text-gray-700">
-                  <span className="text-amber-600 font-bold">✓</span>
-                  Age-appropriate curriculum (PreK-12)
-                </li>
-                <li className="flex items-center gap-2 text-gray-700">
-                  <span className="text-amber-600 font-bold">✓</span>
-                  Trained instructors & all materials provided
-                </li>
-                <li className="flex items-center gap-2 text-gray-700">
-                  <span className="text-amber-600 font-bold">✓</span>
-                  Flexible scheduling (after-school, camps, in-class)
-                </li>
-              </ul>
-              <div className="flex justify-center">
-                <a
-                  href="mailto:admin@kindlewoodstudio.ai?subject=Partner School Enrichment Inquiry"
-                  className="inline-block bg-amber-600 hover:bg-amber-700 text-white px-8 py-3 rounded-lg font-semibold text-center text-base transition-colors min-w-[200px]"
-                >
-                  Learn More
-                </a>
-              </div>
-            </div>
-
-            {/* KindleWood Learning Lab */}
-            <div className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-all">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-14 h-14 bg-green-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900">KindleWood Learning Lab</h3>
-                  <p className="text-sm text-amber-600 font-medium">Coming Soon</p>
-                </div>
-              </div>
-              <p className="text-gray-700 mb-6 leading-relaxed">
-                Our dedicated creative space where children explore imagination through guided workshops, collaborative projects, and hands-on learning experiences.
-              </p>
-              <h4 className="font-semibold text-gray-900 mb-3">Sample Activities:</h4>
-              <ul className="space-y-2 mb-6 text-sm sm:text-base">
-                <li className="flex items-center gap-2 text-gray-700 whitespace-nowrap">
-                  <span className="text-green-600 font-bold flex-shrink-0">✓</span>
-                  Imagination to Storybook with Show & Tell
-                  <span className="text-gray-500">(Ages 3-6)</span>
-                </li>
-                <li className="flex items-center gap-2 text-gray-700 whitespace-nowrap">
-                  <span className="text-green-600 font-bold flex-shrink-0">✓</span>
-                  Bring Story Character into Real World with 3D Modeling
-                  <span className="text-gray-500">(Ages 6-7)</span>
-                </li>
-                <li className="flex items-center gap-2 text-gray-700 whitespace-nowrap">
-                  <span className="text-green-600 font-bold flex-shrink-0">✓</span>
-                  PBL Engineering: AI Coding, Complex 3D Modeling
-                  <span className="text-gray-500">(Ages 7-12+)</span>
-                </li>
-              </ul>
-              <div className="flex justify-center">
-                <button
-                  disabled
-                  className="inline-block bg-gray-300 text-gray-500 px-8 py-3 rounded-lg font-semibold text-center text-base cursor-not-allowed min-w-[200px]"
-                >
-                  Coming Soon
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Learn Real Skills Through Creation */}
-        <div className="mb-16">
-          <div className="mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center">
-              Learn Real Skills Through Creation
-            </h2>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Read & Write */}
-            <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200 hover:shadow-lg transition-shadow">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Read & Write</h3>
-              <p className="text-gray-600">
-                Children build literacy skills through creative projects — from storytelling to designing their own content
-              </p>
-            </div>
-
-            {/* Teamwork & Empathy */}
-            <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200 hover:shadow-lg transition-shadow">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Teamwork & Empathy</h3>
-              <p className="text-gray-600">
-                Kids practice expressing ideas, listening to others, and collaborating through shared creation
-              </p>
-            </div>
-
-            {/* Learn from Failure */}
-            <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200 hover:shadow-lg transition-shadow">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Learn from Failure</h3>
-              <p className="text-gray-600">
-                When something doesn't work as expected, kids build resilience through iteration — whether fixing a story, a 3D model, or code
-              </p>
-            </div>
-
-            {/* Creative & Confident Thinkers */}
-            <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200 hover:shadow-lg transition-shadow">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Creative & Confident Thinkers</h3>
-              <p className="text-gray-600">
-                Children become problem-solvers who take ownership of their ideas — from first stories to coding projects
-              </p>
-            </div>
-          </div>
+        {/* In-Person Learning Lab Hook */}
+        <div className="mb-16 max-w-2xl mx-auto text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+            We Also Offer In-Person Learning
+          </h2>
+          <p className="text-gray-600 max-w-lg mx-auto mb-6">
+            Hands-on creative workshops at partner schools and KindleWood Learning Lab — where kids create, collaborate, and learn beyond the screen.
+          </p>
+          <Link
+            href="/workshops"
+            className="inline-block bg-amber-600 hover:bg-amber-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
+          >
+            View Workshops & Events
+          </Link>
         </div>
 
         {/* CTA Section - Clean, no background */}

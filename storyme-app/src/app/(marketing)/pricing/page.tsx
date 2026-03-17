@@ -154,22 +154,22 @@ export default function PricingPage() {
           />
         </div>
 
-        {/* In-Person Learning Lab Coming Soon */}
+        {/* In-Person Learning Lab */}
         <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 mb-12 max-w-2xl mx-auto">
           <div className="text-center">
             <h3 className="text-2xl font-bold text-gray-900 mb-2">
               In-Person Learning Lab
             </h3>
-            <p className="text-amber-600 font-medium mb-4">Pricing Coming Soon</p>
+            <p className="text-amber-600 font-medium mb-4">Hands-On Creative Workshops</p>
             <p className="text-gray-600 max-w-lg mx-auto">
-              Pricing for our in-person enrichment classes at partner schools and KindleWood Learning Lab workshops will vary based on the type of learning experience and workshop.
+              Explore our in-person enrichment classes at partner schools and KindleWood Learning Lab workshops. Pricing varies based on the type of learning experience and workshop.
             </p>
-            <a
-              href="mailto:admin@kindlewoodstudio.ai?subject=In-Person Learning Lab Inquiry"
+            <Link
+              href="/workshops"
               className="inline-block mt-6 bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors"
             >
-              Contact Us for Details
-            </a>
+              View Workshops & Events
+            </Link>
           </div>
         </div>
 
