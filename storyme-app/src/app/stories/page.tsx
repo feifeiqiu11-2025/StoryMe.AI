@@ -7,7 +7,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import LandingNav from '@/components/navigation/LandingNav';
 import { StoryCard, type StoryCardData } from '@/components/story/StoryCard';
 import type { StoryTag } from '@/lib/types/story';
@@ -19,6 +19,7 @@ interface PublicStory extends StoryCardData {
 
 export default function PublicStoriesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [stories, setStories] = useState<PublicStory[]>([]);
   const [availableTags, setAvailableTags] = useState<StoryTag[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -33,7 +34,12 @@ export default function PublicStoriesPage() {
   const [totalPages, setTotalPages] = useState(0);
   const limit = 24;
 
+  // Read filter from URL on mount
   useEffect(() => {
+    const filterParam = searchParams.get('filter');
+    if (filterParam) {
+      setSelectedTags([filterParam]);
+    }
     fetchTags();
   }, []);
 
@@ -89,12 +95,16 @@ export default function PublicStoriesPage() {
     // Single selection: clicking a tag replaces the current selection
     setSelectedTags([tagSlug]);
     setCurrentPage(1);
+    const params = new URLSearchParams(window.location.search);
+    params.set('filter', tagSlug);
+    router.replace(`?${params.toString()}`, { scroll: false });
   };
 
   const clearFilters = () => {
     setSelectedTags([]);
     setSearchQuery('');
     setCurrentPage(1);
+    router.replace(window.location.pathname, { scroll: false });
   };
 
   const handlePageChange = (page: number) => {

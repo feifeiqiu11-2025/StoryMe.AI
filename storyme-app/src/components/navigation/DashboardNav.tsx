@@ -69,32 +69,20 @@ export default function DashboardNav() {
         </button>
 
         {communityDropdownOpen && (
-          <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
+          <div className="absolute top-full left-0 mt-1 w-52 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
             <Link
               href="/community-stories"
               onClick={() => setCommunityDropdownOpen(false)}
-              className="block px-4 py-2 hover:bg-gray-50 transition-colors"
+              className="block px-4 py-2.5 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
             >
-              <div className="flex items-center gap-2">
-                <span className="text-lg">📚</span>
-                <div>
-                  <div className="font-semibold text-gray-900 text-sm">Community Stories</div>
-                  <div className="text-xs text-gray-500 mt-0.5">Discover amazing stories</div>
-                </div>
-              </div>
+              Community Stories
             </Link>
             <Link
               href="/little-artists"
               onClick={() => setCommunityDropdownOpen(false)}
-              className="block px-4 py-2 hover:bg-gray-50 transition-colors"
+              className="block px-4 py-2.5 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
             >
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🎨</span>
-                <div>
-                  <div className="font-semibold text-gray-900 text-sm">Little Artists</div>
-                  <div className="text-xs text-gray-500 mt-0.5">Showcase young creators</div>
-                </div>
-              </div>
+              Little Artists
             </Link>
           </div>
         )}
