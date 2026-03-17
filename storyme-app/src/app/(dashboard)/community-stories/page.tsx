@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { StoryCard, type StoryCardData } from '@/components/story/StoryCard';
 import type { StoryTag } from '@/lib/types/story';
@@ -16,7 +16,7 @@ interface PublicStory extends StoryCardData {
   tags?: StoryTag[];
 }
 
-export default function PublicStoriesPage() {
+function CommunityStoriesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [stories, setStories] = useState<PublicStory[]>([]);
@@ -451,5 +451,13 @@ export default function PublicStoriesPage() {
           </div>
         )}
     </div>
+  );
+}
+
+export default function CommunityStoriesPage() {
+  return (
+    <Suspense>
+      <CommunityStoriesContent />
+    </Suspense>
   );
 }
