@@ -527,6 +527,234 @@ function buildIndoorNoticeHtml(parentFirstName: string, childFirstName: string):
 </html>`;
 }
 
+// ─── School Partnership Outreach Email ────────────────────────────────────
+
+function buildSchoolOutreachHtml(): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #6d28d9; background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: 32px; text-align: center;">
+              <a href="https://www.kindlewoodstudio.ai" style="text-decoration: none;">
+                <img src="https://www.kindlewoodstudio.ai/Logo_New.png" alt="KindleWood Studio" width="60" style="display: inline-block; max-width: 60px; height: auto; margin-bottom: 12px;" />
+              </a>
+              <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;">
+                Creative Storytelling Enrichment
+              </h1>
+              <p style="color: #e0e7ff; margin: 8px 0 0; font-size: 15px;">
+                Hands-on workshops where kids become authors &amp; creators
+              </p>
+            </td>
+          </tr>
+
+          <!-- Greeting -->
+          <tr>
+            <td style="padding: 32px 24px 16px;">
+              <p style="color: #374151; font-size: 16px; margin: 0;">
+                Hi there,
+              </p>
+              <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
+                My name is Feifei Qiu, and I&rsquo;m the founder of <strong style="color: #374151;">KindleWood Studio</strong> &mdash; a creativity-based learning platform where children ages 3&ndash;9 create their own personalized storybooks through hands-on craft, guided storytelling, and AI-powered tools.
+              </p>
+              <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
+                We currently run in-person workshop programs with partners including <strong style="color: #374151;">SteamOji Academy</strong> (Bellevue) and <strong style="color: #374151;">Avocado Montessori Academy</strong> (Bellevue &amp; Kirkland), and we&rsquo;d love to explore bringing a similar enrichment program to your school.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- What Our Workshops Look Like -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                What Our Workshops Look Like
+              </h2>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <span style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+                      Children explore real-world themes (nature, emotions, healthy habits, innovation) through <strong style="color: #374151;">craft and guided storytelling</strong>
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <span style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+                      Each session produces a tangible creation &mdash; a <strong style="color: #374151;">physical storybook</strong> the child takes home
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <span style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+                      Programs are structured in multi-week series, adaptable to <strong style="color: #374151;">after-school, enrichment block, or summer camp</strong> formats
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px;">
+                    <span style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+                      Age-appropriate tracks: <strong style="color: #374151;">ages 3&ndash;6</strong> (35&ndash;60 min) and <strong style="color: #374151;">ages 7&ndash;9</strong> (60&ndash;120 min)
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- Video Previews -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                &#127916; See Our Programs in Action
+              </h2>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td width="50%" style="padding: 0 6px 8px 0;">
+                    <a href="https://www.youtube.com/watch?v=c0fbsTEjK9Q" style="text-decoration: none;">
+                      <img src="https://img.youtube.com/vi/c0fbsTEjK9Q/hqdefault.jpg" alt="SteamOji Workshop — Ages 4-6" width="270" style="display: block; width: 100%; max-width: 270px; border-radius: 8px; border: 1px solid #e5e7eb;" />
+                    </a>
+                    <p style="color: #6b7280; font-size: 12px; margin: 6px 0 0; text-align: center;">
+                      <strong style="color: #374151;">SteamOji Workshop</strong><br />Ages 4&ndash;6 &middot; 60 min
+                    </p>
+                  </td>
+                  <td width="50%" style="padding: 0 0 8px 6px;">
+                    <a href="https://www.youtube.com/watch?v=oGIqaPkw9aw" style="text-decoration: none;">
+                      <img src="https://img.youtube.com/vi/oGIqaPkw9aw/hqdefault.jpg" alt="Avocado Montessori Workshop — Ages 3-6" width="270" style="display: block; width: 100%; max-width: 270px; border-radius: 8px; border: 1px solid #e5e7eb;" />
+                    </a>
+                    <p style="color: #6b7280; font-size: 12px; margin: 6px 0 0; text-align: center;">
+                      <strong style="color: #374151;">Montessori Workshop</strong><br />Ages 3&ndash;6 &middot; 35 min
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- Partnership Models -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                &#129309; What a School Partnership Can Look Like
+              </h2>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #7c3aed;">After-School Enrichment Series</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">4&ndash;8 week themed storytelling program</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #7c3aed;">Integrated Enrichment Blocks</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">Sessions that fit into your existing school-day schedule</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #7c3aed;">Summer Camp Modules</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">Week-long creative storytelling camps</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px;">
+                    <span style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+                      We provide all <strong style="color: #374151;">materials, curriculum, and instructors</strong> &mdash; the school provides the space and families.
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- CTA -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <p style="color: #6b7280; font-size: 15px; margin: 0; line-height: 1.6;">
+                We&rsquo;d welcome the chance to have a brief conversation about whether this could be a good fit for your community. Would you be open to a <strong style="color: #374151;">15-minute call or meeting</strong>?
+              </p>
+              <p style="margin: 16px 0 0; text-align: center;">
+                <a href="https://www.kindlewoodstudio.ai/workshops" style="display: inline-block; background-color: #7c3aed; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-size: 15px; font-weight: 600;">
+                  Learn More About Our Programs &rarr;
+                </a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px; background-color: #f9fafb; text-align: center;">
+              <p style="color: #374151; font-size: 14px; margin: 0; line-height: 1.6;">
+                Warm regards,
+              </p>
+              <p style="color: #374151; font-size: 14px; margin: 8px 0 0; font-weight: 600;">
+                Feifei Qiu
+              </p>
+              <p style="color: #6b7280; font-size: 13px; margin: 4px 0 0;">
+                Founder &amp; CEO, KindleWood Studio
+              </p>
+              <p style="margin: 20px 0 0;">
+                <a href="https://www.kindlewoodstudio.ai" style="text-decoration: none;">
+                  <img src="https://www.kindlewoodstudio.ai/Logo_New.png" alt="KindleWood Studio" width="80" style="display: inline-block; max-width: 80px; height: auto;" />
+                </a>
+              </p>
+              <p style="margin: 12px 0 0;">
+                <a href="https://www.kindlewoodstudio.ai" style="color: #7c3aed; font-size: 13px; text-decoration: underline;">
+                  kindlewoodstudio.ai
+                </a>
+                &nbsp;&middot;&nbsp;
+                <a href="https://www.youtube.com/@KindleWoodStudio" style="color: #9ca3af; font-size: 13px; text-decoration: underline;">
+                  YouTube
+                </a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
 // ─── Thank You + Promo Email ─────────────────────────────────────────────
 
 const LOGO_URL = 'https://www.kindlewoodstudio.ai/Logo_New.png';
@@ -929,6 +1157,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       mode: 'indoor-notice',
+      total: results.length,
+      sent: results.filter(r => !r.error).length,
+      failed: results.filter(r => r.error).length,
+      results,
+    });
+  }
+
+  if (mode === 'school-outreach') {
+    const recipients = ['feifei_qiu@hotmail.com', 'admin@kindlewoodstudio.ai'];
+    const results = [];
+
+    for (let i = 0; i < recipients.length; i++) {
+      if (i > 0) await delay(600);
+      const { error: sendErr } = await resend.emails.send({
+        from: EMAIL_FROM,
+        to: recipients[i],
+        subject: 'Creative Storytelling Enrichment Program — Partnership Inquiry',
+        html: buildSchoolOutreachHtml(),
+        replyTo: REPLY_TO,
+      });
+      results.push({ to: recipients[i], error: sendErr?.message || null });
+    }
+
+    return NextResponse.json({
+      success: true,
+      mode: 'school-outreach',
       total: results.length,
       sent: results.filter(r => !r.error).length,
       failed: results.filter(r => r.error).length,
