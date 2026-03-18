@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   try {
     const partnerId = request.nextUrl.searchParams.get('partnerId');
     const location = request.nextUrl.searchParams.get('location');
+    const timeSlot = request.nextUrl.searchParams.get('timeSlot');
 
     if (!partnerId) {
       return NextResponse.json(
@@ -42,11 +43,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (partner.sessionMode === 'single') {
-      // Single-session partner (e.g., Avocado) — use v2 RPC with optional location
-      const { data, error } = await supabase.rpc('get_workshop_registration_counts_v2', {
+      // Single-session partner (e.g., Avocado) — use v3 RPC with optional location + time slot
+      const { data, error } = await supabase.rpc('get_workshop_registration_counts_v3', {
         p_partner_id: partnerId,
         p_session_type: 'single',
         p_location: location || null,
+        p_time_slot: timeSlot || null,
       });
 
       if (error) {

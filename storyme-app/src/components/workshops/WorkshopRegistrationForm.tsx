@@ -24,6 +24,7 @@ import {
   getPartnerSessionPricing,
   getPartnerCapacity,
   getEnrollableSessions,
+  getSessionDates,
 } from '@/lib/workshops/constants';
 import type { WorkshopAvailabilityData } from '@/lib/workshops/types';
 
@@ -43,6 +44,10 @@ export default function WorkshopRegistrationForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showWaiverText, setShowWaiverText] = useState(false);
+
+  // Local availability state — refetched when location/timeSlot changes (Avocado only)
+  const [localAvailability, setLocalAvailability] = useState(availability ?? null);
+  const [localAvailabilityLoading, setLocalAvailabilityLoading] = useState(availabilityLoading ?? false);
 
   // Mode detection
   const isSingleMode = partner.sessionMode === 'single';
@@ -75,6 +80,7 @@ export default function WorkshopRegistrationForm({
         ? 'single'
         : (defaultSessionType as 'morning' | 'afternoon') || undefined,
       selectedLocation: hasLocations ? partner.locations![0].slug : undefined,
+      selectedTimeSlot: undefined,
       parentFirstName: '',
       parentLastName: '',
       parentEmail: '',
@@ -103,6 +109,7 @@ export default function WorkshopRegistrationForm({
   const selectedWorkshopIds = watch('selectedWorkshopIds');
   const selectedSessionType = watch('selectedSessionType');
   const selectedLocation = watch('selectedLocation');
+  const selectedTimeSlot = watch('selectedTimeSlot');
 
   // Auto-set workshop IDs for series mode
   useEffect(() => {
@@ -118,6 +125,29 @@ export default function WorkshopRegistrationForm({
       setValue('selectedSessionType', 'single');
     }
   }, [isSingleMode, setValue]);
+
+  // Refetch availability when location or time slot changes (Avocado only)
+  const hasTimeSlots = partner.locations?.some(l => (l.timeSlots?.length ?? 0) > 0) ?? false;
+  useEffect(() => {
+    if (!hasTimeSlots || !selectedLocation) return;
+    // Only refetch when a time slot is selected
+    if (!selectedTimeSlot) {
+      setLocalAvailability(null);
+      return;
+    }
+    let cancelled = false;
+    setLocalAvailabilityLoading(true);
+    fetch(`/api/v1/workshops/availability?partnerId=${partner.id}&location=${selectedLocation}&timeSlot=${selectedTimeSlot}`)
+      .then(res => res.json())
+      .then(json => {
+        if (!cancelled && json.success && json.data) {
+          setLocalAvailability(json.data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLocalAvailabilityLoading(false); });
+    return () => { cancelled = true; };
+  }, [hasTimeSlots, partner.id, selectedLocation, selectedTimeSlot]);
 
   // Pricing — use helpers for correct mode handling
   const sessionPricing = getPartnerSessionPricing(
@@ -159,10 +189,12 @@ export default function WorkshopRegistrationForm({
     return sessionDate < today;
   };
 
-  // Spot availability helper
+  // Spot availability helper — uses local availability for time-slot partners, prop for others
+  const effectiveAvailability = hasTimeSlots ? localAvailability : availability;
+  const effectiveLoading = hasTimeSlots ? localAvailabilityLoading : availabilityLoading;
   const getSpotsLeft = (sessionId: string): number | null => {
-    if (!availability || availabilityLoading) return null;
-    const countData = availability.counts[sessionId];
+    if (!effectiveAvailability || effectiveLoading) return null;
+    const countData = effectiveAvailability.counts[sessionId];
     if (!countData) return null;
     const count = isSingleMode
       ? (countData.single ?? 0)
@@ -223,6 +255,11 @@ export default function WorkshopRegistrationForm({
       // SteamOji requires Code of Conduct
       if (partner.id === 'steamoji' && !data.codeOfConductAccepted) {
         throw new Error('You must accept the Code of Conduct to register for SteamOji workshops.');
+      }
+
+      // Partners with time slots require a time slot selection
+      if (hasTimeSlots && !data.selectedTimeSlot) {
+        throw new Error('Please select a time slot before registering.');
       }
 
       const response = await fetch('/api/workshop-checkout', {
@@ -339,6 +376,59 @@ export default function WorkshopRegistrationForm({
               {errors.selectedLocation.message}
             </p>
           )}
+
+          {/* Time Slot Picker — only for partners with time slots */}
+          {(() => {
+            const loc = partner.locations!.find(l => l.slug === selectedLocation);
+            if (!loc?.timeSlots?.length) return null;
+            const dayName = loc.dayOfWeek ? loc.dayOfWeek.charAt(0).toUpperCase() + loc.dayOfWeek.slice(1) + 's' : '';
+            return (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  2. Choose Your Time Slot
+                </h3>
+                {dayName && (
+                  <p className="mb-3 text-sm text-amber-700">
+                    Sessions held every <span className="font-semibold">{dayName}</span>
+                    {loc.skipDates?.length ? ' (except spring break)' : ''}
+                  </p>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {loc.timeSlots.map((ts) => (
+                    <label
+                      key={ts.slug}
+                      className={`relative flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                        selectedTimeSlot === ts.slug
+                          ? 'border-amber-500 bg-amber-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        value={ts.slug}
+                        {...register('selectedTimeSlot')}
+                        className="sr-only peer"
+                      />
+                      <div className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                        selectedTimeSlot === ts.slug
+                          ? 'bg-amber-500 border-amber-500'
+                          : 'border-gray-300 bg-white'
+                      }`}>
+                        {selectedTimeSlot === ts.slug && (
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className="text-base font-semibold text-gray-900">
+                        {ts.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       ) : !isSingleMode ? (
         /* --- DUAL MODE: Morning / Afternoon Session Picker --- */
@@ -520,13 +610,13 @@ export default function WorkshopRegistrationForm({
       ) : null}
 
       {/* ═══════════════════════════════════════════════════════ */}
-      {/* Section 2 — Series: Series Overview / Dual: Workshop Dates */}
+      {/* Section — Series: Series Overview / Dual: Workshop Dates */}
       {/* ═══════════════════════════════════════════════════════ */}
       {isSeriesMode ? (
         /* --- SERIES MODE: Read-only series overview --- */
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-3">
-            2. Series Overview
+            {hasTimeSlots ? '3' : '2'}. Series Overview
           </h3>
 
           {/* Series 1 — Enrolling Now */}
@@ -537,7 +627,7 @@ export default function WorkshopRegistrationForm({
                   Series 1: Core Life Skills
                 </h4>
                 <p className="text-sm text-gray-600 mt-0.5">
-                  4 sessions · 35 mins each · 2 physical storybooks
+                  {enrollableSessions.length} sessions · 35 mins each · {Math.floor(enrollableSessions.length / 2)} physical storybooks
                 </p>
               </div>
               <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
@@ -546,36 +636,45 @@ export default function WorkshopRegistrationForm({
             </div>
 
             <div className="space-y-2">
-              {enrollableSessions.map((session, index) => (
-                <div
-                  key={session.id}
-                  className="flex items-start gap-3 p-3 bg-white/70 rounded-lg"
-                >
-                  <div className="flex-shrink-0 w-7 h-7 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-sm font-bold">
-                    {index + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">
-                        {session.theme}
-                      </span>
-                      <span className="text-xs text-gray-600 font-medium">
-                        {session.dateLabel}
-                      </span>
+              {(() => {
+                const loc = selectedLocation
+                  ? partner.locations?.find(l => l.slug === selectedLocation)
+                  : undefined;
+                const sessionDates = loc
+                  ? getSessionDates(loc, enrollableSessions.length)
+                  : null;
+
+                return enrollableSessions.map((session, index) => (
+                  <div
+                    key={session.id}
+                    className="flex items-start gap-3 p-3 bg-white/70 rounded-lg"
+                  >
+                    <div className="flex-shrink-0 w-7 h-7 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-sm font-bold">
+                      {index + 1}
                     </div>
-                    {session.themeDescription && (
-                      <p className="text-sm text-gray-500 mt-0.5">
-                        {session.themeDescription}
-                      </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900">
+                          {session.theme}
+                        </span>
+                        <span className="text-xs text-gray-600 font-medium">
+                          {sessionDates?.[index]?.formatted || session.dateLabel}
+                        </span>
+                      </div>
+                      {session.themeDescription && (
+                        <p className="text-sm text-gray-500 mt-0.5">
+                          {session.themeDescription}
+                        </p>
+                      )}
+                    </div>
+                    {index % 2 === 1 && (
+                      <span className="flex-shrink-0 text-xs font-medium text-amber-700 bg-amber-100/80 px-2.5 py-1 rounded-md whitespace-nowrap">
+                        Storybook {Math.floor(index / 2) + 1} produced
+                      </span>
                     )}
                   </div>
-                  {(index === 1 || index === 3) && (
-                    <span className="flex-shrink-0 text-xs font-medium text-amber-700 bg-amber-100/80 px-2.5 py-1 rounded-md whitespace-nowrap">
-                      Storybook {index === 1 ? 1 : 2} produced
-                    </span>
-                  )}
-                </div>
-              ))}
+                ));
+              })()}
             </div>
 
             {/* Series pricing */}
@@ -609,7 +708,7 @@ export default function WorkshopRegistrationForm({
                 </span>
               </div>
               <p className="text-xs text-gray-500">
-                Includes 2 physical storybooks your child creates during the series
+                Includes {Math.floor(enrollableSessions.length / 2)} physical storybooks your child creates during the series
               </p>
             </div>
           </div>
@@ -834,7 +933,7 @@ export default function WorkshopRegistrationForm({
       {/* ═══════════════════════════════════════════════════════ */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
-          3. Parent / Guardian Information
+          {hasTimeSlots ? '4' : '3'}. Parent / Guardian Information
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -917,7 +1016,7 @@ export default function WorkshopRegistrationForm({
       {/* ═══════════════════════════════════════════════════════ */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
-          4. Child Information
+          {hasTimeSlots ? '5' : '4'}. Child Information
         </h3>
         <div className="space-y-4">
           {childrenFields.map((field, index) => (
@@ -1051,7 +1150,7 @@ export default function WorkshopRegistrationForm({
       {!isSingleMode && (
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-3">
-            5. Emergency Contact
+            {hasTimeSlots ? '6' : '5'}. Emergency Contact
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
@@ -1121,7 +1220,7 @@ export default function WorkshopRegistrationForm({
       {/* ═══════════════════════════════════════════════════════ */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
-          {isSingleMode ? '5' : '6'}. Digital Waiver
+          {hasTimeSlots ? '6' : isSingleMode ? '5' : '6'}. Digital Waiver
         </h3>
         <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
           <label className="flex items-start gap-3 cursor-pointer">

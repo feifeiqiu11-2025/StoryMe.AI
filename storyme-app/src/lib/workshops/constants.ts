@@ -43,12 +43,23 @@ export interface WorkshopCapacity {
   perLocation?: Record<string, number>; // Keyed by location slug, for multi-location partners
 }
 
+export interface WorkshopTimeSlot {
+  slug: string; // e.g. 'slot-1', 'slot-2'
+  label: string; // e.g. '3:30 – 4:05 PM'
+  startTime: string; // '15:30'
+  endTime: string; // '16:05'
+}
+
 export interface WorkshopLocation {
   slug: string; // e.g. 'bellevue', 'kirkland'
   name: string;
   address: string;
   mapUrl?: string;
   taxRate?: number; // e.g. 0.103 for 10.3% WA sales tax
+  dayOfWeek?: string; // e.g. 'monday', 'wednesday' — for computing session dates
+  startDate?: string; // ISO date string, e.g. '2026-04-01'
+  skipDates?: string[]; // ISO date strings to skip (e.g. spring break)
+  timeSlots?: WorkshopTimeSlot[]; // Available time slots at this location
 }
 
 export interface WorkshopPartner {
@@ -257,7 +268,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
     tagline: 'Nurturing curious minds through stories, nature, and hands-on discovery.',
     logoUrl: '/images/avocado-logo.png',
     description:
-      'A Montessori-aligned storytelling program where children ages 3–6 explore real-world themes through craft, guided storytelling, and creative expression. Each 4-session series produces 2 physical storybooks — one every two sessions — that children take home as keepsakes of their learning journey.',
+      'A Montessori-aligned storytelling program where children ages 3–6 explore real-world themes through craft, guided storytelling, and creative expression. Series 1 includes 6 sessions and produces 3 physical storybooks — one every two sessions — that children take home as keepsakes of their learning journey.',
     partnerDescription:
       'Avocado Montessori Academy nurtures young learners through the Montessori philosophy of independence, hands-on discovery, and respect for each child\'s natural development. With campuses in Bellevue and Kirkland, they serve families across the Eastside.',
     theme: 'amber',
@@ -348,10 +359,50 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
           ],
         },
       },
+      {
+        id: 'avocado-s1-wk5',
+        dateLabel: 'Week 5',
+        theme: 'Animal & World Exploration',
+        themeDescription: 'Story Spark: discover animals & habitats, craft a character, and build a guided story plot',
+        series: 1,
+        enrollable: true,
+        morning: {
+          time: 'TBD',
+          ageRange: 'Ages 3–6',
+          title: 'My Animal Adventure — Story Spark',
+          description:
+            'Children explore the animal kingdom through hands-on activities, create a story character inspired by their favorite animal, and build a guided plot about habitats, adaptations, and the natural world.',
+          highlights: [
+            'Animal & habitat discovery through craft',
+            'Story character creation & plot building',
+            'Guided narrative: observation → wonder → story',
+          ],
+        },
+      },
+      {
+        id: 'avocado-s1-wk6',
+        dateLabel: 'Week 6',
+        theme: 'Animal & World Exploration',
+        themeDescription: 'Book Making: complete the story, produce a physical storybook, sign & show-and-tell',
+        series: 1,
+        enrollable: true,
+        morning: {
+          time: 'TBD',
+          ageRange: 'Ages 3–6',
+          title: 'My Animal Adventure — Storybook',
+          description:
+            'Children complete their animal adventure story with detailed illustrations, produce a physical storybook, sign their work, and present it in a show-and-tell circle.',
+          highlights: [
+            'Detailed story completion & illustration',
+            'Physical storybook production',
+            'Book signing & show-and-tell celebration',
+          ],
+        },
+      },
       // Series 2: Curious Minds (preview — not enrollable yet)
       {
         id: 'avocado-s2-wk1',
-        dateLabel: 'Week 5',
+        dateLabel: 'Week 7',
         theme: 'STEM Thinking',
         themeDescription: 'Story Spark: discover patterns & logic, craft a detective character, and build a guided story plot',
         series: 2,
@@ -371,7 +422,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       },
       {
         id: 'avocado-s2-wk2',
-        dateLabel: 'Week 6',
+        dateLabel: 'Week 8',
         theme: 'STEM Thinking',
         themeDescription: 'Book Making: complete the story, produce a physical storybook, sign & show-and-tell',
         series: 2,
@@ -391,7 +442,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       },
       {
         id: 'avocado-s2-wk3',
-        dateLabel: 'Week 7',
+        dateLabel: 'Week 9',
         theme: 'Financial Awareness',
         themeDescription: 'Story Spark: explore saving & sharing, craft a character, and build a guided story plot',
         series: 2,
@@ -411,7 +462,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       },
       {
         id: 'avocado-s2-wk4',
-        dateLabel: 'Week 8',
+        dateLabel: 'Week 10',
         theme: 'Financial Awareness',
         themeDescription: 'Book Making: complete the story, produce a physical storybook, sign & show-and-tell',
         series: 2,
@@ -439,12 +490,36 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
     capacity: {
       morning: 0,
       afternoon: 0,
-      single: 12,
-      perLocation: { bellevue: 12, kirkland: 12 },
+      single: 10,
+      perLocation: { bellevue: 10, kirkland: 10 },
     },
     locations: [
-      { slug: 'bellevue', name: 'Bellevue Campus', address: 'TBD', taxRate: 0.103 },
-      { slug: 'kirkland', name: 'Kirkland Campus', address: 'TBD', taxRate: 0.102 },
+      {
+        slug: 'bellevue',
+        name: 'Bellevue Campus',
+        address: 'TBD',
+        taxRate: 0.103,
+        dayOfWeek: 'wednesday',
+        startDate: '2026-04-01',
+        skipDates: ['2026-04-08'], // Spring break week
+        timeSlots: [
+          { slug: 'slot-1', label: '3:30 – 4:05 PM', startTime: '15:30', endTime: '16:05' },
+          { slug: 'slot-2', label: '4:10 – 4:45 PM', startTime: '16:10', endTime: '16:45' },
+        ],
+      },
+      {
+        slug: 'kirkland',
+        name: 'Kirkland Campus',
+        address: 'TBD',
+        taxRate: 0.102,
+        dayOfWeek: 'monday',
+        startDate: '2026-03-30',
+        skipDates: ['2026-04-06'], // Spring break week
+        timeSlots: [
+          { slug: 'slot-1', label: '3:30 – 4:05 PM', startTime: '15:30', endTime: '16:05' },
+          { slug: 'slot-2', label: '4:10 – 4:45 PM', startTime: '16:10', endTime: '16:45' },
+        ],
+      },
     ],
   },
 ];
@@ -463,7 +538,7 @@ export const WORKSHOP_FAQS = [
   {
     question: 'How does pricing work?',
     answer:
-      'Pricing varies by partner and program. SteamOji workshops are priced per session (morning and afternoon). Avocado Montessori workshops are enrolled by series — each series includes 4 sessions and 2 physical storybooks. If you have a promo code, you can enter it on the Stripe checkout page.',
+      'Pricing varies by partner and program. SteamOji workshops are priced per session (morning and afternoon). Avocado Montessori workshops are enrolled by series — Series 1 includes 6 sessions and 3 physical storybooks, while Series 2 includes 4 sessions and 2 physical storybooks. If you have a promo code, you can enter it on the Stripe checkout page.',
   },
   {
     question: 'What is the cancellation and refund policy?',
@@ -535,4 +610,50 @@ export function getEnrollableSessions(partner: WorkshopPartner, series?: number)
     if (series !== undefined && s.series !== series) return false;
     return true;
   });
+}
+
+// Helper to compute actual session dates from a location's schedule config.
+// Returns one entry per session with the formatted date string.
+export function getSessionDates(
+  location: WorkshopLocation,
+  sessionCount: number,
+): { weekLabel: string; date: string; formatted: string }[] {
+  if (!location.startDate || !location.dayOfWeek) return [];
+
+  const results: { weekLabel: string; date: string; formatted: string }[] = [];
+  const skipSet = new Set(location.skipDates || []);
+
+  // Parse start date as local date (YYYY-MM-DD)
+  const [startYear, startMonth, startDay] = location.startDate.split('-').map(Number);
+  const current = new Date(startYear, startMonth - 1, startDay);
+
+  const shortDays: Record<string, string> = {
+    monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed',
+    thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
+  };
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dayPrefix = shortDays[location.dayOfWeek] || '';
+
+  let weekNum = 0;
+  while (results.length < sessionCount) {
+    // Format as YYYY-MM-DD for skip check
+    const y = current.getFullYear();
+    const m = String(current.getMonth() + 1).padStart(2, '0');
+    const d = String(current.getDate()).padStart(2, '0');
+    const isoDate = `${y}-${m}-${d}`;
+
+    if (!skipSet.has(isoDate)) {
+      weekNum++;
+      results.push({
+        weekLabel: `Week ${weekNum}`,
+        date: isoDate,
+        formatted: `${dayPrefix}, ${months[current.getMonth()]} ${current.getDate()}`,
+      });
+    }
+
+    // Advance by 7 days
+    current.setDate(current.getDate() + 7);
+  }
+
+  return results;
 }

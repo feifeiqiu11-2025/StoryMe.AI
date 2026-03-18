@@ -14,6 +14,7 @@ export const WorkshopRegistrationSchema = z.object({
   }),
   partnerId: z.string().min(1, 'Partner is required'),
   selectedLocation: z.string().max(100).optional(),
+  selectedTimeSlot: z.string().max(50).optional(),
 
   // Parent / Guardian
   parentFirstName: z

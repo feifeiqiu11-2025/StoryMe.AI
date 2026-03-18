@@ -72,6 +72,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validate time slot for partners with time slots
+    const hasTimeSlots = partner.locations?.some(l => (l.timeSlots?.length ?? 0) > 0);
+    if (hasTimeSlots) {
+      if (!validated.selectedTimeSlot) {
+        return NextResponse.json(
+          { error: 'Time slot selection is required for this partner' },
+          { status: 400 },
+        );
+      }
+      const loc = partner.locations?.find(l => l.slug === validated.selectedLocation);
+      const validSlot = loc?.timeSlots?.find(ts => ts.slug === validated.selectedTimeSlot);
+      if (!validSlot) {
+        return NextResponse.json(
+          { error: 'Invalid time slot selected' },
+          { status: 400 },
+        );
+      }
+    }
+
     // Reject non-enrollable sessions (e.g., Series 2 preview sessions)
     const enrollableIds = new Set(
       partner.sessions.filter(s => s.enrollable !== false).map(s => s.id),
@@ -87,10 +106,11 @@ export async function POST(request: NextRequest) {
     // Check spot availability before proceeding
     const supabaseAvailability = createServiceRoleClient();
 
-    // Use v2 RPC for location-aware counting when applicable
+    // Use v3 RPC for single-mode partners (location + time slot aware);
+    // Use v1 RPC for dual-mode partners (SteamOji)
     const useLocationRpc = isSingleMode && validated.selectedLocation;
     const rpcName = useLocationRpc
-      ? 'get_workshop_registration_counts_v2'
+      ? 'get_workshop_registration_counts_v3'
       : 'get_workshop_registration_counts';
 
     const rpcParams: Record<string, string | null> = {
@@ -99,6 +119,7 @@ export async function POST(request: NextRequest) {
     };
     if (useLocationRpc) {
       rpcParams.p_location = validated.selectedLocation || null;
+      rpcParams.p_time_slot = validated.selectedTimeSlot || null;
     }
 
     const { data: currentCounts, error: rpcError } = await supabaseAvailability.rpc(
@@ -184,6 +205,7 @@ export async function POST(request: NextRequest) {
           selected_session_type: sessionTypeForQuery,
           is_bundle: partner.enrollmentMode === 'series',
           location: validated.selectedLocation || null,
+          time_slot: validated.selectedTimeSlot || null,
           promo_code: null,
           waiver_accepted: true,
           waiver_accepted_at: new Date().toISOString(),
@@ -213,6 +235,11 @@ export async function POST(request: NextRequest) {
       if (validated.selectedLocation) {
         const loc = partner.locations?.find(l => l.slug === validated.selectedLocation);
         if (loc) sessionDescription += ` · ${loc.name}`;
+        // Append time slot label if selected
+        if (validated.selectedTimeSlot && loc?.timeSlots) {
+          const ts = loc.timeSlots.find(t => t.slug === validated.selectedTimeSlot);
+          if (ts) sessionDescription += ` · ${ts.label}`;
+        }
       }
     } else {
       sessionDescription = validated.selectedSessionType === 'morning'
@@ -302,6 +329,7 @@ export async function POST(request: NextRequest) {
         type: 'workshop',
         children_count: String(numberOfChildren),
         location: validated.selectedLocation || '',
+        time_slot: validated.selectedTimeSlot || '',
         tax_rate: taxRate > 0 ? String(taxRate) : '',
         tax_amount: taxAmount > 0 ? String(taxAmount) : '',
       },

@@ -272,9 +272,9 @@ export default function WorkshopsPage() {
                       <p className="text-lg text-gray-700 leading-relaxed">
                         We&apos;re excited to bring a Montessori-aligned storytelling program
                         into the classroom. Children ages 3–6 explore real-world themes —
-                        from emotions and healthy habits to STEM thinking and financial
-                        awareness — through hands-on craft, guided storytelling, and creative
-                        expression.
+                        from emotions and healthy habits to animal exploration, STEM thinking,
+                        and financial awareness — through hands-on craft, guided storytelling,
+                        and creative expression.
                       </p>
                     </div>
                   </div>
@@ -293,12 +293,12 @@ export default function WorkshopsPage() {
                       Where every drawing becomes a story character, and every child grows into a confident storyteller.
                     </p>
                     <p className="text-gray-500 mb-3">
-                      Ages 3–6 · 2 series · 4 sessions per series
+                      Ages 3–6 · 2 series · Series 1 with 6 sessions · Series 2 with 4 sessions
                     </p>
                     <p className="text-gray-700 leading-relaxed mb-4">
                       Each session follows a Montessori-inspired creative arc: Story Spark →
                       Craft Creation → Guided Story Build → Share Circle. Every two sessions,
-                      your child takes home a professionally printed physical storybook they created.
+                      your child takes home a physical storybook they created.
                     </p>
                     <ul className="space-y-2 mb-6">
                       {partner.sessions[0]?.morning.highlights.map(
