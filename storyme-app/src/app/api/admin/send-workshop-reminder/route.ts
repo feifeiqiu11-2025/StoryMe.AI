@@ -545,9 +545,6 @@ function buildSchoolOutreachHtml(): string {
           <!-- Header -->
           <tr>
             <td style="background-color: #6d28d9; background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: 32px; text-align: center;">
-              <a href="https://www.kindlewoodstudio.ai" style="text-decoration: none;">
-                <img src="https://www.kindlewoodstudio.ai/Logo_New.png" alt="KindleWood Studio" width="60" style="display: inline-block; max-width: 60px; height: auto; margin-bottom: 12px;" />
-              </a>
               <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;">
                 Creative Storytelling Enrichment
               </h1>
@@ -708,7 +705,7 @@ function buildSchoolOutreachHtml(): string {
           <tr>
             <td style="padding: 16px 24px;">
               <p style="color: #6b7280; font-size: 15px; margin: 0; line-height: 1.6;">
-                We&rsquo;d welcome the chance to have a brief conversation about whether this could be a good fit for your community. Would you be open to a <strong style="color: #374151;">15-minute call or meeting</strong>?
+                We&rsquo;d love the chance to have a brief conversation about whether this could be a good fit for your community. Would you be open to a <strong style="color: #374151;">15-minute call or meeting</strong>?
               </p>
               <p style="margin: 16px 0 0; text-align: center;">
                 <a href="https://www.kindlewoodstudio.ai/workshops" style="display: inline-block; background-color: #7c3aed; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-size: 15px; font-weight: 600;">
@@ -730,11 +727,6 @@ function buildSchoolOutreachHtml(): string {
               <p style="color: #6b7280; font-size: 13px; margin: 4px 0 0;">
                 Founder &amp; CEO, KindleWood Studio
               </p>
-              <p style="margin: 20px 0 0;">
-                <a href="https://www.kindlewoodstudio.ai" style="text-decoration: none;">
-                  <img src="https://www.kindlewoodstudio.ai/Logo_New.png" alt="KindleWood Studio" width="80" style="display: inline-block; max-width: 80px; height: auto;" />
-                </a>
-              </p>
               <p style="margin: 12px 0 0;">
                 <a href="https://www.kindlewoodstudio.ai" style="color: #7c3aed; font-size: 13px; text-decoration: underline;">
                   kindlewoodstudio.ai
@@ -742,6 +734,11 @@ function buildSchoolOutreachHtml(): string {
                 &nbsp;&middot;&nbsp;
                 <a href="https://www.youtube.com/@KindleWoodStudio" style="color: #9ca3af; font-size: 13px; text-decoration: underline;">
                   YouTube
+                </a>
+              </p>
+              <p style="margin: 16px 0 0;">
+                <a href="https://www.kindlewoodstudio.ai" style="text-decoration: none;">
+                  <img src="https://www.kindlewoodstudio.ai/Logo_New.png" alt="KindleWood Studio" width="80" style="display: inline-block; max-width: 80px; height: auto;" />
                 </a>
               </p>
             </td>
