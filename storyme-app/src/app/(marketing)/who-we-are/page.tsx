@@ -52,9 +52,9 @@ const founders: Founder[] = [
     name: 'Lu Pang',
     role: 'Co-Founder',
     photo: '/images/team/lu-pang.webp',
-    bio: 'Data analytics expert with 10 years of data modeling and analytics experience, and founder of Seattle Little Ranger, a nonprofit dedicated to youth enrichment and nature learning. Lu brings a rare combination of analytical thinking and hands-on community building to everything she does.',
-    focus: 'At KindleWood, Lu designs and leads in-person workshops \u2014 bringing creative learning beyond the screen and into real classrooms. She also drives growth by connecting with families and communities firsthand.',
-    quote: 'I bring imagination into practice \u2014 where kids and communities meet.',
+    bio: 'A data analytics expert with over 10 years of experience in data modeling in Healthcare, and co-founder of Seattle Little Rangers, a nonprofit dedicated to youth enrichment and nature-based learning. Lu brings a rare blend of analytical rigor and hands-on community building to everything she does.',
+    focus: 'At KindleWood, Lu designs and leads in-person workshops, bringing creative learning beyond the screen and into real-world classroom experiences. She also drives growth by building authentic connections with families and communities.',
+    quote: 'I bring imagination into practice\u2014where kids and communities come together.',
   },
 ];
 
@@ -146,15 +146,17 @@ function CtaSection() {
         Join Us on This Journey
       </h2>
       <p className="text-gray-600 text-lg mb-8 max-w-2xl mx-auto">
-        We&rsquo;re building something special for families and educators. Come create with us.
+        We&rsquo;re building something special for families and educators.
+        <br />
+        Interested in joining our team? Reach out to us.
       </p>
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
-        <Link
-          href="/signup"
+        <a
+          href="mailto:Admin@KindleWoodStudio.ai"
           className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold text-base transition-colors"
         >
-          Start Creating
-        </Link>
+          Get in Touch
+        </a>
         <Link
           href="/what-sparked-kindlewood"
           className="bg-white text-gray-700 px-8 py-3 rounded-lg font-semibold text-base transition-colors border-2 border-gray-300 hover:border-gray-400"
