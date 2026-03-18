@@ -107,7 +107,7 @@ export default function PricingPage() {
       <div className="max-w-7xl mx-auto px-4 py-12">
         {/* Hero Section */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
             Choose Your <span className="text-amber-700 underline decoration-amber-700 decoration-2 underline-offset-4">Creative Journey</span>
           </h1>
           <p className="text-xl text-gray-600 mb-4 max-w-3xl mx-auto">

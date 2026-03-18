@@ -184,7 +184,7 @@ function PublicStoriesContent() {
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
             <div>
-              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
+              <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-2">
                 Community Stories
               </h1>
               <p className="text-gray-600 text-lg">

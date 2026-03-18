@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import LandingNav from '@/components/navigation/LandingNav';
 import { createClient } from '@/lib/supabase/client';
 
@@ -245,7 +246,7 @@ export default function LittleArtistsGalleryPage() {
       <div className="max-w-7xl mx-auto px-4 py-8 pb-20">
         {/* Page Header */}
         <div className="mb-10 text-center max-w-5xl mx-auto">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
             Little Artists Gallery
           </h1>
           <p className="text-gray-600 text-lg sm:text-xl leading-relaxed">
@@ -292,24 +293,28 @@ export default function LittleArtistsGalleryPage() {
                         {/* Side-by-side comparison */}
                         <div className="grid grid-cols-2 h-full">
                           <div className="relative overflow-hidden">
-                            <img
+                            <Image
                               src={character.reference_image_url}
                               alt={`${character.name} - original`}
-                              className="w-full h-full object-cover"
-                              loading={isCenter ? 'eager' : 'lazy'}
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 640px) 160px, (max-width: 1024px) 220px, 270px"
+                              priority={isCenter}
                             />
-                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent px-2 py-1">
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent px-2 py-1 z-10">
                               <p className="text-white text-[10px] sm:text-xs font-medium">Original</p>
                             </div>
                           </div>
                           <div className="relative overflow-hidden">
-                            <img
+                            <Image
                               src={character.animated_preview_url}
                               alt={`${character.name} - in story`}
-                              className="w-full h-full object-cover"
-                              loading={isCenter ? 'eager' : 'lazy'}
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 640px) 160px, (max-width: 1024px) 220px, 270px"
+                              priority={isCenter}
                             />
-                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent px-2 py-1">
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent px-2 py-1 z-10">
                               <p className="text-white text-[10px] sm:text-xs font-medium">In the Story</p>
                             </div>
                           </div>
@@ -422,23 +427,25 @@ export default function LittleArtistsGalleryPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-xs text-gray-500 mb-1">Original Creation</p>
-                      <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-                        <img
+                      <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 relative">
+                        <Image
                           src={character.reference_image_url}
                           alt={`${character.name} - original`}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 18vw"
                         />
                       </div>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500 mb-1">In the Story</p>
-                      <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-                        <img
+                      <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 relative">
+                        <Image
                           src={character.animated_preview_url}
                           alt={`${character.name} - in story`}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 18vw"
                         />
                       </div>
                     </div>
@@ -571,21 +578,27 @@ export default function LittleArtistsGalleryPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-2">Original Creation</p>
-                  <div className="aspect-square rounded-xl overflow-hidden bg-gray-100">
-                    <img
+                  <div className="aspect-square rounded-xl overflow-hidden bg-gray-100 relative">
+                    <Image
                       src={selectedCharacter.reference_image_url}
                       alt={`${selectedCharacter.name} - original creation`}
-                      className="w-full h-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 640px) 90vw, 45vw"
+                      priority
                     />
                   </div>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-2">In the Story</p>
-                  <div className="aspect-square rounded-xl overflow-hidden bg-gray-100">
-                    <img
+                  <div className="aspect-square rounded-xl overflow-hidden bg-gray-100 relative">
+                    <Image
                       src={selectedCharacter.animated_preview_url}
                       alt={`${selectedCharacter.name} - in the story`}
-                      className="w-full h-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 640px) 90vw, 45vw"
+                      priority
                     />
                   </div>
                 </div>

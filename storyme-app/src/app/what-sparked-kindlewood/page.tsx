@@ -19,7 +19,7 @@ export default function WhatSparkedKindlewoodPage() {
       <div className="max-w-4xl mx-auto px-4 py-12 sm:py-16">
         {/* Page Header */}
         <div className="text-center mb-10">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
             What Sparked KindleWood
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">

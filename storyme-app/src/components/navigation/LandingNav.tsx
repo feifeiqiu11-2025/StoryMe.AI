@@ -14,7 +14,7 @@ import { createClient } from '@/lib/supabase/client';
 export default function LandingNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [productsDropdownOpen, setProductsDropdownOpen] = useState(false);
-  const [founderDropdownOpen, setFounderDropdownOpen] = useState(false);
+  const [aboutDropdownOpen, setAboutDropdownOpen] = useState(false);
   const [communityDropdownOpen, setCommunityDropdownOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -32,7 +32,7 @@ export default function LandingNav() {
   }, []);
 
   const productsRef = useRef<HTMLDivElement>(null);
-  const founderRef = useRef<HTMLDivElement>(null);
+  const aboutRef = useRef<HTMLDivElement>(null);
   const communityRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -47,8 +47,8 @@ export default function LandingNav() {
       if (productsRef.current && !productsRef.current.contains(event.target as Node)) {
         setProductsDropdownOpen(false);
       }
-      if (founderRef.current && !founderRef.current.contains(event.target as Node)) {
-        setFounderDropdownOpen(false);
+      if (aboutRef.current && !aboutRef.current.contains(event.target as Node)) {
+        setAboutDropdownOpen(false);
       }
       if (communityRef.current && !communityRef.current.contains(event.target as Node)) {
         setCommunityDropdownOpen(false);
@@ -137,17 +137,17 @@ export default function LandingNav() {
               )}
             </div>
 
-            {/* Founder Stories Dropdown */}
-            <div className="relative" ref={founderRef}>
+            {/* About Us Dropdown */}
+            <div className="relative" ref={aboutRef}>
               <button
-                onClick={() => setFounderDropdownOpen(!founderDropdownOpen)}
+                onClick={() => setAboutDropdownOpen(!aboutDropdownOpen)}
                 className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors flex items-center gap-1 ${
-                  isActive('/founder-letter') || isActive('/founder-journal') || isActive('/what-sparked-kindlewood') ? 'text-blue-600 border-b-2 border-blue-600' : ''
+                  isActive('/who-we-are') || isActive('/founder-letter') || isActive('/founder-journal') || isActive('/what-sparked-kindlewood') ? 'text-blue-600 border-b-2 border-blue-600' : ''
                 }`}
               >
-                Founder Stories
+                About Us
                 <svg
-                  className={`w-4 h-4 transition-transform ${founderDropdownOpen ? 'rotate-180' : ''}`}
+                  className={`w-4 h-4 transition-transform ${aboutDropdownOpen ? 'rotate-180' : ''}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -155,28 +155,35 @@ export default function LandingNav() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
-              {founderDropdownOpen && (
+              {aboutDropdownOpen && (
                 <div className="absolute top-full left-0 mt-1 w-60 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
                   <Link
+                    href="/who-we-are"
+                    onClick={() => setAboutDropdownOpen(false)}
+                    className="block px-4 py-2.5 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                  >
+                    Who We Are
+                  </Link>
+                  <Link
                     href="/what-sparked-kindlewood"
-                    onClick={() => setFounderDropdownOpen(false)}
+                    onClick={() => setAboutDropdownOpen(false)}
                     className="block px-4 py-2.5 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                   >
                     What Sparked KindleWood
                   </Link>
                   <Link
                     href="/founder-letter"
-                    onClick={() => setFounderDropdownOpen(false)}
+                    onClick={() => setAboutDropdownOpen(false)}
                     className="block px-4 py-2.5 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                   >
                     A Letter from the Founder
                   </Link>
                   <Link
                     href="/founder-journal"
-                    onClick={() => setFounderDropdownOpen(false)}
+                    onClick={() => setAboutDropdownOpen(false)}
                     className="block px-4 py-2.5 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                   >
-                    Founder's Journal
+                    Founder&apos;s Journal
                   </Link>
                 </div>
               )}
@@ -187,7 +194,7 @@ export default function LandingNav() {
               <button
                 onClick={() => setCommunityDropdownOpen(!communityDropdownOpen)}
                 className={`text-gray-700 hover:text-blue-600 px-3 py-2 text-base font-medium transition-colors flex items-center gap-1 ${
-                  isActive('/stories') || isActive('/little-artists') || isActive('/how-kids-grow') || isActive('/community-stories') ? 'text-blue-600 border-b-2 border-blue-600' : ''
+                  isActive('/stories') || isActive('/little-artists') || isActive('/how-kids-grow') ? 'text-blue-600 border-b-2 border-blue-600' : ''
                 }`}
               >
                 Community
@@ -339,15 +346,15 @@ export default function LandingNav() {
               )}
             </div>
 
-            {/* Founder Stories - Mobile */}
+            {/* About Us - Mobile */}
             <div>
               <button
-                onClick={() => setFounderDropdownOpen(!founderDropdownOpen)}
+                onClick={() => setAboutDropdownOpen(!aboutDropdownOpen)}
                 className="w-full flex items-center justify-between px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
               >
-                <span>Founder Stories</span>
+                <span>About Us</span>
                 <svg
-                  className={`w-4 h-4 transition-transform ${founderDropdownOpen ? 'rotate-180' : ''}`}
+                  className={`w-4 h-4 transition-transform ${aboutDropdownOpen ? 'rotate-180' : ''}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -355,8 +362,16 @@ export default function LandingNav() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
-              {founderDropdownOpen && (
+              {aboutDropdownOpen && (
                 <div className="ml-4 mt-2 space-y-1">
+                  <Link
+                    href="/who-we-are"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
+                    style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
+                  >
+                    Who We Are
+                  </Link>
                   <Link
                     href="/what-sparked-kindlewood"
                     onClick={() => setIsMobileMenuOpen(false)}
@@ -379,7 +394,7 @@ export default function LandingNav() {
                     className="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer active:bg-blue-100"
                     style={{ WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.1)' }}
                   >
-                    Founder's Journal
+                    Founder&apos;s Journal
                   </Link>
                 </div>
               )}
