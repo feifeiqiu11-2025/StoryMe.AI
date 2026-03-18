@@ -1162,7 +1162,8 @@ export async function POST(req: NextRequest) {
   }
 
   if (mode === 'school-outreach') {
-    const recipients = ['feifei_qiu@hotmail.com', 'admin@kindlewoodstudio.ai'];
+    const recipients = ['hope@shamrockmh.com'];
+    const cc = ['Feifei_Qiu@Hotmail.com'];
     const results = [];
 
     for (let i = 0; i < recipients.length; i++) {
@@ -1170,11 +1171,12 @@ export async function POST(req: NextRequest) {
       const { error: sendErr } = await resend.emails.send({
         from: EMAIL_FROM,
         to: recipients[i],
+        cc,
         subject: 'Creative Storytelling Enrichment Program — Partnership Inquiry',
         html: buildSchoolOutreachHtml(),
         replyTo: REPLY_TO,
       });
-      results.push({ to: recipients[i], error: sendErr?.message || null });
+      results.push({ to: recipients[i], cc, error: sendErr?.message || null });
     }
 
     return NextResponse.json({
