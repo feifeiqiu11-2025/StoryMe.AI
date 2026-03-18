@@ -66,9 +66,8 @@ export default function WhyCreativitySection() {
           <div className="text-5xl sm:text-6xl font-bold text-gray-900 mb-2">
             #1
           </div>
-          <h3 className="text-lg font-bold text-gray-900 mb-1">Future Skill</h3>
-          <p className="text-gray-600 leading-relaxed">
-            Creativity is the most needed skill for 2025 and beyond
+          <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
+            Creativity is the top skill<br />for the future
           </p>
         </div>
 
@@ -81,9 +80,8 @@ export default function WhyCreativitySection() {
           <div className="text-5xl sm:text-6xl font-bold text-gray-900 mb-2">
             92%
           </div>
-          <h3 className="text-lg font-bold text-gray-900 mb-1">Confidence Boost</h3>
-          <p className="text-gray-600 leading-relaxed">
-            Children with creativity show dramatically improved self-confidence
+          <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
+            of creative kids show<br />higher self-confidence
           </p>
         </div>
 
@@ -96,9 +94,8 @@ export default function WhyCreativitySection() {
           <div className="text-5xl sm:text-6xl font-bold text-gray-900 mb-2">
             90%
           </div>
-          <h3 className="text-lg font-bold text-gray-900 mb-1">Brain Development</h3>
-          <p className="text-gray-600 leading-relaxed">
-            Creative activities build neural pathways during critical early years
+          <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
+            of brain growth happens<br />before age 5
           </p>
         </div>
       </div>

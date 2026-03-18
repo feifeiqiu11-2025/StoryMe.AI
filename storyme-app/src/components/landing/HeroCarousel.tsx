@@ -39,8 +39,7 @@ interface HeroCarouselProps {
 }
 
 // Messages for typing effect
-const MAIN_MESSAGE = "Turn Your Child's Ideas Into Creations They Can Learn From";
-const SUB_MESSAGE = "A story, a drawing, a 3D model, and more—brought to life by their imagination.";
+const MAIN_MESSAGE = "Turn Your Child's Ideas Into Storybooks They Can Learn From";
 
 export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
   const router = useRouter();
@@ -56,8 +55,6 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
   // Typing effect state
   const [displayedText, setDisplayedText] = useState('');
   const [typingComplete, setTypingComplete] = useState(false);
-  const [subDisplayedText, setSubDisplayedText] = useState('');
-  const [subTypingComplete, setSubTypingComplete] = useState(false);
 
   // Check if user is logged in
   useEffect(() => {
@@ -92,27 +89,6 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
     return () => clearInterval(timer);
   }, [typingComplete]);
 
-  // Sub message typing effect - starts after main message, complete in ~2 seconds
-  useEffect(() => {
-    if (!typingComplete || subTypingComplete) return;
-
-    const totalChars = SUB_MESSAGE.length;
-    // ~2 seconds to type sub message
-    const intervalTime = Math.floor(2000 / totalChars);
-
-    const timer = setInterval(() => {
-      setSubDisplayedText(prev => {
-        if (prev.length >= SUB_MESSAGE.length) {
-          clearInterval(timer);
-          setSubTypingComplete(true);
-          return SUB_MESSAGE;
-        }
-        return SUB_MESSAGE.slice(0, prev.length + 1);
-      });
-    }, intervalTime);
-
-    return () => clearInterval(timer);
-  }, [typingComplete, subTypingComplete]);
 
   // Fetch featured stories
   useEffect(() => {
@@ -367,20 +343,12 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
         <div className="absolute inset-0 flex items-end justify-center z-20 pointer-events-none pb-3 px-2 sm:px-4">
           <div className="bg-white/65 backdrop-blur-sm rounded-xl px-3 sm:px-5 py-3 max-w-[calc(100%-1rem)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl text-center shadow-lg pointer-events-auto">
             {/* Main Message with Typing Effect */}
-            <h2 className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-gray-900 mb-0.5 leading-tight">
+            <h2 className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-gray-900 mb-3 leading-tight">
               {displayedText}
               {!typingComplete && (
                 <span className="inline-block w-0.5 h-4 sm:h-5 bg-blue-600 ml-1 animate-pulse" />
               )}
             </h2>
-
-            {/* Sub Message with Typing Effect */}
-            <p className="text-gray-600 text-xs sm:text-sm md:text-base mb-2 leading-tight">
-              {subDisplayedText}
-              {typingComplete && !subTypingComplete && (
-                <span className="inline-block w-0.5 h-3 sm:h-4 bg-blue-600 ml-1 animate-pulse" />
-              )}
-            </p>
 
             {/* CTA Button */}
             {!isMounted ? (

@@ -116,11 +116,11 @@ export default function HomePage() {
             {/* Clean Journey Flow - Inspired by Slides */}
             <div className="mb-12">
               {/* Three Column Grid with Arrows */}
-              <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-2 mb-8">
+              <div className="flex flex-col md:flex-row items-stretch justify-center gap-4 md:gap-2 mb-8">
 
                 {/* Column 1: Spark */}
                 <Reveal delay={0}>
-                  <div className="bg-white rounded-xl p-6 shadow-md border border-yellow-200 flex-1 max-w-sm">
+                  <div className="bg-white rounded-xl p-6 shadow-md border border-yellow-200 flex-1 max-w-sm h-full">
                     <h4 className="text-xl font-bold text-gray-900 text-center mb-4">Spark</h4>
                     <div className="mb-4 rounded-lg overflow-hidden">
                       <img
@@ -130,7 +130,7 @@ export default function HomePage() {
                       />
                     </div>
                     <p className="text-gray-700 leading-relaxed text-center">
-                      A wild idea whispered at bedtime, a curious question, a drawing on a napkin.
+                      A curious question, a wild idea, a drawing on a napkin — any kind of imagination.
                     </p>
                   </div>
                 </Reveal>
@@ -145,7 +145,7 @@ export default function HomePage() {
 
                 {/* Column 2: Create */}
                 <Reveal delay={150}>
-                  <div className="bg-white rounded-xl p-6 shadow-md border border-pink-200 flex-1 max-w-sm">
+                  <div className="bg-white rounded-xl p-6 shadow-md border border-pink-200 flex-1 max-w-sm h-full">
                     <h4 className="text-xl font-bold text-gray-900 text-center mb-4">Create</h4>
                     <div className="mb-4 rounded-lg overflow-hidden">
                       <img
@@ -155,7 +155,7 @@ export default function HomePage() {
                       />
                     </div>
                     <p className="text-gray-700 leading-relaxed text-center">
-                      Turn sparks into real creations—personalized storybooks, art projects, and 3D models that kids proudly share.
+                      Turn sparks into personalized storybooks, art projects and 3D models.
                     </p>
                   </div>
                 </Reveal>
@@ -170,7 +170,7 @@ export default function HomePage() {
 
                 {/* Column 3: Grow */}
                 <Reveal delay={300}>
-                  <div className="bg-white rounded-xl p-6 shadow-md border border-green-200 flex-1 max-w-sm">
+                  <div className="bg-white rounded-xl p-6 shadow-md border border-green-200 flex-1 max-w-sm h-full">
                     <h4 className="text-xl font-bold text-gray-900 text-center mb-4">Grow</h4>
                     <div className="mb-4 rounded-lg overflow-hidden">
                       <img
@@ -180,7 +180,7 @@ export default function HomePage() {
                       />
                     </div>
                     <p className="text-gray-700 leading-relaxed text-center">
-                      Through creating, children become confident, resilient, and empathetic thinkers.
+                      Build literacy, confidence, resilience, and empathy — one story at a time.
                     </p>
                   </div>
                 </Reveal>
