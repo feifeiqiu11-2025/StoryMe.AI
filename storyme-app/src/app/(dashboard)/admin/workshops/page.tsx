@@ -37,6 +37,7 @@ interface Registration {
   selected_session_type: 'morning' | 'afternoon' | 'single';
   selected_workshop_ids: string[];
   location: string | null;
+  time_slot: string | null;
   payment_status: string;
   status: string;
   amount_paid: number | null;
@@ -76,6 +77,7 @@ export default function AdminWorkshopsPage() {
 
   // Avocado-specific filters
   const [locationFilter, setLocationFilter] = useState<'all' | string>('all');
+  const [slotFilter, setSlotFilter] = useState<'all' | string>('all');
   const [seriesFilter, setSeriesFilter] = useState<'all' | number>('all');
 
   // Reset Level 2 filters when partner changes
@@ -85,6 +87,7 @@ export default function AdminWorkshopsPage() {
     setSessionFilter('all');
     setWeekFilter('all');
     setLocationFilter('all');
+    setSlotFilter('all');
     setSeriesFilter('all');
   };
 
@@ -168,6 +171,7 @@ export default function AdminWorkshopsPage() {
     // Avocado-specific
     if (partnerFilter === 'avocado' || (partnerFilter === 'all' && r.partner_id === 'avocado')) {
       if (locationFilter !== 'all' && r.partner_id === 'avocado' && r.location !== locationFilter) return false;
+      if (slotFilter !== 'all' && r.partner_id === 'avocado' && r.time_slot !== slotFilter) return false;
       if (seriesFilter !== 'all' && r.partner_id === 'avocado') {
         const avocadoPartner = WORKSHOP_PARTNERS.find((p) => p.id === 'avocado');
         if (avocadoPartner) {
@@ -215,7 +219,12 @@ export default function AdminWorkshopsPage() {
       if (r.location) {
         const avocadoPartner = WORKSHOP_PARTNERS.find((p) => p.id === 'avocado');
         const loc = avocadoPartner?.locations?.find((l) => l.slug === r.location);
-        return loc?.name || r.location;
+        const locName = loc?.name || r.location;
+        if (r.time_slot && loc?.timeSlots) {
+          const ts = loc.timeSlots.find((t) => t.slug === r.time_slot);
+          return ts ? `${locName} · ${ts.label}` : locName;
+        }
+        return locName;
       }
       return 'Single';
     }
@@ -382,6 +391,30 @@ export default function AdminWorkshopsPage() {
                 {loc.name}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Avocado: Time Slot filter */}
+        {partnerFilter === 'avocado' && selectedPartner?.locations?.some(l => (l.timeSlots?.length ?? 0) > 0) && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Slot</span>
+            <button
+              onClick={() => setSlotFilter('all')}
+              className={pillClass(slotFilter === 'all')}
+            >
+              All
+            </button>
+            {selectedPartner.locations!
+              .find(l => l.slug === (locationFilter !== 'all' ? locationFilter : selectedPartner.locations![0].slug))
+              ?.timeSlots?.map((ts) => (
+                <button
+                  key={ts.slug}
+                  onClick={() => setSlotFilter(ts.slug)}
+                  className={pillClass(slotFilter === ts.slug)}
+                >
+                  {ts.label}
+                </button>
+              ))}
           </div>
         )}
 
