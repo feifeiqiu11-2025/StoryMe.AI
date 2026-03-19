@@ -768,10 +768,7 @@ function buildSchoolOutreachHtml(): string {
                 Warm regards,
               </p>
               <p style="color: #374151; font-size: 14px; margin: 8px 0 0; font-weight: 600;">
-                Feifei Qiu
-              </p>
-              <p style="color: #6b7280; font-size: 13px; margin: 4px 0 0;">
-                Founder &amp; CEO, KindleWood Studio
+                KindleWood Team
               </p>
               <p style="margin: 12px 0 0;">
                 <a href="https://www.kindlewoodstudio.ai" style="color: #7c3aed; font-size: 13px; text-decoration: underline;">
