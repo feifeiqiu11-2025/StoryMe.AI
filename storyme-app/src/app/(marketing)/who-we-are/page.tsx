@@ -84,19 +84,19 @@ function FounderSection({ founder, index }: { founder: Founder; index: number })
   return (
     <div
       ref={ref}
-      className={`flex flex-col md:flex-row items-start gap-10 md:gap-14 ${
+      className={`flex flex-col md:flex-row items-start gap-6 md:gap-14 ${
         photoLeft ? '' : 'md:flex-row-reverse'
       }`}
     >
-      {/* Photo */}
+      {/* Photo - hidden on mobile, shown on desktop */}
       <div
-        className={`flex-shrink-0 transition-all duration-700 delay-100 ${
+        className={`hidden md:block flex-shrink-0 transition-all duration-700 delay-100 ${
           isVisible
             ? 'opacity-100 translate-x-0'
             : `opacity-0 ${photoLeft ? '-translate-x-10' : 'translate-x-10'}`
         }`}
       >
-        <div className="w-60 h-60 sm:w-72 sm:h-72 rounded-2xl overflow-hidden shadow-xl relative">
+        <div className="w-72 h-72 rounded-2xl overflow-hidden shadow-xl relative">
           <Image
             src={founder.photo}
             alt={founder.name}
@@ -119,6 +119,20 @@ function FounderSection({ founder, index }: { founder: Founder; index: number })
           {founder.name}
         </h2>
         <p className="text-amber-700 font-semibold text-lg mb-4">{founder.role}</p>
+
+        {/* Photo - shown on mobile only, centered between title and bio */}
+        <div className="md:hidden flex justify-center mb-4">
+          <div className="w-72 h-72 rounded-2xl overflow-hidden shadow-xl relative">
+            <Image
+              src={founder.photo}
+              alt={founder.name}
+              fill
+              className="object-cover"
+              sizes="288px"
+            />
+          </div>
+        </div>
+
         <p className="text-gray-600 text-lg leading-relaxed mb-4">
           {founder.bio}
         </p>
