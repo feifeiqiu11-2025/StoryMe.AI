@@ -1205,8 +1205,9 @@ export async function POST(req: NextRequest) {
   }
 
   if (mode === 'school-outreach') {
-    const recipients = ['Feifei_Qiu@Hotmail.com'];
-    const cc: string[] = [];
+    const recipients = ['heather@cedarcrestacademy.org'];
+    const cc = ['Lupang@KindleWoodStudio.ai'];
+    const bcc = ['Feifei_Qiu@Hotmail.com'];
     const results = [];
 
     for (let i = 0; i < recipients.length; i++) {
@@ -1215,11 +1216,12 @@ export async function POST(req: NextRequest) {
         from: EMAIL_FROM,
         to: recipients[i],
         cc,
+        bcc,
         subject: 'Creative Storytelling Enrichment Program — Partnership Inquiry',
         html: buildSchoolOutreachHtml(),
         replyTo: REPLY_TO,
       });
-      results.push({ to: recipients[i], cc, error: sendErr?.message || null });
+      results.push({ to: recipients[i], cc, bcc, error: sendErr?.message || null });
     }
 
     return NextResponse.json({
