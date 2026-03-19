@@ -558,13 +558,13 @@ function buildSchoolOutreachHtml(): string {
           <tr>
             <td style="padding: 32px 24px 16px;">
               <p style="color: #374151; font-size: 16px; margin: 0;">
-                Hi there,
+                Hi Heather,
               </p>
               <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
-                My name is Feifei Qiu, and I&rsquo;m the founder of <strong style="color: #374151;">KindleWood Studio</strong> &mdash; a creativity-based learning platform where children ages 3&ndash;9 create their own personalized storybooks through hands-on craft, guided storytelling, and AI-powered tools.
+                My name is Feifei Qiu, and I&rsquo;m the founder of <strong style="color: #374151;">KindleWood Studio</strong> &mdash; a creativity-based learning platform where children ages 3&ndash;9 create their own personalized storybooks through hands-on craft, guided storytelling, and child-friendly AI tools we developed in-house.
               </p>
               <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
-                We currently run in-person workshop programs with partners including <strong style="color: #374151;">SteamOji Academy</strong> (Bellevue) and <strong style="color: #374151;">Avocado Montessori Academy</strong> (Bellevue &amp; Kirkland), and we&rsquo;d love to explore bringing a similar enrichment program to your school.
+                I was connected to you through <strong style="color: #374151;">Jayden and Jessie Chen&rsquo;s family</strong>, who spoke highly of your school community. We currently run in-person workshop programs with partners including <strong style="color: #374151;">Steamoji Academy</strong> (Bellevue, with an upcoming Bothell location this spring) and <strong style="color: #374151;">Avocado Montessori Academy</strong> (Bellevue &amp; Kirkland), and we&rsquo;d love to explore bringing a similar enrichment program to CCA.
               </p>
             </td>
           </tr>
@@ -622,6 +622,52 @@ function buildSchoolOutreachHtml(): string {
             </td>
           </tr>
 
+          <!-- Our Approach to AI -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                &#129302; Our Approach to AI in the Classroom
+              </h2>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <span style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+                      Our AI tools were <strong style="color: #374151;">intentionally and independently developed</strong> for young learners &mdash; they are not general-purpose apps
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <span style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+                      AI serves as a <strong style="color: #374151;">creative assistant</strong>: it helps bring each child&rsquo;s ideas to life through illustrations and narration, but every story starts with the child&rsquo;s own imagination
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <span style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+                      Children remain the <strong style="color: #374151;">authors and decision-makers</strong> &mdash; AI amplifies their voice and vision rather than replacing their thinking
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px;">
+                    <span style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+                      Sessions are <strong style="color: #374151;">hands-on and craft-centered</strong> &mdash; children draw, build, and create physical storybooks with minimal screen time
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
           <!-- Video Previews -->
           <tr>
             <td style="padding: 16px 24px;">
@@ -632,10 +678,10 @@ function buildSchoolOutreachHtml(): string {
                 <tr>
                   <td width="50%" style="padding: 0 6px 8px 0;">
                     <a href="https://www.youtube.com/watch?v=c0fbsTEjK9Q" style="text-decoration: none;">
-                      <img src="https://img.youtube.com/vi/c0fbsTEjK9Q/hqdefault.jpg" alt="SteamOji Workshop — Ages 4-6" width="270" style="display: block; width: 100%; max-width: 270px; border-radius: 8px; border: 1px solid #e5e7eb;" />
+                      <img src="https://img.youtube.com/vi/c0fbsTEjK9Q/hqdefault.jpg" alt="Steamoji Workshop — Ages 4-6" width="270" style="display: block; width: 100%; max-width: 270px; border-radius: 8px; border: 1px solid #e5e7eb;" />
                     </a>
                     <p style="color: #6b7280; font-size: 12px; margin: 6px 0 0; text-align: center;">
-                      <strong style="color: #374151;">SteamOji Workshop</strong><br />Ages 4&ndash;6 &middot; 60 min
+                      <strong style="color: #374151;">Steamoji Workshop</strong><br />Ages 4&ndash;6 &middot; 60 min
                     </p>
                   </td>
                   <td width="50%" style="padding: 0 0 8px 6px;">
@@ -1162,8 +1208,8 @@ export async function POST(req: NextRequest) {
   }
 
   if (mode === 'school-outreach') {
-    const recipients = ['hope@shamrockmh.com'];
-    const cc = ['Feifei_Qiu@Hotmail.com'];
+    const recipients = ['Feifei_Qiu@Hotmail.com'];
+    const cc: string[] = [];
     const results = [];
 
     for (let i = 0; i < recipients.length; i++) {
