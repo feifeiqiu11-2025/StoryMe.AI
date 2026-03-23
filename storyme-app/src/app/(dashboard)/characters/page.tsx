@@ -94,6 +94,8 @@ export default function CharactersPage() {
     imageFileName: '',
     animatedPreviewUrl: '',
     characterType: '', // For description-only mode: "baby eagle", "friendly dragon", etc.
+    designerName: '',
+    designerAge: '',
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [analyzingImage, setAnalyzingImage] = useState(false); // Shows overlay while AI analyzes
@@ -123,6 +125,11 @@ export default function CharactersPage() {
   // Admin state for featured toggle
   const [isAdmin, setIsAdmin] = useState(false);
   const ADMIN_EMAILS = ['feifei_qiu@hotmail.com', 'admin@kindlewoodstudio.ai'];
+  // Tag editing state
+  const [allGalleryTags, setAllGalleryTags] = useState<string[]>([]);
+  const [editingTagCharId, setEditingTagCharId] = useState<string | null>(null);
+  const [tagInput, setTagInput] = useState('');
+  const [savingTags, setSavingTags] = useState<string | null>(null);
 
   // Load characters from database with scope and pagination
   const loadCharacters = async (userId: string, scope: 'mine' | 'community' = 'mine', page: number = 1) => {
@@ -168,6 +175,9 @@ export default function CharactersPage() {
         order: 0,
         isPublic: char.is_public ?? false,
         isFeatured: char.is_featured ?? false,
+        tags: char.tags ?? [],
+        designerName: char.designer_name ?? undefined,
+        designerAge: char.designer_age ?? undefined,
       }));
 
       setCharacters(transformedCharacters);
@@ -228,6 +238,68 @@ export default function CharactersPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, currentPage]);
+
+  // Fetch all existing gallery tags for autocomplete
+  useEffect(() => {
+    fetch('/api/gallery-tags')
+      .then((res) => res.json())
+      .then((data) => setAllGalleryTags(Array.from(new Set<string>(data.tags || []))))
+      .catch(() => {});
+  }, []);
+
+  // Build deduplicated autocomplete suggestions from gallery tags + current characters' tags
+  const allTagSuggestions = Array.from(
+    new Set([...allGalleryTags, ...characters.flatMap((c) => c.tags || [])])
+  ).sort();
+
+  // Tag management
+  const handleAddTag = async (characterId: string, currentTags: string[], newTag: string) => {
+    const trimmed = newTag.trim();
+    if (!trimmed || currentTags.includes(trimmed)) return;
+    const updatedTags = [...currentTags, trimmed];
+    setSavingTags(characterId);
+    try {
+      const res = await fetch(`/api/characters/${characterId}/tags`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: updatedTags }),
+      });
+      if (!res.ok) throw new Error('Failed to update tags');
+      // Update local state
+      setCharacters((prev) =>
+        prev.map((c) => (c.id === characterId ? { ...c, tags: updatedTags } : c))
+      );
+      // Add to autocomplete suggestions if new
+      if (!allGalleryTags.includes(trimmed)) {
+        setAllGalleryTags((prev) => [...prev, trimmed].sort());
+      }
+      setTagInput('');
+    } catch (err) {
+      console.error('Error adding tag:', err);
+    } finally {
+      setSavingTags(null);
+    }
+  };
+
+  const handleRemoveTag = async (characterId: string, currentTags: string[], tagToRemove: string) => {
+    const updatedTags = currentTags.filter((t) => t !== tagToRemove);
+    setSavingTags(characterId);
+    try {
+      const res = await fetch(`/api/characters/${characterId}/tags`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: updatedTags }),
+      });
+      if (!res.ok) throw new Error('Failed to update tags');
+      setCharacters((prev) =>
+        prev.map((c) => (c.id === characterId ? { ...c, tags: updatedTags } : c))
+      );
+    } catch (err) {
+      console.error('Error removing tag:', err);
+    } finally {
+      setSavingTags(null);
+    }
+  };
 
   const handleConfirmTogglePublic = async () => {
     if (!publicModalCharacter) return;
@@ -347,6 +419,8 @@ export default function CharactersPage() {
         imageFileName: character.referenceImage.fileName,
         animatedPreviewUrl: character.animatedPreviewUrl || '',
         characterType: parsedCharacterType,
+        designerName: character.designerName || '',
+        designerAge: character.designerAge ? String(character.designerAge) : '',
       });
       // Restore preview if character has an animated preview URL
       if (character.animatedPreviewUrl) {
@@ -388,6 +462,8 @@ export default function CharactersPage() {
         imageFileName: '',
         animatedPreviewUrl: '',
         characterType: '',
+        designerName: '',
+        designerAge: '',
       });
       setPreviewOptions({ pixar: null, classic: null });
       setSelectedStyle(null);
@@ -421,6 +497,8 @@ export default function CharactersPage() {
       imageFileName: '',
       animatedPreviewUrl: '',
       characterType: '',
+      designerName: '',
+      designerAge: '',
     });
   };
 
@@ -857,6 +935,8 @@ export default function CharactersPage() {
         age: isHuman ? (formData.age || null) : null,
         other_features: otherFeatures,
         subject_type: subjectType,
+        designer_name: formData.designerName.trim() || null,
+        designer_age: formData.designerAge ? parseInt(formData.designerAge, 10) : null,
       };
 
       console.log('Saving character data:', characterData);
@@ -1716,6 +1796,35 @@ export default function CharactersPage() {
                 )}
               </div>
 
+              {/* Designer Info (optional) */}
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <p className="text-sm font-medium text-gray-700 mb-2">Designer Info (optional)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Designer Name</label>
+                    <input
+                      type="text"
+                      value={formData.designerName}
+                      onChange={(e) => setFormData({ ...formData, designerName: e.target.value })}
+                      placeholder="Child's name"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Designer Age</label>
+                    <input
+                      type="number"
+                      min={3}
+                      max={18}
+                      value={formData.designerAge}
+                      onChange={(e) => setFormData({ ...formData, designerAge: e.target.value })}
+                      placeholder="Age"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Action Buttons */}
               <div className="flex gap-4 mt-6">
                 <button
@@ -1855,11 +1964,101 @@ export default function CharactersPage() {
                           </svg>
                         </button>
                       )}
+                      {/* Tag action (admin only) */}
+                      {isAdmin && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (editingTagCharId === character.id) {
+                              setEditingTagCharId(null);
+                              setTagInput('');
+                            } else {
+                              setEditingTagCharId(character.id);
+                              setTagInput('');
+                            }
+                          }}
+                          title="Add tag"
+                          className={`ml-1 px-2 py-2 rounded-lg transition-colors ${
+                            editingTagCharId === character.id
+                              ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                              : (character.tags || []).length > 0
+                                ? 'text-blue-500 hover:text-blue-600 hover:bg-blue-50'
+                                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   </div>
 
+                  {/* Tags - visible to all users, editable by admins only */}
+                  {((character.tags || []).length > 0 || editingTagCharId === character.id) && (
+                    <div className="flex flex-wrap items-center gap-1 mt-1">
+                      {(character.tags || []).map((tag) => (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600"
+                        >
+                          {tag}
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleRemoveTag(character.id, character.tags || [], tag)}
+                              className="ml-0.5 text-gray-400 hover:text-red-500"
+                              disabled={savingTags === character.id}
+                              aria-label={`Remove tag ${tag}`}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                      {editingTagCharId === character.id && (
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={tagInput}
+                            onChange={(e) => setTagInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && tagInput.trim()) {
+                                handleAddTag(character.id, character.tags || [], tagInput);
+                              }
+                              if (e.key === 'Escape') {
+                                setEditingTagCharId(null);
+                                setTagInput('');
+                              }
+                            }}
+                            onBlur={() => {
+                              if (tagInput.trim()) {
+                                handleAddTag(character.id, character.tags || [], tagInput);
+                              }
+                              setTimeout(() => {
+                                setEditingTagCharId(null);
+                                setTagInput('');
+                              }, 150);
+                            }}
+                            placeholder="Type tag..."
+                            className="w-28 text-xs px-2 py-0.5 border border-gray-300 rounded-full focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none"
+                            autoFocus
+                            list={`tag-suggestions-${character.id}`}
+                          />
+                          <datalist id={`tag-suggestions-${character.id}`}>
+                            {allTagSuggestions
+                              .filter((t) => !(character.tags || []).includes(t))
+                              .filter((t) => t.toLowerCase().includes(tagInput.toLowerCase()))
+                              .map((t) => (
+                                <option key={t} value={t} />
+                              ))}
+                          </datalist>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Actions */}
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mt-1">
                     <Link
                       href="/create"
                       className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 font-medium text-sm text-center"

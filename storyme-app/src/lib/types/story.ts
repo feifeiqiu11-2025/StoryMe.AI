@@ -122,6 +122,9 @@ export interface Character {
   isFromLibrary?: boolean; // Track if character was imported from library
   isPublic?: boolean; // Whether this character is shared publicly
   isFeatured?: boolean; // Admin-featured for Little Artists gallery carousel
+  tags?: string[]; // Free-text tags for grouping/filtering (e.g., workshop session names)
+  designerName?: string; // Child artist's name
+  designerAge?: number; // Child artist's age
 }
 
 export interface Scene {

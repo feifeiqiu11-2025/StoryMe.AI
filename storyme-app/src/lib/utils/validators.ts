@@ -29,6 +29,13 @@ export const characterLibrarySchema = z.object({
 
   // Public sharing
   is_public: z.boolean().optional(),
+
+  // Tags for grouping/filtering (e.g., workshop session names)
+  tags: z.array(z.string().min(1).max(50)).max(10).optional(),
+
+  // Designer info (child artist)
+  designer_name: z.string().max(100).optional().nullable(),
+  designer_age: z.coerce.number().int().min(3).max(18).optional().nullable(),
 }).refine(
   (data) => {
     // Either have a reference image OR at least one description field OR an animated preview

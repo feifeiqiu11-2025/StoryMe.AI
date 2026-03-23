@@ -11,9 +11,10 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useSearchParams, useRouter } from 'next/navigation';
 import LandingNav from '@/components/navigation/LandingNav';
 import { createClient } from '@/lib/supabase/client';
 
@@ -23,17 +24,38 @@ interface PublicCharacter {
   reference_image_url: string;
   animated_preview_url: string;
   created_at: string;
+  designer_name?: string;
+  designer_age?: number;
 }
 
 const PAGE_SIZE = 24;
 
-export default function LittleArtistsGalleryPage() {
+export default function LittleArtistsGalleryPageWrapper() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+      </div>
+    }>
+      <LittleArtistsGalleryPage />
+    </Suspense>
+  );
+}
+
+function LittleArtistsGalleryPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   // Gallery state
   const [characters, setCharacters] = useState<PublicCharacter[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCharacter, setSelectedCharacter] = useState<PublicCharacter | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Tag filter state
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [activeTag, setActiveTag] = useState<string | null>(searchParams.get('tag'));
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -56,12 +78,17 @@ export default function LittleArtistsGalleryPage() {
     setIsMounted(true);
     checkAuthStatus();
     fetchFeatured();
+    // Fetch all gallery tags for dropdown
+    fetch('/api/gallery-tags')
+      .then((res) => res.json())
+      .then((data) => setAllTags(data.tags || []))
+      .catch(() => {});
   }, []);
 
-  // Load gallery when page changes
+  // Load gallery when page or tag changes
   useEffect(() => {
-    loadPublicCharacters(currentPage);
-  }, [currentPage]);
+    loadPublicCharacters(currentPage, activeTag);
+  }, [currentPage, activeTag]);
 
   // Close lightbox on Escape key
   useEffect(() => {
@@ -84,12 +111,13 @@ export default function LittleArtistsGalleryPage() {
     }
   };
 
-  const loadPublicCharacters = async (page: number = 1) => {
+  const loadPublicCharacters = async (page: number = 1, tag: string | null = null) => {
     try {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/public-characters?page=${page}&limit=${PAGE_SIZE}`);
+      const tagParam = tag ? `&tag=${encodeURIComponent(tag)}` : '';
+      const response = await fetch(`/api/public-characters?page=${page}&limit=${PAGE_SIZE}${tagParam}`);
       if (!response.ok) throw new Error('Failed to load characters');
 
       const data = await response.json();
@@ -260,8 +288,8 @@ export default function LittleArtistsGalleryPage() {
           </p>
         </div>
 
-        {/* Featured Carousel */}
-        {!featuredLoading && featuredCharacters.length >= 3 && isMounted && (
+        {/* Featured Carousel - hidden when filtering by tag */}
+        {!activeTag && !featuredLoading && featuredCharacters.length >= 3 && isMounted && (
           <div className="mb-10">
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 text-center">Featured Artwork</h2>
             <div className="relative" style={{ height: viewportWidth < 640 ? 220 : viewportWidth < 1024 ? 300 : 340 }}>
@@ -399,7 +427,7 @@ export default function LittleArtistsGalleryPage() {
           <div className="text-center py-12 bg-white rounded-xl shadow-md">
             <p className="text-red-600 text-lg mb-4">Failed to load gallery</p>
             <button
-              onClick={() => loadPublicCharacters(currentPage)}
+              onClick={() => loadPublicCharacters(currentPage, activeTag)}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
             >
               Try Again
@@ -410,7 +438,50 @@ export default function LittleArtistsGalleryPage() {
         {/* Character Grid */}
         {!loading && !error && characters.length > 0 && (
           <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 text-center">More Artwork</h2>
+            {/* Header with tag filter */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                {activeTag ? `Artwork from: ${activeTag}` : 'More Artwork'}
+              </h2>
+              <div className="flex items-center gap-2">
+                {allTags.length > 0 && (
+                  <select
+                    value={activeTag || ''}
+                    onChange={(e) => {
+                      const tag = e.target.value || null;
+                      setActiveTag(tag);
+                      setCurrentPage(1);
+                      if (tag) {
+                        router.push(`/little-artists?tag=${encodeURIComponent(tag)}`, { scroll: false });
+                      } else {
+                        router.push('/little-artists', { scroll: false });
+                      }
+                    }}
+                    className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none"
+                  >
+                    <option value="">All Artwork</option>
+                    {allTags.map((tag) => (
+                      <option key={tag} value={tag}>
+                        {tag}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {activeTag && (
+                  <button
+                    onClick={() => {
+                      setActiveTag(null);
+                      setCurrentPage(1);
+                      router.push('/little-artists', { scroll: false });
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {characters.map((character) => (
               <div
@@ -419,9 +490,16 @@ export default function LittleArtistsGalleryPage() {
                 className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
               >
                 <div className="p-4 pb-2">
-                  <h3 className="text-lg font-semibold text-gray-900 truncate">
-                    {character.name}
-                  </h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900 truncate">
+                      {character.name}
+                    </h3>
+                    {character.designer_name && (
+                      <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
+                        By {character.designer_name}{character.designer_age ? `, age ${character.designer_age}` : ''}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="px-4 pb-4">
                   <div className="grid grid-cols-2 gap-3">
@@ -559,9 +637,16 @@ export default function LittleArtistsGalleryPage() {
           >
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-100">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {selectedCharacter.name}
-              </h2>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {selectedCharacter.name}
+                </h2>
+                {selectedCharacter.designer_name && (
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    By {selectedCharacter.designer_name}{selectedCharacter.designer_age ? `, age ${selectedCharacter.designer_age}` : ''}
+                  </p>
+                )}
+              </div>
               <button
                 onClick={() => setSelectedCharacter(null)}
                 className="text-gray-400 hover:text-gray-600 p-1"
