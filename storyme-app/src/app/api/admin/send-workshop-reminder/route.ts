@@ -795,6 +795,221 @@ function buildSchoolOutreachHtml(): string {
 </html>`;
 }
 
+// ─── Invention Workshop Promo Email ──────────────────────────────────────
+
+function buildInventionWorkshopHtml(parentFirstName: string, childFirstName: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #6d28d9; background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: 32px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 21px; font-weight: 700;">
+                Creative Inventors &amp; Storytellers
+              </h1>
+              <p style="color: #e0e7ff; margin: 8px 0 0; font-size: 15px;">
+                Where Ideas Become Invention &amp; Stories
+              </p>
+            </td>
+          </tr>
+
+          <!-- Greeting -->
+          <tr>
+            <td style="padding: 32px 24px 16px;">
+              <p style="color: #374151; font-size: 16px; margin: 0;">
+                Hi ${parentFirstName},
+              </p>
+              <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
+                ${childFirstName} had such a great time at our previous Creative Explorers Workshop &mdash; and we&rsquo;d love to welcome them back for an exciting new theme!
+              </p>
+              <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
+                Our upcoming <strong style="color: #374151;">Creative Inventors &amp; Storytellers</strong> workshop takes kids on a hands-on journey from problem to invention &mdash; and turns the whole experience into a personalized storybook they take home.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- What Your Child Will Do -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                What Your Child Will Do
+              </h2>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #7c3aed;">Step 1 &mdash; Identify a Problem</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">Discover everyday challenges worth solving</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #7c3aed;">Step 2 &mdash; Imagine Solutions</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">Brainstorm creative ideas &mdash; the wilder, the better!</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #7c3aed;">Step 3 &mdash; Build or Draw a Helper Tool</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">Bring their invention to life through craft and design</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #7c3aed;">Step 4 &mdash; Test &amp; Improve</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">Try it out, get feedback, and make it even better</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #7c3aed;">Step 5 &mdash; Create a Storybook</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">Turn their invention journey into a personalized storybook with AI-assisted illustrations</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px;">
+                    <strong style="color: #7c3aed;">Step 6 &mdash; Show &amp; Tell</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">Share their invention and story in a group circle</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- AI Section -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                How AI Supports (Not Replaces) Their Creativity
+              </h2>
+              <p style="color: #6b7280; font-size: 14px; margin: 0; line-height: 1.7;">
+                Our child-friendly AI tools were developed in-house specifically for young learners. AI acts as a <strong style="color: #374151;">creative assistant</strong> &mdash; it helps turn each child&rsquo;s drawings and ideas into illustrated storybook pages, but every invention and story starts with <strong style="color: #374151;">your child&rsquo;s own thinking</strong>. Sessions are hands-on and craft-centered with minimal screen time.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- Session Details -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                Session Details
+              </h2>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #374151;">Ages</strong><br />
+                    <span style="color: #6b7280;">4&ndash;6</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #374151;">Duration</strong><br />
+                    <span style="color: #6b7280;">60 minutes</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #374151;">Location</strong><br />
+                    <span style="color: #6b7280;">Steamoji Academy &mdash; Bellevue</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 16px;">
+                    <strong style="color: #374151;">What&rsquo;s Included</strong><br />
+                    <span style="color: #6b7280;">All craft materials, guided instruction, and a take-home storybook</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- CTA -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <p style="color: #6b7280; font-size: 15px; margin: 0; line-height: 1.6;">
+                We have limited spots available. Reply to this email or sign up below to reserve ${childFirstName}&rsquo;s spot!
+              </p>
+              <p style="margin: 16px 0 0; text-align: center;">
+                <a href="https://www.kindlewoodstudio.ai/workshops/register?session=morning&partner=steamoji" style="display: inline-block; background-color: #7c3aed; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-size: 15px; font-weight: 600;">
+                  Reserve a Spot &rarr;
+                </a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px; background-color: #f9fafb; text-align: center;">
+              <p style="color: #6b7280; font-size: 14px; margin: 0; line-height: 1.6;">
+                If you have any questions, simply reply to this email and we&rsquo;ll get back to you promptly.
+              </p>
+              <p style="color: #374151; font-size: 14px; margin: 16px 0 0; line-height: 1.6;">
+                Warm regards,
+              </p>
+              <p style="color: #374151; font-size: 14px; margin: 8px 0 0; font-weight: 600;">
+                KindleWood Team
+              </p>
+              <p style="margin: 12px 0 0;">
+                <a href="https://www.kindlewoodstudio.ai" style="color: #7c3aed; font-size: 13px; text-decoration: underline;">
+                  kindlewoodstudio.ai
+                </a>
+                &nbsp;&middot;&nbsp;
+                <a href="https://www.youtube.com/@KindleWoodStudio" style="color: #9ca3af; font-size: 13px; text-decoration: underline;">
+                  YouTube
+                </a>
+              </p>
+              <p style="margin: 16px 0 0;">
+                <a href="https://www.kindlewoodstudio.ai" style="text-decoration: none;">
+                  <img src="https://www.kindlewoodstudio.ai/Logo_New.png" alt="KindleWood Studio" width="80" style="display: inline-block; max-width: 80px; height: auto;" />
+                </a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
 // ─── Thank You + Promo Email ─────────────────────────────────────────────
 
 const LOGO_URL = 'https://www.kindlewoodstudio.ai/Logo_New.png';
@@ -1231,6 +1446,22 @@ export async function POST(req: NextRequest) {
       sent: results.filter(r => !r.error).length,
       failed: results.filter(r => r.error).length,
       results,
+    });
+  }
+
+  if (mode === 'invention-promo-test') {
+    const { error: sendErr } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: 'feifei_qiu@hotmail.com',
+      subject: 'New Workshop: Creative Inventors & Storytellers — Where Ideas Become Invention & Stories',
+      html: buildInventionWorkshopHtml('Feifei', 'Connor'),
+      replyTo: REPLY_TO,
+    });
+    return NextResponse.json({
+      success: !sendErr,
+      mode: 'invention-promo-test',
+      to: 'feifei_qiu@hotmail.com',
+      error: sendErr?.message || null,
     });
   }
 
