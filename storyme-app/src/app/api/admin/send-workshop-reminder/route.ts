@@ -1460,7 +1460,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (mode === 'invention-promo-test') {
-    const testEmail = 'feifei_qiu@hotmail.com';
+    const testEmail = 'feifeiqiu11@gmail.com';
     const { error: sendErr } = await resend.emails.send({
       from: EMAIL_FROM,
       to: testEmail,
