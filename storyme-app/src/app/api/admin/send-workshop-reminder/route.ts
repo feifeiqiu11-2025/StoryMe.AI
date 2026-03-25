@@ -1461,20 +1461,28 @@ export async function POST(req: NextRequest) {
 
   if (mode === 'invention-promo-test') {
     const testEmail = 'feifeiqiu11@gmail.com';
-    const { error: sendErr } = await resend.emails.send({
-      from: EMAIL_FROM,
-      to: testEmail,
-      subject: 'New Workshop: Creative Inventors & Storytellers — Where Ideas Become Invention & Stories',
-      html: buildInventionWorkshopHtml('Feifei', 'Connor', testEmail),
-      replyTo: REPLY_TO,
-      headers: getUnsubscribeHeaders(testEmail),
-    });
-    return NextResponse.json({
-      success: !sendErr,
-      mode: 'invention-promo-test',
-      to: testEmail,
-      error: sendErr?.message || null,
-    });
+    try {
+      const { error: sendErr } = await resend.emails.send({
+        from: EMAIL_FROM,
+        to: testEmail,
+        subject: 'New Workshop: Creative Inventors & Storytellers — Where Ideas Become Invention & Stories',
+        html: buildInventionWorkshopHtml('Feifei', 'Connor', testEmail),
+        replyTo: REPLY_TO,
+        headers: getUnsubscribeHeaders(testEmail),
+      });
+      return NextResponse.json({
+        success: !sendErr,
+        mode: 'invention-promo-test',
+        to: testEmail,
+        error: sendErr?.message || null,
+      });
+    } catch (err: any) {
+      return NextResponse.json({
+        success: false,
+        mode: 'invention-promo-test',
+        error: err?.message || 'Unknown error',
+      }, { status: 500 });
+    }
   }
 
   if (mode === 'invention-promo') {

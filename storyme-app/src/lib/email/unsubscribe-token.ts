@@ -14,6 +14,7 @@ const HMAC_SECRET_KEY = 'UNSUBSCRIBE_HMAC_SECRET';
 function getSecret(): string {
   const secret = process.env[HMAC_SECRET_KEY];
   if (!secret || secret.length < 32) {
+    console.error(`[UNSUBSCRIBE] Missing or too-short ${HMAC_SECRET_KEY} env var (need >= 32 chars). Actual length: ${secret?.length ?? 0}`);
     throw new Error(`Missing or too-short ${HMAC_SECRET_KEY} env var (need >= 32 chars)`);
   }
   return secret;
