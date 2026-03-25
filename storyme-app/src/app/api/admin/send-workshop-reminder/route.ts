@@ -11,6 +11,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resend, EMAIL_FROM } from '@/lib/email/resend';
 import { createClient } from '@supabase/supabase-js';
+import { getUnsubscribeHeaders } from '@/lib/email/unsubscribe-token';
+import { buildUnsubscribeFooter } from '@/lib/email/unsubscribe-footer';
+import { getOptedOutEmails } from '@/lib/email/check-opt-out';
 
 const REPLY_TO = 'Admin@KindleWoodStudio.ai';
 
@@ -529,7 +532,8 @@ function buildIndoorNoticeHtml(parentFirstName: string, childFirstName: string):
 
 // ─── School Partnership Outreach Email ────────────────────────────────────
 
-function buildSchoolOutreachHtml(): string {
+function buildSchoolOutreachHtml(recipientEmail?: string): string {
+  const unsubFooter = recipientEmail ? buildUnsubscribeFooter(recipientEmail) : '';
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -787,6 +791,8 @@ function buildSchoolOutreachHtml(): string {
             </td>
           </tr>
 
+          ${unsubFooter}
+
         </table>
       </td>
     </tr>
@@ -797,7 +803,8 @@ function buildSchoolOutreachHtml(): string {
 
 // ─── Invention Workshop Promo Email ──────────────────────────────────────
 
-function buildInventionWorkshopHtml(parentFirstName: string, childFirstName: string): string {
+function buildInventionWorkshopHtml(parentFirstName: string, childFirstName: string, recipientEmail?: string): string {
+  const unsubFooter = recipientEmail ? buildUnsubscribeFooter(recipientEmail) : '';
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -1001,6 +1008,8 @@ function buildInventionWorkshopHtml(parentFirstName: string, childFirstName: str
               </p>
             </td>
           </tr>
+
+          ${unsubFooter}
 
         </table>
       </td>
@@ -1433,8 +1442,9 @@ export async function POST(req: NextRequest) {
         cc,
         bcc,
         subject: 'Creative Storytelling Enrichment Program — Partnership Inquiry',
-        html: buildSchoolOutreachHtml(),
+        html: buildSchoolOutreachHtml(recipients[i]),
         replyTo: REPLY_TO,
+        headers: getUnsubscribeHeaders(recipients[i]),
       });
       results.push({ to: recipients[i], cc, bcc, error: sendErr?.message || null });
     }
@@ -1450,17 +1460,19 @@ export async function POST(req: NextRequest) {
   }
 
   if (mode === 'invention-promo-test') {
+    const testEmail = 'feifei_qiu@hotmail.com';
     const { error: sendErr } = await resend.emails.send({
       from: EMAIL_FROM,
-      to: 'feifei_qiu@hotmail.com',
+      to: testEmail,
       subject: 'New Workshop: Creative Inventors & Storytellers — Where Ideas Become Invention & Stories',
-      html: buildInventionWorkshopHtml('Feifei', 'Connor'),
+      html: buildInventionWorkshopHtml('Feifei', 'Connor', testEmail),
       replyTo: REPLY_TO,
+      headers: getUnsubscribeHeaders(testEmail),
     });
     return NextResponse.json({
       success: !sendErr,
       mode: 'invention-promo-test',
-      to: 'feifei_qiu@hotmail.com',
+      to: testEmail,
       error: sendErr?.message || null,
     });
   }
@@ -1491,11 +1503,15 @@ export async function POST(req: NextRequest) {
       familyMap.get(key)!.children.add(r.child_first_name);
     }
 
-    const families = Array.from(familyMap.values());
+    const allFamilies = Array.from(familyMap.values());
 
-    if (families.length === 0) {
+    if (allFamilies.length === 0) {
       return NextResponse.json({ success: true, message: 'No Steamoji AM registrations found', sent: 0 });
     }
+
+    // Filter out opted-out emails
+    const optedOut = await getOptedOutEmails(allFamilies.map(f => f.email), getSupabase());
+    const families = allFamilies.filter(f => !optedOut.has(f.email.toLowerCase()));
 
     const results = [];
 
@@ -1508,8 +1524,9 @@ export async function POST(req: NextRequest) {
         from: EMAIL_FROM,
         to: family.email,
         subject: 'This Sunday: Creative Inventors & Storytellers — Where Ideas Become Invention & Stories',
-        html: buildInventionWorkshopHtml(family.parentFirstName, childNames),
+        html: buildInventionWorkshopHtml(family.parentFirstName, childNames, family.email),
         replyTo: REPLY_TO,
+        headers: getUnsubscribeHeaders(family.email),
       });
       results.push({
         to: family.email,
