@@ -1,27 +1,23 @@
 /**
  * Shared unsubscribe footer HTML for marketing emails.
  * CAN-SPAM compliant: includes unsubscribe link and physical address.
+ *
+ * Returns inline HTML to be placed INSIDE the existing email footer <td>,
+ * after the logo — not a separate <tr>.
  */
 
 import { buildUnsubscribeUrl } from './unsubscribe-token';
 
-/** Returns an HTML table row with unsubscribe link + address for marketing emails. */
+/** Returns inline HTML with unsubscribe link + address for the existing email footer. */
 export function buildUnsubscribeFooter(email: string): string {
   const url = buildUnsubscribeUrl(email);
   return `
-          <!-- Unsubscribe Footer -->
-          <tr>
-            <td style="padding: 16px 24px 8px; text-align: center; border-top: 1px solid #e5e7eb;">
-              <p style="color: #9ca3af; font-size: 12px; margin: 0; line-height: 1.6;">
-                You&rsquo;re receiving this email because you signed up for KindleWood Studio.
-              </p>
-              <p style="color: #9ca3af; font-size: 12px; margin: 4px 0 0; line-height: 1.6;">
+              <p style="color: #9ca3af; font-size: 12px; margin: 16px 0 0; line-height: 1.6;">
+                Questions? Simply reply to this email.
+                &nbsp;&middot;&nbsp;
                 <a href="${url}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe</a>
-                from marketing emails
               </p>
-              <p style="color: #9ca3af; font-size: 11px; margin: 8px 0 0;">
+              <p style="color: #9ca3af; font-size: 11px; margin: 4px 0 0;">
                 KindleWood Studio &middot; Bellevue, WA
-              </p>
-            </td>
-          </tr>`;
+              </p>`;
 }

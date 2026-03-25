@@ -788,10 +788,9 @@ function buildSchoolOutreachHtml(recipientEmail?: string): string {
                   <img src="https://www.kindlewoodstudio.ai/Logo_New.png" alt="KindleWood Studio" width="80" style="display: inline-block; max-width: 80px; height: auto;" />
                 </a>
               </p>
+              ${unsubFooter}
             </td>
           </tr>
-
-          ${unsubFooter}
 
         </table>
       </td>
@@ -983,10 +982,7 @@ function buildInventionWorkshopHtml(parentFirstName: string, childFirstName: str
           <!-- Footer -->
           <tr>
             <td style="padding: 24px; background-color: #f9fafb; text-align: center;">
-              <p style="color: #6b7280; font-size: 14px; margin: 0; line-height: 1.6;">
-                If you have any questions, simply reply to this email and we&rsquo;ll get back to you promptly.
-              </p>
-              <p style="color: #374151; font-size: 14px; margin: 16px 0 0; line-height: 1.6;">
+              <p style="color: #374151; font-size: 14px; margin: 0; line-height: 1.6;">
                 Warm regards,
               </p>
               <p style="color: #374151; font-size: 14px; margin: 8px 0 0; font-weight: 600;">
@@ -1006,10 +1002,9 @@ function buildInventionWorkshopHtml(parentFirstName: string, childFirstName: str
                   <img src="https://www.kindlewoodstudio.ai/Logo_New.png" alt="KindleWood Studio" width="80" style="display: inline-block; max-width: 80px; height: auto;" />
                 </a>
               </p>
+              ${unsubFooter}
             </td>
           </tr>
-
-          ${unsubFooter}
 
         </table>
       </td>

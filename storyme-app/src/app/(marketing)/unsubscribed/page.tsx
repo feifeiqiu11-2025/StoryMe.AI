@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
@@ -39,12 +38,12 @@ function UnsubscribedContent() {
       <div className="max-w-xl mx-auto px-4 py-20">
         {/* Header */}
         <div className="text-center mb-8">
-          <Link
-            href="/"
+          <a
+            href="https://www.kindlewoodstudio.ai"
             className="inline-block text-2xl font-bold hover:opacity-80 transition-opacity"
           >
             KindleWood Studio
-          </Link>
+          </a>
         </div>
 
         {/* Card */}
@@ -57,12 +56,12 @@ function UnsubscribedContent() {
 
         {/* Back to Home */}
         <div className="text-center mt-8">
-          <Link
-            href="/"
+          <a
+            href="https://www.kindlewoodstudio.ai"
             className="inline-block px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
           >
             Back to KindleWood Studio
-          </Link>
+          </a>
         </div>
       </div>
     </div>
