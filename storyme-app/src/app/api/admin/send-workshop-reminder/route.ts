@@ -1102,22 +1102,20 @@ function buildWorkshopAwarenessHtml(recipientEmail?: string): string {
               <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
                 See Our Workshops in Action
               </h2>
-
-              <!-- Video 1: Ages 4-6 -->
-              <p style="color: #374151; font-size: 14px; margin: 0 0 8px; font-weight: 600;">
-                Ages 4&ndash;6
-              </p>
-              <a href="https://www.youtube.com/watch?v=c0fbsTEjK9Q" style="display: block; text-decoration: none; margin: 0 0 16px;">
-                <img src="https://img.youtube.com/vi/c0fbsTEjK9Q/hqdefault.jpg" alt="Workshop video for ages 4-6" width="552" style="width: 100%; max-width: 552px; border-radius: 8px; display: block;" />
-              </a>
-
-              <!-- Video 2: Ages 7-9 -->
-              <p style="color: #374151; font-size: 14px; margin: 0 0 8px; font-weight: 600;">
-                Ages 7&ndash;9
-              </p>
-              <a href="https://www.youtube.com/watch?v=zNJ4sFUp-SQ" style="display: block; text-decoration: none;">
-                <img src="https://img.youtube.com/vi/zNJ4sFUp-SQ/hqdefault.jpg" alt="Workshop video for ages 7-9" width="552" style="width: 100%; max-width: 552px; border-radius: 8px; display: block;" />
-              </a>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td width="50%" style="padding-right: 8px; vertical-align: top;">
+                    <a href="https://www.youtube.com/watch?v=c0fbsTEjK9Q" style="text-decoration: none;">
+                      <img src="https://img.youtube.com/vi/c0fbsTEjK9Q/hqdefault.jpg" alt="Steamoji Workshop" width="260" style="width: 100%; border-radius: 8px; display: block;" />
+                    </a>
+                  </td>
+                  <td width="50%" style="padding-left: 8px; vertical-align: top;">
+                    <a href="https://www.youtube.com/watch?v=zNJ4sFUp-SQ" style="text-decoration: none;">
+                      <img src="https://img.youtube.com/vi/zNJ4sFUp-SQ/hqdefault.jpg" alt="Montessori Workshop" width="260" style="width: 100%; border-radius: 8px; display: block;" />
+                    </a>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
