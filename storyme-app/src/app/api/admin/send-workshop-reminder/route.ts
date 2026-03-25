@@ -832,7 +832,7 @@ function buildInventionWorkshopHtml(parentFirstName: string, childFirstName: str
                 ${childFirstName} had such a great time at our previous Creative Explorers Workshop &mdash; and we&rsquo;d love to welcome them back for an exciting new theme!
               </p>
               <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
-                Our upcoming <strong style="color: #374151;">Creative Inventors &amp; Storytellers</strong> workshop takes kids on a hands-on journey from problem to invention &mdash; and turns the whole experience into a personalized storybook they take home.
+                Our upcoming <strong style="color: #374151;">Creative Inventors &amp; Storytellers</strong> session is happening <strong style="color: #374151;">this Sunday, March 29</strong> &mdash; a hands-on journey from problem to invention, where kids turn the whole experience into a personalized storybook they take home.
               </p>
             </td>
           </tr>
@@ -1462,6 +1462,70 @@ export async function POST(req: NextRequest) {
       mode: 'invention-promo-test',
       to: 'feifei_qiu@hotmail.com',
       error: sendErr?.message || null,
+    });
+  }
+
+  if (mode === 'invention-promo') {
+    const { data: registrations, error } = await getSupabase()
+      .from('workshop_registrations')
+      .select('parent_first_name, parent_email, child_first_name, selected_workshop_ids')
+      .eq('status', 'confirmed')
+      .eq('selected_session_type', 'morning')
+      .order('parent_email');
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    // Filter for steamoji workshops and de-dupe by email (case-insensitive)
+    const steamoji = (registrations || []).filter((r: any) =>
+      r.selected_workshop_ids && r.selected_workshop_ids.some((id: string) => id.includes('steamoji'))
+    );
+
+    const familyMap = new Map<string, { parentFirstName: string; email: string; children: Set<string> }>();
+    for (const r of steamoji) {
+      const key = r.parent_email.toLowerCase();
+      if (!familyMap.has(key)) {
+        familyMap.set(key, { parentFirstName: r.parent_first_name, email: r.parent_email, children: new Set() });
+      }
+      familyMap.get(key)!.children.add(r.child_first_name);
+    }
+
+    const families = Array.from(familyMap.values());
+
+    if (families.length === 0) {
+      return NextResponse.json({ success: true, message: 'No Steamoji AM registrations found', sent: 0 });
+    }
+
+    const results = [];
+
+    for (let i = 0; i < families.length; i++) {
+      const family = families[i];
+      const childNames = Array.from(family.children).join(' and ');
+      if (i > 0) await delay(600);
+
+      const { error: sendErr } = await resend.emails.send({
+        from: EMAIL_FROM,
+        to: family.email,
+        subject: 'This Sunday: Creative Inventors & Storytellers — Where Ideas Become Invention & Stories',
+        html: buildInventionWorkshopHtml(family.parentFirstName, childNames),
+        replyTo: REPLY_TO,
+      });
+      results.push({
+        to: family.email,
+        parent: family.parentFirstName,
+        children: childNames,
+        error: sendErr?.message || null,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      mode: 'invention-promo',
+      total: results.length,
+      sent: results.filter(r => !r.error).length,
+      failed: results.filter(r => r.error).length,
+      results,
     });
   }
 
