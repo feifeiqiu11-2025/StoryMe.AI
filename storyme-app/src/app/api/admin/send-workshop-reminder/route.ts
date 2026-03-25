@@ -1820,7 +1820,7 @@ export async function POST(req: NextRequest) {
     // Get all users from users table
     const { data: users, error } = await getSupabase()
       .from('users')
-      .select('email, first_name')
+      .select('email, name')
       .order('email');
 
     if (error) {
@@ -1831,15 +1831,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'No users found', sent: 0 });
     }
 
-    // Filter out Apple Private Relay, test accounts, and duplicates
+    // Get workshop participant emails to exclude
+    const { data: workshopRegs } = await getSupabase()
+      .from('workshop_registrations')
+      .select('parent_email');
+    const workshopEmails = new Set((workshopRegs || []).map((r: any) => r.parent_email.toLowerCase()));
+
+    // Internal/own accounts to exclude
+    const internalEmails = new Set([
+      'admin@kindlewoodstudio.ai',
+      'kindlewoodkids@icloud.com',
+      'kindlewoodsai@gmail.com',
+      'childrenstorywithai@gmail.com',
+    ]);
+
+    // Always include (even if workshop participant)
+    const alwaysInclude = new Set([
+      'feifei_qiu@hotmail.com',
+    ]);
+
+    // Filter out Apple Private Relay, test accounts, QQ emails, workshop participants, internal accounts
     const seen = new Set<string>();
     const validUsers = users.filter((u: any) => {
       const email = u.email?.toLowerCase();
       if (!email) return false;
       if (seen.has(email)) return false;
       seen.add(email);
+      if (alwaysInclude.has(email)) return true;
       if (email.includes('privaterelay.appleid.com')) return false;
       if (email.includes('test@') || email.includes('test123')) return false;
+      if (email.endsWith('@qq.com')) return false;
+      if (workshopEmails.has(email)) return false;
+      if (internalEmails.has(email)) return false;
       return true;
     });
 
@@ -1873,10 +1896,6 @@ export async function POST(req: NextRequest) {
       total: results.length,
       sent: results.filter(r => !r.error).length,
       failed: results.filter(r => r.error).length,
-      filteredOut: {
-        appleRelay: users.filter((u: any) => u.email?.toLowerCase().includes('privaterelay.appleid.com')).length,
-        optedOut: optedOut.size,
-      },
       results,
     });
   }
