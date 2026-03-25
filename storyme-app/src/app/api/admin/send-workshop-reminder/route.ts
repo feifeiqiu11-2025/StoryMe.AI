@@ -783,11 +783,6 @@ function buildSchoolOutreachHtml(recipientEmail?: string): string {
                   YouTube
                 </a>
               </p>
-              <p style="margin: 16px 0 0;">
-                <a href="https://www.kindlewoodstudio.ai" style="text-decoration: none;">
-                  <img src="https://www.kindlewoodstudio.ai/Logo_New.png" alt="KindleWood Studio" width="80" style="display: inline-block; max-width: 80px; height: auto;" />
-                </a>
-              </p>
               ${unsubFooter}
             </td>
           </tr>
@@ -997,9 +992,170 @@ function buildInventionWorkshopHtml(parentFirstName: string, childFirstName: str
                   YouTube
                 </a>
               </p>
-              <p style="margin: 16px 0 0;">
-                <a href="https://www.kindlewoodstudio.ai" style="text-decoration: none;">
-                  <img src="https://www.kindlewoodstudio.ai/Logo_New.png" alt="KindleWood Studio" width="80" style="display: inline-block; max-width: 80px; height: auto;" />
+              ${unsubFooter}
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+// ─── Workshop Awareness Email (generic, for all KindleWood users) ────────
+
+function buildWorkshopAwarenessHtml(recipientEmail?: string): string {
+  const unsubFooter = recipientEmail ? buildUnsubscribeFooter(recipientEmail) : '';
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #6d28d9; background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: 32px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;">
+                Creative Workshops for Kids
+              </h1>
+              <p style="color: #e0e7ff; margin: 8px 0 0; font-size: 15px;">
+                Where Storytelling Meets Hands-On Learning
+              </p>
+            </td>
+          </tr>
+
+          <!-- Intro -->
+          <tr>
+            <td style="padding: 32px 24px 16px;">
+              <p style="color: #374151; font-size: 16px; margin: 0;">
+                Hi there,
+              </p>
+              <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
+                We&rsquo;re excited to share that <strong style="color: #374151;">KindleWood Studio</strong> now offers in-person creative workshops for kids ages 4&ndash;8 in the Greater Seattle area!
+              </p>
+              <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
+                Each workshop is a unique, hands-on experience where children explore a creative theme &mdash; from invention and storytelling to art and science &mdash; and turn their ideas into a <strong style="color: #374151;">personalized storybook</strong> they take home.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- What Makes It Special -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                What Makes Our Workshops Special
+              </h2>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #7c3aed;">Hands-On &amp; Screen-Light</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">Kids draw, build, and create with real materials &mdash; AI assists behind the scenes, not in front of it</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #7c3aed;">Every Child Gets a Storybook</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">Their drawings and ideas become a beautifully illustrated story they can read and share</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #7c3aed;">New Themes Every Session</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">Past themes include Creative Explorers, Invention &amp; Innovation, and more coming soon</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px;">
+                    <strong style="color: #7c3aed;">Small Groups, Big Impact</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">Guided sessions with personalized attention for every child</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- Locations -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                Where to Find Us
+              </h2>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #374151;">Bellevue</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">Steamoji Academy &mdash; Weekend sessions</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px;">
+                    <strong style="color: #374151;">Bothell</strong><br />
+                    <span style="color: #6b7280; font-size: 14px;">Avocado Montessori &mdash; Weekday afternoon sessions</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- CTA -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <p style="color: #6b7280; font-size: 15px; margin: 0; line-height: 1.6;">
+                Visit our workshops page to see upcoming sessions and reserve a spot for your child.
+              </p>
+              <p style="margin: 16px 0 0; text-align: center;">
+                <a href="https://www.kindlewoodstudio.ai/workshops" style="display: inline-block; background-color: #7c3aed; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-size: 15px; font-weight: 600;">
+                  View Upcoming Workshops &rarr;
+                </a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px; background-color: #f9fafb; text-align: center;">
+              <p style="color: #374151; font-size: 14px; margin: 0; line-height: 1.6;">
+                Warm regards,
+              </p>
+              <p style="color: #374151; font-size: 14px; margin: 8px 0 0; font-weight: 600;">
+                KindleWood Team
+              </p>
+              <p style="margin: 12px 0 0;">
+                <a href="https://www.kindlewoodstudio.ai" style="color: #7c3aed; font-size: 13px; text-decoration: underline;">
+                  kindlewoodstudio.ai
+                </a>
+                &nbsp;&middot;&nbsp;
+                <a href="https://www.youtube.com/@KindleWoodStudio" style="color: #9ca3af; font-size: 13px; text-decoration: underline;">
+                  YouTube
                 </a>
               </p>
               ${unsubFooter}
@@ -1630,6 +1786,97 @@ export async function POST(req: NextRequest) {
       total: results.length,
       sent: results.filter(r => !r.error).length,
       failed: results.filter(r => r.error).length,
+      results,
+    });
+  }
+
+  if (mode === 'workshop-awareness-test') {
+    const testEmail = 'feifeiqiu11@gmail.com';
+    try {
+      const { error: sendErr } = await resend.emails.send({
+        from: EMAIL_FROM,
+        to: testEmail,
+        subject: 'Hands-On Creative Workshops for Kids — Now in Bellevue & Bothell',
+        html: buildWorkshopAwarenessHtml(testEmail),
+        replyTo: REPLY_TO,
+        headers: getUnsubscribeHeaders(testEmail),
+      });
+      return NextResponse.json({
+        success: !sendErr,
+        mode: 'workshop-awareness-test',
+        to: testEmail,
+        error: sendErr?.message || null,
+      });
+    } catch (err: any) {
+      return NextResponse.json({
+        success: false,
+        mode: 'workshop-awareness-test',
+        error: err?.message || 'Unknown error',
+      }, { status: 500 });
+    }
+  }
+
+  if (mode === 'workshop-awareness') {
+    // Get all users from users table
+    const { data: users, error } = await getSupabase()
+      .from('users')
+      .select('email, first_name')
+      .order('email');
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    if (!users || users.length === 0) {
+      return NextResponse.json({ success: true, message: 'No users found', sent: 0 });
+    }
+
+    // Filter out Apple Private Relay, test accounts, and duplicates
+    const seen = new Set<string>();
+    const validUsers = users.filter((u: any) => {
+      const email = u.email?.toLowerCase();
+      if (!email) return false;
+      if (seen.has(email)) return false;
+      seen.add(email);
+      if (email.includes('privaterelay.appleid.com')) return false;
+      if (email.includes('test@') || email.includes('test123')) return false;
+      return true;
+    });
+
+    // Filter out opted-out emails
+    const optedOut = await getOptedOutEmails(validUsers.map((u: any) => u.email), getSupabase());
+    const recipients = validUsers.filter((u: any) => !optedOut.has(u.email.toLowerCase()));
+
+    const results = [];
+
+    for (let i = 0; i < recipients.length; i++) {
+      const user = recipients[i];
+      if (i > 0) await delay(600);
+
+      const { error: sendErr } = await resend.emails.send({
+        from: EMAIL_FROM,
+        to: user.email,
+        subject: 'Hands-On Creative Workshops for Kids — Now in Bellevue & Bothell',
+        html: buildWorkshopAwarenessHtml(user.email),
+        replyTo: REPLY_TO,
+        headers: getUnsubscribeHeaders(user.email),
+      });
+      results.push({
+        to: user.email,
+        error: sendErr?.message || null,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      mode: 'workshop-awareness',
+      total: results.length,
+      sent: results.filter(r => !r.error).length,
+      failed: results.filter(r => r.error).length,
+      filteredOut: {
+        appleRelay: users.filter((u: any) => u.email?.toLowerCase().includes('privaterelay.appleid.com')).length,
+        optedOut: optedOut.size,
+      },
       results,
     });
   }

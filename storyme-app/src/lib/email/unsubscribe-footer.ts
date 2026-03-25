@@ -1,14 +1,14 @@
 /**
  * Shared unsubscribe footer HTML for marketing emails.
- * CAN-SPAM compliant: includes unsubscribe link and physical address.
+ * CAN-SPAM compliant: includes unsubscribe link.
  *
  * Returns inline HTML to be placed INSIDE the existing email footer <td>,
- * after the logo — not a separate <tr>.
+ * after the site links.
  */
 
 import { buildUnsubscribeUrl } from './unsubscribe-token';
 
-/** Returns inline HTML with unsubscribe link + address for the existing email footer. */
+/** Returns inline HTML with unsubscribe link for the existing email footer. */
 export function buildUnsubscribeFooter(email: string): string {
   const url = buildUnsubscribeUrl(email);
   return `
@@ -16,8 +16,5 @@ export function buildUnsubscribeFooter(email: string): string {
                 Questions? Simply reply to this email.
                 &nbsp;&middot;&nbsp;
                 <a href="${url}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe</a>
-              </p>
-              <p style="color: #9ca3af; font-size: 11px; margin: 4px 0 0;">
-                KindleWood Studio &middot; Bellevue, WA
               </p>`;
 }
