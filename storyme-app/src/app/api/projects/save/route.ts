@@ -57,7 +57,8 @@ export async function POST(request: NextRequest) {
       scenes,
       quizData, // NEW: Optional quiz questions
       visibility = 'private', // DEFAULT to private for safety
-      language = 'en' // NEW: Language for the story (en or zh)
+      language = 'en', // NEW: Language for the story (en or zh)
+      secondaryLanguage = null, // Secondary language for bilingual captions (e.g., 'zh', 'ko')
     } = body;
 
     // If projectId provided, verify it's a draft owned by this user
@@ -207,6 +208,7 @@ export async function POST(request: NextRequest) {
       storyTone: storyTone,
       visibility: visibility as 'private' | 'public',
       language: language as 'en' | 'zh',
+      secondaryLanguage,
       characterIds,
       scenes,
       quizData,

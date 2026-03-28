@@ -32,6 +32,15 @@ export async function GET(
     // PUBLIC endpoint - no auth check required
     // Kids app needs to fetch audio for published stories
 
+    // Fetch project secondary_language setting
+    const { data: projectData } = await supabase
+      .from('projects')
+      .select('secondary_language')
+      .eq('id', projectId)
+      .single();
+
+    const secondaryLanguage = projectData?.secondary_language || null;
+
     // Fetch audio pages (includes quiz transition and quiz question audio)
     const { data: audioPages, error: audioPagesError } = await supabase
       .from('story_audio_pages')
@@ -55,10 +64,15 @@ export async function GET(
     // Determine available languages based on audio URLs
     const hasEnglishAudio = (audioPages || []).some((page: any) => page.audio_url);
     const hasChineseAudio = (audioPages || []).some((page: any) => page.audio_url_zh);
+    const hasSecondaryAudio = (audioPages || []).some((page: any) => page.audio_url_secondary);
 
     const availableLanguages: string[] = [];
     if (hasEnglishAudio) availableLanguages.push('en');
-    if (hasChineseAudio) availableLanguages.push('zh');
+    if (hasChineseAudio && !availableLanguages.includes('zh')) availableLanguages.push('zh');
+    // Add secondary language if it has audio and isn't already listed (e.g. non-zh languages)
+    if (hasSecondaryAudio && secondaryLanguage && !availableLanguages.includes(secondaryLanguage)) {
+      availableLanguages.push(secondaryLanguage);
+    }
 
     // Detect if audio generation is currently in progress
     // Rows with generation_status='generating' older than 10 minutes are considered stale
@@ -69,17 +83,23 @@ export async function GET(
     const isGeneratingChinese = (audioPages || []).some(
       (page: any) => page.generation_status === 'generating' && !page.audio_url_zh && page.text_content_zh && page.created_at > tenMinutesAgo
     );
-    const isGenerating = isGeneratingEnglish || isGeneratingChinese;
+    const isGeneratingSecondary = (audioPages || []).some(
+      (page: any) => page.generation_status === 'generating' && !page.audio_url_secondary && page.text_content_secondary && page.created_at > tenMinutesAgo
+    );
+    const isGenerating = isGeneratingEnglish || isGeneratingChinese || isGeneratingSecondary;
 
     const response = NextResponse.json({
       pages: audioPages || [],
       hasAudio: (audioPages || []).length > 0,
       hasEnglishAudio,
       hasChineseAudio,
+      hasSecondaryAudio,
       availableLanguages,
       isGenerating,
       isGeneratingEnglish,
       isGeneratingChinese,
+      isGeneratingSecondary,
+      secondaryLanguage,
     });
 
     // Add CORS headers for kids app

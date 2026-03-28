@@ -2,6 +2,7 @@
 
 import { StoryTone, ExpansionLevel, ClothingConsistency } from '@/lib/types/story';
 import ExpansionLevelSelector from './ExpansionLevelSelector';
+import { getSecondaryLanguageOptions } from '@/lib/config/languages';
 
 export interface StorySettingsPanelProps {
   readingLevel: number;
@@ -14,7 +15,11 @@ export interface StorySettingsPanelProps {
   onExpansionLevelChange?: (level: ExpansionLevel) => void;
   // Bilingual options (only shown for English content)
   contentLanguage?: 'en' | 'zh';
+  secondaryLanguage?: string | null;
+  onSecondaryLanguageChange?: (value: string | null) => void;
+  /** @deprecated Use secondaryLanguage + onSecondaryLanguageChange instead */
   generateChineseTranslation?: boolean;
+  /** @deprecated Use secondaryLanguage + onSecondaryLanguageChange instead */
   onGenerateChineseTranslationChange?: (value: boolean) => void;
   disabled?: boolean;
 }
@@ -137,11 +142,28 @@ export default function StorySettingsPanel({
   expansionLevel = 'as_written',
   onExpansionLevelChange,
   contentLanguage = 'en',
+  secondaryLanguage = null,
+  onSecondaryLanguageChange,
   generateChineseTranslation = false,
   onGenerateChineseTranslationChange,
   disabled = false,
 }: StorySettingsPanelProps) {
   const currentLevel = readingLevelLabels[readingLevel];
+  const languageOptions = getSecondaryLanguageOptions();
+
+  // Determine the effective secondary language (support legacy prop)
+  const effectiveSecondaryLanguage = secondaryLanguage ?? (generateChineseTranslation ? 'zh' : null);
+
+  // Handle language change — update both new and legacy callbacks
+  const handleSecondaryLanguageChange = (lang: string | null) => {
+    if (onSecondaryLanguageChange) {
+      onSecondaryLanguageChange(lang);
+    }
+    // Backward compat: also call legacy callback
+    if (onGenerateChineseTranslationChange) {
+      onGenerateChineseTranslationChange(lang === 'zh');
+    }
+  };
 
   return (
     <div className="w-full space-y-6 p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
@@ -318,34 +340,63 @@ export default function StorySettingsPanel({
         />
       )}
 
-      {/* Chinese Captions Checkbox (Only for English stories) */}
-      {contentLanguage === 'en' && onGenerateChineseTranslationChange && (
-        <div className="flex items-center gap-3 pt-2">
-          <div className="relative inline-flex items-center">
-            <input
-              type="checkbox"
-              id="bilingual-checkbox-settings"
-              checked={generateChineseTranslation}
-              onChange={(e) => onGenerateChineseTranslationChange(e.target.checked)}
-              disabled={disabled}
-              className="peer w-5 h-5 appearance-none bg-white border-2 border-gray-400 rounded cursor-pointer checked:bg-purple-600 checked:border-purple-600 focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            />
-            <svg
-              className="absolute w-3 h-3 left-1 top-1 pointer-events-none hidden peer-checked:block text-white"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-          </div>
-          <label htmlFor="bilingual-checkbox-settings" className="text-sm font-semibold text-gray-700 cursor-pointer select-none">
-            Generate Chinese Captions for Bilingual Book
+      {/* Secondary Language Selector (Only for English stories) */}
+      {contentLanguage === 'en' && (onSecondaryLanguageChange || onGenerateChineseTranslationChange) && (
+        <div className="space-y-3">
+          <label className="block text-sm font-semibold text-gray-700">
+            Bilingual Captions &amp; Narration
           </label>
+          <div className="grid grid-cols-3 gap-3">
+            {/* None option */}
+            <button
+              type="button"
+              onClick={() => !disabled && handleSecondaryLanguageChange(null)}
+              disabled={disabled}
+              className={`flex items-center gap-2.5 p-3 border-2 rounded-xl cursor-pointer transition-all text-left ${
+                !effectiveSecondaryLanguage
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/30'
+              } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                !effectiveSecondaryLanguage
+                  ? 'border-blue-500 bg-blue-500'
+                  : 'border-gray-300 bg-white'
+              }`}>
+                {!effectiveSecondaryLanguage && (
+                  <div className="w-2 h-2 rounded-full bg-white"></div>
+                )}
+              </div>
+              <span className="font-semibold text-gray-900 text-sm">None</span>
+            </button>
+            {/* Language options */}
+            {languageOptions.map((lang) => (
+              <button
+                key={lang.code}
+                type="button"
+                onClick={() => !disabled && handleSecondaryLanguageChange(lang.code)}
+                disabled={disabled}
+                className={`flex items-center gap-2.5 p-3 border-2 rounded-xl cursor-pointer transition-all text-left ${
+                  effectiveSecondaryLanguage === lang.code
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50/30'
+                } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  effectiveSecondaryLanguage === lang.code
+                    ? 'border-purple-500 bg-purple-500'
+                    : 'border-gray-300 bg-white'
+                }`}>
+                  {effectiveSecondaryLanguage === lang.code && (
+                    <div className="w-2 h-2 rounded-full bg-white"></div>
+                  )}
+                </div>
+                <span className="font-semibold text-gray-900 text-sm">
+                  {lang.label} ({lang.nativeLabel})
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

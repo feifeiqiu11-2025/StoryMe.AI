@@ -122,6 +122,9 @@ export interface Project {
     gemini_model_used?: string;
   };
 
+  // Bilingual / Multi-language
+  secondary_language?: string;    // 'zh', 'ko', etc. — chosen secondary language for this project
+
   // Draft state (UI-specific data not in structured columns)
   draft_metadata?: Record<string, any>;
 
@@ -163,7 +166,8 @@ export interface Scene {
   raw_description?: string;      // Original user input
   enhanced_prompt?: string;       // AI-enhanced for image generation
   caption?: string;               // Age-appropriate caption for PDF
-  caption_chinese?: string;       // Chinese translation (Bilingual Support)
+  caption_chinese?: string;       // Chinese translation (kept for mobile app backward compat)
+  caption_secondary?: string;     // Generic secondary language caption
 
   // Characters in this scene
   character_ids?: string[];

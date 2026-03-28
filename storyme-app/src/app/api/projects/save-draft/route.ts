@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       readingLevel,
       storyTone,
       language = 'en',
+      secondaryLanguage = null,
       characterIds,
       scenes,
       draftMetadata,
@@ -113,6 +114,7 @@ export async function POST(request: NextRequest) {
       readingLevel,
       storyTone,
       language: language as 'en' | 'zh',
+      secondaryLanguage,
       characterIds,
       scenes,
       draftMetadata: {

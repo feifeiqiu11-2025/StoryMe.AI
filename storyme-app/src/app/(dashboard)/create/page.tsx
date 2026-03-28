@@ -54,8 +54,8 @@ function CreateStoryPageInner() {
   // Language selection (NEW - Bilingual Support)
   const [contentLanguage, setContentLanguage] = useState<'en' | 'zh'>('en');
 
-  // Chinese translation toggle (NEW - Bilingual PDF Support)
-  const [generateChineseTranslation, setGenerateChineseTranslation] = useState(false);
+  // Secondary language for bilingual support (NEW - replaces generateChineseTranslation)
+  const [secondaryLanguage, setSecondaryLanguage] = useState<string | null>(null);
 
   // Enhancement state (NEW)
   const [enhancedScenes, setEnhancedScenes] = useState<EnhancedScene[]>([]);
@@ -258,7 +258,11 @@ function CreateStoryPageInner() {
         if (meta.expansionLevel) setExpansionLevel(meta.expansionLevel as ExpansionLevel);
         if (meta.artStyle) setArtStyle(meta.artStyle as ArtStyleType);
         if (meta.imageProvider) setImageProvider(meta.imageProvider as ImageProvider);
-        if (meta.generateChineseTranslation !== undefined) setGenerateChineseTranslation(meta.generateChineseTranslation);
+        if (meta.secondaryLanguage) {
+          setSecondaryLanguage(meta.secondaryLanguage);
+        } else if (meta.generateChineseTranslation === true) {
+          setSecondaryLanguage('zh'); // migrate old format
+        }
         if (meta.selectedTemplate) setSelectedTemplate(meta.selectedTemplate);
         if (meta.contentLanguage) setContentLanguage(meta.contentLanguage);
 
@@ -523,7 +527,7 @@ function CreateStoryPageInner() {
           language: contentLanguage,
           templateBasePrompt: selectedTemplate ? STORY_TEMPLATES[selectedTemplate]?.basePrompt : undefined,
           templateId: selectedTemplate,  // NEW: Pass template ID for story architecture
-          generateChineseTranslation, // NEW: For bilingual English stories with Chinese captions
+          secondaryLanguage, // NEW: For bilingual English stories with secondary language captions
           script: scriptInput,  // NEW: Pass raw script for title/description generation
           characters: characters.map(c => ({
             name: c.name,
@@ -613,12 +617,17 @@ function CreateStoryPageInner() {
     );
   };
 
-  // NEW: Handle Chinese caption editing
-  const handleCaptionChineseEdit = (sceneNumber: number, newCaptionChinese: string) => {
+  // Handle secondary language caption editing (bilingual support)
+  const handleCaptionSecondaryEdit = (sceneNumber: number, newCaption: string) => {
     setEnhancedScenes(prev =>
       prev.map(scene =>
         scene.sceneNumber === sceneNumber
-          ? { ...scene, caption_chinese: newCaptionChinese }
+          ? {
+              ...scene,
+              caption_secondary: newCaption,
+              // Also write caption_chinese for backward compatibility when language is Chinese
+              ...(secondaryLanguage === 'zh' ? { caption_chinese: newCaption } : {}),
+            }
           : scene
       )
     );
@@ -916,6 +925,7 @@ function CreateStoryPageInner() {
               enhanced_prompt: enhancedScene?.enhanced_prompt || img.sceneDescription,
               caption: enhancedScene?.caption || img.sceneDescription,
               caption_chinese: enhancedScene?.caption_chinese,
+              caption_secondary: enhancedScene?.caption_secondary,
               imageUrl: img.imageUrl || null,
               prompt: img.prompt,
               generationTime: img.generationTime,
@@ -932,6 +942,7 @@ function CreateStoryPageInner() {
             enhanced_prompt: es.enhanced_prompt,
             caption: es.caption,
             caption_chinese: es.caption_chinese,
+            caption_secondary: es.caption_secondary,
           }));
       }
 
@@ -995,7 +1006,7 @@ function CreateStoryPageInner() {
         expansionLevel,
         imageProvider,
         artStyle,
-        generateChineseTranslation,
+        secondaryLanguage,
         storyTone,
         selectedTemplate,
         contentLanguage,
@@ -1100,7 +1111,8 @@ function CreateStoryPageInner() {
             raw_description: enhancedScene?.raw_description || img.sceneDescription,
             enhanced_prompt: enhancedScene?.enhanced_prompt || img.sceneDescription,
             caption: enhancedScene?.caption || img.sceneDescription,
-            caption_chinese: enhancedScene?.caption_chinese,  // NEW: Bilingual Support
+            caption_chinese: enhancedScene?.caption_chinese,  // Bilingual Support (backward compat)
+            caption_secondary: enhancedScene?.caption_secondary,  // NEW: Generic secondary language
             imageUrl: img.imageUrl || null,  // null for failed scenes
             prompt: img.prompt,
             generationTime: img.generationTime,
@@ -1204,6 +1216,7 @@ function CreateStoryPageInner() {
           storyTone: storyTone,
           contentLanguage: contentLanguage,
           characterIds: characterIds,
+          secondaryLanguage,
           scenes: scenesData,
           quizData: quizData || undefined,
         }),
@@ -1320,7 +1333,8 @@ function CreateStoryPageInner() {
         return {
           sceneNumber: img.sceneNumber,
           caption: enhancedScene?.caption || img.sceneDescription, // Use caption for PDF
-          caption_chinese: enhancedScene?.caption_chinese,  // NEW: Bilingual Support
+          caption_chinese: enhancedScene?.caption_chinese,
+          caption_secondary: enhancedScene?.caption_secondary || enhancedScene?.caption_chinese,
           imageUrl: img.imageUrl,
         };
       });
@@ -1890,8 +1904,8 @@ function CreateStoryPageInner() {
               expansionLevel={expansionLevel}
               onExpansionLevelChange={setExpansionLevel}
               contentLanguage={contentLanguage}
-              generateChineseTranslation={generateChineseTranslation}
-              onGenerateChineseTranslationChange={setGenerateChineseTranslation}
+              secondaryLanguage={secondaryLanguage}
+              onSecondaryLanguageChange={setSecondaryLanguage}
               disabled={isEnhancing}
             />
 
@@ -1955,7 +1969,7 @@ function CreateStoryPageInner() {
               onApprove={handleGenerateImages}
               onBack={handleRegenerateAll}
               onCaptionEdit={handleCaptionEdit}
-              onCaptionChineseEdit={handleCaptionChineseEdit}
+              onCaptionSecondaryEdit={handleCaptionSecondaryEdit}
               onImagePromptEdit={handleImagePromptEdit}
               onScenesUpdate={handleScenesUpdate}
               onTitleEdit={handleTitleEdit}  // NEW: Title editing
@@ -1965,7 +1979,7 @@ function CreateStoryPageInner() {
               storyTone={storyTone}
               expansionLevel={expansionLevel}
               contentLanguage={contentLanguage}
-              generateChineseTranslation={generateChineseTranslation}
+              secondaryLanguage={secondaryLanguage}
               artStyle={artStyle}
               onArtStyleChange={setArtStyle}
               imageProvider={imageProvider}
@@ -2009,10 +2023,10 @@ function CreateStoryPageInner() {
               clothingConsistency={clothingConsistency}
               enhancedScenes={enhancedScenes}
               onCaptionEdit={handleCaptionEdit}
-              onCaptionChineseEdit={handleCaptionChineseEdit}
+              onCaptionSecondaryEdit={handleCaptionSecondaryEdit}
               onTitleEdit={handleTitleEdit}
               onDescriptionEdit={handleDescriptionEdit}
-              generateChineseTranslation={generateChineseTranslation}
+              secondaryLanguage={secondaryLanguage}
               onRegenerateScene={(imageId, newImageData) => {
                 // Replace the image in the status array
                 setImageGenerationStatus(prev =>

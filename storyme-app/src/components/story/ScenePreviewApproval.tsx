@@ -8,6 +8,7 @@
 
 import React, { useState } from 'react';
 import { EnhancedScene, ImageProvider, IMAGE_PROVIDER_OPTIONS, DEFAULT_IMAGE_PROVIDER } from '@/lib/types/story';
+import { getLanguageLabel } from '@/lib/config/languages';
 
 // Art style type
 type ArtStyleType = 'pixar' | 'classic' | 'coloring';
@@ -19,7 +20,7 @@ interface ScenePreviewApprovalProps {
   onApprove: () => void;
   onBack: () => void;
   onCaptionEdit?: (sceneNumber: number, newCaption: string) => void;
-  onCaptionChineseEdit?: (sceneNumber: number, newCaptionChinese: string) => void;  // NEW
+  onCaptionSecondaryEdit?: (sceneNumber: number, newCaption: string) => void;
   onImagePromptEdit?: (sceneNumber: number, newPrompt: string) => void;  // NEW: For image prompt editing
   onScenesUpdate?: (updatedScenes: EnhancedScene[]) => void;
   isGenerating: boolean;
@@ -31,7 +32,7 @@ interface ScenePreviewApprovalProps {
   storyTone?: string;
   expansionLevel?: string;
   contentLanguage?: 'en' | 'zh';
-  generateChineseTranslation?: boolean;  // NEW: For bilingual stories
+  secondaryLanguage?: string | null;
   // Art style and image provider settings
   artStyle?: ArtStyleType;
   onArtStyleChange?: (style: ArtStyleType) => void;
@@ -51,7 +52,7 @@ export default function ScenePreviewApproval({
   onApprove,
   onBack,
   onCaptionEdit,
-  onCaptionChineseEdit,
+  onCaptionSecondaryEdit,
   onImagePromptEdit,
   onScenesUpdate,
   isGenerating,
@@ -61,7 +62,7 @@ export default function ScenePreviewApproval({
   storyTone = 'playful',
   expansionLevel = 'as_written',
   contentLanguage = 'en',
-  generateChineseTranslation = false,
+  secondaryLanguage = null,
   artStyle = 'classic',
   onArtStyleChange,
   imageProvider = DEFAULT_IMAGE_PROVIDER,
@@ -451,13 +452,13 @@ export default function ScenePreviewApproval({
                   </div>
                   )}
 
-                  {/* Chinese Caption - Editable (NEW - Bilingual Support) - Skip for cover */}
-                  {!scene.isCover && generateChineseTranslation && (
-                    onCaptionChineseEdit ? (
+                  {/* Secondary Language Caption - Editable (Bilingual Support) - Skip for cover */}
+                  {!scene.isCover && !!secondaryLanguage && (
+                    onCaptionSecondaryEdit ? (
                       <textarea
-                        value={scene.caption_chinese || ''}
+                        value={scene.caption_secondary || scene.caption_chinese || ''}
                         onChange={(e) => {
-                          onCaptionChineseEdit(scene.sceneNumber, e.target.value);
+                          onCaptionSecondaryEdit(scene.sceneNumber, e.target.value);
                           // Auto-resize textarea based on content
                           e.target.style.height = 'auto';
                           e.target.style.height = e.target.scrollHeight + 'px';
@@ -468,14 +469,14 @@ export default function ScenePreviewApproval({
                           e.target.style.height = e.target.scrollHeight + 'px';
                         }}
                         disabled={isGenerating}
-                        placeholder="Chinese translation will appear here..."
+                        placeholder={`${getLanguageLabel(secondaryLanguage)} translation will appear here...`}
                         className="w-full px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 leading-relaxed overflow-hidden mb-3"
                         rows={1}
                         style={{ minHeight: '2.5rem' }}
                       />
                     ) : (
                       <p className="text-gray-900 leading-relaxed bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 mb-3">
-                        {scene.caption_chinese || <span className="text-gray-400 italic">No Chinese translation</span>}
+                        {scene.caption_secondary || scene.caption_chinese || <span className="text-gray-400 italic">No {getLanguageLabel(secondaryLanguage)} translation</span>}
                       </p>
                     )
                   )}

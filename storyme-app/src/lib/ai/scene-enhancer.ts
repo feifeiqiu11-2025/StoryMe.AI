@@ -27,7 +27,8 @@ export interface EnhancedSceneResult {
   raw_description: string;
   enhanced_prompt: string;
   caption: string;
-  caption_chinese?: string;      // Chinese translation (NEW - Bilingual Support)
+  caption_chinese?: string;      // Chinese translation (kept for backward compat)
+  caption_secondary?: string;   // Generic secondary language caption
   characterNames: string[];
   isNewCharacter?: boolean;      // Flag if AI added new character
   characterTypes?: CharacterType[]; // AI-detected character types for this scene
