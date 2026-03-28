@@ -3,11 +3,13 @@
  * Generates audio narration for all pages of a story using Azure Neural TTS
  * - English: Uses en-US-AnaNeural (child voice) for authentic kid storytelling
  * - Chinese: Uses zh-CN-XiaoxiaoNeural (晓晓) and other kid-friendly voices
+ * - Korean: Uses ko-KR-SunHiNeural for Korean storytelling
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientFromRequest } from '@/lib/supabase/server';
 import { getAzureTTSClient, isAzureTTSAvailable } from '@/lib/azure-tts-client';
+import { isSupportedSecondaryLanguage, getLanguageLabel } from '@/lib/config/languages';
 
 // Maximum duration for this API route (5 minutes)
 export const maxDuration = 300;
@@ -32,9 +34,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate language parameter
-    if (!['en', 'zh'].includes(language)) {
+    if (language !== 'en' && !isSupportedSecondaryLanguage(language)) {
       return NextResponse.json(
-        { error: 'Invalid language. Must be "en" or "zh"' },
+        { error: `Invalid language "${language}". Must be "en" or a supported secondary language.` },
         { status: 400 }
       );
     }
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch project with scenes (including Chinese captions for bilingual support)
+    // Fetch project with scenes (including secondary language captions for bilingual support)
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select(`
@@ -63,7 +65,8 @@ export async function POST(request: NextRequest) {
           scene_number,
           description,
           caption,
-          caption_chinese
+          caption_chinese,
+          caption_secondary
         )
       `)
       .eq('id', projectId)
@@ -96,7 +99,7 @@ export async function POST(request: NextRequest) {
     const pages: AudioPage[] = [];
 
     // Page 1: Cover page
-    // For Chinese, we keep the same cover text (title + author) as it's usually in the target language
+    // For non-English, we keep the same cover text (title + author) as it's usually in the target language
     const coverText = project.author_name && project.author_age
       ? `${project.title}, by ${project.author_name}, age ${project.author_age}`
       : project.author_name
@@ -112,20 +115,20 @@ export async function POST(request: NextRequest) {
     // Pages 2+: Scene pages
     const scenes = (project.scenes || []).sort((a: any, b: any) => a.scene_number - b.scene_number);
 
-    // Check if story has Chinese captions
-    const hasBilingualContent = scenes.some((scene: any) => scene.caption_chinese);
+    // Check if story has secondary language captions
+    const hasBilingualContent = scenes.some((scene: any) => scene.caption_secondary || scene.caption_chinese);
 
-    if (language === 'zh' && !hasBilingualContent) {
+    if (language !== 'en' && !hasBilingualContent) {
       return NextResponse.json(
-        { error: 'This story does not have Chinese captions. Please add Chinese captions first.' },
+        { error: `This story does not have ${getLanguageLabel(language)} captions. Please add secondary language captions first.` },
         { status: 400 }
       );
     }
 
     scenes.forEach((scene: any, index: number) => {
-      // Use Chinese caption if generating Chinese audio, fallback to English
-      const textContent = language === 'zh'
-        ? (scene.caption_chinese || scene.caption || scene.description || `Scene ${index + 1}`)
+      // Use secondary language caption if generating non-English audio, fallback to English
+      const textContent = language !== 'en'
+        ? (scene.caption_secondary || scene.caption_chinese || scene.caption || scene.description || `Scene ${index + 1}`)
         : (scene.caption || scene.description || `Scene ${index + 1}`);
 
       if (textContent && textContent.trim()) {
@@ -196,7 +199,7 @@ export async function POST(request: NextRequest) {
     console.log(`🎤 Using Azure TTS for ${language.toUpperCase()} with kid-friendly voice (tone: ${tone})`);
 
     // For English: Delete existing audio pages and recreate
-    // For Chinese: Update existing rows with Chinese audio columns
+    // For secondary languages: Update existing rows with secondary audio columns
     if (language === 'en') {
       await supabase
         .from('story_audio_pages')
@@ -213,8 +216,13 @@ export async function POST(request: NextRequest) {
 
         let audioPageId: string;
 
-        // Determine voice ID based on language
-        const voiceId = language === 'en' ? 'en-US-AnaNeural' : 'zh-CN-XiaoxiaoNeural';
+        // Determine voice ID based on language (stored for reference in DB)
+        const voiceIdMap: Record<string, string> = {
+          en: 'en-US-AnaNeural',
+          zh: 'zh-CN-XiaoxiaoNeural',
+          ko: 'ko-KR-SunHiNeural',
+        };
+        const voiceId = voiceIdMap[language] || voiceIdMap.en;
 
         if (language === 'en') {
           // English: Insert new row
@@ -242,7 +250,7 @@ export async function POST(request: NextRequest) {
           }
           audioPageId = audioPage.id;
         } else {
-          // Chinese: Find existing row or create one
+          // Secondary language: Find existing row or create one
           const { data: existingPage } = await supabase
             .from('story_audio_pages')
             .select('id')
@@ -252,10 +260,13 @@ export async function POST(request: NextRequest) {
 
           if (existingPage) {
             audioPageId = existingPage.id;
-            // Update text_content_zh
+            // Update text content for secondary language
             await supabase
               .from('story_audio_pages')
-              .update({ text_content_zh: page.textContent })
+              .update({
+                text_content_secondary: page.textContent,
+                ...(language === 'zh' ? { text_content_zh: page.textContent } : {}),
+              })
               .eq('id', audioPageId);
           } else {
             // Create new row if English audio wasn't generated first
@@ -267,11 +278,12 @@ export async function POST(request: NextRequest) {
                 page_type: page.pageType,
                 scene_id: page.sceneId,
                 quiz_question_id: page.quizQuestionId,
-                text_content_zh: page.textContent,
+                text_content_secondary: page.textContent,
+                ...(language === 'zh' ? { text_content_zh: page.textContent } : {}),
                 voice_id: voiceId,
                 tone: tone,
                 generation_status: 'generating',
-                language: 'en', // Default, but we're adding Chinese audio
+                language: 'en', // Default, but we're adding secondary audio
               })
               .select()
               .single();
@@ -284,9 +296,8 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Generate audio using Azure TTS (for both English and Chinese)
-        const langCode = language as 'en' | 'zh';
-        const azureResult = await azureTTS.synthesize(page.textContent, tone, langCode);
+        // Generate audio using Azure TTS (for both English and secondary languages)
+        const azureResult = await azureTTS.synthesize(page.textContent, tone, language);
         const buffer = azureResult.audioBuffer;
         console.log(`[Azure TTS] Generated ${buffer.length} bytes for page ${page.pageNumber}`);
 
@@ -327,7 +338,8 @@ export async function POST(request: NextRequest) {
               generation_status: 'completed',
             }
           : {
-              audio_url_zh: publicUrl,
+              audio_url_secondary: publicUrl,
+              ...(language === 'zh' ? { audio_url_zh: publicUrl } : {}),
               generation_status: 'completed',
             };
 

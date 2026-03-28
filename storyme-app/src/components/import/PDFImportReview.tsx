@@ -9,6 +9,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
+import { getSecondaryLanguageOptions } from '@/lib/config/languages';
 
 // Types for extracted PDF content (must match import page)
 interface ExtractedPage {
@@ -244,7 +245,7 @@ export default function PDFImportReview({
         </button>
 
         <div className="flex items-center gap-3">
-          {/* Always show both translation buttons - user picks which one to use */}
+          {/* Translation buttons - English + secondary language options */}
           {scenePages.length > 0 && (
             <>
               <button
@@ -253,12 +254,15 @@ export default function PDFImportReview({
               >
                 Generate English Captions
               </button>
-              <button
-                onClick={() => onTranslate('en-to-zh')}
-                className="px-4 py-2 border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50 font-medium text-sm"
-              >
-                Generate Chinese Captions
-              </button>
+              {getSecondaryLanguageOptions().map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => onTranslate(`en-to-${lang.code}` as any)}
+                  className="px-4 py-2 border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50 font-medium text-sm"
+                >
+                  Generate {lang.label} Captions
+                </button>
+              ))}
             </>
           )}
 

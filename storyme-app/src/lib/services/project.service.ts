@@ -8,6 +8,7 @@ import { ProjectRepository } from '../repositories/project.repository';
 import { SceneRepository } from '../repositories/scene.repository';
 import { CharacterRepository } from '../repositories/character.repository';
 import { StorageService } from './storage.service';
+import type { SecondaryLanguage } from '../config/languages';
 import type { Project, ProjectCharacter, Scene } from '../domain/models';
 import type {
   CreateProjectDTO,
@@ -349,6 +350,7 @@ export class ProjectService {
       readingLevel?: number;
       storyTone?: string;
       language?: 'en' | 'zh';
+      secondaryLanguage?: SecondaryLanguage | null;
       characterIds?: string[];
       scenes?: Array<{
         sceneNumber: number;
@@ -357,6 +359,7 @@ export class ProjectService {
         enhanced_prompt?: string;
         caption?: string;
         caption_chinese?: string;
+        caption_secondary?: string;
         imageUrl?: string | null;
         prompt?: string;
         generationTime?: number;
@@ -386,6 +389,7 @@ export class ProjectService {
         reading_level: data.readingLevel,
         story_tone: data.storyTone,
         content_language: data.language || 'en',
+        secondary_language: data.secondaryLanguage ?? existing.secondary_language,
         visibility: 'private', // Drafts always private
         draft_metadata: data.draftMetadata,
       } as any);
@@ -411,6 +415,7 @@ export class ProjectService {
         reading_level: data.readingLevel,
         story_tone: data.storyTone,
         content_language: data.language || 'en',
+        secondary_language: data.secondaryLanguage || null,
         visibility: 'private', // Drafts always private
         status: 'draft',
         draft_metadata: data.draftMetadata,
@@ -426,7 +431,13 @@ export class ProjectService {
 
     // Save scenes + images if provided
     if (data.scenes && data.scenes.length > 0) {
+      // Determine secondary language for dual-write logic
+      const secLang = data.secondaryLanguage || null;
+
       for (const sceneData of data.scenes) {
+        // Resolve the secondary caption: prefer explicit caption_secondary, fall back to caption_chinese
+        const secondaryCaption = sceneData.caption_secondary || sceneData.caption_chinese || null;
+
         const { data: scene, error: sceneError } = await supabase
           .from('scenes')
           .insert({
@@ -436,7 +447,10 @@ export class ProjectService {
             raw_description: sceneData.raw_description,
             enhanced_prompt: sceneData.enhanced_prompt,
             caption: sceneData.caption,
-            caption_chinese: sceneData.caption_chinese,
+            // Always write to generic column
+            caption_secondary: secondaryCaption,
+            // Dual-write to legacy Chinese column when language is 'zh' (backward compat for mobile app)
+            caption_chinese: secLang === 'zh' ? secondaryCaption : (sceneData.caption_chinese || null),
             character_ids: data.characterIds || [],
           })
           .select()
@@ -495,6 +509,7 @@ export class ProjectService {
       storyTone?: string;
       visibility?: 'private' | 'public';
       language?: 'en' | 'zh';
+      secondaryLanguage?: SecondaryLanguage | null;
       characterIds: string[];
       scenes: Array<{
         sceneNumber: number;
@@ -503,6 +518,7 @@ export class ProjectService {
         enhanced_prompt?: string;
         caption?: string;
         caption_chinese?: string;
+        caption_secondary?: string;
         imageUrl: string | null;
         prompt: string;
         generationTime: number;
@@ -548,6 +564,7 @@ export class ProjectService {
         story_tone: data.storyTone,
         visibility: data.visibility || 'private',
         content_language: data.language || 'en',
+        secondary_language: data.secondaryLanguage ?? existing.secondary_language,
         status: 'completed',
         draft_metadata: null, // Clear draft state
       } as any);
@@ -565,6 +582,7 @@ export class ProjectService {
         story_tone: data.storyTone,
         visibility: data.visibility || 'private',
         content_language: data.language || 'en',
+        secondary_language: data.secondaryLanguage || null,
         status: 'completed',
       } as any);
     }
@@ -578,7 +596,13 @@ export class ProjectService {
     }
 
     // 4. Save scenes with images
+    // Determine secondary language for dual-write logic
+    const secLang = data.secondaryLanguage || null;
+
     for (const sceneData of data.scenes) {
+      // Resolve the secondary caption: prefer explicit caption_secondary, fall back to caption_chinese
+      const secondaryCaption = sceneData.caption_secondary || sceneData.caption_chinese || null;
+
       const { data: scene, error: sceneError } = await supabase
         .from('scenes')
         .insert({
@@ -588,7 +612,10 @@ export class ProjectService {
           raw_description: sceneData.raw_description,
           enhanced_prompt: sceneData.enhanced_prompt,
           caption: sceneData.caption,
-          caption_chinese: sceneData.caption_chinese,
+          // Always write to generic column
+          caption_secondary: secondaryCaption,
+          // Dual-write to legacy Chinese column when language is 'zh' (backward compat for mobile app)
+          caption_chinese: secLang === 'zh' ? secondaryCaption : (sceneData.caption_chinese || null),
           character_ids: data.characterIds,
         })
         .select()

@@ -95,6 +95,7 @@ export interface ProjectDTO {
   viewCount?: number;
   shareCount?: number;
   tags?: StoryTag[];
+  secondaryLanguage?: string;
   draftMetadata?: Record<string, any>;
 }
 
@@ -157,7 +158,8 @@ export interface SceneDTO {
   rawDescription?: string;      // Original user input
   enhancedPrompt?: string;       // AI-enhanced for image generation
   caption?: string;               // Age-appropriate caption for PDF
-  captionChinese?: string;        // Chinese translation (Bilingual Support)
+  captionChinese?: string;        // Chinese translation (kept for backward compat)
+  captionSecondary?: string;      // Generic secondary language caption
   characterIds?: string[];
   characterNames?: string[]; // Helper for display
   locationType?: string;

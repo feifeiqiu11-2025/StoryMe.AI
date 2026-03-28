@@ -26,6 +26,8 @@ import { StoryTone, ExpansionLevel, StoryTemplateId } from '@/lib/types/story';
 import { generateStoryMetadata } from '@/lib/ai/metadata-generator';
 import { buildCoverPrompt } from '@/lib/ai/cover-prompt-builder';
 import { getStoryArchitecture } from '@/lib/ai/story-templates';
+import { translateCaptions } from '@/lib/ai/caption-translator';
+import { isSupportedSecondaryLanguage, type SecondaryLanguage } from '@/lib/config/languages';
 
 export const maxDuration = 60; // 1 minute timeout
 
@@ -39,7 +41,8 @@ export async function POST(request: NextRequest) {
       characters,
       expansionLevel = 'as_written',
       language = 'en',
-      generateChineseTranslation = false,  // For bilingual English stories
+      generateChineseTranslation = false,  // Legacy param — backward compat alias for secondaryLanguage='zh'
+      secondaryLanguage: rawSecondaryLanguage,  // Generic: 'zh', 'ko', etc.
       script,  // Raw script text for title/description generation
       templateBasePrompt,  // Optional: story category guidance from selected template
       templateId  // Optional: template ID for story architecture
@@ -85,7 +88,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`Enhancing ${scenes.length} scenes with reading level ${readingLevel}, ${storyTone} tone, ${expansionLevel} expansion, language: ${language}`);
+    // Resolve secondary language: new param takes precedence, old boolean is backward compat alias
+    const secondaryLanguage: SecondaryLanguage | null =
+      (rawSecondaryLanguage && isSupportedSecondaryLanguage(rawSecondaryLanguage))
+        ? rawSecondaryLanguage
+        : (generateChineseTranslation ? 'zh' : null);
+
+    console.log(`Enhancing ${scenes.length} scenes with reading level ${readingLevel}, ${storyTone} tone, ${expansionLevel} expansion, language: ${language}${secondaryLanguage ? `, secondary: ${secondaryLanguage}` : ''}`);
 
     // Get story architecture if template is selected
     const storyArchitecture = templateId
@@ -234,56 +243,23 @@ export async function POST(request: NextRequest) {
       console.warn('No script provided, skipping metadata generation');
     }
 
-    // NEW: If bilingual mode, generate Chinese translations
-    if (language === 'en' && generateChineseTranslation) {
-      console.log('🌏 Generating Chinese translations for bilingual story...');
-
+    // Generate secondary language translations if requested
+    if (language === 'en' && secondaryLanguage) {
       try {
-        const { client: zhClient, model: zhModel } = getModelForLanguage('zh');
+        const translations = await translateCaptions(
+          enhancedScenes.map(s => s.caption),
+          secondaryLanguage,
+          { readingLevel, storyTone }
+        );
 
-        // Build simple translation prompt
-        const captionsToTranslate = enhancedScenes.map(s => s.caption).join('\n\n');
-
-        const translationPrompt = `Translate the following English children's story captions to Chinese. Keep the same playful, age-appropriate tone. Return ONLY the translations, one per line, in the same order.
-
-English Captions:
-${captionsToTranslate}
-
-Chinese Translations:`;
-
-        const translationCompletion = await zhClient.chat.completions.create({
-          model: zhModel,
-          max_tokens: 2048,
-          temperature: 0.5,
-          messages: [
-            {
-              role: 'system',
-              content: '你是专业的儿童故事翻译专家，擅长将英文故事翻译成生动、适合儿童的中文。'
-            },
-            {
-              role: 'user',
-              content: translationPrompt
-            }
-          ]
-        });
-
-        const translationsText = translationCompletion.choices[0]?.message?.content || '';
-        const translations = translationsText.trim().split('\n').filter(t => t.trim());
-
-        console.log(`✓ Generated ${translations.length} Chinese translations`);
-
-        // Log translation usage
-        logModelUsage('zh', zhModel, translationCompletion.usage);
-
-        // Attach translations to enhanced scenes
         enhancedScenes = enhancedScenes.map((scene, index) => ({
           ...scene,
-          caption_chinese: translations[index] || scene.caption  // Fallback to English if missing
+          caption_secondary: translations[index],
+          // Backward compat: also set caption_chinese when secondary is Chinese
+          ...(secondaryLanguage === 'zh' ? { caption_chinese: translations[index] } : {}),
         }));
-
       } catch (translationError) {
-        console.error('Chinese translation failed, continuing without translations:', translationError);
-        // Don't fail the whole request, just skip translations
+        console.error(`${secondaryLanguage} translation failed, continuing without translations:`, translationError);
       }
     }
 

@@ -32,6 +32,21 @@ Font.register({
   ],
 });
 
+// Register Korean fonts for PDF rendering
+Font.register({
+  family: 'Noto Sans KR',
+  fonts: [
+    {
+      src: 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-kr@5.1.1/files/noto-sans-kr-korean-400-normal.woff2',
+      fontWeight: 400,
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-kr@5.1.1/files/noto-sans-kr-korean-700-normal.woff2',
+      fontWeight: 700,
+    },
+  ],
+});
+
 // Define styles for PDF
 const styles = StyleSheet.create({
   page: {
@@ -208,7 +223,8 @@ interface StorybookTemplateProps {
   scenes: Array<{
     sceneNumber: number;
     caption?: string;          // Age-appropriate caption (English)
-    caption_chinese?: string;  // Chinese translation (NEW - Bilingual Support)
+    caption_chinese?: string;  // Chinese translation (backward compat)
+    caption_secondary?: string; // Generic secondary language caption (Korean, Chinese, etc.)
     description?: string;      // Fallback for backward compatibility
     imageUrl: string;
   }>;
@@ -228,10 +244,17 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 }
 
 /**
- * Helper function to detect if text contains Chinese characters
+ * Helper function to detect if text contains CJK characters (Chinese or Korean)
  */
-function containsChinese(text: string): boolean {
-  return /[\u4e00-\u9fa5]/.test(text);
+function containsCJK(text: string): boolean {
+  return /[\u4e00-\u9fa5\uAC00-\uD7AF]/.test(text);
+}
+
+/**
+ * Helper function to detect if text contains Korean characters
+ */
+function containsKorean(text: string): boolean {
+  return /[\uAC00-\uD7AF]/.test(text);
 }
 
 /**
@@ -239,7 +262,7 @@ function containsChinese(text: string): boolean {
  * Only applies to Chinese text, English text keeps natural wrapping
  */
 function wrapChineseText(text: string, maxCharsPerLine: number = 18): string {
-  if (!containsChinese(text)) {
+  if (!containsCJK(text)) {
     // English text - return as is, natural wrapping will work
     return text;
   }
@@ -308,7 +331,8 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
     sceneNumber: s.sceneNumber,
     hasCaption: !!s.caption,
     hasCaptionChinese: !!s.caption_chinese,
-    caption_chinese: s.caption_chinese
+    hasCaptionSecondary: !!s.caption_secondary,
+    caption_secondary: s.caption_secondary || s.caption_chinese
   })));
 
   return (
@@ -543,19 +567,23 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
                     {wrapChineseText(caption)}
                   </Text>
 
-                  {/* Chinese Caption (NEW - Bilingual Support) */}
-                  {scene.caption_chinese && (
-                    <Text style={{
-                      fontSize: fontSize - 2,  // Slightly smaller for Chinese
-                      lineHeight: lineHeight,
-                      fontFamily: 'Noto Sans SC',
-                      color: '#6B7280',  // Lighter gray
-                      textAlign: 'center',
-                      marginTop: 8,
-                    }}>
-                      {wrapChineseText(scene.caption_chinese)}
-                    </Text>
-                  )}
+                  {/* Secondary Language Caption (Bilingual Support - Chinese/Korean) */}
+                  {(scene.caption_secondary || scene.caption_chinese) && (() => {
+                    const secondaryText = scene.caption_secondary || scene.caption_chinese || '';
+                    const secondaryFontFamily = containsKorean(secondaryText) ? 'Noto Sans KR' : 'Noto Sans SC';
+                    return (
+                      <Text style={{
+                        fontSize: fontSize - 2,
+                        lineHeight: lineHeight,
+                        fontFamily: secondaryFontFamily,
+                        color: '#6B7280',
+                        textAlign: 'center',
+                        marginTop: 8,
+                      }}>
+                        {wrapChineseText(secondaryText)}
+                      </Text>
+                    );
+                  })()}
                 </View>
                 {/* Page number - book style: odd=left, even=right */}
                 <Text style={{

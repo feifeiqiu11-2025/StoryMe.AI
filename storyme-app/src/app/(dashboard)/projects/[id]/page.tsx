@@ -13,6 +13,7 @@ import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeViewer';
 import Tooltip from '@/components/ui/Tooltip';
 import TagSelector from '@/components/story/TagSelector';
+import { getLanguageLabel } from '@/lib/config/languages';
 
 export default function StoryViewerPage() {
   const router = useRouter();
@@ -240,7 +241,7 @@ export default function StoryViewerPage() {
     }
   };
 
-  const handleGenerateAudio = async (language: 'en' | 'zh' = 'en') => {
+  const handleGenerateAudio = async (language: string = 'en') => {
     if (!project) {
       alert('Project not loaded');
       return;
@@ -250,7 +251,8 @@ export default function StoryViewerPage() {
     setShowAudioDropdown(false);
 
     try {
-      console.log(`🎵 Starting ${language.toUpperCase()} audio generation...`);
+      const languageLabel = language === 'en' ? 'English' : getLanguageLabel(language);
+      console.log(`🎵 Starting ${languageLabel} audio generation...`);
 
       const response = await fetch('/api/generate-story-audio', {
         method: 'POST',
@@ -261,7 +263,7 @@ export default function StoryViewerPage() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        alert(`✅ ${language === 'zh' ? 'Chinese' : 'English'} audio generated successfully!\n\n${data.successfulPages} of ${data.totalPages} pages have audio narration.`);
+        alert(`${languageLabel} audio generated successfully!\n\n${data.successfulPages} of ${data.totalPages} pages have audio narration.`);
         setHasAudio(true);
         await checkAudioExists();
       } else {
@@ -841,8 +843,10 @@ export default function StoryViewerPage() {
           imageUrl: scene.images[0].imageUrl,
           textContent: scene.caption || scene.description,
           textContentChinese: scene.captionChinese,
+          textContentSecondary: scene.captionSecondary || scene.captionChinese,
           audioUrl: sceneAudioPage?.audio_url,
           audioUrlZh: sceneAudioPage?.audio_url_zh,
+          audioUrlSecondary: sceneAudioPage?.audio_url_secondary || sceneAudioPage?.audio_url_zh,
           audioDuration: sceneAudioPage?.audio_duration_seconds,
         });
       });
@@ -917,7 +921,8 @@ export default function StoryViewerPage() {
         .map((scene: any) => ({
           sceneNumber: scene.sceneNumber,
           caption: scene.caption || scene.description,  // Use caption for PDF
-          caption_chinese: scene.captionChinese || scene.caption_chinese,  // NEW: Bilingual Support (support both camelCase and snake_case)
+          caption_chinese: scene.captionChinese || scene.caption_chinese,
+          caption_secondary: scene.captionSecondary || scene.caption_secondary || scene.captionChinese || scene.caption_chinese,
           description: scene.description,  // Keep for backward compatibility
           imageUrl: scene.images[0].imageUrl,
         }));
@@ -1232,8 +1237,8 @@ export default function StoryViewerPage() {
   // IMPORTANT: Sort scenes by sceneNumber to ensure correct page order
   const scenes = (project.scenes || []).sort((a: any, b: any) => a.sceneNumber - b.sceneNumber);
 
-  // Check if story has bilingual content (Chinese captions)
-  const hasBilingualContent = scenes.some((scene: any) => scene.captionChinese || scene.caption_chinese);
+  // Check if story has bilingual content (secondary language captions)
+  const hasBilingualContent = scenes.some((scene: any) => scene.captionSecondary || scene.captionChinese || scene.caption_secondary || scene.caption_chinese);
 
   // Build combined pages array: cover + scenes + quiz
   const allPages = [
@@ -1422,9 +1427,9 @@ export default function StoryViewerPage() {
                   <p className="text-gray-800 text-lg leading-relaxed">
                     {currentPage.scene?.caption || currentPage.scene?.description || 'No description available'}
                   </p>
-                  {currentPage.scene?.captionChinese && (
+                  {(currentPage.scene?.captionSecondary || currentPage.scene?.captionChinese) && (
                     <p className="text-gray-500 text-base leading-relaxed mt-2">
-                      {currentPage.scene.captionChinese}
+                      {currentPage.scene.captionSecondary || currentPage.scene.captionChinese}
                     </p>
                   )}
                 </div>
@@ -1511,10 +1516,10 @@ export default function StoryViewerPage() {
                         </button>
                         {hasBilingualContent && (
                           <button
-                            onClick={() => handleGenerateAudio('zh')}
+                            onClick={() => handleGenerateAudio((project?.secondaryLanguage || 'zh') as 'en' | 'zh')}
                             className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
                           >
-                            <span>Chinese Narration</span>
+                            <span>{getLanguageLabel(project?.secondaryLanguage || 'zh')} Narration</span>
                             {hasChineseAudio && <span className="text-green-600">✓</span>}
                           </button>
                         )}
@@ -1771,6 +1776,7 @@ export default function StoryViewerPage() {
           projectTitle={project?.title || 'Storybook'}
           pages={readingPages}
           onExit={() => setReadingMode(false)}
+          secondaryLanguage={project?.secondaryLanguage}
         />
       )}
 

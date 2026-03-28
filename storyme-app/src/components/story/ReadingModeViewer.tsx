@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSwipeable } from 'react-swipeable';
+import { getLanguageLabel } from '@/lib/config/languages';
 
 export interface ReadingPage {
   pageNumber: number;
@@ -14,8 +15,10 @@ export interface ReadingPage {
   imageUrl: string;
   textContent: string;
   textContentChinese?: string;
+  textContentSecondary?: string;
   audioUrl?: string;
   audioUrlZh?: string;
+  audioUrlSecondary?: string;
   audioDuration?: number;
   quizQuestion?: {
     id: string;
@@ -35,6 +38,7 @@ interface ReadingModeViewerProps {
   pages: ReadingPage[];
   onExit: () => void;
   autoPlayAudio?: boolean;
+  secondaryLanguage?: string | null;
 }
 
 export default function ReadingModeViewer({
@@ -43,6 +47,7 @@ export default function ReadingModeViewer({
   pages,
   onExit,
   autoPlayAudio = false,
+  secondaryLanguage,
 }: ReadingModeViewerProps) {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [audioEnabled, setAudioEnabled] = useState(autoPlayAudio);
@@ -50,7 +55,7 @@ export default function ReadingModeViewer({
   const [showControls, setShowControls] = useState(true);
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
-  const [audioLanguage, setAudioLanguage] = useState<'en' | 'zh'>('en');
+  const [audioLanguage, setAudioLanguage] = useState<string>('en');
   const audioRef = useRef<HTMLAudioElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -62,12 +67,17 @@ export default function ReadingModeViewer({
   // Check if bilingual audio is available
   const hasEnglishAudio = pages.some(p => p.audioUrl);
   const hasChineseAudio = pages.some(p => p.audioUrlZh);
-  const hasBilingualAudio = hasEnglishAudio && hasChineseAudio;
+  const hasSecondaryAudio = pages.some(p => p.audioUrlSecondary || p.audioUrlZh);
+  const hasBilingualAudio = hasEnglishAudio && hasSecondaryAudio;
+
+  // Derive the secondary language label for the toggle button
+  const secondaryLangCode = secondaryLanguage || (hasChineseAudio ? 'zh' : null);
 
   // Get current audio URL based on selected language
   const getCurrentAudioUrl = (page: ReadingPage) => {
-    if (audioLanguage === 'zh' && page.audioUrlZh) {
-      return page.audioUrlZh;
+    if (audioLanguage !== 'en') {
+      // Prefer audioUrlSecondary, fall back to audioUrlZh for backward compatibility
+      return page.audioUrlSecondary || page.audioUrlZh || page.audioUrl;
     }
     return page.audioUrl;
   };
@@ -219,14 +229,14 @@ export default function ReadingModeViewer({
   };
 
   const toggleLanguage = () => {
-    setAudioLanguage(prev => prev === 'en' ? 'zh' : 'en');
+    setAudioLanguage(prev => prev === 'en' ? (secondaryLangCode || 'zh') : 'en');
   };
 
   if (!currentPage) {
     return null;
   }
 
-  const hasAudio = hasEnglishAudio || hasChineseAudio;
+  const hasAudio = hasEnglishAudio || hasSecondaryAudio;
 
   return (
     <div
@@ -273,9 +283,9 @@ export default function ReadingModeViewer({
                   toggleLanguage();
                 }}
                 className="px-2 py-1 rounded-lg bg-gray-700 text-white text-sm font-medium transition-all hover:bg-gray-600"
-                aria-label={`Switch to ${audioLanguage === 'en' ? 'Chinese' : 'English'} audio`}
+                aria-label={`Switch to ${audioLanguage === 'en' ? getLanguageLabel(secondaryLangCode) : 'English'} audio`}
               >
-                {audioLanguage === 'en' ? 'EN' : '中'}
+                {audioLanguage === 'en' ? 'EN' : (secondaryLangCode === 'zh' ? '中' : (secondaryLangCode || 'EN').toUpperCase().slice(0, 2))}
               </button>
             )}
 
@@ -356,9 +366,9 @@ export default function ReadingModeViewer({
                 <p className="text-gray-800 text-xl md:text-2xl lg:text-3xl leading-relaxed font-medium">
                   {currentPage.textContent}
                 </p>
-                {currentPage.textContentChinese && (
+                {(currentPage.textContentSecondary || currentPage.textContentChinese) && (
                   <p className="text-gray-500 text-lg md:text-xl lg:text-2xl leading-relaxed mt-3">
-                    {currentPage.textContentChinese}
+                    {currentPage.textContentSecondary || currentPage.textContentChinese}
                   </p>
                 )}
               </div>

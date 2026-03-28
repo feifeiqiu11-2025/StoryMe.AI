@@ -1,15 +1,16 @@
 /**
  * Auto-Generate Audio API
  *
- * Triggers English audio generation, then Chinese (if bilingual).
+ * Triggers English audio generation, then secondary language (if bilingual).
  * Designed to be called fire-and-forget from the create page after story save.
  * Calls the existing /api/generate-story-audio endpoint internally.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientFromRequest } from '@/lib/supabase/server';
+import { getLanguageLabel } from '@/lib/config/languages';
 
-// 5 minutes — enough for English + Chinese generation sequentially
+// 5 minutes — enough for English + secondary language generation sequentially
 export const maxDuration = 300;
 
 export async function POST(
@@ -43,10 +44,10 @@ export async function POST(
       });
     }
 
-    // Fetch project to check ownership and bilingual content
+    // Fetch project to check ownership, secondary language, and bilingual content
     const { data: project } = await supabase
       .from('projects')
-      .select('id, user_id, scenes(caption_chinese)')
+      .select('id, user_id, secondary_language, scenes(caption_chinese, caption_secondary)')
       .eq('id', projectId)
       .eq('user_id', user.id)
       .single();
@@ -55,8 +56,9 @@ export async function POST(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
+    const secondaryLanguage = project.secondary_language || null;
     const hasBilingual = (project.scenes || []).some(
-      (s: any) => s.caption_chinese
+      (s: any) => s.caption_secondary || s.caption_chinese
     );
 
     // Forward cookies so internal fetch calls maintain auth
@@ -80,22 +82,23 @@ export async function POST(
       console.error('[Auto-Audio] English generation failed:', err);
     }
 
-    // Step 2: Generate Chinese audio (if bilingual)
-    if (hasBilingual) {
-      console.log(`[Auto-Audio] Starting Chinese generation for project ${projectId}`);
+    // Step 2: Generate secondary language audio (if bilingual)
+    if (hasBilingual && secondaryLanguage) {
+      const langLabel = getLanguageLabel(secondaryLanguage);
+      console.log(`[Auto-Audio] Starting ${langLabel} (${secondaryLanguage}) generation for project ${projectId}`);
       try {
-        const zhResponse = await fetch(`${baseUrl}/api/generate-story-audio`, {
+        const secResponse = await fetch(`${baseUrl}/api/generate-story-audio`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Cookie': cookieHeader,
           },
-          body: JSON.stringify({ projectId, language: 'zh' }),
+          body: JSON.stringify({ projectId, language: secondaryLanguage }),
         });
-        const zhData = await zhResponse.json();
-        console.log(`[Auto-Audio] Chinese result: success=${zhData.success}, pages=${zhData.successfulPages}/${zhData.totalPages}`);
+        const secData = await secResponse.json();
+        console.log(`[Auto-Audio] ${langLabel} result: success=${secData.success}, pages=${secData.successfulPages}/${secData.totalPages}`);
       } catch (err) {
-        console.error('[Auto-Audio] Chinese generation failed:', err);
+        console.error(`[Auto-Audio] ${langLabel} generation failed:`, err);
       }
     }
 

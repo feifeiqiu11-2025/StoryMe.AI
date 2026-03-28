@@ -2,12 +2,16 @@
  * Azure Text-to-Speech Client for StoryMe.AI
  *
  * Generates audio narration for children's stories using Azure Neural TTS.
- * - English: Uses en-US-Ava:DragonHDLatestNeural (HD voice - warm, expressive female)
- * - Chinese: Uses zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural with "story" style
+ * Supports multiple languages:
+ * - English: en-US-Ava:DragonHDLatestNeural (HD voice - warm, expressive female)
+ * - Chinese: zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural with "story" style
+ * - Korean: ko-KR-SunHiNeural (warm, expressive female)
  *
  * Uses REST API instead of SDK for serverless compatibility (Vercel).
  * Reference: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/rest-text-to-speech
  */
+
+import { getLocaleForLanguage } from './config/languages';
 
 export interface AzureTTSResult {
   audioBuffer: Buffer;
@@ -61,6 +65,39 @@ const CHINESE_VOICE_CONFIG: Record<string, VoiceConfig> = {
   default: { voice: 'zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural', rate: '-20%', pitch: '0%', style: 'story' },         // Default: HD story mode
 };
 
+// Korean voice configuration based on story tone
+// Using ko-KR-SunHiNeural - warm, expressive female voice for Korean storytelling
+const KOREAN_VOICE_CONFIG: Record<string, VoiceConfig> = {
+  playful: { voice: 'ko-KR-SunHiNeural', rate: '-15%', pitch: '+3%' },
+  educational: { voice: 'ko-KR-SunHiNeural', rate: '-20%', pitch: '0%' },
+  adventurous: { voice: 'ko-KR-SunHiNeural', rate: '-15%', pitch: '+2%' },
+  adventure: { voice: 'ko-KR-SunHiNeural', rate: '-15%', pitch: '+2%' },
+  calming: { voice: 'ko-KR-SunHiNeural', rate: '-25%', pitch: '-3%' },
+  gentle: { voice: 'ko-KR-SunHiNeural', rate: '-25%', pitch: '-3%' },
+  mysterious: { voice: 'ko-KR-SunHiNeural', rate: '-20%', pitch: '-2%' },
+  mystery: { voice: 'ko-KR-SunHiNeural', rate: '-20%', pitch: '-2%' },
+  silly: { voice: 'ko-KR-SunHiNeural', rate: '-10%', pitch: '+5%' },
+  brave: { voice: 'ko-KR-SunHiNeural', rate: '-15%', pitch: '0%' },
+  friendly: { voice: 'ko-KR-SunHiNeural', rate: '-15%', pitch: '+2%' },
+  default: { voice: 'ko-KR-SunHiNeural', rate: '-20%', pitch: '0%' },
+};
+
+// Voice config lookup by language code
+const VOICE_CONFIGS: Record<string, Record<string, VoiceConfig>> = {
+  en: ENGLISH_VOICE_CONFIG,
+  zh: CHINESE_VOICE_CONFIG,
+  ko: KOREAN_VOICE_CONFIG,
+};
+
+/**
+ * Get voice config for a language + tone combination.
+ * Falls back to English config for unknown languages.
+ */
+function getVoiceConfigForLanguage(language: string, tone: string): VoiceConfig {
+  const langConfig = VOICE_CONFIGS[language] || VOICE_CONFIGS.en;
+  return langConfig[tone] || langConfig.default;
+}
+
 /**
  * Azure TTS Client for story audio generation
  * Uses REST API for serverless compatibility (Vercel)
@@ -83,19 +120,16 @@ export class AzureTTSClient {
    * Synthesize text to speech using Azure REST API
    * @param text - Text to synthesize
    * @param tone - Story tone for voice selection
-   * @param language - Language code: 'en' for English, 'zh' for Chinese
+   * @param language - Language code: 'en', 'zh', 'ko', etc.
    * @returns Audio buffer (MP3 format)
    */
-  async synthesize(text: string, tone: string = 'default', language: 'en' | 'zh' = 'zh'): Promise<AzureTTSResult> {
+  async synthesize(text: string, tone: string = 'default', language: string = 'en'): Promise<AzureTTSResult> {
     if (!this.isAvailable()) {
       throw new Error('Azure TTS is not configured. Please set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION.');
     }
 
-    const voiceConfig = language === 'en'
-      ? (ENGLISH_VOICE_CONFIG[tone] || ENGLISH_VOICE_CONFIG.default)
-      : (CHINESE_VOICE_CONFIG[tone] || CHINESE_VOICE_CONFIG.default);
-
-    const xmlLang = language === 'en' ? 'en-US' : 'zh-CN';
+    const voiceConfig = getVoiceConfigForLanguage(language, tone);
+    const xmlLang = getLocaleForLanguage(language);
     const ssml = this.buildSSML(text, voiceConfig, xmlLang);
 
     console.log(`[Azure TTS REST] Synthesizing ${language.toUpperCase()} audio with voice: ${voiceConfig.voice}`);

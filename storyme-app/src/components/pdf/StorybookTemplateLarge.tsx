@@ -32,6 +32,21 @@ Font.register({
   ],
 });
 
+// Register Korean fonts for PDF rendering
+Font.register({
+  family: 'Noto Sans KR',
+  fonts: [
+    {
+      src: 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-kr@5.1.1/files/noto-sans-kr-korean-400-normal.woff2',
+      fontWeight: 400,
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-kr@5.1.1/files/noto-sans-kr-korean-700-normal.woff2',
+      fontWeight: 700,
+    },
+  ],
+});
+
 // Define styles for large format PDF
 const styles = StyleSheet.create({
   page: {
@@ -168,6 +183,7 @@ interface StorybookTemplateLargeProps {
     sceneNumber: number;
     caption?: string;
     caption_chinese?: string;
+    caption_secondary?: string;
     description?: string;
     imageUrl: string;
   }>;
@@ -184,17 +200,24 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 }
 
 /**
- * Helper function to detect if text contains Chinese characters
+ * Helper function to detect if text contains CJK characters (Chinese or Korean)
  */
-function containsChinese(text: string): boolean {
-  return /[\u4e00-\u9fa5]/.test(text);
+function containsCJK(text: string): boolean {
+  return /[\u4e00-\u9fa5\uAC00-\uD7AF]/.test(text);
+}
+
+/**
+ * Helper function to detect if text contains Korean characters
+ */
+function containsKorean(text: string): boolean {
+  return /[\uAC00-\uD7AF]/.test(text);
 }
 
 /**
  * Helper function to wrap Chinese text
  */
 function wrapChineseText(text: string, maxCharsPerLine: number = 25): string {
-  if (!containsChinese(text)) {
+  if (!containsCJK(text)) {
     return text;
   }
 
@@ -390,19 +413,23 @@ export const StorybookTemplateLarge: React.FC<StorybookTemplateLargeProps> = ({
                     {wrapChineseText(caption)}
                   </Text>
 
-                  {/* Chinese Caption - Bilingual Support */}
-                  {scene.caption_chinese && (
-                    <Text style={{
-                      fontSize: fontSize - 2,
-                      lineHeight: lineHeight,
-                      fontFamily: 'Noto Sans SC',
-                      color: '#6B7280',
-                      textAlign: 'center',
-                      marginTop: 4,
-                    }}>
-                      {wrapChineseText(scene.caption_chinese)}
-                    </Text>
-                  )}
+                  {/* Secondary Language Caption (Bilingual Support - Chinese/Korean) */}
+                  {(scene.caption_secondary || scene.caption_chinese) && (() => {
+                    const secondaryText = scene.caption_secondary || scene.caption_chinese || '';
+                    const secondaryFontFamily = containsKorean(secondaryText) ? 'Noto Sans KR' : 'Noto Sans SC';
+                    return (
+                      <Text style={{
+                        fontSize: fontSize - 2,
+                        lineHeight: lineHeight,
+                        fontFamily: secondaryFontFamily,
+                        color: '#6B7280',
+                        textAlign: 'center',
+                        marginTop: 4,
+                      }}>
+                        {wrapChineseText(secondaryText)}
+                      </Text>
+                    );
+                  })()}
                 </View>
 
                 {/* Page number - book style: odd=left, even=right */}

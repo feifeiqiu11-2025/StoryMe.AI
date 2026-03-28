@@ -23,7 +23,8 @@ export interface StoryData {
   scenes: Array<{
     sceneNumber: number;
     caption?: string;          // Age-appropriate caption for PDF
-    caption_chinese?: string;  // Chinese translation (NEW - Bilingual Support)
+    caption_chinese?: string;  // Chinese translation (backward compat)
+    caption_secondary?: string; // Generic secondary language caption (Korean, Chinese, etc.)
     description?: string;      // Fallback for backward compatibility
     imageUrl: string;
   }>;

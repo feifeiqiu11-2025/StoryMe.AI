@@ -120,6 +120,7 @@ export function projectToDTO(project: Project): ProjectDTO {
     featured: project.featured,
     viewCount: project.view_count,
     shareCount: project.share_count,
+    secondaryLanguage: project.secondary_language,
     draftMetadata: project.draft_metadata,
   };
 }
@@ -191,6 +192,7 @@ export function sceneToDTO(scene: Scene): SceneDTO {
     enhancedPrompt: scene.enhanced_prompt,
     caption: scene.caption,
     captionChinese: scene.caption_chinese,
+    captionSecondary: scene.caption_secondary,
     characterIds: scene.character_ids,
     locationType: scene.location_type,
     locationDescription: scene.location_description,

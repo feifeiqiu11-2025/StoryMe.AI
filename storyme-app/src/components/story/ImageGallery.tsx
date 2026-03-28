@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { GeneratedImage, Character, ImageProvider, ClothingConsistency, EnhancedScene } from '@/lib/types/story';
+import { getLanguageLabel } from '@/lib/config/languages';
 import { detectCharactersInInstruction } from '@/lib/utils/character-matcher';
 import SceneRatingCard from './SceneRatingCard';
 import EditImageControl from './EditImageControl';
@@ -24,10 +25,10 @@ interface ImageGalleryProps {
   isGuestMode?: boolean; // Hide individual downloads in guest mode
   enhancedScenes?: EnhancedScene[];
   onCaptionEdit?: (sceneNumber: number, newCaption: string) => void;
-  onCaptionChineseEdit?: (sceneNumber: number, newCaptionChinese: string) => void;
+  onCaptionSecondaryEdit?: (sceneNumber: number, newCaption: string) => void;
   onTitleEdit?: (newTitle: string) => void;
   onDescriptionEdit?: (newDescription: string) => void;
-  generateChineseTranslation?: boolean;
+  secondaryLanguage?: string | null;
 }
 
 export default function ImageGallery({
@@ -44,10 +45,10 @@ export default function ImageGallery({
   isGuestMode = false,
   enhancedScenes,
   onCaptionEdit,
-  onCaptionChineseEdit,
+  onCaptionSecondaryEdit,
   onTitleEdit,
   onDescriptionEdit,
-  generateChineseTranslation,
+  secondaryLanguage,
 }: ImageGalleryProps) {
   // Debug logging
   console.log('[ImageGallery] Rendering with', {
@@ -402,13 +403,13 @@ export default function ImageGallery({
                               rows={1}
                               style={{ minHeight: '2.5rem' }}
                             />
-                            {/* Regular Scene: Editable Chinese Caption (if bilingual) */}
-                            {generateChineseTranslation && (
-                              onCaptionChineseEdit ? (
+                            {/* Regular Scene: Editable Secondary Language Caption (if bilingual) */}
+                            {!!secondaryLanguage && (
+                              onCaptionSecondaryEdit ? (
                                 <textarea
-                                  value={enhancedScene.caption_chinese || ''}
+                                  value={enhancedScene.caption_secondary || enhancedScene.caption_chinese || ''}
                                   onChange={(e) => {
-                                    onCaptionChineseEdit(image.sceneNumber, e.target.value);
+                                    onCaptionSecondaryEdit(image.sceneNumber, e.target.value);
                                     e.target.style.height = 'auto';
                                     e.target.style.height = e.target.scrollHeight + 'px';
                                   }}
@@ -416,13 +417,13 @@ export default function ImageGallery({
                                     e.target.style.height = 'auto';
                                     e.target.style.height = e.target.scrollHeight + 'px';
                                   }}
-                                  placeholder="Chinese translation..."
+                                  placeholder={`${getLanguageLabel(secondaryLanguage)} translation...`}
                                   className="w-full mt-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm text-gray-600 leading-relaxed overflow-hidden"
                                   rows={1}
                                   style={{ minHeight: '2.5rem' }}
                                 />
                               ) : (
-                                <p className="mt-2 text-sm text-gray-600 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">{enhancedScene.caption_chinese || ''}</p>
+                                <p className="mt-2 text-sm text-gray-600 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">{enhancedScene.caption_secondary || enhancedScene.caption_chinese || ''}</p>
                               )
                             )}
                           </>

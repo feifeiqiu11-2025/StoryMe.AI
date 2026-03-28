@@ -2,6 +2,7 @@
 
 import { StoryTone, ExpansionLevel, ClothingConsistency } from '@/lib/types/story';
 import ExpansionLevelSelector from './ExpansionLevelSelector';
+import { getSecondaryLanguageOptions } from '@/lib/config/languages';
 
 export interface StorySettingsPanelProps {
   readingLevel: number;
@@ -14,7 +15,11 @@ export interface StorySettingsPanelProps {
   onExpansionLevelChange?: (level: ExpansionLevel) => void;
   // Bilingual options (only shown for English content)
   contentLanguage?: 'en' | 'zh';
+  secondaryLanguage?: string | null;
+  onSecondaryLanguageChange?: (value: string | null) => void;
+  /** @deprecated Use secondaryLanguage + onSecondaryLanguageChange instead */
   generateChineseTranslation?: boolean;
+  /** @deprecated Use secondaryLanguage + onSecondaryLanguageChange instead */
   onGenerateChineseTranslationChange?: (value: boolean) => void;
   disabled?: boolean;
 }
@@ -137,11 +142,28 @@ export default function StorySettingsPanel({
   expansionLevel = 'as_written',
   onExpansionLevelChange,
   contentLanguage = 'en',
+  secondaryLanguage = null,
+  onSecondaryLanguageChange,
   generateChineseTranslation = false,
   onGenerateChineseTranslationChange,
   disabled = false,
 }: StorySettingsPanelProps) {
   const currentLevel = readingLevelLabels[readingLevel];
+  const languageOptions = getSecondaryLanguageOptions();
+
+  // Determine the effective secondary language (support legacy prop)
+  const effectiveSecondaryLanguage = secondaryLanguage ?? (generateChineseTranslation ? 'zh' : null);
+
+  // Handle language change — update both new and legacy callbacks
+  const handleSecondaryLanguageChange = (lang: string | null) => {
+    if (onSecondaryLanguageChange) {
+      onSecondaryLanguageChange(lang);
+    }
+    // Backward compat: also call legacy callback
+    if (onGenerateChineseTranslationChange) {
+      onGenerateChineseTranslationChange(lang === 'zh');
+    }
+  };
 
   return (
     <div className="w-full space-y-6 p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
@@ -318,34 +340,48 @@ export default function StorySettingsPanel({
         />
       )}
 
-      {/* Chinese Captions Checkbox (Only for English stories) */}
-      {contentLanguage === 'en' && onGenerateChineseTranslationChange && (
-        <div className="flex items-center gap-3 pt-2">
-          <div className="relative inline-flex items-center">
-            <input
-              type="checkbox"
-              id="bilingual-checkbox-settings"
-              checked={generateChineseTranslation}
-              onChange={(e) => onGenerateChineseTranslationChange(e.target.checked)}
-              disabled={disabled}
-              className="peer w-5 h-5 appearance-none bg-white border-2 border-gray-400 rounded cursor-pointer checked:bg-purple-600 checked:border-purple-600 focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            />
-            <svg
-              className="absolute w-3 h-3 left-1 top-1 pointer-events-none hidden peer-checked:block text-white"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-          </div>
-          <label htmlFor="bilingual-checkbox-settings" className="text-sm font-semibold text-gray-700 cursor-pointer select-none">
-            Generate Chinese Captions for Bilingual Book
+      {/* Bilingual Captions — Secondary Language Selector (Only for English stories) */}
+      {contentLanguage === 'en' && (onSecondaryLanguageChange || onGenerateChineseTranslationChange) && (
+        <div className="space-y-2 pt-2">
+          <label className="block text-sm font-semibold text-gray-700">
+            Bilingual Captions
           </label>
+          <div className="flex flex-wrap gap-2">
+            {/* None option */}
+            <button
+              type="button"
+              onClick={() => !disabled && handleSecondaryLanguageChange(null)}
+              disabled={disabled}
+              className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                !effectiveSecondaryLanguage
+                  ? 'border-purple-500 bg-purple-50 text-purple-700'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-purple-300'
+              } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              English Only
+            </button>
+            {/* Language options */}
+            {languageOptions.map((lang) => (
+              <button
+                key={lang.code}
+                type="button"
+                onClick={() => !disabled && handleSecondaryLanguageChange(lang.code)}
+                disabled={disabled}
+                className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                  effectiveSecondaryLanguage === lang.code
+                    ? 'border-purple-500 bg-purple-50 text-purple-700'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-purple-300'
+                } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {lang.label} ({lang.nativeLabel})
+              </button>
+            ))}
+          </div>
+          {effectiveSecondaryLanguage && (
+            <p className="text-xs text-gray-500">
+              Captions will be generated in both English and {languageOptions.find(l => l.code === effectiveSecondaryLanguage)?.label || effectiveSecondaryLanguage}
+            </p>
+          )}
         </div>
       )}
     </div>

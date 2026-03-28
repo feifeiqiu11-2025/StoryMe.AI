@@ -35,12 +35,14 @@ export async function GET(
         cover_image_url,
         author_name,
         author_age,
+        secondary_language,
         scenes (
           id,
           scene_number,
           description,
           caption,
           caption_chinese,
+          caption_secondary,
           generated_images (
             id,
             image_url,
@@ -92,6 +94,7 @@ export async function GET(
       coverImageUrl: project.cover_image_url,
       authorName: project.author_name,
       authorAge: project.author_age,
+      secondaryLanguage: project.secondary_language,
       scenes: project.scenes
         ?.sort((a: any, b: any) => a.scene_number - b.scene_number)
         .map((scene: any) => ({
@@ -100,6 +103,7 @@ export async function GET(
           description: scene.description,
           caption: scene.caption,
           captionChinese: scene.caption_chinese,
+          captionSecondary: scene.caption_secondary,
           imageUrl: scene.generated_images?.[0]?.image_url || null,
           prompt: scene.generated_images?.[0]?.prompt || null,
         })) || [],
