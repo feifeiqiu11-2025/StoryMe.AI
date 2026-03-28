@@ -340,25 +340,34 @@ export default function StorySettingsPanel({
         />
       )}
 
-      {/* Bilingual Captions — Secondary Language Selector (Only for English stories) */}
+      {/* Secondary Language Selector (Only for English stories) */}
       {contentLanguage === 'en' && (onSecondaryLanguageChange || onGenerateChineseTranslationChange) && (
-        <div className="space-y-2 pt-2">
+        <div className="space-y-3">
           <label className="block text-sm font-semibold text-gray-700">
-            Bilingual Captions
+            Bilingual Captions &amp; Narration
           </label>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-3 gap-3">
             {/* None option */}
             <button
               type="button"
               onClick={() => !disabled && handleSecondaryLanguageChange(null)}
               disabled={disabled}
-              className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+              className={`flex items-center gap-2.5 p-3 border-2 rounded-xl cursor-pointer transition-all text-left ${
                 !effectiveSecondaryLanguage
-                  ? 'border-purple-500 bg-purple-50 text-purple-700'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-purple-300'
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/30'
               } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              English Only
+              <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                !effectiveSecondaryLanguage
+                  ? 'border-blue-500 bg-blue-500'
+                  : 'border-gray-300 bg-white'
+              }`}>
+                {!effectiveSecondaryLanguage && (
+                  <div className="w-2 h-2 rounded-full bg-white"></div>
+                )}
+              </div>
+              <span className="font-semibold text-gray-900 text-sm">None</span>
             </button>
             {/* Language options */}
             {languageOptions.map((lang) => (
@@ -367,21 +376,27 @@ export default function StorySettingsPanel({
                 type="button"
                 onClick={() => !disabled && handleSecondaryLanguageChange(lang.code)}
                 disabled={disabled}
-                className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                className={`flex items-center gap-2.5 p-3 border-2 rounded-xl cursor-pointer transition-all text-left ${
                   effectiveSecondaryLanguage === lang.code
-                    ? 'border-purple-500 bg-purple-50 text-purple-700'
-                    : 'border-gray-200 bg-white text-gray-600 hover:border-purple-300'
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50/30'
                 } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                {lang.label} ({lang.nativeLabel})
+                <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  effectiveSecondaryLanguage === lang.code
+                    ? 'border-purple-500 bg-purple-500'
+                    : 'border-gray-300 bg-white'
+                }`}>
+                  {effectiveSecondaryLanguage === lang.code && (
+                    <div className="w-2 h-2 rounded-full bg-white"></div>
+                  )}
+                </div>
+                <span className="font-semibold text-gray-900 text-sm">
+                  {lang.label} ({lang.nativeLabel})
+                </span>
               </button>
             ))}
           </div>
-          {effectiveSecondaryLanguage && (
-            <p className="text-xs text-gray-500">
-              Captions will be generated in both English and {languageOptions.find(l => l.code === effectiveSecondaryLanguage)?.label || effectiveSecondaryLanguage}
-            </p>
-          )}
         </div>
       )}
     </div>

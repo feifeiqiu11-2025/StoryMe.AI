@@ -37,12 +37,14 @@ Font.register({
   family: 'Noto Sans KR',
   fonts: [
     {
-      src: 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-kr@5.1.1/files/noto-sans-kr-korean-400-normal.woff2',
+      src: 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-kr@5.1.1/files/noto-sans-kr-korean-400-normal.woff',
       fontWeight: 400,
+      format: 'woff' as any,
     },
     {
-      src: 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-kr@5.1.1/files/noto-sans-kr-korean-700-normal.woff2',
+      src: 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-kr@5.1.1/files/noto-sans-kr-korean-700-normal.woff',
       fontWeight: 700,
+      format: 'woff' as any,
     },
   ],
 });

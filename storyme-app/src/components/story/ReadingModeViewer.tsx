@@ -71,7 +71,7 @@ export default function ReadingModeViewer({
   const hasBilingualAudio = hasEnglishAudio && hasSecondaryAudio;
 
   // Derive the secondary language label for the toggle button
-  const secondaryLangCode = secondaryLanguage || (hasChineseAudio ? 'zh' : null);
+  const secondaryLangCode = secondaryLanguage || (hasSecondaryAudio ? 'zh' : hasChineseAudio ? 'zh' : null);
 
   // Get current audio URL based on selected language
   const getCurrentAudioUrl = (page: ReadingPage) => {

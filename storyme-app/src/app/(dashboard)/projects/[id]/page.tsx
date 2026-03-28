@@ -33,6 +33,7 @@ export default function StoryViewerPage() {
   const [hasAudio, setHasAudio] = useState(false);
   const [hasEnglishAudio, setHasEnglishAudio] = useState(false);
   const [hasChineseAudio, setHasChineseAudio] = useState(false);
+  const [hasSecondaryAudio, setHasSecondaryAudio] = useState(false);
   const [updatingVisibility, setUpdatingVisibility] = useState(false);
   const [showPublicConfirm, setShowPublicConfirm] = useState(false);
   const [spotifyStatus, setSpotifyStatus] = useState<string | null>(null);
@@ -197,6 +198,7 @@ export default function StoryViewerPage() {
         setHasAudio(data.hasAudio || false);
         setHasEnglishAudio(data.hasEnglishAudio || false);
         setHasChineseAudio(data.hasChineseAudio || false);
+        setHasSecondaryAudio(data.hasSecondaryAudio || data.hasChineseAudio || false);
 
         if (!data.isGenerating) {
           setGeneratingAudio(false);
@@ -1516,11 +1518,11 @@ export default function StoryViewerPage() {
                         </button>
                         {hasBilingualContent && (
                           <button
-                            onClick={() => handleGenerateAudio((project?.secondaryLanguage || 'zh') as 'en' | 'zh')}
+                            onClick={() => handleGenerateAudio(project?.secondaryLanguage || 'zh')}
                             className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
                           >
                             <span>{getLanguageLabel(project?.secondaryLanguage || 'zh')} Narration</span>
-                            {hasChineseAudio && <span className="text-green-600">✓</span>}
+                            {hasSecondaryAudio && <span className="text-green-600">✓</span>}
                           </button>
                         )}
                       </div>

@@ -1216,6 +1216,7 @@ function CreateStoryPageInner() {
           storyTone: storyTone,
           contentLanguage: contentLanguage,
           characterIds: characterIds,
+          secondaryLanguage,
           scenes: scenesData,
           quizData: quizData || undefined,
         }),
