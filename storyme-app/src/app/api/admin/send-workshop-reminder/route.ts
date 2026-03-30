@@ -1873,6 +1873,76 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  if (mode === 'week3-followup') {
+    // Week 3 AM attendees — query steamoji-wk3 registrations
+    const { data: registrations, error } = await getSupabase()
+      .from('workshop_registrations')
+      .select('parent_first_name, parent_email, child_first_name, selected_workshop_ids')
+      .eq('status', 'confirmed')
+      .order('parent_email');
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    // Filter for steamoji-wk3 (any session type — some registered as PM but attended AM)
+    const wk3 = (registrations || []).filter((r: any) =>
+      r.selected_workshop_ids && r.selected_workshop_ids.some((id: string) => id === 'steamoji-wk3')
+    );
+
+    // De-dupe by email, merge children names
+    const familyMap = new Map<string, { parentFirstName: string; email: string; children: Set<string> }>();
+    for (const r of wk3) {
+      const key = r.parent_email.toLowerCase();
+      if (!familyMap.has(key)) {
+        familyMap.set(key, { parentFirstName: r.parent_first_name, email: r.parent_email, children: new Set() });
+      }
+      familyMap.get(key)!.children.add(r.child_first_name);
+    }
+
+    const families = Array.from(familyMap.values());
+
+    if (families.length === 0) {
+      return NextResponse.json({ success: true, message: 'No wk3 registrations found', sent: 0 });
+    }
+
+    // Filter out opted-out emails
+    const optedOut = await getOptedOutEmails(families.map(f => f.email), getSupabase());
+    const recipients = families.filter(f => !optedOut.has(f.email.toLowerCase()));
+
+    const results = [];
+
+    for (let i = 0; i < recipients.length; i++) {
+      const family = recipients[i];
+      const childNames = Array.from(family.children).join(' and ');
+      if (i > 0) await delay(600);
+
+      const { error: sendErr } = await resend.emails.send({
+        from: EMAIL_FROM,
+        to: family.email,
+        subject: "Your Creative Explorer's Workshop Creations + 1 Month Free Gift",
+        html: buildWeek3FollowUpHtml(family.parentFirstName, childNames, family.email),
+        replyTo: REPLY_TO,
+        headers: getUnsubscribeHeaders(family.email),
+      });
+      results.push({
+        to: family.email,
+        parent: family.parentFirstName,
+        children: childNames,
+        error: sendErr?.message || null,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      mode: 'week3-followup',
+      total: results.length,
+      sent: results.filter(r => !r.error).length,
+      failed: results.filter(r => r.error).length,
+      results,
+    });
+  }
+
   if (mode === 'school-outreach') {
     const recipients = ['heather@cedarcrestacademy.org'];
     const cc = ['Lupang@KindleWoodStudio.ai'];
