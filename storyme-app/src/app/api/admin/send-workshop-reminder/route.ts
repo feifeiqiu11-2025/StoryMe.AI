@@ -1394,6 +1394,274 @@ function buildThankYouHtml(parentFirstName: string, childFirstName: string): str
 </html>`;
 }
 
+// ─── Week 3 Follow-Up Email ─────────────────────────────────────────────
+
+function buildWeek3FollowUpHtml(parentFirstName: string, childFirstName: string, recipientEmail?: string): string {
+  const unsubFooter = recipientEmail ? buildUnsubscribeFooter(recipientEmail) : '';
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #6d28d9; background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: 32px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;">
+                Thank You for Joining Creative Explorers!
+              </h1>
+              <p style="color: #e0e7ff; margin: 8px 0 0; font-size: 15px;">
+                Week 3 &mdash; Solving the Messy Lego Problem
+              </p>
+            </td>
+          </tr>
+
+          <!-- Greeting + Recap -->
+          <tr>
+            <td style="padding: 32px 24px 16px;">
+              <p style="color: #374151; font-size: 16px; margin: 0;">
+                Hi ${parentFirstName},
+              </p>
+              <p style="color: #6b7280; font-size: 15px; margin: 12px 0 0; line-height: 1.6;">
+                Thank you for bringing <strong style="color: #374151;">${childFirstName}</strong> to today&rsquo;s Creative Explorers Workshop! The kids tackled a real-world challenge &mdash; <strong style="color: #374151;">how to solve the messy Lego problem</strong> &mdash; and came up with some brilliant inventions:
+              </p>
+              <ul style="color: #6b7280; font-size: 15px; line-height: 1.8; margin: 12px 0 0; padding-left: 20px;">
+                <li>A <strong style="color: #374151;">handful scoop</strong> to grab Legos quickly</li>
+                <li>A <strong style="color: #374151;">shovel</strong> to pick up scattered pieces</li>
+                <li>A <strong style="color: #374151;">container</strong> to store Legos neatly</li>
+                <li>A <strong style="color: #374151;">robot</strong> that cleans up Legos automatically</li>
+              </ul>
+              <p style="color: #6b7280; font-size: 15px; margin: 16px 0 0; line-height: 1.6;">
+                Check out the artwork your Creative Explorer made today:
+              </p>
+              <p style="margin: 8px 0 0;">
+                <a href="https://www.kindlewoodstudio.ai/little-artists?tag=Steamojiw3" style="color: #7c3aed; font-size: 15px; font-weight: 600; text-decoration: underline;">
+                  View Their Artwork &rarr;
+                </a>
+              </p>
+              <p style="color: #6b7280; font-size: 15px; margin: 16px 0 0; line-height: 1.6;">
+                <strong style="color: #374151;">${childFirstName}</strong>&rsquo;s personalized storybook is also ready &mdash; you can view it anytime. For an even better reading and learning experience, download the <strong style="color: #374151;">KindleWood Kids</strong> iOS app &mdash; where your child can read along, learn new vocabulary, based on their own story.
+              </p>
+              <p style="margin: 8px 0 0;">
+                <a href="https://www.kindlewoodstudio.ai/stories" style="color: #7c3aed; font-size: 15px; font-weight: 600; text-decoration: underline;">
+                  Read Their Story &rarr;
+                </a>
+              </p>
+              <p style="margin: 8px 0 0;">
+                <a href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039" style="color: #2563eb; font-size: 14px; font-weight: 600; text-decoration: underline;">
+                  Download KindleWood Kids on the App Store &rarr;
+                </a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- About Steamoji -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                &#129309; About Our Workshop Partner &mdash; Steamoji
+              </h2>
+              <p style="color: #6b7280; font-size: 14px; margin: 0; line-height: 1.7;">
+                Steamoji is a hands-on maker academy for kids ages 6&ndash;14, where students build real-world STEM skills through coding, robotics, engineering, 3D printing, and digital design. They offer a structured, project-based curriculum across five pathways &mdash; Robotics, Coding, 3-D Printing, Engineering, and Digital Arts &mdash; helping students develop problem-solving skills and a strong maker mindset.
+              </p>
+              <p style="color: #6b7280; font-size: 14px; margin: 12px 0 0; line-height: 1.7;">
+                Operating multiple locations across the Eastside including Redmond, Bellevue, Bothell, Newcastle, and Klahanie, Steamoji also offers competitive robotics teams (VEX IQ and VEX V5) &mdash; and are proud to be <strong style="color: #374151;">Washington State Champions in VEX V5 Middle School</strong> for the 2025&ndash;26 season.
+              </p>
+              <p style="margin: 12px 0 0;">
+                <a href="https://steamojibelredplus.com/" style="color: #7c3aed; font-size: 14px; font-weight: 600; text-decoration: underline;">
+                  Learn More About Steamoji &rarr;
+                </a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- Promo Section -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                &#127873; Keep the Creativity Going &mdash; Free!
+              </h2>
+              <p style="color: #6b7280; font-size: 14px; margin: 0 0 16px; line-height: 1.6;">
+                As a workshop family, you can keep creating stories at home &mdash; no payment needed to get started.
+              </p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #374151;">1.</strong> <span style="color: #6b7280;">Sign up free at <a href="https://www.kindlewoodstudio.ai/signup" style="color: #7c3aed; text-decoration: underline;">kindlewoodstudio.ai/signup</a></span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #374151;">2.</strong> <span style="color: #6b7280;">Enjoy your <strong style="color: #374151;">7-day free trial</strong> with <strong style="color: #374151;">2 free stories</strong></span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                    <strong style="color: #374151;">3.</strong> <span style="color: #6b7280;">When you&rsquo;re ready to upgrade to the <strong style="color: #374151;">Casual Creator</strong> plan, use promo code:</span><br />
+                    <span style="display: inline-block; margin-top: 6px; background-color: #f3e8ff; border: 1px dashed #7c3aed; border-radius: 6px; padding: 6px 14px;">
+                      <strong style="color: #7c3aed; font-size: 16px; letter-spacing: 1px;">EXTENDEDTRIAL30</strong>
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 16px;">
+                    <strong style="color: #374151;">4.</strong> <span style="color: #6b7280;">Get <strong style="color: #374151;">1 month free</strong> on Casual Creator!</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- Studio Features -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                &#9997;&#65039; What You Can Do with KindleWood Studio
+              </h2>
+              <p style="color: #9ca3af; font-size: 13px; margin: 0 0 8px; font-style: italic;">For parents &amp; teachers</p>
+              <ul style="color: #6b7280; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 20px;">
+                <li><strong style="color: #374151;">Turn ideas into storybooks</strong> &mdash; From your child&rsquo;s voice, drawings, or text</li>
+                <li><strong style="color: #374151;">Your child becomes the hero</strong> &mdash; Upload a photo, and they appear in every scene with consistent characters</li>
+                <li><strong style="color: #374151;">Bilingual stories</strong> &mdash; English &amp; Chinese with professional illustrations</li>
+                <li><strong style="color: #374151;">Voice narration</strong> &mdash; Record your own voice or use AI narration</li>
+                <li><strong style="color: #374151;">Print-ready PDFs</strong> &mdash; Download and print keepsake storybooks</li>
+                <li><strong style="color: #374151;">Publish to Spotify</strong> &mdash; Share stories as audio podcasts</li>
+              </ul>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- Kids App -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 4px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                &#128241; KindleWood Kids App
+              </h2>
+              <div style="display: inline-block; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 2px 8px; margin: 4px 0 8px;">
+                <span style="color: #166534; font-size: 12px; font-weight: 600;">For children &mdash; always free!</span>
+              </div>
+              <ul style="color: #6b7280; font-size: 14px; line-height: 1.8; margin: 0 0 12px; padding-left: 20px;">
+                <li>Read &amp; listen to their personalized story library &mdash; ad-free, 100% safe</li>
+                <li>Tap-to-learn vocabulary &mdash; hear pronunciation in English or Chinese</li>
+                <li>Fun quizzes that adapt to their reading level</li>
+                <li>Goal setting &amp; progress tracking &mdash; earn badges, celebrate milestones</li>
+              </ul>
+              <p style="margin: 0;">
+                <a href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039" style="color: #2563eb; font-size: 14px; font-weight: 600; text-decoration: underline;">
+                  Download free on the App Store &rarr;
+                </a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 8px 24px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+
+          <!-- YouTube -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <h2 style="color: #374151; font-size: 18px; margin: 0 0 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px;">
+                &#127916; Watch How It Works
+              </h2>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td width="50%" style="padding: 0 6px 12px 0;">
+                    <a href="https://www.youtube.com/watch?v=4wA7NmmD-4g" style="text-decoration: none;">
+                      <img src="https://img.youtube.com/vi/4wA7NmmD-4g/hqdefault.jpg" alt="Product Demo Part 1" width="270" style="display: block; width: 100%; max-width: 270px; border-radius: 8px; border: 1px solid #e5e7eb;" />
+                    </a>
+                  </td>
+                  <td width="50%" style="padding: 0 0 12px 6px;">
+                    <a href="https://www.youtube.com/watch?v=Sngj7wdkgSw" style="text-decoration: none;">
+                      <img src="https://img.youtube.com/vi/Sngj7wdkgSw/hqdefault.jpg" alt="Product Demo Part 2" width="270" style="display: block; width: 100%; max-width: 270px; border-radius: 8px; border: 1px solid #e5e7eb;" />
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td width="50%" style="padding: 0 6px 0 0;">
+                    <a href="https://www.youtube.com/watch?v=EAYKm_gPZwQ" style="text-decoration: none;">
+                      <img src="https://img.youtube.com/vi/EAYKm_gPZwQ/hqdefault.jpg" alt="Product Demo Part 3" width="270" style="display: block; width: 100%; max-width: 270px; border-radius: 8px; border: 1px solid #e5e7eb;" />
+                    </a>
+                  </td>
+                  <td width="50%" style="padding: 0 0 0 6px;">
+                    <a href="https://www.youtube.com/watch?v=h1aPfdIeoKI" style="text-decoration: none;">
+                      <img src="https://img.youtube.com/vi/h1aPfdIeoKI/hqdefault.jpg" alt="KindleWood Kids App Demo" width="270" style="display: block; width: 100%; max-width: 270px; border-radius: 8px; border: 1px solid #e5e7eb;" />
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px; background-color: #f9fafb; text-align: center;">
+              <p style="color: #374151; font-size: 15px; margin: 0; font-weight: 600;">
+                We can&rsquo;t wait to see what ${childFirstName} creates next!
+              </p>
+              <p style="color: #6b7280; font-size: 14px; margin: 12px 0 0; line-height: 1.6;">
+                Happy storytelling!
+              </p>
+              <p style="color: #9ca3af; font-size: 13px; margin: 8px 0 0;">
+                &mdash; The KindleWood Team
+              </p>
+              <p style="margin: 12px 0 0;">
+                <a href="https://www.kindlewoodstudio.ai" style="color: #7c3aed; font-size: 13px; text-decoration: underline;">
+                  kindlewoodstudio.ai
+                </a>
+                &nbsp;&middot;&nbsp;
+                <a href="https://www.youtube.com/@KindleWoodStudio" style="color: #9ca3af; font-size: 13px; text-decoration: underline;">
+                  YouTube
+                </a>
+              </p>
+              ${unsubFooter}
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
 // ─── Route Handler ───────────────────────────────────────────────────────
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -1577,6 +1845,32 @@ export async function POST(req: NextRequest) {
       failed: results.filter(r => r.error).length,
       results,
     });
+  }
+
+  if (mode === 'week3-followup-test') {
+    const testEmail = 'feifei_qiu@hotmail.com';
+    try {
+      const { error: sendErr } = await resend.emails.send({
+        from: EMAIL_FROM,
+        to: testEmail,
+        subject: "Your Creative Explorer's Workshop Creations + 1 Month Free Gift",
+        html: buildWeek3FollowUpHtml('Feifei', 'Connor', testEmail),
+        replyTo: REPLY_TO,
+        headers: getUnsubscribeHeaders(testEmail),
+      });
+      return NextResponse.json({
+        success: !sendErr,
+        mode: 'week3-followup-test',
+        to: testEmail,
+        error: sendErr?.message || null,
+      });
+    } catch (err: any) {
+      return NextResponse.json({
+        success: false,
+        mode: 'week3-followup-test',
+        error: err?.message || 'Unknown error',
+      }, { status: 500 });
+    }
   }
 
   if (mode === 'school-outreach') {
