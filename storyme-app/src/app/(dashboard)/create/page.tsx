@@ -78,6 +78,7 @@ function CreateStoryPageInner() {
   const [session, setSession] = useState<StorySession | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAddCharacterModal, setShowAddCharacterModal] = useState(false);
+  const [definingNewCharacterName, setDefiningNewCharacterName] = useState<string | null>(null);
   const [libraryCharacters, setLibraryCharacters] = useState<Character[]>([]);
   const [communityCharacters, setCommunityCharacters] = useState<Character[]>([]);
   const [importTab, setImportTab] = useState<'mine' | 'community'>('mine');
@@ -1701,7 +1702,7 @@ function CreateStoryPageInner() {
           </div>
         )}
 
-        {/* Add Character Modal */}
+        {/* Add Character Modal (Step 1) */}
         <CharacterFormModal
           isOpen={showAddCharacterModal}
           onClose={() => setShowAddCharacterModal(false)}
@@ -1717,6 +1718,47 @@ function CreateStoryPageInner() {
             setShowAddCharacterModal(false);
           }}
         />
+
+        {/* Define New Character Modal (Scene Preview — for AI-introduced characters) */}
+        {/* key forces remount so useState initializer picks up editingCharacter */}
+        {definingNewCharacterName && (
+          <CharacterFormModal
+            key={definingNewCharacterName}
+            isOpen={true}
+            onClose={() => setDefiningNewCharacterName(null)}
+            imageProvider={imageProvider}
+            editingCharacter={{
+              id: `char-new-${definingNewCharacterName}`,
+              name: definingNewCharacterName,
+              referenceImage: { url: '', fileName: '' },
+              description: { otherFeatures: '' },
+              isPrimary: false,
+              order: characters.length + 1,
+            }}
+            onSave={(character) => {
+              // Check if character with this name already exists (avoid duplicates)
+              const exists = characters.some(c =>
+                c.name.toLowerCase() === character.name.toLowerCase()
+              );
+              if (exists) {
+                // Update existing character instead of adding duplicate
+                setCharacters(prev => prev.map(c =>
+                  c.name.toLowerCase() === character.name.toLowerCase()
+                    ? { ...character, isPrimary: c.isPrimary, order: c.order }
+                    : c
+                ));
+              } else {
+                setCharacters(prev => [...prev, {
+                  ...character,
+                  isPrimary: false,
+                  order: prev.length + 1,
+                  isFromLibrary: true,
+                }]);
+              }
+              setDefiningNewCharacterName(null);
+            }}
+          />
+        )}
 
         {/* Step 1.5: Language Selection - COMMENTED OUT (English is now default)
         {characters.length > 0 && enhancedScenes.length === 0 && (
@@ -1836,6 +1878,10 @@ function CreateStoryPageInner() {
                   selectedTemplate={selectedTemplate}
                   onTemplateChange={setSelectedTemplate}
                   onCoachClick={() => setIsCoachModalOpen(true)}
+                  onScanInsert={(text) => {
+                    // Append scanned text to existing script, or replace if empty
+                    setScriptInput(prev => prev.trim() ? prev.trim() + '\n' + text : text);
+                  }}
                 />
               </div>
 
@@ -1988,6 +2034,7 @@ function CreateStoryPageInner() {
               savingDraft={savingDraft}
               draftSaveLabel={draftProjectId ? 'Update Draft' : 'Save as Draft'}
               draftSaveMessage={draftSaveMessage || undefined}
+              onDefineNewCharacter={(name) => setDefiningNewCharacterName(name)}
             />
           </div>
         )}

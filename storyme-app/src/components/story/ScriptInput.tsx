@@ -6,6 +6,7 @@ import { Character } from '@/lib/types/story';
 import { StoryTemplateId } from '@/lib/types/story';
 import { STORY_TEMPLATES } from '@/lib/ai/story-templates';
 import TemplateCategoryCards from './TemplateCategoryCards';
+import ScanScriptButton from './ScanScriptButton';
 
 interface ScriptInputProps {
   value: string;
@@ -15,6 +16,7 @@ interface ScriptInputProps {
   selectedTemplate?: StoryTemplateId | null;
   onTemplateChange?: (templateId: StoryTemplateId | null) => void;
   onCoachClick?: () => void;
+  onScanInsert?: (text: string) => void;
 }
 
 export default function ScriptInput({
@@ -25,6 +27,7 @@ export default function ScriptInput({
   selectedTemplate,
   onTemplateChange,
   onCoachClick,
+  onScanInsert,
 }: ScriptInputProps) {
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -107,6 +110,13 @@ export default function ScriptInput({
         <label className="block text-sm font-medium text-gray-700">
           Story Scenes
         </label>
+        <div className="flex items-center gap-2">
+          {onScanInsert && (
+            <ScanScriptButton
+              onInsert={onScanInsert}
+              disabled={disabled}
+            />
+          )}
         {onCoachClick && (
           <button
             type="button"
@@ -128,6 +138,7 @@ export default function ScriptInput({
             Writing Coach
           </button>
         )}
+        </div>
       </div>
 
       {/* Character chips */}

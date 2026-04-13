@@ -43,6 +43,8 @@ interface ScenePreviewApprovalProps {
   savingDraft?: boolean;
   draftSaveLabel?: string;
   draftSaveMessage?: string;
+  // Define new character (click on NEW chip to create character with reference)
+  onDefineNewCharacter?: (characterName: string) => void;
 }
 
 export default function ScenePreviewApproval({
@@ -71,6 +73,7 @@ export default function ScenePreviewApproval({
   savingDraft = false,
   draftSaveLabel = 'Save as Draft',
   draftSaveMessage,
+  onDefineNewCharacter,
 }: ScenePreviewApprovalProps) {
   // Add Scene Modal State
   const [showAddSceneModal, setShowAddSceneModal] = useState(false);
@@ -330,11 +333,31 @@ export default function ScenePreviewApproval({
                   <p className="text-sm font-semibold text-yellow-800">
                     AI Added Minor Characters
                   </p>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    {newCharacters.join(', ')}
-                  </p>
-                  <p className="text-xs text-yellow-600 mt-1">
-                    These supporting characters will help tell the story. They'll appear with generic, age-appropriate appearance.
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {newCharacters.map((char) => (
+                      onDefineNewCharacter ? (
+                        <button
+                          key={char}
+                          type="button"
+                          onClick={() => onDefineNewCharacter(char)}
+                          className="inline-flex items-center gap-1 text-sm px-2.5 py-1 rounded-full font-medium bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-200 hover:border-yellow-400 transition-colors cursor-pointer"
+                        >
+                          {char}
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                        </button>
+                      ) : (
+                        <span key={char} className="text-sm px-2.5 py-1 rounded-full font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
+                          {char}
+                        </span>
+                      )
+                    ))}
+                  </div>
+                  <p className="text-xs text-yellow-600 mt-1.5">
+                    {onDefineNewCharacter
+                      ? 'Click a character to define their appearance for better image consistency.'
+                      : 'These supporting characters will help tell the story. They\'ll appear with generic, age-appropriate appearance.'}
                   </p>
                 </div>
               </div>
@@ -487,7 +510,19 @@ export default function ScenePreviewApproval({
                       <span className="text-xs text-gray-500">Characters:</span>
                       {scene.characterNames.map((char, idx) => {
                         const isNew = newCharacters.includes(char);
-                        return (
+                        return isNew && onDefineNewCharacter ? (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => onDefineNewCharacter(char)}
+                            className="text-xs px-2 py-1 rounded-full font-medium bg-yellow-100 text-yellow-700 border border-yellow-300 hover:bg-yellow-200 hover:border-yellow-400 transition-colors cursor-pointer inline-flex items-center gap-0.5"
+                          >
+                            {char} (NEW)
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                          </button>
+                        ) : (
                           <span
                             key={idx}
                             className={`text-xs px-2 py-1 rounded-full font-medium ${
