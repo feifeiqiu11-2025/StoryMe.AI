@@ -102,7 +102,7 @@ export function UsageLimitBadge() {
           </div>
           {totalWarning === 'critical' && (
             <p className="text-xs text-red-600 mt-2 font-medium">
-              ⚠️ Trial almost complete! Upgrade to continue creating unlimited stories.
+              ⚠️ Trial almost complete! Upgrade to continue creating stories.
             </p>
           )}
           {totalWarning === 'warning' && (

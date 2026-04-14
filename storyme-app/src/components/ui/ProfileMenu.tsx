@@ -83,10 +83,12 @@ export default function ProfileMenu({ displayName }: ProfileMenuProps) {
     );
   }
 
-  const percentage = (usage.count / usage.limit) * 100;
-  const remaining = usage.limit - usage.count;
-  const isLow = percentage >= 80;
-  const isCritical = percentage >= 90;
+  // Guard against legacy unlimited (-1) limits during transition
+  const effectiveLimit = usage.limit > 0 ? usage.limit : 999;
+  const percentage = usage.limit > 0 ? (usage.count / usage.limit) * 100 : 0;
+  const remaining = usage.limit > 0 ? usage.limit - usage.count : 999;
+  const isLow = usage.limit > 0 && percentage >= 80;
+  const isCritical = usage.limit > 0 && percentage >= 90;
 
   // Calculate days remaining in trial
   // Only show trial countdown if trial is still ACTIVE (not completed)
@@ -141,18 +143,12 @@ export default function ProfileMenu({ displayName }: ProfileMenuProps) {
 
           {/* Usage Stats */}
           <div className="px-4 py-3 space-y-3">
-            {isPremium ? (
-              <div className="px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-semibold text-center">
-                ✨ Unlimited Stories
-              </div>
-            ) : (
-              <>
                 {/* Story Usage */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Stories Created</span>
                     <span className={`font-semibold ${isCritical ? 'text-red-600' : isLow ? 'text-orange-600' : 'text-blue-600'}`}>
-                      {usage.count} / {usage.limit}
+                      {usage.count} / {usage.limit > 0 ? usage.limit : '∞'}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -168,7 +164,7 @@ export default function ProfileMenu({ displayName }: ProfileMenuProps) {
                     />
                   </div>
                   <p className={`text-xs ${isCritical ? 'text-red-600' : isLow ? 'text-orange-600' : 'text-gray-500'}`}>
-                    {remaining} stories remaining
+                    {usage.limit > 0 ? `${remaining} stories remaining` : 'Limit updates next billing cycle'}
                   </p>
                 </div>
 
@@ -199,8 +195,6 @@ export default function ProfileMenu({ displayName }: ProfileMenuProps) {
                     ⬆️ Upgrade to Premium
                   </Link>
                 )}
-              </>
-            )}
           </div>
 
           {/* Menu Items */}

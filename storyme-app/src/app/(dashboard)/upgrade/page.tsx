@@ -404,13 +404,13 @@ export default function UpgradePage() {
                     /{billingCycle === 'monthly' ? 'mo' : 'yr'}
                   </span>
                 </div>
-                <div className="text-sm text-blue-600 font-semibold">20 stories/month</div>
+                <div className="text-sm text-blue-600 font-semibold">5 stories/month</div>
               </div>
 
               <ul className="space-y-2 mb-6 text-sm">
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
-                  <span className="text-gray-600">20 new stories per month</span>
+                  <span className="text-gray-600">5 new stories per month</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
@@ -480,17 +480,17 @@ export default function UpgradePage() {
                     /{billingCycle === 'monthly' ? 'mo' : 'yr'}
                   </span>
                 </div>
-                <div className="text-sm text-purple-600 font-semibold">Unlimited stories</div>
+                <div className="text-sm text-purple-600 font-semibold">10 stories/month</div>
               </div>
 
               <ul className="space-y-2 mb-6 text-sm">
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
-                  <span className="text-gray-600">Unlimited story creation</span>
+                  <span className="text-gray-600">10 projects per month</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
-                  <span className="text-gray-600">Everything in Basic</span>
+                  <span className="text-gray-600">Everything in Casual Creator</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
@@ -555,25 +555,25 @@ export default function UpgradePage() {
                     /{billingCycle === 'monthly' ? 'mo' : 'yr'}
                   </span>
                 </div>
-                <div className="text-sm text-green-600 font-semibold">5 accounts, unlimited each</div>
+                <div className="text-sm text-green-600 font-semibold">4 accounts, 10 projects each</div>
               </div>
 
               <ul className="space-y-2 mb-6 text-sm">
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
-                  <span className="text-gray-600">5 Studio accounts</span>
+                  <span className="text-gray-600">4 Studio accounts</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
-                  <span className="text-gray-600">Unlimited per account</span>
+                  <span className="text-gray-600">10 projects per account/month</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
-                  <span className="text-gray-600">All Premium features</span>
+                  <span className="text-gray-600">All Pro Creator features</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
-                  <span className="text-gray-600">$12/user (save $2.99)</span>
+                  <span className="text-gray-600">Priority support for all</span>
                 </li>
               </ul>
 

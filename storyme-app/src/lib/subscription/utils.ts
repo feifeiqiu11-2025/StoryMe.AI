@@ -96,7 +96,7 @@ export function getTierFeatures(tier: string): string[] {
     free: trialFeatures, // backward compatibility
     trial: trialFeatures,
     basic: [
-      '20 new stories per month',
+      '5 new stories per month',
       'AI story generation',
       'Audio narration (EN + ZH)',
       'High-quality PDF download',
@@ -108,20 +108,18 @@ export function getTierFeatures(tier: string): string[] {
       'FREE translation',
     ],
     premium: [
-      'Unlimited story creation',
+      '10 stories per month',
       'Everything in Basic +',
       'Priority support',
       'Early access to features',
       'Advanced analytics (soon)',
-      'No story limits ever',
     ],
     team: [
-      '5 separate Studio accounts',
-      'Unlimited stories per account',
-      'All Premium features',
+      '4 separate Studio accounts',
+      '10 stories per account per month',
+      'All Pro Creator features',
       'Priority support for all',
       'Shared billing',
-      '$12/user (save $2.99)',
     ],
   };
 
@@ -132,7 +130,8 @@ export function getTierFeatures(tier: string): string[] {
  * Check if tier is unlimited
  */
 export function isUnlimitedTier(tier: string): boolean {
-  return tier === 'premium' || tier === 'team';
+  // No tier is unlimited — all have monthly caps
+  return false;
 }
 
 /**
@@ -189,24 +188,38 @@ export function getUpgradeRecommendation(
     };
   }
 
-  // Basic users approaching limit
+  // Basic users approaching limit — recommend Pro
   if (tier === 'basic' && storiesLimit > 0) {
-    const percentUsed = (storiesUsed / storiesLimit) * 100;
-
-    if (percentUsed >= 90) {
-      return {
-        shouldUpgrade: true,
-        reason: "You've used 90% of your monthly stories",
-        recommendedTier: 'premium',
-      };
-    }
-
-    // If they consistently use all their stories
     if (storiesUsed >= storiesLimit) {
       return {
         shouldUpgrade: true,
         reason: "You've reached your monthly limit",
         recommendedTier: 'premium',
+      };
+    }
+    if ((storiesUsed / storiesLimit) * 100 >= 80) {
+      return {
+        shouldUpgrade: true,
+        reason: "You're approaching your monthly limit",
+        recommendedTier: 'premium',
+      };
+    }
+  }
+
+  // Premium users approaching limit — recommend Schools
+  if (tier === 'premium' && storiesLimit > 0) {
+    if (storiesUsed >= storiesLimit) {
+      return {
+        shouldUpgrade: true,
+        reason: "You've reached your monthly limit",
+        recommendedTier: 'team',
+      };
+    }
+    if ((storiesUsed / storiesLimit) * 100 >= 80) {
+      return {
+        shouldUpgrade: true,
+        reason: "You're approaching your monthly limit",
+        recommendedTier: 'team',
       };
     }
   }

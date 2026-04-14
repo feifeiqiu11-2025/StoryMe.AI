@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { isAdminEmail } from '@/lib/auth/isAdmin';
 
 export interface SubscriptionStatus {
   canCreate: boolean;
@@ -22,11 +23,10 @@ export interface SubscriptionStatus {
 export async function checkStoryCreationLimit(userId: string): Promise<SubscriptionStatus> {
   const supabase = await createClient();
 
-  // Get user's subscription details
-  // Note: using trial_ends_at (existing field) instead of trial_end_date
+  // Get user's subscription details + email for admin check
   const { data: user, error } = await supabase
     .from('users')
-    .select('subscription_tier, subscription_status, stories_created_this_month, stories_limit, trial_ends_at, billing_cycle_start')
+    .select('email, subscription_tier, subscription_status, stories_created_this_month, stories_limit, trial_ends_at, billing_cycle_start')
     .eq('id', userId)
     .single();
 
@@ -38,6 +38,17 @@ export async function checkStoryCreationLimit(userId: string): Promise<Subscript
       storiesLimit: 0,
       tier: 'unknown',
       status: 'unknown',
+    };
+  }
+
+  // Admin accounts bypass all limits
+  if (isAdminEmail(user.email)) {
+    return {
+      canCreate: true,
+      storiesUsed: user.stories_created_this_month || 0,
+      storiesLimit: -1,
+      tier: user.subscription_tier || 'premium',
+      status: user.subscription_status || 'active',
     };
   }
 
@@ -127,24 +138,17 @@ export async function checkStoryCreationLimit(userId: string): Promise<Subscript
     }
   }
 
-  // Unlimited tiers (Premium, Team)
-  if (stories_limit === -1) {
-    return {
-      canCreate: true,
-      storiesUsed: stories_created_this_month || 0,
-      storiesLimit: -1,
-      tier: subscription_tier || 'unknown',
-      status: subscription_status || 'active',
-      trialEndsAt: trial_ends_at,
-    };
-  }
-
   // Check if user has reached their limit
   const currentCount = stories_created_this_month || 0;
-  if (currentCount >= stories_limit) {
+  if (stories_limit > 0 && currentCount >= stories_limit) {
+    const upgradeHint = subscription_tier === 'basic'
+      ? 'Upgrade to Pro Creator for 10 stories/month'
+      : subscription_tier === 'premium'
+      ? 'Consider the Schools & Educators plan for more capacity'
+      : 'Please wait until your next billing cycle';
     return {
       canCreate: false,
-      reason: `You've reached your monthly limit of ${stories_limit} stories. Upgrade to Premium for unlimited stories or wait until your next billing cycle.`,
+      reason: `You've reached your monthly limit of ${stories_limit} stories. ${upgradeHint}.`,
       storiesUsed: currentCount,
       storiesLimit: stories_limit,
       tier: subscription_tier || 'unknown',
@@ -262,7 +266,7 @@ export async function getSubscriptionSummary(userId: string) {
   return {
     ...user,
     trialDaysRemaining,
-    isUnlimited: user.stories_limit === -1,
+    isUnlimited: false, // No tier is unlimited — all have monthly caps
     percentUsed: user.stories_limit > 0
       ? Math.round((user.stories_created_this_month / user.stories_limit) * 100)
       : 0,

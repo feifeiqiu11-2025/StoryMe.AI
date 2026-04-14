@@ -133,7 +133,7 @@ export default function LimitReachedPage() {
                 <ul className="space-y-2 text-sm text-gray-700">
                   <li className="flex items-start gap-2">
                     <span className="text-green-600 mt-0.5">✓</span>
-                    <span><strong>20 stories</strong> per month</span>
+                    <span><strong>5 stories</strong> per month</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-green-600 mt-0.5">✓</span>
@@ -165,7 +165,7 @@ export default function LimitReachedPage() {
                 <ul className="space-y-2 text-sm text-gray-700">
                   <li className="flex items-start gap-2">
                     <span className="text-green-600 mt-0.5">✓</span>
-                    <span><strong>Unlimited stories</strong></span>
+                    <span><strong>10 stories</strong> per month</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-green-600 mt-0.5">✓</span>
