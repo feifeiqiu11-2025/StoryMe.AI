@@ -37,6 +37,7 @@ interface ReadingModeViewerProps {
   projectTitle: string;
   pages: ReadingPage[];
   onExit: () => void;
+  /** @default true */
   autoPlayAudio?: boolean;
   secondaryLanguage?: string | null;
 }
@@ -46,18 +47,17 @@ export default function ReadingModeViewer({
   projectTitle,
   pages,
   onExit,
-  autoPlayAudio = false,
+  autoPlayAudio = true,
   secondaryLanguage,
 }: ReadingModeViewerProps) {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [audioEnabled, setAudioEnabled] = useState(autoPlayAudio);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [showControls, setShowControls] = useState(true);
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [audioLanguage, setAudioLanguage] = useState<string>('en');
+  const [showAudioHint, setShowAudioHint] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const KIDS_APP_URL = 'https://apps.apple.com/us/app/kindlewood-kids/id6755075039';
 
@@ -82,22 +82,16 @@ export default function ReadingModeViewer({
     return page.audioUrl;
   };
 
-  // Auto-hide controls after 3 seconds
+  // Controls are always visible — no auto-hide timer.
+
+  // Show a brief hint when audio is off so users know it's available
   useEffect(() => {
-    if (showControls) {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-      controlsTimeoutRef.current = setTimeout(() => {
-        setShowControls(false);
-      }, 3000);
+    if (!audioEnabled && hasAudio) {
+      setShowAudioHint(true);
+      const timer = setTimeout(() => setShowAudioHint(false), 4000);
+      return () => clearTimeout(timer);
     }
-    return () => {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-    };
-  }, [showControls, currentPageIndex]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Play audio when page changes or on initial load (if audio enabled)
   useEffect(() => {
@@ -171,7 +165,6 @@ export default function ReadingModeViewer({
   const goToNextPage = () => {
     if (currentPageIndex < totalPages - 1) {
       setCurrentPageIndex(currentPageIndex + 1);
-      setShowControls(true);
     } else {
       // Show completion screen when user tries to go past last page
       setShowCompletionScreen(true);
@@ -181,7 +174,6 @@ export default function ReadingModeViewer({
   const goToPreviousPage = () => {
     if (currentPageIndex > 0) {
       setCurrentPageIndex(currentPageIndex - 1);
-      setShowControls(true);
     }
   };
 
@@ -224,8 +216,6 @@ export default function ReadingModeViewer({
         console.error('Audio play error on tap:', err);
       });
     }
-    // Toggle controls on tap
-    setShowControls(!showControls);
   };
 
   const toggleLanguage = () => {
@@ -249,9 +239,7 @@ export default function ReadingModeViewer({
 
       {/* Top Controls Bar */}
       <div
-        className={`absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/70 to-transparent transition-opacity duration-300 ${
-          showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
+        className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/70 to-transparent"
       >
         <div className="flex items-center justify-between p-4">
           {/* Exit Button */}
@@ -378,9 +366,7 @@ export default function ReadingModeViewer({
 
         {/* Navigation Arrows */}
         <div
-          className={`absolute left-0 right-0 top-1/2 -translate-y-1/2 flex items-center justify-between px-4 pointer-events-none transition-opacity duration-300 ${
-            showControls ? 'opacity-100' : 'opacity-0'
-          }`}
+          className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex items-center justify-between px-4 pointer-events-none"
         >
           {/* Previous Button */}
           <button
@@ -417,9 +403,7 @@ export default function ReadingModeViewer({
 
       {/* Bottom Controls Bar */}
       <div
-        className={`absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/70 to-transparent transition-opacity duration-300 ${
-          showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
+        className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/70 to-transparent"
       >
         <div className="flex flex-col items-center p-4 space-y-3">
           {/* Page Indicator Dots */}
@@ -430,7 +414,6 @@ export default function ReadingModeViewer({
                 onClick={(e) => {
                   e.stopPropagation();
                   setCurrentPageIndex(index);
-                  setShowControls(true);
                 }}
                 className={`pointer-events-auto transition-all rounded-full ${
                   index === currentPageIndex
@@ -462,12 +445,22 @@ export default function ReadingModeViewer({
       )}
 
       {/* Tap to Start Audio Indicator */}
-      {audioEnabled && audioBlocked && !isPlaying && currentPage?.audioUrl && (
+      {audioEnabled && audioBlocked && !isPlaying && getCurrentAudioUrl(currentPage) && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-4 py-2 rounded-full flex items-center gap-2 shadow-lg animate-pulse">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
           </svg>
           <span className="text-sm font-medium">Tap to start audio</span>
+        </div>
+      )}
+
+      {/* Audio Available Hint — shown briefly when audio is off */}
+      {showAudioHint && !audioEnabled && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-blue-500 text-white px-4 py-2 rounded-full flex items-center gap-2 shadow-lg transition-opacity duration-500">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+          </svg>
+          <span className="text-sm font-medium">Audio available — tap speaker to listen</span>
         </div>
       )}
 

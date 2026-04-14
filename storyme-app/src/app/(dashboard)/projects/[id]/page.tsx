@@ -217,6 +217,7 @@ export default function StoryViewerPage() {
       setHasAudio(data.hasAudio || false);
       setHasEnglishAudio(data.hasEnglishAudio || false);
       setHasChineseAudio(data.hasChineseAudio || false);
+      setHasSecondaryAudio(data.hasSecondaryAudio || data.hasChineseAudio || false);
 
       // Detect if audio is currently being generated in the background
       if (data.isGenerating) {
@@ -228,6 +229,7 @@ export default function StoryViewerPage() {
       setHasAudio(false);
       setHasEnglishAudio(false);
       setHasChineseAudio(false);
+      setHasSecondaryAudio(false);
     }
   };
 
@@ -828,6 +830,8 @@ export default function StoryViewerPage() {
         imageUrl: project.coverImageUrl || '/api/placeholder/1024/1024',
         textContent: coverText,
         audioUrl: coverAudioPage?.audio_url,
+        audioUrlZh: coverAudioPage?.audio_url_zh,
+        audioUrlSecondary: coverAudioPage?.audio_url_secondary || coverAudioPage?.audio_url_zh,
         audioDuration: coverAudioPage?.audio_duration_seconds,
       });
 

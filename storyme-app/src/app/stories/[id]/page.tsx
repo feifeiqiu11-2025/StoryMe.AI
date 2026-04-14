@@ -14,7 +14,6 @@ import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeViewer';
 import AudioRecorder, { RecordingPage } from '@/components/story/AudioRecorder';
 import LandingNav from '@/components/navigation/LandingNav';
-import AppPromoBanner from '@/components/promotion/AppPromoBanner';
 
 function StoryViewer() {
   const router = useRouter();
@@ -269,6 +268,7 @@ function StoryViewer() {
         textContent: coverText,
         audioUrl: coverAudioPage?.audio_url,
         audioUrlZh: coverAudioPage?.audio_url_zh,
+        audioUrlSecondary: coverAudioPage?.audio_url_secondary || coverAudioPage?.audio_url_zh,
         audioDuration: coverAudioPage?.audio_duration_seconds,
       });
 
@@ -282,8 +282,10 @@ function StoryViewer() {
           imageUrl: scene.imageUrl || '/api/placeholder/1024/1024',
           textContent: scene.caption || scene.description,
           textContentChinese: scene.captionChinese,
+          textContentSecondary: scene.captionSecondary || scene.captionChinese,
           audioUrl: sceneAudioPage?.audio_url,
           audioUrlZh: sceneAudioPage?.audio_url_zh,
+          audioUrlSecondary: sceneAudioPage?.audio_url_secondary || sceneAudioPage?.audio_url_zh,
           audioDuration: sceneAudioPage?.audio_duration_seconds,
         });
       });
@@ -509,9 +511,9 @@ function StoryViewer() {
                     <p className="text-gray-800 text-lg leading-relaxed">
                       {currentPage?.caption || currentPage?.description || 'No description available'}
                     </p>
-                    {currentPage?.captionChinese && (
+                    {(currentPage?.captionSecondary || currentPage?.captionChinese) && (
                       <p className="text-gray-500 text-base leading-relaxed mt-2">
-                        {currentPage.captionChinese}
+                        {currentPage.captionSecondary || currentPage.captionChinese}
                       </p>
                     )}
                   </div>
@@ -520,75 +522,108 @@ function StoryViewer() {
             </div>
 
             {/* Actions */}
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              <div className="flex gap-4 flex-wrap">
-                <button
-                  onClick={handleEnterReadingMode}
-                  disabled={loadingAudio}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-purple-700 hover:to-blue-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loadingAudio ? (
-                    <span className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Loading...
-                    </span>
-                  ) : (
-                    '📖 Reading Mode'
-                  )}
-                </button>
-                {/* Only show Record Audio and Generate AI Audio if NOT community story */}
-                {user && !isCommunityStory && (
-                  <>
-                    <button
-                      onClick={handleRecordAudio}
-                      disabled={uploadingAudio}
-                      className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-pink-600 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {uploadingAudio ? (
-                        <span className="flex items-center gap-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          Saving...
-                        </span>
-                      ) : (
-                        '🎙️ Record Your Voice'
-                      )}
-                    </button>
-                    {!hasAudio && (
-                      <button
-                        onClick={handleGenerateAudio}
-                        disabled={generatingAudio}
-                        className="bg-gradient-to-r from-green-600 to-teal-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-teal-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {generatingAudio ? (
-                          <span className="flex items-center gap-2">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            Generating...
-                          </span>
-                        ) : (
-                          '🤖 Generate AI Audio'
-                        )}
-                      </button>
-                    )}
-                  </>
+            <div className="flex items-center gap-4 flex-wrap mt-2">
+              <button
+                onClick={handleEnterReadingMode}
+                disabled={loadingAudio}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-purple-700 hover:to-blue-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingAudio ? (
+                  <span className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Loading...
+                  </span>
+                ) : (
+                  '📖 Reading Mode'
                 )}
-                {/* Only show Download PDF if NOT community story */}
-                {!isCommunityStory && (
+              </button>
+              {/* Only show Record Audio and Generate AI Audio if NOT community story */}
+              {user && !isCommunityStory && (
+                <>
                   <button
-                    onClick={handleDownloadPDF}
-                    disabled={generatingPDF}
-                    className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl hover:from-orange-700 hover:to-red-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={handleRecordAudio}
+                    disabled={uploadingAudio}
+                    className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-pink-600 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {generatingPDF ? (
+                    {uploadingAudio ? (
                       <span className="flex items-center gap-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Generating PDF...
+                        Saving...
                       </span>
                     ) : (
-                      '📄 Download PDF'
+                      '🎙️ Record Your Voice'
                     )}
                   </button>
-                )}
-              </div>
+                  {!hasAudio && (
+                    <button
+                      onClick={handleGenerateAudio}
+                      disabled={generatingAudio}
+                      className="bg-gradient-to-r from-green-600 to-teal-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-teal-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {generatingAudio ? (
+                        <span className="flex items-center gap-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Generating...
+                        </span>
+                      ) : (
+                        '🤖 Generate AI Audio'
+                      )}
+                    </button>
+                  )}
+                </>
+              )}
+              {/* Only show Download PDF if NOT community story */}
+              {!isCommunityStory && (
+                <button
+                  onClick={handleDownloadPDF}
+                  disabled={generatingPDF}
+                  className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl hover:from-orange-700 hover:to-red-700 font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {generatingPDF ? (
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Generating PDF...
+                    </span>
+                  ) : (
+                    '📄 Download PDF'
+                  )}
+                </button>
+              )}
+
+              {/* Inline app promo tip */}
+              {!user && (
+                <div className="flex items-center gap-3 text-base text-gray-500">
+                  <span>📱 Better reading experience & learning games in the mobile app</span>
+                  <a
+                    href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-600 font-semibold hover:text-purple-700 transition-colors"
+                  >
+                    Get App
+                  </a>
+                  <span className="text-gray-300">|</span>
+                  <Link
+                    href="/signup"
+                    className="text-purple-600 font-semibold hover:text-purple-700 transition-colors"
+                  >
+                    Sign Up
+                  </Link>
+                </div>
+              )}
+              {user && (
+                <div className="flex items-center gap-3 text-base text-gray-500">
+                  <span>📱 Better reading experience & learning games in the mobile app</span>
+                  <a
+                    href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-600 font-semibold hover:text-purple-700 transition-colors"
+                  >
+                    Get App
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -602,11 +637,6 @@ function StoryViewer() {
             </p>
           </div>
         )}
-
-        {/* App Promotion Banner */}
-        <div className="mt-8">
-          <AppPromoBanner isLoggedIn={!!user} variant="inline" />
-        </div>
       </div>
 
       {/* Reading Mode Viewer */}
@@ -617,6 +647,7 @@ function StoryViewer() {
           pages={readingPages}
           onExit={() => setReadingMode(false)}
           autoPlayAudio={searchParams.get('mode') === 'reading'}
+          secondaryLanguage={story?.secondaryLanguage}
         />
       )}
 
