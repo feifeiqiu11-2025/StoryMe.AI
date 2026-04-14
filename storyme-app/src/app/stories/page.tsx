@@ -27,6 +27,7 @@ function PublicStoriesContent() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'popular' | 'recent'>('recent');
+  const [selectedCustomTag, setSelectedCustomTag] = useState<string>('');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -34,18 +35,22 @@ function PublicStoriesContent() {
   const [totalPages, setTotalPages] = useState(0);
   const limit = 24;
 
-  // Read filter from URL on mount
+  // Read filters from URL on mount
   useEffect(() => {
     const filterParam = searchParams.get('filter');
     if (filterParam) {
       setSelectedTags([filterParam]);
+    }
+    const customTagParam = searchParams.get('customTag');
+    if (customTagParam) {
+      setSelectedCustomTag(customTagParam);
     }
     fetchTags();
   }, []);
 
   useEffect(() => {
     fetchPublicStories();
-  }, [sortBy, selectedTags, searchQuery, currentPage]);
+  }, [sortBy, selectedTags, searchQuery, currentPage, selectedCustomTag]);
 
   const fetchTags = async () => {
     try {
@@ -61,7 +66,9 @@ function PublicStoriesContent() {
     try {
       setLoading(true);
       const offset = (currentPage - 1) * limit;
-      const tags = selectedTags.join(',');
+      const allTagSlugs = [...selectedTags];
+      if (selectedCustomTag) allTagSlugs.push(selectedCustomTag);
+      const tags = allTagSlugs.join(',');
       const search = searchQuery.trim();
 
       const params = new URLSearchParams({
@@ -91,17 +98,24 @@ function PublicStoriesContent() {
     }
   };
 
+  // Helper to sync filter state to URL
+  const updateFilterUrl = (filter?: string, customTag?: string) => {
+    const params = new URLSearchParams();
+    if (filter) params.set('filter', filter);
+    if (customTag) params.set('customTag', customTag);
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false });
+  };
+
   const toggleTag = (tagSlug: string) => {
-    // Single selection: clicking a tag replaces the current selection
     setSelectedTags([tagSlug]);
     setCurrentPage(1);
-    const params = new URLSearchParams(window.location.search);
-    params.set('filter', tagSlug);
-    router.replace(`?${params.toString()}`, { scroll: false });
+    updateFilterUrl(tagSlug, selectedCustomTag || undefined);
   };
 
   const clearFilters = () => {
     setSelectedTags([]);
+    setSelectedCustomTag('');
     setSearchQuery('');
     setCurrentPage(1);
     router.replace(window.location.pathname, { scroll: false });
@@ -171,23 +185,26 @@ function PublicStoriesContent() {
 
   const groupedStories = getGroupedStories();
 
-  // Separate featured and regular stories
-  const featuredStories = stories.filter(s => s.featured);
-  const regularStories = stories.filter(s => !s.featured);
+  // Sort stories: featured first, then by publishedAt
+  const sortedStories = [...stories].sort((a, b) => {
+    if (a.featured && !b.featured) return -1;
+    if (!a.featured && b.featured) return 1;
+    return 0; // preserve API sort order within each group
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       <LandingNav />
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Page Header with Search */}
-        <div className="mb-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+        <div className="mb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
             <div>
-              <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-1">
                 Community Stories
               </h1>
-              <p className="text-gray-600 text-lg">
+              <p className="text-gray-600">
                 Discover amazing stories created by kids and families around the world!
               </p>
             </div>
@@ -217,13 +234,14 @@ function PublicStoriesContent() {
         </div>
 
         {/* Tag Filters */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-8">
+        <div className="mb-6">
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-sm font-medium text-gray-600">Filter by:</span>
             <button
               onClick={() => {
                 setSelectedTags([]);
                 setCurrentPage(1);
+                updateFilterUrl(undefined, selectedCustomTag || undefined);
               }}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                 selectedTags.length === 0
@@ -237,11 +255,11 @@ function PublicStoriesContent() {
             {availableTags
               .filter(tag =>
                 // Only show top-level categories (Collections, Learning) and special categories (Avocado, Original)
-                (!tag.isLeaf && tag.parentId === null) ||
-                (tag.isLeaf && tag.parentId === null && (tag.category === 'avocado-ama' || tag.category === 'original-stories'))
+                // Exclude 'custom' — it gets its own dropdown
+                ((!tag.isLeaf && tag.parentId === null && tag.category !== 'custom') ||
+                (tag.isLeaf && tag.parentId === null && (tag.category === 'avocado-ama' || tag.category === 'original-stories')))
               )
               .sort((a, b) => {
-                // Custom sort order: Collections, Learning, Avocado, Original
                 const order = ['collections', 'learning', 'avocado-ama', 'original-stories'];
                 return order.indexOf(a.category || '') - order.indexOf(b.category || '');
               })
@@ -260,7 +278,34 @@ function PublicStoriesContent() {
                 </button>
               ))}
 
-            {(selectedTags.length > 0 || searchQuery) && (
+            {/* Custom Tags Dropdown */}
+            {availableTags.some(t => t.category === 'custom' && t.isLeaf) && (
+              <>
+                <span className="text-gray-300">|</span>
+                <select
+                  value={selectedCustomTag}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedCustomTag(val);
+                    setCurrentPage(1);
+                    updateFilterUrl(selectedTags[0] || undefined, val || undefined);
+                  }}
+                  className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Custom Tags</option>
+                  {availableTags
+                    .filter(t => t.category === 'custom' && t.isLeaf)
+                    .sort((a, b) => a.displayOrder - b.displayOrder)
+                    .map(tag => (
+                      <option key={tag.id} value={tag.slug}>
+                        {tag.name}
+                      </option>
+                    ))}
+                </select>
+              </>
+            )}
+
+            {(selectedTags.length > 0 || searchQuery || selectedCustomTag) && (
               <button
                 onClick={clearFilters}
                 className="text-sm text-blue-600 hover:text-blue-700 font-medium"
@@ -299,31 +344,8 @@ function PublicStoriesContent() {
           </div>
         )}
 
-        {/* Featured Stories */}
-        {!loading && !error && featuredStories.length > 0 && (
-          <div className="mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <span>⭐</span>
-              <span>Featured Stories</span>
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {featuredStories.map((story) => (
-                <StoryCard
-                  key={story.id}
-                  story={story}
-                  onClick={() => handleStoryClick(story.id)}
-                  variant="community"
-                  showFeaturedBadge={true}
-                  showViewCount={true}
-                  showAuthor={true}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Regular Stories - Grouped by subcategory or flat grid */}
-        {!loading && !error && regularStories.length > 0 && (
+        {/* Stories - Grouped by subcategory or unified grid (featured first with badges) */}
+        {!loading && !error && sortedStories.length > 0 && (
           <div>
             {groupedStories ? (
               // Show grouped by subcategory
@@ -340,7 +362,7 @@ function PublicStoriesContent() {
                           story={story}
                           onClick={() => handleStoryClick(story.id)}
                           variant="community"
-                          showFeaturedBadge={false}
+                          showFeaturedBadge={true}
                           showViewCount={true}
                           showAuthor={true}
                         />
@@ -350,28 +372,20 @@ function PublicStoriesContent() {
                 ))}
               </div>
             ) : (
-              // Show flat grid
-              <>
-                {featuredStories.length > 0 && (
-                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                    <span>📖</span>
-                    <span>All Stories</span>
-                  </h2>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {regularStories.map((story) => (
-                    <StoryCard
-                      key={story.id}
-                      story={story}
-                      onClick={() => handleStoryClick(story.id)}
-                      variant="community"
-                      showFeaturedBadge={false}
-                      showViewCount={true}
-                      showAuthor={true}
-                    />
-                  ))}
-                </div>
-              </>
+              // Unified grid — featured stories appear first with badge
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {sortedStories.map((story) => (
+                  <StoryCard
+                    key={story.id}
+                    story={story}
+                    onClick={() => handleStoryClick(story.id)}
+                    variant="community"
+                    showFeaturedBadge={true}
+                    showViewCount={true}
+                    showAuthor={true}
+                  />
+                ))}
+              </div>
             )}
           </div>
         )}

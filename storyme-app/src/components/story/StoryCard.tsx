@@ -46,6 +46,9 @@ export interface StoryCardProps {
   onPrivacyToggle?: (storyId: string, currentVisibility: 'public' | 'private') => void;
   onDelete?: (storyId: string) => void;
   isUpdatingPrivacy?: boolean;
+  adminActions?: React.ReactNode;
+  tagEditor?: React.ReactNode;
+  onRemoveTag?: (storyId: string, tagId: string) => void;
 }
 
 export function StoryCard({
@@ -62,6 +65,9 @@ export function StoryCard({
   onPrivacyToggle,
   onDelete,
   isUpdatingPrivacy = false,
+  adminActions,
+  tagEditor,
+  onRemoveTag,
 }: StoryCardProps) {
   const [copied, setCopied] = useState(false);
 
@@ -202,23 +208,35 @@ export function StoryCard({
           </div>
         )}
 
-        {/* Tags (NEW) */}
-        {story.tags && story.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-2">
-            {story.tags.slice(0, 2).map(tag => (
+        {/* Tags + inline tag editor — always visible */}
+        {((story.tags && story.tags.length > 0) || tagEditor) && (
+          <div className="flex flex-wrap items-center gap-1 mb-2">
+            {(onRemoveTag ? story.tags : story.tags?.slice(0, 3))?.map(tag => (
               <span
                 key={tag.id}
-                className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium"
+                className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium"
               >
                 {tag.icon && <span className="text-sm">{tag.icon}</span>}
                 {tag.name}
+                {onRemoveTag && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveTag(story.id, tag.id);
+                    }}
+                    className="ml-0.5 text-gray-400 hover:text-red-500"
+                  >
+                    &times;
+                  </button>
+                )}
               </span>
             ))}
-            {story.tags.length > 2 && (
-              <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">
-                +{story.tags.length - 2}
+            {!onRemoveTag && story.tags && story.tags.length > 3 && (
+              <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs">
+                +{story.tags.length - 3}
               </span>
             )}
+            {tagEditor}
           </div>
         )}
 
@@ -238,7 +256,7 @@ export function StoryCard({
         )}
 
         {/* Action Buttons (My Stories only) */}
-        {variant === 'myStories' && (onPrivacyToggle || onDelete) && (
+        {variant === 'myStories' && (onPrivacyToggle || onDelete || adminActions) && (
           <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
             {isDraft ? (
               /* Draft: Show "Continue Editing" label instead of privacy toggle */
@@ -269,6 +287,9 @@ export function StoryCard({
               )
             )}
 
+            {/* Admin Actions (star, tag) - rendered inline next to delete */}
+            {adminActions}
+
             {/* Delete Button */}
             {onDelete && (
               <button
@@ -296,6 +317,7 @@ export function StoryCard({
             )}
           </div>
         )}
+
       </div>
     </div>
   );

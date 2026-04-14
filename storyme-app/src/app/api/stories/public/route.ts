@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '24');
     const offset = parseInt(searchParams.get('offset') || '0');
     const featured = searchParams.get('featured') === 'true';
+    const featuredWithBackfill = searchParams.get('featuredWithBackfill') === 'true';
     const sortBy = searchParams.get('sortBy') || 'recent'; // 'popular' or 'recent'
     const tagSlugs = searchParams.get('tags')?.split(',').filter(Boolean) || [];
     const search = searchParams.get('search') || '';
@@ -108,6 +109,105 @@ export async function GET(request: NextRequest) {
           },
         });
       }
+    }
+
+    // Step 1.5: Featured-with-backfill mode for HeroCarousel
+    // Returns up to `limit` featured stories, backfilled with latest non-featured if needed
+    if (featuredWithBackfill) {
+      const selectFields = `
+        id, title, description, visibility, featured, view_count, like_count, share_count,
+        published_at, created_at, author_name, author_age, cover_image_url,
+        scenes (id, scene_number, description, caption, generated_images (id, image_url)),
+        project_tags (tag_id, story_tags (id, name, slug, icon, category, parent_id, is_leaf, display_order))
+      `;
+
+      // First: get featured stories (up to limit)
+      const { data: featuredStories, error: featuredError } = await supabase
+        .from('projects')
+        .select(selectFields)
+        .eq('visibility', 'public')
+        .eq('status', 'completed')
+        .eq('featured', true)
+        .order('published_at', { ascending: false })
+        .limit(limit);
+
+      if (featuredError) {
+        console.error('Error fetching featured stories:', featuredError);
+        return NextResponse.json({ error: 'Failed to fetch featured stories' }, { status: 500 });
+      }
+
+      let allStories = featuredStories || [];
+
+      // Backfill with latest non-featured if we have fewer than limit
+      if (allStories.length < limit) {
+        const remaining = limit - allStories.length;
+        const featuredIds = allStories.map((s: any) => s.id);
+
+        let backfillQuery = supabase
+          .from('projects')
+          .select(selectFields)
+          .eq('visibility', 'public')
+          .eq('status', 'completed')
+          .eq('featured', false)
+          .order('published_at', { ascending: false })
+          .limit(remaining);
+
+        // Exclude already-fetched featured stories
+        if (featuredIds.length > 0) {
+          backfillQuery = backfillQuery.not('id', 'in', `(${featuredIds.join(',')})`);
+        }
+
+        const { data: backfillStories } = await backfillQuery;
+        if (backfillStories) {
+          allStories = [...allStories, ...backfillStories];
+        }
+      }
+
+      const formatStory = (project: any) => ({
+        id: project.id,
+        title: project.title,
+        description: project.description,
+        visibility: project.visibility,
+        featured: project.featured,
+        viewCount: project.view_count,
+        likeCount: project.like_count,
+        shareCount: project.share_count,
+        publishedAt: project.published_at,
+        createdAt: project.created_at,
+        authorName: project.author_name,
+        authorAge: project.author_age,
+        coverImageUrl: project.cover_image_url,
+        scenes: project.scenes?.map((scene: any) => ({
+          id: scene.id,
+          sceneNumber: scene.scene_number,
+          description: scene.description,
+          caption: scene.caption,
+          imageUrl: scene.generated_images?.[0]?.image_url || null,
+        })) || [],
+        tags: project.project_tags?.map((pt: any) => ({
+          id: pt.story_tags.id,
+          name: pt.story_tags.name,
+          slug: pt.story_tags.slug,
+          icon: pt.story_tags.icon,
+        })) || [],
+      });
+
+      return NextResponse.json({
+        success: true,
+        stories: allStories.map(formatStory),
+        totalCount: allStories.length,
+        currentPage: 1,
+        totalPages: 1,
+        offset: 0,
+        limit,
+      }, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      });
     }
 
     // Step 2: Build the main query with tag filter applied at DB level

@@ -90,12 +90,11 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
   }, [typingComplete]);
 
 
-  // Fetch featured stories
+  // Fetch featured stories with backfill (featured first, then latest to fill 8)
   useEffect(() => {
     async function fetchFeaturedStories() {
       try {
-        // Fetch public stories (remove featured filter to get more results)
-        const response = await fetch('/api/stories/public?limit=8');
+        const response = await fetch('/api/stories/public?limit=8&featuredWithBackfill=true');
         if (!response.ok) {
           throw new Error('Failed to fetch stories');
         }

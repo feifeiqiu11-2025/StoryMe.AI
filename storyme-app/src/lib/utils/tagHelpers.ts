@@ -54,8 +54,8 @@ export function groupTagsByCategory(tags: StoryTag[]): GroupedTags[] {
   }
 
   return grouped.sort((a, b) => {
-    // Order: Collections, Learning, Avocado (AMA), Original Stories
-    const order = ['collections', 'learning', 'avocado-ama', 'original-stories'];
+    // Order: Collections, Learning, Avocado (AMA), Original Stories, Custom
+    const order = ['collections', 'learning', 'avocado-ama', 'original-stories', 'custom'];
     return order.indexOf(a.category) - order.indexOf(b.category);
   });
 }
@@ -103,6 +103,7 @@ export function getCategoryDisplayName(category: TagCategory | 'all'): string {
     learning: 'Learning',
     'avocado-ama': 'Avocado (AMA)',
     'original-stories': 'Original Stories',
+    custom: 'Custom',
   };
   return names[category];
 }
@@ -117,6 +118,7 @@ export function getCategoryIcon(category: TagCategory | 'all'): string {
     learning: '🎓',
     'avocado-ama': '🥑',
     'original-stories': '✨',
+    custom: '🏷️',
   };
   return icons[category];
 }

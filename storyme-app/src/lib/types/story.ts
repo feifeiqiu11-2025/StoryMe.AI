@@ -48,7 +48,8 @@ export type TagCategory =
   | 'collections'       // Thematic collections (has sub-categories)
   | 'learning'          // Educational purpose (has sub-categories)
   | 'avocado-ama'       // School partner (both category and tag)
-  | 'original-stories'; // User-created (both category and tag)
+  | 'original-stories'  // User-created (both category and tag)
+  | 'custom';           // Admin-created free-text tags (has sub-categories)
 
 // Predefined tag slugs (for type safety and autocomplete)
 export const PREDEFINED_TAG_SLUGS = {
@@ -57,6 +58,7 @@ export const PREDEFINED_TAG_SLUGS = {
   LEARNING: 'learning',
   AVOCADO_AMA: 'avocado-ama',
   ORIGINAL: 'original-stories',
+  CUSTOM: 'custom',
 
   // Collection sub-categories
   SPACE_SCIENCE: 'space-science',

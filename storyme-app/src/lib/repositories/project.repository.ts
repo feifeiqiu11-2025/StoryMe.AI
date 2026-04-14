@@ -175,7 +175,9 @@ export class ProjectRepository extends BaseRepository<Project> {
             id,
             name,
             slug,
-            icon
+            icon,
+            category,
+            display_order
           )
         )
       `)

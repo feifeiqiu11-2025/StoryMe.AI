@@ -14,8 +14,9 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
-import type { StoryVisibility } from '@/lib/types/story';
+import type { StoryVisibility, StoryTag } from '@/lib/types/story';
 import { StoryCard, type StoryCardData } from '@/components/story/StoryCard';
+import { isAdminEmail } from '@/lib/auth/isAdmin';
 
 const PAGE_SIZE = 12; // 12 divides evenly by 1, 2, 3, 4 columns
 
@@ -196,6 +197,16 @@ function ProjectsContent() {
   const [updatingPrivacy, setUpdatingPrivacy] = useState<string | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState<string | null>(null);
 
+  // Admin state
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [togglingFeatured, setTogglingFeatured] = useState<string | null>(null);
+
+  // Tag editing state
+  const [allCustomTags, setAllCustomTags] = useState<StoryTag[]>([]);
+  const [editingTagProjectId, setEditingTagProjectId] = useState<string | null>(null);
+  const [tagInput, setTagInput] = useState('');
+  const [savingTags, setSavingTags] = useState<string | null>(null);
+
   // AbortController ref for canceling stale requests
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -345,6 +356,7 @@ function ProjectsContent() {
             name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0],
           };
           setUser(userData);
+          setIsAdmin(isAdminEmail(supabaseUser.email));
         } else {
           router.push('/login');
         }
@@ -486,6 +498,126 @@ function ProjectsContent() {
     }
   };
 
+  // Fetch custom tags for admin tag editor
+  useEffect(() => {
+    if (!isAdmin) return;
+    const fetchCustomTags = async () => {
+      try {
+        const response = await fetch('/api/tags');
+        if (response.ok) {
+          const data = await response.json();
+          const custom = (data.tags || []).filter(
+            (t: any) => t.category === 'custom' && t.isLeaf
+          );
+          setAllCustomTags(custom);
+        }
+      } catch (err) {
+        console.error('Failed to fetch tags:', err);
+      }
+    };
+    fetchCustomTags();
+  }, [isAdmin]);
+
+  // Toggle featured status on a story
+  const handleToggleFeatured = async (projectId: string, featured: boolean) => {
+    setTogglingFeatured(projectId);
+    try {
+      const response = await fetch('/api/admin/toggle-featured-story', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, featured }),
+      });
+      if (response.ok) {
+        invalidateCache(validPage);
+        setProjects(prev =>
+          prev.map(p => (p.id === projectId ? { ...p, featured } : p))
+        );
+      }
+    } catch (err) {
+      console.error('Error toggling featured:', err);
+    } finally {
+      setTogglingFeatured(null);
+    }
+  };
+
+  // Add a tag to a story (select existing or create new custom tag)
+  const handleAddTag = async (projectId: string, currentTags: StoryTag[], tagNameOrId: string) => {
+    setSavingTags(projectId);
+    try {
+      // Check if this is an existing tag ID or a new tag name
+      let tagToAdd = allCustomTags.find(t => t.id === tagNameOrId);
+
+      if (!tagToAdd) {
+        // Create new custom tag
+        const createRes = await fetch('/api/admin/custom-tags', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: tagNameOrId }),
+        });
+        if (!createRes.ok) {
+          const err = await createRes.json();
+          alert(err.error || 'Failed to create tag');
+          return;
+        }
+        const created = await createRes.json();
+        tagToAdd = created.tag;
+        setAllCustomTags(prev => [...prev, created.tag]);
+      }
+
+      if (!tagToAdd) return;
+
+      // Check for duplicates
+      if (currentTags.some(t => t.id === tagToAdd!.id)) return;
+
+      const newTagIds = [...currentTags.map(t => t.id), tagToAdd.id];
+
+      const response = await fetch('/api/admin/story-tags', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, tagIds: newTagIds }),
+      });
+
+      if (response.ok) {
+        const newTags = [...currentTags, tagToAdd];
+        invalidateCache(validPage);
+        setProjects(prev =>
+          prev.map(p => (p.id === projectId ? { ...p, tags: newTags } : p))
+        );
+        // Auto-close tag editor after successful add
+        setEditingTagProjectId(null);
+      }
+    } catch (err) {
+      console.error('Error adding tag:', err);
+    } finally {
+      setSavingTags(null);
+      setTagInput('');
+    }
+  };
+
+  // Remove a tag from a story
+  const handleRemoveTag = async (projectId: string, currentTags: StoryTag[], tagId: string) => {
+    setSavingTags(projectId);
+    try {
+      const newTags = currentTags.filter(t => t.id !== tagId);
+      const response = await fetch('/api/admin/story-tags', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, tagIds: newTags.map(t => t.id) }),
+      });
+
+      if (response.ok) {
+        invalidateCache(validPage);
+        setProjects(prev =>
+          prev.map(p => (p.id === projectId ? { ...p, tags: newTags } : p))
+        );
+      }
+    } catch (err) {
+      console.error('Error removing tag:', err);
+    } finally {
+      setSavingTags(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
@@ -553,6 +685,8 @@ function ProjectsContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {projects.map((project) => {
               const isDraft = project.status === 'draft';
+              const isPublic = project.visibility === 'public';
+              const projectTags: StoryTag[] = project.tags || [];
               const storyData: StoryCardData = {
                 id: project.id,
                 title: project.title || 'Untitled Draft',
@@ -566,24 +700,120 @@ function ProjectsContent() {
                 createdAt: project.createdAt,
                 updatedAt: project.updatedAt,
                 scenes: project.scenes,
+                tags: projectTags,
               };
 
               return (
                 <StoryCard
                   key={project.id}
-                  story={storyData}
-                  onClick={() => {
-                    if (isDraft) {
-                      router.push(`/create?projectId=${project.id}`);
-                    } else {
-                      router.push(`/projects/${project.id}`);
-                    }
-                  }}
-                  variant="myStories"
-                  onPrivacyToggle={isDraft ? undefined : handlePrivacyToggle}
-                  onDelete={() => setDeleteConfirm(project.id)}
-                  isUpdatingPrivacy={updatingPrivacy === project.id}
-                />
+                    story={storyData}
+                    onClick={() => {
+                      if (isDraft) {
+                        router.push(`/create?projectId=${project.id}`);
+                      } else {
+                        router.push(`/projects/${project.id}`);
+                      }
+                    }}
+                    variant="myStories"
+                    onPrivacyToggle={isDraft ? undefined : handlePrivacyToggle}
+                    onDelete={() => setDeleteConfirm(project.id)}
+                    isUpdatingPrivacy={updatingPrivacy === project.id}
+                    onRemoveTag={isAdmin && !isDraft ? (storyId, tagId) => {
+                      handleRemoveTag(storyId, projectTags, tagId);
+                    } : undefined}
+                    adminActions={isAdmin && !isDraft ? (
+                      <div className="flex items-center gap-1">
+                        {/* Featured Star Toggle (only for public stories) */}
+                        {isPublic && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleFeatured(project.id, !project.featured);
+                            }}
+                            disabled={togglingFeatured === project.id}
+                            className={`p-2 rounded-lg transition-all ${
+                              project.featured
+                                ? 'text-yellow-500 hover:bg-yellow-50'
+                                : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50'
+                            } ${togglingFeatured === project.id ? 'opacity-50' : ''}`}
+                            title={project.featured ? 'Remove from Featured' : 'Add to Featured'}
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            </svg>
+                          </button>
+                        )}
+
+                        {/* Tag Editor Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTagProjectId(
+                              editingTagProjectId === project.id ? null : project.id
+                            );
+                            setTagInput('');
+                          }}
+                          className={`p-2 rounded-lg transition-all ${
+                            editingTagProjectId === project.id
+                              ? 'text-blue-500 bg-blue-50'
+                              : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'
+                          }`}
+                          title="Manage Tags"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : undefined}
+                    tagEditor={isAdmin && editingTagProjectId === project.id ? (
+                      <div className="relative" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          value={tagInput}
+                          onChange={(e) => setTagInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && tagInput.trim()) {
+                              e.preventDefault();
+                              const match = allCustomTags.find(
+                                t => t.name.toLowerCase() === tagInput.trim().toLowerCase()
+                              );
+                              handleAddTag(project.id, projectTags, match ? match.id : tagInput.trim());
+                            }
+                            if (e.key === 'Escape') {
+                              setEditingTagProjectId(null);
+                              setTagInput('');
+                            }
+                          }}
+                          onBlur={() => {
+                            if (tagInput.trim()) {
+                              const match = allCustomTags.find(
+                                t => t.name.toLowerCase() === tagInput.trim().toLowerCase()
+                              );
+                              handleAddTag(project.id, projectTags, match ? match.id : tagInput.trim());
+                            }
+                            setTimeout(() => {
+                              setEditingTagProjectId(null);
+                              setTagInput('');
+                            }, 150);
+                          }}
+                          placeholder="Type tag..."
+                          disabled={savingTags === project.id}
+                          className="w-24 text-xs px-2 py-0.5 border border-gray-300 rounded-full focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none"
+                          autoFocus
+                          list={`custom-tags-${project.id}`}
+                        />
+                        <datalist id={`custom-tags-${project.id}`}>
+                          {allCustomTags
+                            .filter(t => !projectTags.some(pt => pt.id === t.id))
+                            .filter(t => t.name.toLowerCase().includes(tagInput.toLowerCase()))
+                            .map(t => (
+                              <option key={t.id} value={t.name} />
+                            ))}
+                        </datalist>
+                      </div>
+                    ) : undefined}
+                  />
               );
             })}
           </div>
