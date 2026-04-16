@@ -141,7 +141,9 @@ export async function checkStoryCreationLimit(userId: string): Promise<Subscript
   // Check if user has reached their limit
   const currentCount = stories_created_this_month || 0;
   if (stories_limit > 0 && currentCount >= stories_limit) {
-    const upgradeHint = subscription_tier === 'basic'
+    const upgradeHint = isTrialTier
+      ? 'Upgrade to Casual Creator for 5 stories/month'
+      : subscription_tier === 'basic'
       ? 'Upgrade to Pro Creator for 10 stories/month'
       : subscription_tier === 'premium'
       ? 'Consider the Schools & Educators plan for more capacity'

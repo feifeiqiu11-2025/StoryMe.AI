@@ -75,10 +75,11 @@ export async function GET(request: NextRequest) {
     if (isPaymentComplete && userData && userData.subscription_tier !== subscriptionTier) {
       console.log(`[VERIFY-PAYMENT] Payment verified but database not updated. Updating user ${user.id} to tier: ${subscriptionTier}`);
 
-      // Determine stories limit
+      // Determine stories limit (must match webhook handler values)
       let storiesLimit = 2; // default for free tier
-      if (subscriptionTier === 'basic') storiesLimit = 20;
-      if (subscriptionTier === 'premium' || subscriptionTier === 'team') storiesLimit = -1;
+      if (subscriptionTier === 'basic') storiesLimit = 5;
+      if (subscriptionTier === 'premium') storiesLimit = 10;
+      if (subscriptionTier === 'team') storiesLimit = 15;
 
       // Get actual period start from subscription object
       const subscriptionObj = session.subscription as Stripe.Subscription;

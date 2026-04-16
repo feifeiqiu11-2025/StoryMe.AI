@@ -110,6 +110,7 @@ function SignupForm() {
               email: data.user.email,
               name: pendingSignupData.name,
               subscription_tier: 'free',
+              stories_limit: 2,
               trial_started_at: trialStartDate.toISOString(),
               trial_ends_at: trialEndDate.toISOString(),
               images_generated_count: 0,
