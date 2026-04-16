@@ -83,17 +83,18 @@ export const pricingTiers: PricingTier[] = [
     id: 'team',
     name: 'Schools & Educators',
     displayName: 'Schools & Educators',
-    price: { monthly: 59.99, annual: 599 },
+    price: { monthly: 129.99, annual: 1299 },
     description: '',
-    storiesLimit: '10 projects/account',
+    storiesLimit: '15 projects/account',
     features: [
       '4 separate Studio accounts',
-      '10 projects per account',
+      '15 projects per account',
       'All Pro Creator features',
-      'Priority support for all',
+      'Premium priority support',
       'Shared billing',
+      'Shape our product roadmap',
     ],
-    cta: 'Choose Plan',
+    cta: 'Request a Demo',
     gradient: 'from-green-500 to-teal-500',
   },
 ];
@@ -161,8 +162,15 @@ export default function PricingCards({
               ))}
             </ul>
 
-            {/* CTA Button */}
-            {simpleMode ? (
+            {/* CTA Button — team tier always links to demo form */}
+            {tier.id === 'team' ? (
+              <Link
+                href="/support?type=demo"
+                className="w-full py-3 rounded-lg font-semibold transition-all hover:shadow-lg text-center block bg-green-600 hover:bg-green-700 text-white"
+              >
+                {tier.cta}
+              </Link>
+            ) : simpleMode ? (
               <Link
                 href="/signup"
                 className={`w-full py-3 rounded-lg font-semibold transition-all hover:shadow-lg text-center block ${
@@ -170,9 +178,7 @@ export default function PricingCards({
                     ? 'bg-gray-600 hover:bg-gray-700 text-white'
                     : tier.id === 'basic'
                     ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : tier.id === 'premium'
-                    ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                    : 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-purple-600 hover:bg-purple-700 text-white'
                 }`}
               >
                 {tier.cta}
@@ -186,9 +192,7 @@ export default function PricingCards({
                     ? 'bg-gray-600 hover:bg-gray-700 text-white'
                     : tier.id === 'basic'
                     ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : tier.id === 'premium'
-                    ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                    : 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-purple-600 hover:bg-purple-700 text-white'
                 }`}
               >
                 {loading === tier.id ? 'Loading...' : tier.cta}

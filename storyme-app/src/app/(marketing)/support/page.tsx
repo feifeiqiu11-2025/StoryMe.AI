@@ -5,8 +5,9 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 interface FAQ {
@@ -53,9 +54,12 @@ const faqs: FAQ[] = [
   },
 ];
 
-export default function SupportPage() {
+function SupportPageContent() {
+  const searchParams = useSearchParams();
+  const isDemo = searchParams.get('type') === 'demo';
+
   const [user, setUser] = useState<any>(null);
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(isDemo ? 'Schools & Educators — Demo Request' : '');
   const [description, setDescription] = useState('');
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,8 +84,13 @@ export default function SupportPage() {
       return;
     }
 
-    if (!user && !email.trim()) {
+    if (!user && !isDemo && !email.trim()) {
       setSubmitError('Please provide your email address');
+      return;
+    }
+
+    if (isDemo && !user && !email.trim()) {
+      setSubmitError('Please provide your email address so we can reach you');
       return;
     }
 
@@ -97,7 +106,8 @@ export default function SupportPage() {
         body: JSON.stringify({
           title,
           description,
-          email: user ? undefined : email,
+          email: (isDemo || !user) ? email : undefined,
+          type: isDemo ? 'demo' : undefined,
         }),
       });
 
@@ -129,12 +139,16 @@ export default function SupportPage() {
           <Link href="/" className="inline-block text-3xl font-bold mb-4 hover:opacity-80 transition-opacity">
             📚 Kindle<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Wood</span> Studio ✨
           </Link>
-          <h1 className="text-4xl font-bold text-gray-900 mt-4">Support Center</h1>
-          <p className="text-gray-600 mt-2">Find answers and get help</p>
+          {!isDemo && (
+            <>
+              <h1 className="text-4xl font-bold text-gray-900 mt-4">Support Center</h1>
+              <p className="text-gray-600 mt-2">Find answers and get help</p>
+            </>
+          )}
         </div>
 
-        {/* FAQs Section */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
+        {/* FAQs Section — hidden in demo mode */}
+        {!isDemo && <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Frequently Asked Questions</h2>
           <div className="space-y-4">
             {faqs.map((faq, index) => (
@@ -163,7 +177,7 @@ export default function SupportPage() {
               </div>
             ))}
           </div>
-        </div>
+        </div>}
 
         {/* Contact Support Section */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
@@ -176,11 +190,15 @@ export default function SupportPage() {
                 d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
               />
             </svg>
-            <h2 className="text-2xl font-bold text-gray-900">Report an Issue or Share Feedback</h2>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {isDemo ? 'Request a Schools & Educators Demo' : 'Report an Issue or Share Feedback'}
+            </h2>
           </div>
 
           <p className="text-gray-600 mb-6">
-            Can't find what you're looking for? Let us know how we can help or share your thoughts about KindleWood Studio.
+            {isDemo
+              ? "Tell us about your school and we'll schedule a personalized demo to show how KindleWood Studio can work for your classroom."
+              : "Can't find what you're looking for? Let us know how we can help or share your thoughts about KindleWood Studio."}
           </p>
 
           {submitSuccess && (
@@ -190,9 +208,13 @@ export default function SupportPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div>
-                  <h3 className="font-semibold text-green-900">Thank you for your submission!</h3>
+                  <h3 className="font-semibold text-green-900">
+                    {isDemo ? 'Demo request received!' : 'Thank you for your submission!'}
+                  </h3>
                   <p className="text-green-700 text-sm mt-1">
-                    We've received your message and will get back to you as soon as possible.
+                    {isDemo
+                      ? "We'll reach out within 1-2 business days to schedule your demo."
+                      : "We've received your message and will get back to you as soon as possible."}
                   </p>
                 </div>
               </div>
@@ -219,7 +241,7 @@ export default function SupportPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {!user && (
+            {!user && !isDemo && (
               <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-start gap-3">
                   <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -232,6 +254,23 @@ export default function SupportPage() {
                     </p>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {isDemo && (
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Your school or work email"
+                  required
+                />
               </div>
             )}
 
@@ -261,7 +300,9 @@ export default function SupportPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 rows={6}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-                placeholder="Please provide as much detail as possible about your issue or feedback..."
+                placeholder={isDemo
+                  ? "Tell us about your school, how many teachers would use it, grade levels, and what you're looking for..."
+                  : "Please provide as much detail as possible about your issue or feedback..."}
                 required
               />
               <p className="text-sm text-gray-500 mt-2">
@@ -275,7 +316,7 @@ export default function SupportPage() {
               </p>
               <button
                 type="submit"
-                disabled={isSubmitting || !user}
+                disabled={isSubmitting || (!user && !isDemo)}
                 className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit'}
@@ -308,5 +349,13 @@ export default function SupportPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SupportPage() {
+  return (
+    <Suspense>
+      <SupportPageContent />
+    </Suspense>
   );
 }

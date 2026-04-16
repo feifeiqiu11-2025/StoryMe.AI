@@ -42,7 +42,7 @@ export function getTierPrice(tier: string, annual: boolean = false): number {
     trial: 0,
     basic: 8.99,
     premium: 14.99,
-    team: 59.99,
+    team: 129.99,
   };
 
   const annualPrices: Record<string, number> = {
@@ -50,7 +50,7 @@ export function getTierPrice(tier: string, annual: boolean = false): number {
     trial: 0,
     basic: 89,
     premium: 149,
-    team: 599,
+    team: 1299,
   };
 
   return annual ? annualPrices[tier] : monthlyPrices[tier];
@@ -116,10 +116,11 @@ export function getTierFeatures(tier: string): string[] {
     ],
     team: [
       '4 separate Studio accounts',
-      '10 stories per account per month',
+      '15 stories per account per month',
       'All Pro Creator features',
-      'Priority support for all',
+      'Premium priority support',
       'Shared billing',
+      'Shape our product roadmap',
     ],
   };
 

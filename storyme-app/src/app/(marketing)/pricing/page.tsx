@@ -204,7 +204,7 @@ export default function PricingPage() {
             <div className="py-4">
               <h3 className="font-semibold text-gray-900 mb-2">How does the Schools & Educators plan work?</h3>
               <p className="text-gray-600 text-sm">
-                The Schools & Educators plan includes 4 separate KindleWood Studio accounts with 10 projects per month each. Perfect for classrooms, families with multiple adults, or educational settings. One primary account handles billing.
+                The Schools & Educators plan includes 4 separate KindleWood Studio accounts with 15 projects per month each, premium priority support, and the opportunity to shape our product roadmap. Perfect for classrooms and educational settings. Request a demo to discuss your needs and get started.
               </p>
             </div>
           </div>

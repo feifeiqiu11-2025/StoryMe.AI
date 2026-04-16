@@ -555,7 +555,7 @@ export default function UpgradePage() {
                     /{billingCycle === 'monthly' ? 'mo' : 'yr'}
                   </span>
                 </div>
-                <div className="text-sm text-green-600 font-semibold">4 accounts, 10 projects each</div>
+                <div className="text-sm text-green-600 font-semibold">4 accounts, 15 projects each</div>
               </div>
 
               <ul className="space-y-2 mb-6 text-sm">
@@ -565,7 +565,7 @@ export default function UpgradePage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
-                  <span className="text-gray-600">10 projects per account/month</span>
+                  <span className="text-gray-600">15 projects per account/month</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
@@ -573,18 +573,21 @@ export default function UpgradePage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
-                  <span className="text-gray-600">Priority support for all</span>
+                  <span className="text-gray-600">Premium priority support</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span className="text-gray-600">Shape our product roadmap</span>
                 </li>
               </ul>
 
               {!isTeam && (
-                <button
-                  onClick={() => handleSelectPlan('team', billingCycle)}
-                  disabled={checkoutLoading === 'team'}
-                  className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white py-3 rounded-lg font-semibold hover:from-green-600 hover:to-teal-600 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                <a
+                  href="/support?type=demo"
+                  className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white py-3 rounded-lg font-semibold hover:from-green-600 hover:to-teal-600 transition-all shadow-md text-center block"
                 >
-                  {checkoutLoading === 'team' ? 'Loading...' : isPremium ? 'Upgrade to Team' : 'Choose Team'}
-                </button>
+                  Request a Demo
+                </a>
               )}
               {isTeam && (
                 <div className="space-y-2">

@@ -124,7 +124,7 @@ export default function TermsOfServicePage() {
                 <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
                   <li><strong>Casual Creator:</strong> $8.99/month or $89/year - 5 new stories per month</li>
                   <li><strong>Pro Creator:</strong> $14.99/month or $149/year - 10 stories per month</li>
-                  <li><strong>Schools & Educators:</strong> $59.99/month or $599/year - 4 separate accounts, 10 stories per account per month</li>
+                  <li><strong>Schools & Educators:</strong> $129.99/month or $1,299/year - 4 separate accounts, 15 stories per account per month</li>
                 </ul>
               </div>
               <div>

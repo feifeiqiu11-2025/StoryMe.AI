@@ -185,7 +185,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   let storiesLimit = 2; // default for free tier
   if (tier === 'basic') storiesLimit = 5;
   if (tier === 'premium') storiesLimit = 10;
-  if (tier === 'team') storiesLimit = 10; // per account
+  if (tier === 'team') storiesLimit = 15; // per account
 
   // Get current user data to check if billing cycle changed
   const { data: currentUser } = await supabaseAdmin
