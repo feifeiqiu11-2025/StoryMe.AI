@@ -197,6 +197,15 @@ export async function POST(request: NextRequest) {
 
 const ADMIN_EMAIL = 'admin@kindlewoodstudio.ai';
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 async function sendAdminNotification({
   title,
   description,
@@ -214,6 +223,11 @@ async function sendAdminNotification({
 }) {
   const typeLabel = isDemo ? 'Demo Request' : 'Support Request';
   const priorityLabel = isDemo ? 'HIGH' : 'Medium';
+
+  const safeTitle = escapeHtml(title);
+  const safeDesc = escapeHtml(description);
+  const safeName = escapeHtml(userName || 'Unknown');
+  const safeEmail = escapeHtml(userEmail || 'No email');
 
   const subject = `[${typeLabel}] ${title}`;
 
@@ -241,13 +255,13 @@ async function sendAdminNotification({
               <tr>
                 <td style="padding: 8px 0;">
                   <strong style="color: #374151;">From:</strong>
-                  <span style="color: #4b5563;"> ${userName || 'Unknown'} &lt;${userEmail || 'No email'}&gt;</span>
+                  <span style="color: #4b5563;"> ${safeName} &lt;${safeEmail}&gt;</span>
                 </td>
               </tr>
               <tr>
                 <td style="padding: 8px 0;">
                   <strong style="color: #374151;">Subject:</strong>
-                  <span style="color: #4b5563;"> ${title}</span>
+                  <span style="color: #4b5563;"> ${safeTitle}</span>
                 </td>
               </tr>
               <tr>
@@ -257,7 +271,7 @@ async function sendAdminNotification({
               </tr>
               <tr>
                 <td style="padding: 8px 16px; background-color: #f9fafb; border-radius: 8px; border-left: 4px solid ${isDemo ? '#059669' : '#7c3aed'};">
-                  <p style="color: #4b5563; margin: 0; white-space: pre-wrap;">${description}</p>
+                  <p style="color: #4b5563; margin: 0; white-space: pre-wrap;">${safeDesc}</p>
                 </td>
               </tr>
             </table>
