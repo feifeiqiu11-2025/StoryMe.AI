@@ -58,6 +58,8 @@ export function characterToDTO(character: CharacterLibrary): CharacterDTO {
     loraUrl: character.lora_url,
     loraTrainedAt: character.lora_trained_at,
     artStylePreference: character.art_style_preference,
+    designerName: character.designer_name,
+    designerAge: character.designer_age,
     createdAt: character.created_at,
     updatedAt: character.updated_at,
   };

@@ -172,6 +172,7 @@ const styles = StyleSheet.create({
 
 interface CharacterForPDF {
   name: string;
+  designerName?: string;
   originalCreationUrl?: string;
   storyVersionUrl?: string;
 }
@@ -377,7 +378,7 @@ export const StorybookTemplateA4: React.FC<StorybookTemplateA4Props> = ({
                     marginTop: 10,
                     fontWeight: 'bold',
                   }}>
-                    &ldquo;{char.name}&rdquo; — Designed by __________
+                    &ldquo;{char.name}&rdquo; — Designed by {char.designerName || '__________'}
                   </Text>
                 </View>
               );

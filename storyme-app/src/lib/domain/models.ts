@@ -65,6 +65,10 @@ export interface CharacterLibrary {
   lora_trained_at?: string;
   art_style_preference?: 'cartoon' | 'watercolor' | 'realistic';
 
+  // Designer Info
+  designer_name?: string;
+  designer_age?: number;
+
   // Artist Community Features (NEW)
   source_type?: 'user' | 'artist_community';
   artist_id?: string;

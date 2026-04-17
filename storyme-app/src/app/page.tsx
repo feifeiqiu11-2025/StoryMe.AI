@@ -15,6 +15,7 @@ import HeroCarousel from '@/components/landing/HeroCarousel';
 import WhyCreativitySection from '@/components/landing/WhyCreativitySection';
 import VideoShowcase from '@/components/landing/VideoShowcase';
 import Reveal from '@/components/ui/Reveal';
+import PartnerMarquee from '@/components/landing/PartnerMarquee';
 import type { YouTubeVideo } from '@/app/api/v1/youtube/playlist/route';
 
 const LANDING_PLAYLIST_ID = 'PLyDpAVbXE4SUAEuc2SnXwhsbUMg9j3dy9';
@@ -286,43 +287,7 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-14 md:gap-20">
-              {/* Avocado Montessori Academy */}
-              <Reveal delay={0}>
-                <div className="flex items-center justify-center -mt-3">
-                  <img
-                    src="/images/avocado-logo-cropped.png"
-                    alt="Avocado Montessori Academy"
-                    className="h-[4.5rem] w-auto object-contain"
-                  />
-                </div>
-              </Reveal>
-
-              {/* Puget Sound Foundation */}
-              <Reveal delay={150}>
-                <div className="flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="font-bold text-amber-800 text-4xl leading-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", serif' }}>
-                      Puget Sound
-                    </div>
-                    <div className="text-amber-700 text-xl leading-tight italic" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", serif' }}>
-                      Children & Youth Foundation
-                    </div>
-                  </div>
-                </div>
-              </Reveal>
-
-              {/* SteamOji */}
-              <Reveal delay={300}>
-                <Link href="/workshops#steamoji" className="flex items-center justify-center group">
-                  <img
-                    src="/images/steamoji-logo.png"
-                    alt="SteamOji Maker Academy"
-                    className="h-20 w-auto object-contain group-hover:opacity-80 transition-opacity"
-                  />
-                </Link>
-              </Reveal>
-            </div>
+            <PartnerMarquee />
           </div>
         </Reveal>
 

@@ -172,6 +172,7 @@ const styles = StyleSheet.create({
 
 interface CharacterForPDF {
   name: string;
+  designerName?: string;
   originalCreationUrl?: string;
   storyVersionUrl?: string;
 }
@@ -378,7 +379,7 @@ export const StorybookTemplateLarge: React.FC<StorybookTemplateLargeProps> = ({
                     marginTop: 8,
                     fontWeight: 'bold',
                   }}>
-                    &ldquo;{char.name}&rdquo; — Designed by __________
+                    &ldquo;{char.name}&rdquo; — Designed by {char.designerName || '__________'}
                   </Text>
                 </View>
               );

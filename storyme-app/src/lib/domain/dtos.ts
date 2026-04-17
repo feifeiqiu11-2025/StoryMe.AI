@@ -43,6 +43,10 @@ export interface CharacterDTO {
   loraTrainedAt?: string;
   artStylePreference?: 'cartoon' | 'watercolor' | 'realistic';
 
+  // Designer info
+  designerName?: string;
+  designerAge?: number;
+
   createdAt: string;
   updatedAt: string;
 }
