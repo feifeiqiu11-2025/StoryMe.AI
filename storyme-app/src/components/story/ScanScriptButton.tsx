@@ -121,12 +121,11 @@ export default function ScanScriptButton({ onInsert, disabled }: ScanScriptButto
 
   return (
     <>
-      {/* Hidden file input */}
+      {/* Hidden file input — no `capture` so mobile shows "Photo Library / Take Photo / Browse" picker */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-        capture="environment"
         onChange={handleInputChange}
         className="hidden"
         aria-hidden="true"
