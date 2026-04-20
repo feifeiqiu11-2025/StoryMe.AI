@@ -9,8 +9,30 @@ import { ProjectService } from '@/lib/services/project.service';
 // Image limit check disabled — story creation limit is the gatekeeper now
 // import { checkImageLimit } from '@/lib/middleware/checkImageLimit';
 import { checkStoryCreationLimit, incrementStoryCount } from '@/lib/subscription/middleware';
+import { logApiUsage } from '@/lib/utils/rate-limit';
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  const requestId = `save-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  let userId: string | undefined;
+
+  const log = async (statusCode: number, errorMessage?: string) => {
+    try {
+      await logApiUsage({
+        userId,
+        endpoint: '/api/projects/save',
+        method: 'POST',
+        statusCode,
+        responseTimeMs: Date.now() - startTime,
+        errorMessage,
+        requestId,
+      });
+    } catch (logErr) {
+      // Never let logging failures break the actual request
+      console.error('[save] logApiUsage failed:', logErr);
+    }
+  };
+
   try {
     // Get authenticated user
     // Supports both cookie-based and Bearer token auth
@@ -18,16 +40,19 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      await log(401, authError?.message || 'Unauthorized');
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
+    userId = user.id;
 
     // CHECK STORY CREATION LIMIT - Phase 2A subscription system
     const subscriptionStatus = await checkStoryCreationLimit(user.id);
 
     if (!subscriptionStatus.canCreate) {
+      await log(403, `Story limit reached: ${subscriptionStatus.reason}`);
       return NextResponse.json({
         error: 'Story limit reached',
         message: subscriptionStatus.reason,
@@ -71,6 +96,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!existingProject) {
+        await log(404, 'Draft project not found');
         return NextResponse.json(
           { error: 'Draft project not found' },
           { status: 404 }
@@ -78,6 +104,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (existingProject.user_id !== user.id) {
+        await log(403, 'Project does not belong to user');
         return NextResponse.json(
           { error: 'Unauthorized: Project does not belong to you' },
           { status: 403 }
@@ -85,6 +112,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (existingProject.status !== 'draft') {
+        await log(400, `Only drafts can be completed (status=${existingProject.status})`);
         return NextResponse.json(
           { error: 'Only draft projects can be completed via this endpoint' },
           { status: 400 }
@@ -94,6 +122,7 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!title || !title.trim()) {
+      await log(400, 'Title is required');
       return NextResponse.json(
         { error: 'Title is required' },
         { status: 400 }
@@ -101,6 +130,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!originalScript || !originalScript.trim()) {
+      await log(400, 'Original script is required');
       return NextResponse.json(
         { error: 'Original script is required' },
         { status: 400 }
@@ -108,6 +138,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!characterIds || !Array.isArray(characterIds) || characterIds.length === 0) {
+      await log(400, 'At least one character is required');
       return NextResponse.json(
         { error: 'At least one character is required' },
         { status: 400 }
@@ -115,6 +146,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
+      await log(400, 'At least one scene is required');
       return NextResponse.json(
         { error: 'At least one scene is required' },
         { status: 400 }
@@ -124,6 +156,7 @@ export async function POST(request: NextRequest) {
     // Validate scene data (imageUrl is optional — failed scenes may not have one)
     for (const scene of scenes) {
       if (!scene.description || typeof scene.sceneNumber !== 'number') {
+        await log(400, `Invalid scene data at scene ${scene.sceneNumber}`);
         return NextResponse.json(
           { error: 'Invalid scene data: each scene must have description and sceneNumber' },
           { status: 400 }
@@ -133,6 +166,7 @@ export async function POST(request: NextRequest) {
 
     // Validate visibility value
     if (visibility && visibility !== 'private' && visibility !== 'public') {
+      await log(400, `Invalid visibility value: ${visibility}`);
       return NextResponse.json(
         { error: 'Invalid visibility value. Must be "private" or "public"' },
         { status: 400 }
@@ -189,6 +223,7 @@ export async function POST(request: NextRequest) {
       console.error('Failed to increment story count:', countError);
     }
 
+    await log(200);
     return NextResponse.json({
       success: true,
       project,
@@ -200,12 +235,14 @@ export async function POST(request: NextRequest) {
     console.error('Error saving story:', error);
 
     if (error instanceof Error) {
+      await log(500, error.message);
       return NextResponse.json(
         { error: error.message },
         { status: 500 }
       );
     }
 
+    await log(500, 'Unknown error');
     return NextResponse.json(
       { error: 'Failed to save story' },
       { status: 500 }

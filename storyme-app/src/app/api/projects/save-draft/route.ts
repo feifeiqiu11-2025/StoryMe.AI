@@ -12,22 +12,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientFromRequest } from '@/lib/supabase/server';
 import { ProjectService } from '@/lib/services/project.service';
+import { logApiUsage } from '@/lib/utils/rate-limit';
 
 // Max JSONB size: 500KB to prevent abuse
 const MAX_METADATA_SIZE = 500 * 1024;
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  const requestId = `save-draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  let userId: string | undefined;
+
+  const log = async (statusCode: number, errorMessage?: string) => {
+    try {
+      await logApiUsage({
+        userId,
+        endpoint: '/api/projects/save-draft',
+        method: 'POST',
+        statusCode,
+        responseTimeMs: Date.now() - startTime,
+        errorMessage,
+        requestId,
+      });
+    } catch (logErr) {
+      console.error('[save-draft] logApiUsage failed:', logErr);
+    }
+  };
+
   try {
     // Authenticate user
     const supabase = await createClientFromRequest(request);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      await log(401, authError?.message || 'Unauthorized');
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
+    userId = user.id;
 
     // Parse request body
     const body = await request.json();
@@ -54,6 +77,7 @@ export async function POST(request: NextRequest) {
     const hasScenes = scenes && Array.isArray(scenes) && scenes.length > 0;
 
     if (!hasCharacters && !hasScript && !hasScenes) {
+      await log(400, 'Draft must have at least characters, a script, or scenes');
       return NextResponse.json(
         { error: 'Draft must have at least characters, a script, or scenes' },
         { status: 400 }
@@ -64,6 +88,7 @@ export async function POST(request: NextRequest) {
     if (draftMetadata) {
       const metadataSize = JSON.stringify(draftMetadata).length;
       if (metadataSize > MAX_METADATA_SIZE) {
+        await log(400, `Draft metadata too large: ${Math.round(metadataSize / 1024)}KB`);
         return NextResponse.json(
           { error: `Draft metadata too large (${Math.round(metadataSize / 1024)}KB). Maximum is ${MAX_METADATA_SIZE / 1024}KB.` },
           { status: 400 }
@@ -80,6 +105,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!existingProject) {
+        await log(404, 'Draft project not found');
         return NextResponse.json(
           { error: 'Draft project not found' },
           { status: 404 }
@@ -87,6 +113,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (existingProject.user_id !== user.id) {
+        await log(403, 'Draft does not belong to user');
         return NextResponse.json(
           { error: 'Unauthorized: Draft does not belong to you' },
           { status: 403 }
@@ -94,6 +121,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (existingProject.status !== 'draft') {
+        await log(400, `Cannot update non-draft project (status=${existingProject.status})`);
         return NextResponse.json(
           { error: 'Cannot update a non-draft project. Only drafts can be updated via this endpoint.' },
           { status: 400 }
@@ -123,6 +151,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    await log(200);
     return NextResponse.json({
       success: true,
       projectId: result.projectId,
@@ -134,12 +163,14 @@ export async function POST(request: NextRequest) {
     console.error('Error saving draft:', error);
 
     if (error instanceof Error) {
+      await log(500, error.message);
       return NextResponse.json(
         { error: error.message },
         { status: 500 }
       );
     }
 
+    await log(500, 'Unknown error');
     return NextResponse.json(
       { error: 'Failed to save draft' },
       { status: 500 }

@@ -26,6 +26,15 @@ import { getGuestStory, clearGuestStory } from '@/lib/utils/guest-story-storage'
 import EditImageControl from '@/components/story/EditImageControl';
 import { WritingCoachContent } from '@/components/story/WritingCoachModal';
 import { buildCoverPrompt } from '@/lib/ai/cover-prompt-builder';
+import {
+  saveClicked,
+  savePreuploadStarted,
+  savePreuploadFailed,
+  saveRequestSent,
+  saveRequestSucceeded,
+  saveRequestFailed,
+} from '@/lib/telemetry/save-events';
+import { identify as identifyTelemetry } from '@/lib/telemetry/posthog';
 
 const CHARACTERS_STORAGE_KEY = 'storyme_character_library';
 const ART_STYLE = "children's book illustration, colorful, whimsical";
@@ -131,6 +140,7 @@ function CreateStoryPageInner() {
             email: supabaseUser.email,
             name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0],
           });
+          identifyTelemetry(supabaseUser.id);
         } else {
           router.push('/login');
         }
@@ -869,6 +879,7 @@ function CreateStoryPageInner() {
     if (pendingImages.length === 0) return;
 
     console.log(`[Save] Uploading ${pendingImages.length} base64 image(s) to storage...`);
+    savePreuploadStarted({ base64Count: pendingImages.length });
 
     for (const img of pendingImages) {
       try {
@@ -888,9 +899,17 @@ function CreateStoryPageInner() {
           console.log(`[Save] Uploaded scene ${img.sceneNumber} → ${data.url}`);
         } else {
           console.warn(`[Save] Failed to upload scene ${img.sceneNumber}, keeping as-is`);
+          savePreuploadFailed({
+            sceneNumber: img.sceneNumber,
+            error: `http ${response.status}`,
+          });
         }
       } catch (error) {
         console.warn(`[Save] Upload error for scene ${img.sceneNumber}:`, error);
+        savePreuploadFailed({
+          sceneNumber: img.sceneNumber,
+          error: error instanceof Error ? error.message : 'unknown',
+        });
       }
     }
 
@@ -903,6 +922,16 @@ function CreateStoryPageInner() {
    * Stores structured data in DB tables + UI state in draft_metadata JSONB
    */
   const handleSaveDraft = async () => {
+    const draftStartTime = Date.now();
+    const sceneCountForEvent = imageGenerationStatus.filter(img => img.sceneNumber > 0).length;
+    const hasCoverForEvent = imageGenerationStatus.some(img => img.sceneNumber === 0 && img.status === 'completed');
+    saveClicked({
+      type: 'draft',
+      sceneCount: sceneCountForEvent,
+      hasCover: hasCoverForEvent,
+      hasCharacters: characters.length > 0,
+    });
+
     setSavingDraft(true);
     setDraftSaveMessage(null);
 
@@ -1027,24 +1056,33 @@ function CreateStoryPageInner() {
       const coverImage = imageGenerationStatus.find(img => img.sceneNumber === 0 && img.status === 'completed');
       const coverImageUrlToSave = coverImage?.imageUrl || coverImageUrl || undefined;
 
+      const draftBody = JSON.stringify({
+        projectId: draftProjectId || undefined,
+        title: storyTitle || saveTitle || undefined,
+        description: storyDescription || saveDescription || undefined,
+        authorName: authorName || undefined,
+        authorAge: authorAge ? parseInt(authorAge) : undefined,
+        coverImageUrl: coverImageUrlToSave,
+        originalScript: scriptInput || undefined,
+        readingLevel,
+        storyTone,
+        language: contentLanguage,
+        characterIds,
+        scenes: scenesPayload,
+        draftMetadata,
+      });
+
+      saveRequestSent({
+        type: 'draft',
+        payloadBytes: new Blob([draftBody]).size,
+        sceneCount: scenesPayload?.length || 0,
+        hasBase64Urls: (scenesPayload || []).some((s: any) => s.imageUrl?.startsWith?.('data:')),
+      });
+
       const response = await fetch('/api/projects/save-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: draftProjectId || undefined,
-          title: storyTitle || saveTitle || undefined,
-          description: storyDescription || saveDescription || undefined,
-          authorName: authorName || undefined,
-          authorAge: authorAge ? parseInt(authorAge) : undefined,
-          coverImageUrl: coverImageUrlToSave,
-          originalScript: scriptInput || undefined,
-          readingLevel,
-          storyTone,
-          language: contentLanguage,
-          characterIds,
-          scenes: scenesPayload,
-          draftMetadata,
-        }),
+        body: draftBody,
       });
 
       if (!response.ok) {
@@ -1057,10 +1095,21 @@ function CreateStoryPageInner() {
             ? 'Draft data is too large to save. Please try regenerating the images.'
             : `Draft save failed (${response.status}). Please try again.`;
         }
+        saveRequestFailed({
+          type: 'draft',
+          status: response.status,
+          errorMessage,
+          durationMs: Date.now() - draftStartTime,
+        });
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      saveRequestSucceeded({
+        type: 'draft',
+        projectId: data.projectId,
+        durationMs: Date.now() - draftStartTime,
+      });
 
       // Store the projectId for subsequent saves
       setDraftProjectId(data.projectId);
@@ -1083,6 +1132,16 @@ function CreateStoryPageInner() {
       setSaveError('Please enter a title for your story');
       return;
     }
+
+    const saveStartTime = Date.now();
+    const sceneCountForEvent = imageGenerationStatus.filter(img => img.sceneNumber > 0).length;
+    const hasCoverForEvent = imageGenerationStatus.some(img => img.sceneNumber === 0 && img.status === 'completed');
+    saveClicked({
+      type: 'completed',
+      sceneCount: sceneCountForEvent,
+      hasCover: hasCoverForEvent,
+      hasCharacters: characters.length > 0,
+    });
 
     setIsSaving(true);
     setSaveError('');
@@ -1202,25 +1261,34 @@ function CreateStoryPageInner() {
       }
 
       // Call save API (supports both new creation and draft→completed transition)
+      const saveBody = JSON.stringify({
+        projectId: draftProjectId || undefined, // Pass draft ID for draft→completed
+        title: saveTitle.trim(),
+        description: saveDescription.trim() || undefined,
+        authorName: authorName.trim() || undefined,
+        authorAge: authorAge ? parseInt(authorAge) : undefined,
+        coverImageUrl: coverImageUrlToSave,
+        originalScript: scriptInput,
+        readingLevel: readingLevel,
+        storyTone: storyTone,
+        contentLanguage: contentLanguage,
+        characterIds: characterIds,
+        secondaryLanguage,
+        scenes: scenesData,
+        quizData: quizData || undefined,
+      });
+
+      saveRequestSent({
+        type: 'completed',
+        payloadBytes: new Blob([saveBody]).size,
+        sceneCount: scenesData.length,
+        hasBase64Urls: scenesData.some(s => s.imageUrl?.startsWith('data:')),
+      });
+
       const response = await fetch('/api/projects/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: draftProjectId || undefined, // Pass draft ID for draft→completed
-          title: saveTitle.trim(),
-          description: saveDescription.trim() || undefined,
-          authorName: authorName.trim() || undefined,
-          authorAge: authorAge ? parseInt(authorAge) : undefined,
-          coverImageUrl: coverImageUrlToSave,
-          originalScript: scriptInput,
-          readingLevel: readingLevel,
-          storyTone: storyTone,
-          contentLanguage: contentLanguage,
-          characterIds: characterIds,
-          secondaryLanguage,
-          scenes: scenesData,
-          quizData: quizData || undefined,
-        }),
+        body: saveBody,
       });
 
       if (!response.ok) {
@@ -1234,10 +1302,21 @@ function CreateStoryPageInner() {
             ? 'Story data is too large to save. Please try regenerating the images.'
             : `Save failed (${response.status}). Please try again.`;
         }
+        saveRequestFailed({
+          type: 'completed',
+          status: response.status,
+          errorMessage,
+          durationMs: Date.now() - saveStartTime,
+        });
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      saveRequestSucceeded({
+        type: 'completed',
+        projectId: data.project?.id,
+        durationMs: Date.now() - saveStartTime,
+      });
 
       // Clear guest story from sessionStorage after successful save
       clearGuestStory();

@@ -41,6 +41,7 @@
     "next": "^15.5.9",
     "nodemailer": "^7.0.10",
     "openai": "^6.5.0",
+    "posthog-js": "^1.369.3",
     "puppeteer": "^24.26.1",
     "qrcode": "^1.5.4",
     "react": "19.1.0",
