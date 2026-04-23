@@ -65,10 +65,6 @@ export function saveRequestFailed(props: {
   });
 }
 
-export function saveNavDuringSave(props: { type: SaveType }): void {
-  capture('save.nav_during_save', props);
-}
-
 export function autosaveFired(props: { sceneCount: number }): void {
   capture('autosave.fired', props);
 }
@@ -77,4 +73,15 @@ export function autosaveFailed(props: { errorMessage: string }): void {
   capture('autosave.failed', {
     errorMessage: String(props.errorMessage).slice(0, 200),
   });
+}
+
+export type AutosaveSkipReason =
+  | 'base64_pending'
+  | 'payload_too_large'
+  | 'save_in_flight'
+  | 'min_gap'
+  | 'paused';
+
+export function autosaveSkipped(props: { reason: AutosaveSkipReason; sceneCount: number }): void {
+  capture('autosave.skipped', props);
 }

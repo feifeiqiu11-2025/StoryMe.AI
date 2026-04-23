@@ -4,8 +4,9 @@
  * Safe to import from any client component. No-op if NEXT_PUBLIC_POSTHOG_KEY
  * is missing or empty — so the app runs fine in dev/staging without PostHog.
  *
- * COPPA note: session replay masks all text input globally. Workshop consent
- * form must mention session recording.
+ * COPPA: event capture only, no session replay. Children (ages 7-9) use this
+ * app; we do not record sessions even with masking. disable_session_recording
+ * is set defensively in case replay is toggled on at the PostHog dashboard level.
  */
 
 'use client';
@@ -29,10 +30,7 @@ export function initPostHog(): void {
     person_profiles: 'identified_only',
     capture_pageview: true,
     capture_pageleave: true,
-    session_recording: {
-      maskAllInputs: true,
-      maskTextSelector: '*',
-    },
+    disable_session_recording: true,
     loaded: () => {
       initialized = true;
     },
