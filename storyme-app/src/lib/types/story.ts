@@ -82,6 +82,24 @@ export type TagSlug = typeof PREDEFINED_TAG_SLUGS[keyof typeof PREDEFINED_TAG_SL
 // Detected by AI during preview generation
 export type SubjectType = 'human' | 'animal' | 'creature' | 'object' | 'scenery';
 
+/**
+ * Medium / source of the uploaded reference image.
+ * Detected by analyze-character; drives prompt selection.
+ * - real_photo: Photo of a real person/animal/object — use stylization prompt
+ * - kid_creation: Child's drawing, painting, playdoh, lego, paper craft — use faithfulness prompt
+ * - digital_art: Existing animated/illustrated asset — also use faithfulness prompt
+ */
+export type ImageMedium = 'real_photo' | 'kid_creation' | 'digital_art';
+
+export const DEFAULT_IMAGE_MEDIUM: ImageMedium = 'real_photo';
+
+export function normalizeImageMedium(medium?: string): ImageMedium {
+  if (medium === 'kid_creation' || medium === 'digital_art' || medium === 'real_photo') {
+    return medium;
+  }
+  return DEFAULT_IMAGE_MEDIUM;
+}
+
 export interface CharacterDescription {
   hairColor?: string;
   skinTone?: string;
@@ -127,6 +145,10 @@ export interface Character {
   tags?: string[]; // Free-text tags for grouping/filtering (e.g., workshop session names)
   designerName?: string; // Child artist's name
   designerAge?: number; // Child artist's age
+  // Breakdown feature: if this character was extracted from another via breakdown,
+  // this holds the source character's id. Used to hide the "Break into parts"
+  // button on already-derived characters.
+  derivedFromId?: string;
 }
 
 export interface Scene {
@@ -258,16 +280,19 @@ export interface ProjectScene {
 // ============================================================================
 
 /** Image generation provider — selects both the service and model version */
-export type ImageProvider = 'flux' | 'gemini-2.5' | 'gemini-3.1';
+export type ImageProvider = 'flux' | 'gemini-2.5' | 'gemini-3.1' | 'openai-gpt-image-2';
 
 /** Default image provider for new stories */
 export const DEFAULT_IMAGE_PROVIDER: ImageProvider = 'gemini-3.1';
 
 /** Mapping from Gemini provider values to actual Google model IDs */
-export const GEMINI_IMAGE_MODELS: Record<Exclude<ImageProvider, 'flux'>, string> = {
+export const GEMINI_IMAGE_MODELS: Record<'gemini-2.5' | 'gemini-3.1', string> = {
   'gemini-2.5': 'gemini-2.5-flash-image',
   'gemini-3.1': 'gemini-3.1-flash-image-preview',
 } as const;
+
+/** OpenAI image model id used when provider is 'openai-gpt-image-2' */
+export const OPENAI_IMAGE_MODEL = 'gpt-image-2';
 
 /** UI options for the image provider selector */
 export const IMAGE_PROVIDER_OPTIONS: Array<{
@@ -288,6 +313,12 @@ export const IMAGE_PROVIDER_OPTIONS: Array<{
     description: 'Proven quality, stable',
   },
   {
+    value: 'openai-gpt-image-2',
+    label: 'ChatGPT Image 2.0',
+    description: 'OpenAI — best for kid drawings (admin only)',
+    isNew: true,
+  },
+  {
     value: 'flux',
     label: 'Fal.ai FLUX',
     description: 'Fast, text-based descriptions',
@@ -298,7 +329,12 @@ export const IMAGE_PROVIDER_OPTIONS: Array<{
 export function normalizeImageProvider(provider?: string): ImageProvider {
   if (!provider) return DEFAULT_IMAGE_PROVIDER;
   if (provider === 'gemini') return DEFAULT_IMAGE_PROVIDER;
-  if (provider === 'flux' || provider === 'gemini-2.5' || provider === 'gemini-3.1') {
+  if (
+    provider === 'flux' ||
+    provider === 'gemini-2.5' ||
+    provider === 'gemini-3.1' ||
+    provider === 'openai-gpt-image-2'
+  ) {
     return provider;
   }
   return DEFAULT_IMAGE_PROVIDER;
@@ -307,6 +343,11 @@ export function normalizeImageProvider(provider?: string): ImageProvider {
 /** Check if a provider uses the Gemini backend */
 export function isGeminiProvider(provider: ImageProvider): boolean {
   return provider === 'gemini-2.5' || provider === 'gemini-3.1';
+}
+
+/** Check if a provider uses the OpenAI backend */
+export function isOpenAIProvider(provider: ImageProvider): boolean {
+  return provider === 'openai-gpt-image-2';
 }
 
 // ============================================================================

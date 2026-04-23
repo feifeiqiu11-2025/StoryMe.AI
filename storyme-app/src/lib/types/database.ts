@@ -50,6 +50,11 @@ export interface CharacterLibrary {
   lora_trained_at?: string;
   art_style_preference?: 'cartoon' | 'watercolor' | 'realistic';
 
+  // Breakdown feature (20260423): extracted characters vs. scene elements
+  // + traceability back to the source multi-element character.
+  role?: 'character' | 'scene_element';
+  derived_from_id?: string;
+
   created_at: string;
   updated_at: string;
 }

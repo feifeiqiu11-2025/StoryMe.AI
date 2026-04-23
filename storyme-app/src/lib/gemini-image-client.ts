@@ -9,7 +9,25 @@
  */
 
 import { GoogleGenAI, Modality, HarmCategory, HarmBlockThreshold } from '@google/genai';
-import { CharacterDescription, ClothingConsistency, SubjectType, ImageProvider, GEMINI_IMAGE_MODELS, DEFAULT_IMAGE_PROVIDER } from './types/story';
+import {
+  CharacterDescription,
+  ClothingConsistency,
+  SubjectType,
+  ImageProvider,
+  ImageMedium,
+  GEMINI_IMAGE_MODELS,
+  DEFAULT_IMAGE_PROVIDER,
+  isOpenAIProvider,
+} from './types/story';
+import {
+  openaiGenerateCharacterPreview,
+  openaiGenerateCharacterPreviewClassic,
+  openaiGenerateNonHumanPreview,
+  openaiGenerateNonHumanPreviewClassic,
+  openaiGenerateDescriptionOnlyPreview,
+  openaiGenerateDescriptionOnlyPreviewClassic,
+} from './openai-image-client';
+import { buildKidCreationPrompt, shouldUseFaithfulnessPrompt } from './character-prompts';
 
 /**
  * Safety settings for image generation calls.
@@ -108,13 +126,16 @@ function extractImageFromGeminiResponse(result: any, context: string = 'image'):
 
 /**
  * Resolve the Gemini image model ID from an ImageProvider value.
- * Defaults to the latest model if not specified.
+ * Defaults to the latest Gemini model if the provider is non-Gemini (flux, openai)
+ * or not specified — those providers don't use a Gemini model ID, but callers
+ * may still pass it through as a no-op.
  */
 export function resolveGeminiImageModel(provider?: ImageProvider): string {
-  if (!provider || provider === 'flux') {
-    return GEMINI_IMAGE_MODELS[DEFAULT_IMAGE_PROVIDER as Exclude<ImageProvider, 'flux'>];
+  const fallback = GEMINI_IMAGE_MODELS[DEFAULT_IMAGE_PROVIDER as 'gemini-2.5' | 'gemini-3.1'];
+  if (!provider || provider === 'flux' || provider === 'openai-gpt-image-2') {
+    return fallback;
   }
-  return GEMINI_IMAGE_MODELS[provider] || GEMINI_IMAGE_MODELS[DEFAULT_IMAGE_PROVIDER as Exclude<ImageProvider, 'flux'>];
+  return GEMINI_IMAGE_MODELS[provider] ?? fallback;
 }
 
 /**
@@ -1285,6 +1306,8 @@ If the image shows only scenery with small figures, classify as "scenery".`;
 export interface CharacterAnalysisResult {
   subjectType: SubjectType;
   confidence: number;
+  /** Detected medium / source of the image — drives prompt selection downstream */
+  medium: ImageMedium;
   // For humans: structured fields
   humanDetails?: {
     gender: string;      // boy, girl, man, woman, baby, etc.
@@ -1325,18 +1348,24 @@ export async function analyzeCharacterImage(
 
   const analysisPrompt = `Analyze this image and extract character information for a children's storybook.
 
-STEP 1: Determine the subject type:
-- "human": Real person from a photograph (child, adult, baby)
-- "animal": Real-world animals (dog, cat, bird, fish)
-- "creature": Fantasy/cartoon beings (dragon, unicorn, monster, cartoon character)
-- "object": Inanimate items (toy, sword, car)
-- "scenery": Backgrounds, places, buildings
+STEP 1: Determine the MEDIUM (how the image was made):
+- "real_photo": A normal photograph of a real person, animal, object, or scene
+- "kid_creation": A child's handmade artwork — drawing on paper, finger painting, watercolor, playdoh sculpture, lego build, paper craft, clay model, or photo of any other handmade artifact made by a child. Look for: visible paper texture, marker/crayon strokes, simplified or exaggerated shapes, non-realistic colors, child-art proportions
+- "digital_art": An existing digital illustration or animated still (Pixar/anime/cartoon) that was not made by hand
 
-STEP 2: Based on subject type, return the appropriate JSON:
+STEP 2: Determine the subject type (what the image depicts, regardless of medium):
+- "human": Person (child, adult, baby)
+- "animal": Real-world animal (dog, cat, bird, fish)
+- "creature": Fantasy/cartoon being (dragon, unicorn, monster, cartoon character)
+- "object": Inanimate item (toy, sword, car, house)
+- "scenery": Background, place, building
+
+STEP 3: Based on subject type, return the appropriate JSON:
 
 IF HUMAN, return:
 {
   "subjectType": "human",
+  "medium": "real_photo" | "kid_creation" | "digital_art",
   "confidence": 0.0 to 1.0,
   "humanDetails": {
     "gender": "boy/girl/man/woman/baby boy/baby girl/toddler",
@@ -1351,12 +1380,13 @@ IF HUMAN, return:
 IF NOT HUMAN (animal, creature, object, scenery), return:
 {
   "subjectType": "animal" | "creature" | "object" | "scenery",
+  "medium": "real_photo" | "kid_creation" | "digital_art",
   "confidence": 0.0 to 1.0,
   "briefDescription": "detailed visual description (15-30 words) including colors, features, style"
 }
 
 Important guidelines:
-- For children's drawings: Identify what the drawing REPRESENTS (a dragon drawing = "creature")
+- For children's drawings/sculptures: subjectType is what the artwork REPRESENTS (a dragon drawing = "creature"), and medium is "kid_creation"
 - Be specific and descriptive for storybook character consistency
 - For gender: Use child-friendly terms (boy, girl) for children; man, woman for adults
 - NEVER mention brand names, logos, or copyrighted characters (Disney, Marvel, Spider-Man, etc.) in any field — describe the visual appearance generically instead
@@ -1364,25 +1394,54 @@ Important guidelines:
 
 Return the JSON now:`;
 
-  try {
-    const result = await genAI.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: [
-        { text: analysisPrompt },
-        {
-          inlineData: {
-            mimeType,
-            data: imageBase64,
+  // Retry-with-backoff for transient 429 (TPM throttle) errors.
+  // Large images can spike per-minute token usage even on Tier 2 keys.
+  const maxRetries = 3;
+  let result: Awaited<ReturnType<typeof genAI.models.generateContent>> | null = null;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      result = await genAI.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: [
+          { text: analysisPrompt },
+          {
+            inlineData: {
+              mimeType,
+              data: imageBase64,
+            },
           },
-        },
-      ],
-    });
+        ],
+      });
+      break; // success
+    } catch (err) {
+      lastError = err;
+      const message = err instanceof Error ? err.message : String(err);
+      const isRateLimit = message.includes('429') || message.includes('RESOURCE_EXHAUSTED') || message.includes('quota');
+      if (isRateLimit && attempt < maxRetries) {
+        const waitMs = Math.min(2000 * attempt, 10000); // 2s, 4s, 6s (capped 10s)
+        console.warn(`[Gemini Analysis] Rate limited (attempt ${attempt}/${maxRetries}). Waiting ${waitMs}ms…`);
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+        continue;
+      }
+      // non-retryable OR retries exhausted → bubble up so route can return 429
+      throw err;
+    }
+  }
+
+  if (!result) {
+    throw lastError instanceof Error ? lastError : new Error('Gemini analysis failed after retries');
+  }
+
+  try {
 
     const candidates = result.candidates;
     if (!candidates || candidates.length === 0) {
       console.warn('[Gemini Analysis] No candidates in response, defaulting to human');
       return {
         subjectType: 'human',
+        medium: 'real_photo',
         confidence: 0.5,
         humanDetails: {
           gender: '',
@@ -1400,6 +1459,7 @@ Return the JSON now:`;
       console.warn('[Gemini Analysis] No parts in response');
       return {
         subjectType: 'human',
+        medium: 'real_photo',
         confidence: 0.5,
         humanDetails: {
           gender: '',
@@ -1419,6 +1479,7 @@ Return the JSON now:`;
       console.warn('[Gemini Analysis] No text in response');
       return {
         subjectType: 'human',
+        medium: 'real_photo',
         confidence: 0.5,
         humanDetails: {
           gender: '',
@@ -1450,12 +1511,17 @@ Return the JSON now:`;
     const subjectType = validTypes.includes(parsed.subjectType) ? parsed.subjectType : 'human';
     const confidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0.8;
 
+    // Validate medium — defaults to real_photo if missing or invalid
+    const validMediums: ImageMedium[] = ['real_photo', 'kid_creation', 'digital_art'];
+    const medium: ImageMedium = validMediums.includes(parsed.medium) ? parsed.medium : 'real_photo';
+
     if (subjectType === 'human') {
       // Human: return structured fields
       const details = parsed.humanDetails || {};
-      console.log(`[Gemini Analysis] Human detected: ${details.gender || 'unknown'}, ${details.age || 'unknown age'}`);
+      console.log(`[Gemini Analysis] Human detected: ${details.gender || 'unknown'}, ${details.age || 'unknown age'} (medium: ${medium})`);
       return {
         subjectType: 'human',
+        medium,
         confidence,
         humanDetails: {
           gender: details.gender || '',
@@ -1468,9 +1534,10 @@ Return the JSON now:`;
       };
     } else {
       // Non-human: return description
-      console.log(`[Gemini Analysis] Non-human detected: ${subjectType} - ${parsed.briefDescription || ''}`);
+      console.log(`[Gemini Analysis] Non-human detected: ${subjectType} - ${parsed.briefDescription || ''} (medium: ${medium})`);
       return {
         subjectType,
+        medium,
         confidence,
         briefDescription: parsed.briefDescription || `${subjectType} character`,
       };
@@ -1480,6 +1547,7 @@ Return the JSON now:`;
     // Default to human with empty fields
     return {
       subjectType: 'human',
+      medium: 'real_photo',
       confidence: 0.5,
       humanDetails: {
         gender: '',
@@ -1491,6 +1559,154 @@ Return the JSON now:`;
       },
     };
   }
+}
+
+// ============================================================================
+// BOUNDING-BOX DETECTION (for character breakdown feature)
+// ============================================================================
+
+/**
+ * Bounding box in Gemini's convention: normalized 0-1000 coords in
+ * [y_min, x_min, y_max, x_max] order.
+ */
+export interface BoundingBox {
+  name: string;
+  bbox: [number, number, number, number] | null;
+  confidence: number;
+}
+
+const MAX_BBOX_ELEMENTS = 8;
+
+/**
+ * Detect bounding boxes for named elements in an image using Gemini vision.
+ *
+ * Used by the character breakdown feature to locate user-requested elements
+ * (e.g. "Fish, Bunny, Magic Items") within a multi-element character preview.
+ * The caller uses the returned bboxes to crop regions server-side with sharp.
+ *
+ * Retries up to 3 times on transient 429 rate-limit errors.
+ * Caps at 8 elements per call (both in the prompt and post-processing).
+ */
+export async function detectElementBoundingBoxes(
+  imageBase64: string,
+  mimeType: string,
+  instruction: string
+): Promise<BoundingBox[]> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+
+  const genAI = new GoogleGenAI({ apiKey });
+
+  const prompt = `Identify bounding boxes for the following elements in this image: "${instruction}".
+
+Return a JSON array of at most ${MAX_BBOX_ELEMENTS} items. Each item must be:
+{
+  "name": "<the element name as given or a close label for it>",
+  "bbox": [y_min, x_min, y_max, x_max],
+  "confidence": 0.0 to 1.0
+}
+
+Rules:
+- Coordinates must be normalized 0-1000 (y_min < y_max, x_min < x_max).
+- If you cannot find a specific element, include it in the array with bbox: null and confidence: 0.
+- Do not invent elements that aren't in the user's list. Follow the user's list exactly.
+- Return ONLY raw JSON (an array). No markdown code fences, no commentary.
+
+JSON array:`;
+
+  // Retry-with-backoff for transient 429 (TPM throttle) errors.
+  const maxRetries = 3;
+  let result: Awaited<ReturnType<typeof genAI.models.generateContent>> | null = null;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      result = await genAI.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType,
+              data: imageBase64,
+            },
+          },
+        ],
+      });
+      break; // success
+    } catch (err) {
+      lastError = err;
+      const message = err instanceof Error ? err.message : String(err);
+      const isRateLimit = message.includes('429') || message.includes('RESOURCE_EXHAUSTED') || message.includes('quota');
+      if (isRateLimit && attempt < maxRetries) {
+        const waitMs = Math.min(2000 * attempt, 10000);
+        console.warn(`[Gemini BBox] Rate limited (attempt ${attempt}/${maxRetries}). Waiting ${waitMs}ms…`);
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  if (!result) {
+    throw lastError instanceof Error ? lastError : new Error('Gemini bbox detection failed after retries');
+  }
+
+  const textPart = result.candidates?.[0]?.content?.parts?.find((p: { text?: string }) => p.text);
+  if (!textPart?.text) {
+    console.warn('[Gemini BBox] No text in response');
+    return [];
+  }
+
+  // Strip potential code fences (Gemini sometimes adds ``` despite instructions).
+  let jsonText = textPart.text.trim();
+  if (jsonText.startsWith('```json')) jsonText = jsonText.slice(7);
+  else if (jsonText.startsWith('```')) jsonText = jsonText.slice(3);
+  if (jsonText.endsWith('```')) jsonText = jsonText.slice(0, -3);
+  jsonText = jsonText.trim();
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch (parseErr) {
+    console.error('[Gemini BBox] Failed to parse response as JSON:', parseErr);
+    console.error('[Gemini BBox] Raw response:', jsonText.slice(0, 500));
+    return [];
+  }
+
+  if (!Array.isArray(parsed)) {
+    console.warn('[Gemini BBox] Response is not an array:', typeof parsed);
+    return [];
+  }
+
+  // Validate each item + cap at MAX_BBOX_ELEMENTS.
+  const validated: BoundingBox[] = [];
+  for (const raw of parsed.slice(0, MAX_BBOX_ELEMENTS)) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const item = raw as any;
+    if (typeof item.name !== 'string' || !item.name.trim()) continue;
+
+    let bbox: [number, number, number, number] | null = null;
+    if (Array.isArray(item.bbox) && item.bbox.length === 4 && item.bbox.every((n: unknown) => typeof n === 'number')) {
+      const [y1, x1, y2, x2] = item.bbox as [number, number, number, number];
+      // Reject obviously degenerate bboxes (non-positive dimensions, out of range)
+      if (y1 < y2 && x1 < x2 && y1 >= 0 && x1 >= 0 && y2 <= 1000 && x2 <= 1000) {
+        bbox = [y1, x1, y2, x2];
+      }
+    }
+
+    validated.push({
+      name: item.name.trim().slice(0, 100), // cap length for safety
+      bbox,
+      confidence: typeof item.confidence === 'number' ? item.confidence : 0.5,
+    });
+  }
+
+  console.log(`[Gemini BBox] Returning ${validated.length} items (${validated.filter(v => v.bbox).length} with bboxes)`);
+  return validated;
 }
 
 /**
@@ -1521,8 +1737,12 @@ export interface CharacterPreviewParams {
   name: string;
   referenceImageUrl: string;
   description: CharacterDescription;
-  /** Override Gemini model ID */
+  /** Override Gemini model ID (only used when provider is a Gemini variant) */
   modelId?: string;
+  /** Image provider — when 'openai-gpt-image-2', request is delegated to openai-image-client */
+  provider?: ImageProvider;
+  /** Detected medium of the reference image; drives prompt selection. Defaults to 'real_photo'. */
+  medium?: ImageMedium;
 }
 
 export interface CharacterPreviewResult {
@@ -1543,7 +1763,14 @@ export async function generateCharacterPreview({
   referenceImageUrl,
   description,
   modelId,
+  provider,
+  medium,
 }: CharacterPreviewParams): Promise<CharacterPreviewResult> {
+  // Provider branch — delegate to OpenAI sibling when admin selects gpt-image-2
+  if (provider && isOpenAIProvider(provider)) {
+    return openaiGenerateCharacterPreview({ name, referenceImageUrl, description }, medium);
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is not configured');
@@ -1562,7 +1789,15 @@ export async function generateCharacterPreview({
     /\b(chubby|plump|round|fat|chunky|pudgy|stocky|big)\b/i.test(description) : false;
 
   // Portrait-focused prompt for character preview
-  const fullPrompt = `Create a 3D animated character portrait showing: ${name}
+  // For kid_creation medium, swap in the faithfulness-first prompt (preserves child's drawing).
+  const fullPrompt = shouldUseFaithfulnessPrompt(medium)
+    ? buildKidCreationPrompt({
+        style: 'pixar',
+        name,
+        emphasizeReference: true,
+        elementsDescription: description.otherFeatures,
+      })
+    : `Create a 3D animated character portrait showing: ${name}
 
 === CRITICAL RENDERING STYLE (MANDATORY) ===
 - Render as a 3D ANIMATED/ILLUSTRATED character (Pixar/Disney Junior style)
@@ -1691,7 +1926,14 @@ export async function generateCharacterPreviewClassic({
   referenceImageUrl,
   description,
   modelId,
+  provider,
+  medium,
 }: CharacterPreviewParams): Promise<CharacterPreviewResult> {
+  // Provider branch — delegate to OpenAI sibling when admin selects gpt-image-2
+  if (provider && isOpenAIProvider(provider)) {
+    return openaiGenerateCharacterPreviewClassic({ name, referenceImageUrl, description }, medium);
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is not configured');
@@ -1706,7 +1948,15 @@ export async function generateCharacterPreviewClassic({
   const charDesc = buildMinimalCharacterDescription(name, description);
 
   // Classic Storybook style prompt - 2D, warm, watercolor feel
-  const fullPrompt = `Create a 2D illustrated character portrait showing: ${name}
+  // For kid_creation medium, swap in the faithfulness-first prompt (preserves child's drawing).
+  const fullPrompt = shouldUseFaithfulnessPrompt(medium)
+    ? buildKidCreationPrompt({
+        style: 'classic',
+        name,
+        emphasizeReference: true,
+        elementsDescription: description.otherFeatures,
+      })
+    : `Create a 2D illustrated character portrait showing: ${name}
 
 === CRITICAL RENDERING STYLE (MANDATORY) ===
 - Render as a 2D HAND-DRAWN/DIGITAL ILLUSTRATION (NOT 3D CGI)
@@ -1838,8 +2088,12 @@ export interface NonHumanPreviewParams {
   subjectType: SubjectType; // 'animal' | 'creature' | 'object' | 'scenery'
   briefDescription: string; // AI-detected description of key features
   additionalDetails?: string; // User-provided additional details
-  /** Override Gemini model ID */
+  /** Override Gemini model ID (only used when provider is a Gemini variant) */
   modelId?: string;
+  /** Image provider — when 'openai-gpt-image-2', request is delegated to openai-image-client */
+  provider?: ImageProvider;
+  /** Detected medium of the reference image; drives prompt selection. Defaults to 'real_photo'. */
+  medium?: ImageMedium;
 }
 
 export interface NonHumanPreviewResult {
@@ -1862,7 +2116,17 @@ export async function generateNonHumanPreview({
   briefDescription,
   additionalDetails,
   modelId,
+  provider,
+  medium,
 }: NonHumanPreviewParams): Promise<NonHumanPreviewResult> {
+  // Provider branch — delegate to OpenAI sibling when admin selects gpt-image-2
+  if (provider && isOpenAIProvider(provider)) {
+    return openaiGenerateNonHumanPreview(
+      { name, referenceImageUrl, subjectType, briefDescription, additionalDetails },
+      medium
+    );
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is not configured');
@@ -1879,7 +2143,15 @@ export async function generateNonHumanPreview({
     /\b(chubby|plump|round|fat|chunky|pudgy|stocky|big)\b/i.test(additionalDetails) : false;
 
   // Build the prompt for non-human subjects
-  const fullPrompt = `Create a 3D animated illustration of the subject in this reference image.
+  // For kid_creation medium, swap in the faithfulness-first prompt (preserves child's drawing).
+  const fullPrompt = shouldUseFaithfulnessPrompt(medium)
+    ? buildKidCreationPrompt({
+        style: 'pixar',
+        name,
+        emphasizeReference: true,
+        elementsDescription: [briefDescription, additionalDetails].filter(Boolean).join('. '),
+      })
+    : `Create a 3D animated illustration of the subject in this reference image.
 
 === SUBJECT INFORMATION ===
 - Name: ${name}
@@ -2008,7 +2280,17 @@ export async function generateNonHumanPreviewClassic({
   briefDescription,
   additionalDetails,
   modelId,
+  provider,
+  medium,
 }: NonHumanPreviewParams): Promise<NonHumanPreviewResult> {
+  // Provider branch — delegate to OpenAI sibling when admin selects gpt-image-2
+  if (provider && isOpenAIProvider(provider)) {
+    return openaiGenerateNonHumanPreviewClassic(
+      { name, referenceImageUrl, subjectType, briefDescription, additionalDetails },
+      medium
+    );
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is not configured');
@@ -2021,7 +2303,15 @@ export async function generateNonHumanPreviewClassic({
   const subjectRules = getSubjectSpecificRules(subjectType);
 
   // Build the prompt for non-human subjects in classic 2D style
-  const fullPrompt = `Create a 2D illustrated version of the subject in this reference image.
+  // For kid_creation medium, swap in the faithfulness-first prompt (preserves child's drawing).
+  const fullPrompt = shouldUseFaithfulnessPrompt(medium)
+    ? buildKidCreationPrompt({
+        style: 'classic',
+        name,
+        emphasizeReference: true,
+        elementsDescription: [briefDescription, additionalDetails].filter(Boolean).join('. '),
+      })
+    : `Create a 2D illustrated version of the subject in this reference image.
 
 === SUBJECT INFORMATION ===
 - Name: ${name}
@@ -2185,8 +2475,10 @@ export interface DescriptionOnlyPreviewParams {
   name: string;
   characterType: string; // e.g., "baby eagle", "friendly dragon", "talking cat"
   description: string; // Additional description like "fluffy feathers, big curious eyes"
-  /** Override Gemini model ID */
+  /** Override Gemini model ID (only used when provider is a Gemini variant) */
   modelId?: string;
+  /** Image provider — when 'openai-gpt-image-2', request is delegated to openai-image-client */
+  provider?: ImageProvider;
 }
 
 export interface DescriptionOnlyPreviewResult {
@@ -2204,7 +2496,13 @@ export async function generateDescriptionOnlyPreview({
   characterType,
   description,
   modelId,
+  provider,
 }: DescriptionOnlyPreviewParams): Promise<DescriptionOnlyPreviewResult> {
+  // Provider branch — delegate to OpenAI sibling when admin selects gpt-image-2
+  if (provider && isOpenAIProvider(provider)) {
+    return openaiGenerateDescriptionOnlyPreview({ name, characterType, description });
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is not configured');
@@ -2326,7 +2624,13 @@ export async function generateDescriptionOnlyPreviewClassic({
   characterType,
   description,
   modelId,
+  provider,
 }: DescriptionOnlyPreviewParams): Promise<DescriptionOnlyPreviewResult> {
+  // Provider branch — delegate to OpenAI sibling when admin selects gpt-image-2
+  if (provider && isOpenAIProvider(provider)) {
+    return openaiGenerateDescriptionOnlyPreviewClassic({ name, characterType, description });
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is not configured');

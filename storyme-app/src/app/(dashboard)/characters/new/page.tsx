@@ -14,6 +14,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { SketchGuideViewer, SketchStep } from '@/components/characters/SketchGuideViewer';
+import { isAdminEmail } from '@/lib/auth/isAdmin';
+import {
+  ImageProvider,
+  ImageMedium,
+  IMAGE_PROVIDER_OPTIONS,
+  DEFAULT_IMAGE_PROVIDER,
+} from '@/lib/types/story';
 
 type PreviewStatus = 'idle' | 'generating' | 'ready' | 'error';
 type CharacterMode = 'photo' | 'description';
@@ -55,17 +62,24 @@ export default function NewCharacterPage() {
   const [age, setAge] = useState('');
   const [otherFeatures, setOtherFeatures] = useState('');
 
-  // Preview state - now supports BOTH styles
+  // Preview state - per-style independent generation (each click = 1 API call)
   const [pixarPreviewUrl, setPixarPreviewUrl] = useState<string | null>(null);
   const [classicPreviewUrl, setClassicPreviewUrl] = useState<string | null>(null);
   const [selectedStyle, setSelectedStyle] = useState<SelectedStyle>('pixar');
+  const [isGeneratingPixar, setIsGeneratingPixar] = useState(false);
+  const [isGeneratingClassic, setIsGeneratingClassic] = useState(false);
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>('idle');
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [descriptionChanged, setDescriptionChanged] = useState(false);
 
-  // Track if we should auto-generate preview
-  const [shouldAutoGenerate, setShouldAutoGenerate] = useState(false);
+  // Detected medium from analyze step — drives prompt selection.
+  // User can override via the "Wrong?" toggle in case of misclassification.
+  const [detectedMedium, setDetectedMedium] = useState<ImageMedium>('real_photo');
+
+  // Admin-only image provider toggle (gemini-3.1 default; openai-gpt-image-2 is the new option)
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [imageProvider, setImageProvider] = useState<ImageProvider>(DEFAULT_IMAGE_PROVIDER);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -157,8 +171,15 @@ export default function NewCharacterPage() {
             setOtherFeatures(analysisData.briefDescription || '');
           }
 
-          // Trigger auto-generation of preview after analysis
-          setShouldAutoGenerate(true);
+          // Capture detected medium so the kid_creation faithfulness prompt is used
+          // when the user clicks Generate. User can override via the "Wrong?" toggle.
+          if (analysisData.medium) {
+            setDetectedMedium(analysisData.medium as ImageMedium);
+          }
+
+          // Note: previously this auto-fired both styles. We now defer to the user
+          // clicking the "2D" or "3D" Generate button so each generation is intentional
+          // and only the chosen style is billed.
         }
       } else {
         const errorData = await analysisResponse.json();
@@ -173,16 +194,16 @@ export default function NewCharacterPage() {
     }
   };
 
-  // Auto-generate preview when conditions are met
+  // Load current user on mount + set admin flag (controls visibility of model toggle)
   useEffect(() => {
-    if (shouldAutoGenerate && uploadedImageUrl && name.trim()) {
-      setShouldAutoGenerate(false);
-      generatePreview();
-    }
-  }, [shouldAutoGenerate, uploadedImageUrl, name]);
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsAdmin(isAdminEmail(user?.email));
+    });
+  }, []);
 
-  // Generate animated preview (both styles)
-  const generatePreview = useCallback(async () => {
+  // Generate animated preview for a single style (one API call per click)
+  const generatePreview = useCallback(async (style: SelectedStyle) => {
     // Validate based on mode
     if (characterMode === 'photo') {
       if (!uploadedImageUrl || !name.trim()) {
@@ -196,17 +217,26 @@ export default function NewCharacterPage() {
       }
     }
 
+    // Per-style generating state — only the clicked card spins
+    if (style === 'pixar') {
+      setIsGeneratingPixar(true);
+      setPixarPreviewUrl(null);
+    } else {
+      setIsGeneratingClassic(true);
+      setClassicPreviewUrl(null);
+    }
     setPreviewStatus('generating');
     setPreviewError(null);
     setDescriptionChanged(false);
-    setPixarPreviewUrl(null);
-    setClassicPreviewUrl(null);
 
     try {
       const requestBody = characterMode === 'photo'
         ? {
             name: name.trim(),
             referenceImageUrl: uploadedImageUrl,
+            imageProvider,
+            medium: detectedMedium,
+            style,
             description: {
               hairColor,
               skinTone,
@@ -217,6 +247,9 @@ export default function NewCharacterPage() {
         : {
             name: name.trim(),
             characterType: characterType.trim(),
+            imageProvider,
+            // medium is irrelevant for description-only (no reference image)
+            style,
             description: {
               hairColor,
               age,
@@ -238,14 +271,16 @@ export default function NewCharacterPage() {
       }
 
       const data = await response.json();
-      console.log('Previews generated:', data);
+      console.log(`Preview generated (${style}, provider=${data.provider}, medium=${data.medium}):`, data);
 
-      // Set both style previews
-      if (data.previews?.pixar) {
+      // Set the requested style's URL only; the other stays as-is
+      if (style === 'pixar' && data.previews?.pixar) {
         setPixarPreviewUrl(data.previews.pixar.imageUrl);
+        setSelectedStyle('pixar');
       }
-      if (data.previews?.classic) {
+      if (style === 'classic' && data.previews?.classic) {
         setClassicPreviewUrl(data.previews.classic.imageUrl);
+        setSelectedStyle('classic');
       }
 
       setPreviewStatus('ready');
@@ -253,8 +288,11 @@ export default function NewCharacterPage() {
       console.error('Preview generation error:', err);
       setPreviewError(err instanceof Error ? err.message : 'Failed to generate preview');
       setPreviewStatus('error');
+    } finally {
+      if (style === 'pixar') setIsGeneratingPixar(false);
+      else setIsGeneratingClassic(false);
     }
-  }, [characterMode, uploadedImageUrl, name, characterType, hairColor, skinTone, age, otherFeatures]);
+  }, [characterMode, uploadedImageUrl, name, characterType, hairColor, skinTone, age, otherFeatures, imageProvider, detectedMedium]);
 
   // Track description changes
   const handleDescriptionChange = (setter: (val: string) => void) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -474,8 +512,9 @@ export default function NewCharacterPage() {
         }}
         onCreateCharacter={() => {
           // Go back to create form and trigger regular character generation
+          // (defaults to 3D Pixar — user can also generate the 2D Classic from the preview cards)
           setViewMode('create');
-          generatePreview();
+          generatePreview('pixar');
         }}
       />
     );
@@ -531,7 +570,7 @@ export default function NewCharacterPage() {
             <button
               onClick={() => {
                 setViewMode('create');
-                generatePreview();
+                generatePreview('pixar');
               }}
               className="min-h-[44px] p-6 border-4 border-blue-500 bg-blue-50 text-blue-900 rounded-lg hover:bg-blue-100 transition-all group"
             >
@@ -639,12 +678,7 @@ export default function NewCharacterPage() {
             id="name"
             type="text"
             value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              if (characterMode === 'photo' && uploadedImageUrl && !pixarPreviewUrl && e.target.value.trim()) {
-                setShouldAutoGenerate(true);
-              }
-            }}
+            onChange={(e) => setName(e.target.value)}
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder={characterMode === 'photo' ? 'e.g., Connor' : 'e.g., Eddie the Eagle'}
@@ -745,252 +779,241 @@ export default function NewCharacterPage() {
           </div>
         )}
 
-        {/* Preview Section - Shows both styles side by side */}
+        {/* Preview Section — independent 2D / 3D generation */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">
-            Animated Preview
-          </h2>
+          <div className="flex items-start justify-between mb-2 gap-4 flex-wrap">
+            <h2 className="text-lg font-medium text-gray-900">
+              Animated Preview
+            </h2>
 
-          {/* Generate Button (for description mode or manual generation) */}
-          {previewStatus === 'idle' && (
-            <div className="text-center py-8">
-              {characterMode === 'description' ? (
-                <div className="space-y-4">
-                  <div className="text-gray-500">
-                    <svg className="w-16 h-16 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                    <p className="text-sm mb-4">Enter a name and character type, then choose an option below</p>
-                  </div>
-
-                  {/* Error message for sketch generation */}
-                  {sketchError && (
-                    <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                      {sketchError}
-                    </div>
-                  )}
-
-                  {/* Two options: Drawing Guide or Full Character */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-                    {/* Drawing Guide Option */}
-                    <button
-                      type="button"
-                      onClick={generateSketchGuide}
-                      disabled={!name.trim() || !characterType.trim() || isGeneratingSketch}
-                      className="min-h-[44px] p-4 border-2 border-purple-500 bg-purple-50 text-purple-900 rounded-lg hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            {/* Admin-only image model toggle. Hidden for non-admins. */}
+            {isAdmin && (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-gray-500">🛠 Image model (admin):</span>
+                <select
+                  value={imageProvider}
+                  onChange={(e) => setImageProvider(e.target.value as ImageProvider)}
+                  className="border border-gray-300 rounded pl-2 pr-7 py-1 text-sm bg-white min-w-[160px]"
+                >
+                  {IMAGE_PROVIDER_OPTIONS.map((opt) => (
+                    <option
+                      key={opt.value}
+                      value={opt.value}
+                      disabled={opt.value === 'flux'}
                     >
-                      <div className="flex flex-col items-center gap-2">
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
-                        <div>
-                          <div className="font-bold">Drawing Guide</div>
-                          <div className="text-xs text-purple-700">
-                            {isGeneratingSketch ? 'Generating...' : 'Learn to draw step-by-step'}
-                          </div>
-                        </div>
-                      </div>
-                    </button>
+                      {opt.label}{opt.isNew ? ' ✨' : ''}{opt.value === 'flux' ? ' (stories only)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
 
-                    {/* Full Character Option */}
-                    <button
-                      type="button"
-                      onClick={generatePreview}
-                      disabled={!name.trim() || !characterType.trim() || isGeneratingSketch}
-                      className="min-h-[44px] p-4 border-2 border-blue-500 bg-blue-50 text-blue-900 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                    >
-                      <div className="flex flex-col items-center gap-2">
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                        </svg>
-                        <div>
-                          <div className="font-bold">Full Character</div>
-                          <div className="text-xs text-blue-700">Generate animated version</div>
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-gray-500">
-                  <svg className="w-16 h-16 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <p className="text-sm">Upload a photo to see the animated preview</p>
+          {/* Inline link to demoted Sketch / Drawing Guide (description-only mode) */}
+          {characterMode === 'description' && (
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={generateSketchGuide}
+                disabled={!name.trim() || !characterType.trim() || isGeneratingSketch}
+                className="text-sm text-purple-600 hover:underline disabled:text-gray-400 disabled:cursor-not-allowed disabled:no-underline"
+              >
+                📝 Want a step-by-step drawing guide instead? {isGeneratingSketch ? '(generating…)' : ''}
+              </button>
+              {sketchError && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 mt-2">
+                  {sketchError}
                 </div>
               )}
             </div>
           )}
 
-          {/* Generating state */}
-          {previewStatus === 'generating' && (
-            <div className="text-center py-12 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg">
-              <div className="w-12 h-12 border-3 border-purple-300 border-t-purple-600 rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-purple-600 font-medium">Creating animated versions...</p>
-              <p className="text-sm text-purple-500 mt-1">Generating both 3D and 2D styles (15-30 seconds)</p>
+          {/* Detected medium hint + override (photo mode only, when kid_creation detected) */}
+          {characterMode === 'photo' && uploadedImageUrl && detectedMedium === 'kid_creation' && (
+            <div className="mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800 flex items-center gap-2 flex-wrap">
+              <span>🎨 Detected as a kid&apos;s creation — using a faithfulness-first prompt to preserve your drawing.</span>
+              <button
+                type="button"
+                onClick={() => setDetectedMedium('real_photo')}
+                className="ml-auto underline hover:text-amber-900"
+              >
+                Wrong? It&apos;s a real photo
+              </button>
+            </div>
+          )}
+          {characterMode === 'photo' && uploadedImageUrl && detectedMedium === 'real_photo' && (
+            <div className="mb-4 text-xs text-gray-500">
+              <button
+                type="button"
+                onClick={() => setDetectedMedium('kid_creation')}
+                className="underline hover:text-gray-700"
+              >
+                This is a kid&apos;s drawing/craft, not a photo
+              </button>
             </div>
           )}
 
-          {/* Preview ready - show both styles */}
-          {previewStatus === 'ready' && (pixarPreviewUrl || classicPreviewUrl) && (
-            <div className="space-y-4">
-              {/* Style selection tabs */}
-              <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
-                <button
-                  type="button"
-                  onClick={() => setSelectedStyle('pixar')}
-                  className={`flex-1 py-2 px-4 rounded-md font-medium text-sm transition-all ${
-                    selectedStyle === 'pixar'
-                      ? 'bg-white text-purple-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  3D Pixar Style
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedStyle('classic')}
-                  className={`flex-1 py-2 px-4 rounded-md font-medium text-sm transition-all ${
-                    selectedStyle === 'classic'
-                      ? 'bg-white text-amber-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  2D Classic Style
-                </button>
-              </div>
+          {/* Empty hint when nothing yet (photo mode without upload) */}
+          {characterMode === 'photo' && !uploadedImageUrl && (
+            <div className="text-center py-8 text-gray-500">
+              <svg className="w-16 h-16 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <p className="text-sm">Upload a photo above, then choose 2D or 3D below</p>
+            </div>
+          )}
 
-              {/* Side by side comparison */}
-              <div className="grid grid-cols-2 gap-4">
-                {/* 3D Pixar Preview */}
-                <div
-                  className={`relative rounded-lg overflow-hidden cursor-pointer transition-all ${
-                    selectedStyle === 'pixar' ? 'ring-2 ring-purple-500 ring-offset-2' : 'opacity-70 hover:opacity-100'
-                  }`}
-                  onClick={() => setSelectedStyle('pixar')}
-                >
-                  <div className="aspect-square bg-gray-100">
-                    {pixarPreviewUrl ? (
-                      <img
-                        src={pixarPreviewUrl}
-                        alt="3D Pixar style preview"
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <span className="text-sm">Not available</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="absolute top-2 left-2 bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                    3D Pixar
-                  </div>
-                  {selectedStyle === 'pixar' && (
-                    <div className="absolute top-2 right-2 bg-green-500 text-white p-1 rounded-full">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-
-                {/* 2D Classic Preview */}
-                <div
-                  className={`relative rounded-lg overflow-hidden cursor-pointer transition-all ${
-                    selectedStyle === 'classic' ? 'ring-2 ring-amber-500 ring-offset-2' : 'opacity-70 hover:opacity-100'
-                  }`}
-                  onClick={() => setSelectedStyle('classic')}
-                >
-                  <div className="aspect-square bg-gray-100">
-                    {classicPreviewUrl ? (
-                      <img
-                        src={classicPreviewUrl}
-                        alt="2D Classic style preview"
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <span className="text-sm">Not available</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="absolute top-2 left-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                    2D Classic
-                  </div>
-                  {selectedStyle === 'classic' && (
-                    <div className="absolute top-2 right-2 bg-green-500 text-white p-1 rounded-full">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex gap-3">
-                {!isApproved ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setIsApproved(true)}
-                      className="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 font-medium flex items-center justify-center gap-2"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Approve {selectedStyle === 'pixar' ? '3D' : '2D'} Style
-                    </button>
-                    <button
-                      type="button"
-                      onClick={generatePreview}
-                      className="flex-1 border border-gray-300 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      Regenerate Both
-                    </button>
-                  </>
-                ) : descriptionChanged ? (
-                  <button
-                    type="button"
-                    onClick={generatePreview}
-                    className="w-full bg-yellow-500 text-white px-4 py-3 rounded-lg hover:bg-yellow-600 font-medium flex items-center justify-center gap-2"
+          {/* Two independent style cards — only the clicked one fires an API call */}
+          {(characterMode === 'description' || uploadedImageUrl) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* 2D Classic card */}
+              {(() => {
+                const canGenerate = characterMode === 'photo'
+                  ? !!uploadedImageUrl && !!name.trim()
+                  : !!name.trim() && !!characterType.trim();
+                const isSelected = selectedStyle === 'classic' && !!classicPreviewUrl;
+                return (
+                  <div
+                    onClick={() => classicPreviewUrl && setSelectedStyle('classic')}
+                    className={`relative border-2 rounded-lg overflow-hidden transition-all ${
+                      isSelected ? 'border-amber-500 ring-2 ring-amber-200' : 'border-dashed border-gray-300'
+                    } ${classicPreviewUrl ? 'cursor-pointer' : ''}`}
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Description changed - Regenerate Previews
-                  </button>
-                ) : (
-                  <div className="w-full text-center py-3 bg-green-50 rounded-lg">
-                    <p className="text-green-600 font-medium flex items-center justify-center gap-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {selectedStyle === 'pixar' ? '3D Pixar' : '2D Classic'} style approved! Ready to save.
-                    </p>
+                    <div className="text-center text-sm font-medium text-amber-600 py-2 bg-amber-50">
+                      2D Classic Style
+                    </div>
+                    <div className="aspect-square bg-gradient-to-br from-amber-50 to-yellow-50 flex items-center justify-center relative">
+                      {isGeneratingClassic ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-10 h-10 border-2 border-amber-300 border-t-amber-600 rounded-full animate-spin" />
+                          <p className="text-sm text-amber-700">Generating 2D…</p>
+                        </div>
+                      ) : classicPreviewUrl ? (
+                        <img src={classicPreviewUrl} alt="2D Classic preview" className="w-full h-full object-contain" />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); generatePreview('classic'); }}
+                          disabled={!canGenerate || isGeneratingPixar}
+                          className="px-4 py-3 text-amber-700 font-medium hover:text-amber-900 disabled:opacity-40 disabled:cursor-not-allowed text-center"
+                        >
+                          ✨<br />Click to Generate
+                        </button>
+                      )}
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 bg-green-500 text-white p-1 rounded-full">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    {classicPreviewUrl && !isGeneratingClassic && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); generatePreview('classic'); }}
+                        className="w-full py-2 text-xs text-amber-600 hover:bg-amber-50 border-t border-amber-100"
+                      >
+                        🔄 Regenerate
+                      </button>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })()}
+
+              {/* 3D Pixar card */}
+              {(() => {
+                const canGenerate = characterMode === 'photo'
+                  ? !!uploadedImageUrl && !!name.trim()
+                  : !!name.trim() && !!characterType.trim();
+                const isSelected = selectedStyle === 'pixar' && !!pixarPreviewUrl;
+                return (
+                  <div
+                    onClick={() => pixarPreviewUrl && setSelectedStyle('pixar')}
+                    className={`relative border-2 rounded-lg overflow-hidden transition-all ${
+                      isSelected ? 'border-purple-500 ring-2 ring-purple-200' : 'border-dashed border-gray-300'
+                    } ${pixarPreviewUrl ? 'cursor-pointer' : ''}`}
+                  >
+                    <div className="text-center text-sm font-medium text-purple-600 py-2 bg-purple-50">
+                      3D Pixar Style
+                    </div>
+                    <div className="aspect-square bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center relative">
+                      {isGeneratingPixar ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-10 h-10 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin" />
+                          <p className="text-sm text-purple-700">Generating 3D…</p>
+                        </div>
+                      ) : pixarPreviewUrl ? (
+                        <img src={pixarPreviewUrl} alt="3D Pixar preview" className="w-full h-full object-contain" />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); generatePreview('pixar'); }}
+                          disabled={!canGenerate || isGeneratingClassic}
+                          className="px-4 py-3 text-purple-700 font-medium hover:text-purple-900 disabled:opacity-40 disabled:cursor-not-allowed text-center"
+                        >
+                          ✨<br />Click to Generate
+                        </button>
+                      )}
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 bg-green-500 text-white p-1 rounded-full">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    {pixarPreviewUrl && !isGeneratingPixar && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); generatePreview('pixar'); }}
+                        className="w-full py-2 text-xs text-purple-600 hover:bg-purple-50 border-t border-purple-100"
+                      >
+                        🔄 Regenerate
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Approve / status bar (only when at least one style is ready) */}
+          {(pixarPreviewUrl || classicPreviewUrl) && (
+            <div className="mt-4 flex gap-3">
+              {!isApproved ? (
+                <button
+                  type="button"
+                  onClick={() => setIsApproved(true)}
+                  disabled={!pixarPreviewUrl && !classicPreviewUrl}
+                  className="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 font-medium flex items-center justify-center gap-2 disabled:opacity-40"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Approve {selectedStyle === 'pixar' ? '3D Pixar' : '2D Classic'} Style
+                </button>
+              ) : descriptionChanged ? (
+                <div className="w-full text-center py-3 bg-yellow-50 rounded-lg text-yellow-700 text-sm">
+                  Description changed — regenerate the style above to refresh
+                </div>
+              ) : (
+                <div className="w-full text-center py-3 bg-green-50 rounded-lg">
+                  <p className="text-green-600 font-medium flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {selectedStyle === 'pixar' ? '3D Pixar' : '2D Classic'} style approved! Ready to save.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
           {/* Error state */}
-          {previewStatus === 'error' && (
-            <div className="text-center py-8 bg-red-50 rounded-lg">
-              <svg className="w-12 h-12 text-red-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-red-600 font-medium">{previewError || 'Failed to generate preview'}</p>
-              <button
-                type="button"
-                onClick={generatePreview}
-                className="mt-3 text-red-600 hover:text-red-800 underline font-medium"
-              >
-                Try again
-              </button>
+          {previewStatus === 'error' && previewError && (
+            <div className="mt-4 text-center py-4 px-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">{previewError}</p>
             </div>
           )}
         </div>

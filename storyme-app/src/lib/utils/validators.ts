@@ -36,6 +36,11 @@ export const characterLibrarySchema = z.object({
   // Designer info (child artist)
   designer_name: z.string().max(100).optional().nullable(),
   designer_age: z.coerce.number().int().min(3).max(18).optional().nullable(),
+
+  // Breakdown feature: distinguishes characters vs. scene elements, and tracks
+  // which source character this row was extracted from (if any).
+  role: z.enum(['character', 'scene_element']).optional(),
+  derived_from_id: z.string().uuid().optional().nullable(),
 }).refine(
   (data) => {
     // Either have a reference image OR at least one description field OR an animated preview

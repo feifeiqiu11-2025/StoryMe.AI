@@ -1,8 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import { Character, SubjectType, ImageProvider } from '@/lib/types/story';
+import { useState, useEffect } from 'react';
+import {
+  Character,
+  SubjectType,
+  ImageProvider,
+  ImageMedium,
+  IMAGE_PROVIDER_OPTIONS,
+  DEFAULT_IMAGE_PROVIDER,
+} from '@/lib/types/story';
 import { SketchStep } from '@/components/characters/SketchGuideViewer';
+import { isAdminEmail } from '@/lib/auth/isAdmin';
+import { createClient } from '@/lib/supabase/client';
 
 /**
  * Common animal types for detecting if character type is an animal
@@ -35,6 +44,12 @@ interface CharacterFormModalProps {
   onSave: (character: Character) => void;
   editingCharacter?: Character | null;
   imageProvider?: ImageProvider;
+  /**
+   * Optional: triggered when user clicks "Break into parts" inside the edit view.
+   * The parent is expected to close this modal and open the BreakdownModal with
+   * the same character. When undefined, the breakdown section is hidden.
+   */
+  onBreakdown?: (character: Character) => void;
 }
 
 interface FormData {
@@ -56,6 +71,7 @@ export default function CharacterFormModal({
   onSave,
   editingCharacter = null,
   imageProvider,
+  onBreakdown,
 }: CharacterFormModalProps) {
   const [formData, setFormData] = useState<FormData>(() => {
     if (editingCharacter) {
@@ -108,6 +124,29 @@ export default function CharacterFormModal({
   const [sketchError, setSketchError] = useState<string | null>(null);
   // Per-style regeneration: tracks which single style is being regenerated
   const [regeneratingStyle, setRegeneratingStyle] = useState<'pixar' | 'classic' | null>(null);
+  // Per-style initial generation (replaces the old "generate both at once" pattern)
+  const [generatingStyle, setGeneratingStyle] = useState<'pixar' | 'classic' | null>(null);
+
+  // Detected medium of the uploaded reference image. Drives kid_creation prompt branching.
+  // User can override via the "Wrong?" toggle if the analyzer mis-classifies.
+  const [detectedMedium, setDetectedMedium] = useState<ImageMedium>('real_photo');
+  // True when analyze-character failed (e.g. Gemini rate-limited) — UI shows explicit medium picker
+  const [analysisFailed, setAnalysisFailed] = useState(false);
+
+  // Admin-only image provider override. Defaults to ChatGPT Image 2.0 (per current
+  // experiment focus); admin can flip back to Gemini or any other provider for A/B testing.
+  // Story generation still uses the parent's provider — this only affects character preview.
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [providerOverride, setProviderOverride] = useState<ImageProvider | null>(null);
+  const effectiveProvider: ImageProvider = providerOverride ?? 'openai-gpt-image-2';
+
+  // Load admin status on mount
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsAdmin(isAdminEmail(user?.email));
+    });
+  }, []);
 
   // Reset form when modal opens/closes or editingCharacter changes
   const resetForm = () => {
@@ -178,6 +217,7 @@ export default function CharacterFormModal({
       // Auto-analyze image with unified Gemini API (single call for all subject types)
       console.log('Analyzing character image:', data.url);
       setAnalyzingImage(true);
+      setAnalysisFailed(false);
 
       try {
         const analysisResponse = await fetch('/api/analyze-character', {
@@ -192,6 +232,12 @@ export default function CharacterFormModal({
 
           if (analysisData.success) {
             setDetectedSubjectType(analysisData.subjectType);
+
+            // Capture detected medium so the kid_creation faithfulness prompt is used
+            // when the user clicks Generate. User can override via the badge below.
+            if (analysisData.medium) {
+              setDetectedMedium(analysisData.medium as ImageMedium);
+            }
 
             if (analysisData.subjectType === 'human' && analysisData.humanDetails) {
               // Human detected: populate structured fields
@@ -229,12 +275,13 @@ export default function CharacterFormModal({
             }
           }
         } else {
-          console.error('Character analysis API failed');
-          // Fail silently - user can still fill in manually
+          // Analysis failed (likely 429). Surface to UI so user can pick medium manually.
+          console.error('Character analysis API failed:', analysisResponse.status);
+          setAnalysisFailed(true);
         }
       } catch (analysisError) {
         console.error('Auto-analysis error:', analysisError);
-        // User can still fill in manually
+        setAnalysisFailed(true);
       } finally {
         setAnalyzingImage(false);
       }
@@ -246,7 +293,8 @@ export default function CharacterFormModal({
     }
   };
 
-  const handleGeneratePreview = async () => {
+  // Generate ONE style on demand. Each click = one API call (no more parallel both).
+  const handleGeneratePreview = async (style: 'pixar' | 'classic') => {
     // Validate based on mode
     if (characterMode === 'photo') {
       if (!formData.imageUrl || !formData.name) {
@@ -260,10 +308,11 @@ export default function CharacterFormModal({
       }
     }
 
+    setGeneratingStyle(style);
     setGeneratingPreview(true);
     setPreviewError(null);
-    setPreviewOptions({ pixar: null, classic: null });
-    setSelectedStyle(null);
+    // Clear only the style we're regenerating; the OTHER style's preview stays as-is
+    setPreviewOptions((prev) => ({ ...prev, [style]: null }));
 
     try {
       // Pass pre-detected subjectType to avoid redundant AI detection
@@ -273,6 +322,7 @@ export default function CharacterFormModal({
             referenceImageUrl: formData.imageUrl,
             subjectType: detectedSubjectType || undefined, // Pass pre-detected type
             subjectDescription: detectedSubjectType !== 'human' ? formData.otherFeatures : undefined,
+            medium: detectedMedium,
             description: {
               hairColor: formData.hairColor,
               skinTone: formData.skinTone,
@@ -284,6 +334,7 @@ export default function CharacterFormModal({
         : {
             name: formData.name,
             characterType: formData.characterType,
+            // medium irrelevant without a reference image
             description: {
               hairColor: formData.hairColor,
               age: formData.age,
@@ -294,7 +345,7 @@ export default function CharacterFormModal({
       const response = await fetch('/api/generate-character-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...requestBody, imageProvider }),
+        body: JSON.stringify({ ...requestBody, imageProvider: effectiveProvider, style }),
       });
 
       if (!response.ok) {
@@ -321,29 +372,22 @@ export default function CharacterFormModal({
         }
       }
 
-      if (data.previews) {
-        setPreviewOptions({
-          pixar: data.previews.pixar?.imageUrl || null,
-          classic: data.previews.classic?.imageUrl || null,
-        });
-        // Auto-select first available style
-        if (data.previews.pixar?.imageUrl) {
-          setSelectedStyle('pixar');
-          setFormData((prev) => ({ ...prev, animatedPreviewUrl: data.previews.pixar.imageUrl }));
-        } else if (data.previews.classic?.imageUrl) {
-          setSelectedStyle('classic');
-          setFormData((prev) => ({ ...prev, animatedPreviewUrl: data.previews.classic.imageUrl }));
-        }
-      } else {
-        // Backward compatibility - single preview
-        const imageUrl = data.preview?.imageUrl || data.imageUrl;
-        setFormData((prev) => ({ ...prev, animatedPreviewUrl: imageUrl }));
+      // Only the requested style was generated — set just that one and select it
+      const newUrl = style === 'pixar'
+        ? data.previews?.pixar?.imageUrl
+        : data.previews?.classic?.imageUrl;
+
+      if (newUrl) {
+        setPreviewOptions((prev) => ({ ...prev, [style]: newUrl }));
+        setSelectedStyle(style);
+        setFormData((prev) => ({ ...prev, animatedPreviewUrl: newUrl }));
       }
     } catch (err: any) {
       console.error('Preview generation error:', err);
       setPreviewError(err.message || 'Failed to generate preview');
     } finally {
       setGeneratingPreview(false);
+      setGeneratingStyle(null);
     }
   };
 
@@ -371,6 +415,7 @@ export default function CharacterFormModal({
             referenceImageUrl: formData.imageUrl,
             subjectType: detectedSubjectType || undefined,
             subjectDescription: detectedSubjectType !== 'human' ? formData.otherFeatures : undefined,
+            medium: detectedMedium,
             description: {
               hairColor: formData.hairColor,
               skinTone: formData.skinTone,
@@ -392,7 +437,7 @@ export default function CharacterFormModal({
       const response = await fetch('/api/generate-character-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...requestBody, imageProvider, style }),
+        body: JSON.stringify({ ...requestBody, imageProvider: effectiveProvider, style }),
       });
 
       if (!response.ok) {
@@ -930,23 +975,89 @@ export default function CharacterFormModal({
           {/* Character Preview Section */}
           {(characterMode === 'photo' ? formData.imageUrl : formData.characterType) && (
             <div className="border-t border-gray-200 pt-4 mt-4">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
                 <h3 className="text-lg font-semibold text-gray-900">Character Preview</h3>
+                {/* Admin model toggle inline with header to save vertical space */}
+                {isAdmin && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-gray-500">Image model (admin):</span>
+                    <select
+                      value={effectiveProvider}
+                      onChange={(e) => setProviderOverride(e.target.value as ImageProvider)}
+                      className="border border-gray-300 rounded pl-2 pr-7 py-1 text-sm bg-white min-w-[160px]"
+                    >
+                      {IMAGE_PROVIDER_OPTIONS.map((opt) => (
+                        <option
+                          key={opt.value}
+                          value={opt.value}
+                          disabled={opt.value === 'flux'}
+                        >
+                          {opt.label}{opt.value === 'flux' ? ' (stories only)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
-              <p className="text-sm text-gray-500 mb-4">
-                {formData.animatedPreviewUrl && previewOptions.pixar === previewOptions.classic
-                  ? 'Compare your reference photo with the saved animated preview.'
-                  : 'Generate preview styles to see how your character will appear in stories.'}
-              </p>
 
-              {/* Generating state */}
-              {generatingPreview ? (
-                <div className="bg-gray-50 rounded-lg p-8 text-center">
-                  <div className="w-10 h-10 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-3"></div>
-                  <p className="text-purple-600 font-medium">Generating 2 style options...</p>
-                  <p className="text-xs text-gray-400 mt-1">This takes 15-30 seconds</p>
+              {/* Analysis failed → explicit medium picker */}
+              {characterMode === 'photo' && formData.imageUrl && analysisFailed && (
+                <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+                  <p className="mb-2">
+                    ⚠️ Couldn&apos;t auto-detect this image (rate limited). Please pick:
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setDetectedMedium('real_photo'); setAnalysisFailed(false); }}
+                      className={`px-3 py-1 text-xs rounded border ${detectedMedium === 'real_photo' ? 'bg-amber-200 border-amber-400 font-medium' : 'bg-white border-amber-300 hover:bg-amber-100'}`}
+                    >
+                      Real photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setDetectedMedium('kid_creation'); setAnalysisFailed(false); }}
+                      className={`px-3 py-1 text-xs rounded border ${detectedMedium === 'kid_creation' ? 'bg-amber-200 border-amber-400 font-medium' : 'bg-white border-amber-300 hover:bg-amber-100'}`}
+                    >
+                      Kid&apos;s creation
+                    </button>
+                  </div>
                 </div>
-              ) : formData.animatedPreviewUrl && previewOptions.pixar === previewOptions.classic ? (
+              )}
+
+              {/* Detected medium hint (photo mode + kid_creation) — borderless, lightweight */}
+              {characterMode === 'photo' && formData.imageUrl && !analysisFailed && detectedMedium === 'kid_creation' && (
+                <p className="text-xs text-gray-500 mb-3">
+                  Detected as a kid&apos;s creation.{' '}
+                  <button
+                    type="button"
+                    onClick={() => setDetectedMedium('real_photo')}
+                    className="underline hover:text-gray-700"
+                  >
+                    Wrong? It&apos;s a real photo
+                  </button>
+                </p>
+              )}
+              {characterMode === 'photo' && formData.imageUrl && !analysisFailed && detectedMedium === 'real_photo' && (
+                <p className="text-xs text-gray-500 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setDetectedMedium('kid_creation')}
+                    className="underline hover:text-gray-700"
+                  >
+                    This is a kid&apos;s drawing/craft, not a photo
+                  </button>
+                </p>
+              )}
+
+              {formData.animatedPreviewUrl && previewOptions.pixar === previewOptions.classic && (
+                <p className="text-sm text-gray-500 mb-4">
+                  Compare your reference photo with the saved animated preview.
+                </p>
+              )}
+
+              {/* Per-style generation handled inside each card below — no outer "both styles" spinner */}
+              {formData.animatedPreviewUrl && previewOptions.pixar === previewOptions.classic ? (
                 /* Editing existing character */
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
@@ -971,58 +1082,31 @@ export default function CharacterFormModal({
                   </div>
                 </div>
               ) : (previewOptions.pixar || previewOptions.classic) && previewOptions.pixar !== previewOptions.classic ? (
-                /* Freshly generated - show sketch/reference + both style options in one row */
+                /* Freshly generated - reference + both style cards (any may still be ungenerated/clickable) */
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-3">Choose your preferred style:</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {/* Box 1: Sketch (description mode) or Reference Photo (photo mode) */}
-                    {characterMode === 'description' ? (
-                      <div className="text-center">
-                        <p className="text-sm font-medium text-blue-700 mb-2">Character</p>
-                        {isGeneratingSketch ? (
-                          <div className="bg-blue-50 rounded-xl aspect-square flex items-center justify-center border-2 border-blue-300">
-                            <div className="text-center">
-                              <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
-                              <p className="text-blue-600 font-medium text-sm">Generating sketch...</p>
-                            </div>
-                          </div>
-                        ) : sketchGuideData ? (
-                          <>
-                            <div className="aspect-square border-2 border-gray-300 rounded-xl p-4 bg-white">
-                              <img
-                                key={sketchGuideData.guide_image_url}
-                                src={sketchGuideData.guide_image_url}
-                                alt="Simple sketch"
-                                className="w-full h-full object-contain"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => generateSketchGuide()}
-                              disabled={isGeneratingSketch}
-                              className="mt-1 text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
-                            >
-                              ↻ Regenerate
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (formData.name && formData.characterType) generateSketchGuide();
-                            }}
-                            disabled={isGeneratingSketch || !formData.name || !formData.characterType}
-                            className="w-full aspect-square border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-xl flex items-center justify-center bg-gray-50 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                          >
-                            <div className="text-center p-4">
-                              <div className="text-4xl mb-2">✏️</div>
-                              <p className="text-sm font-bold text-gray-900 mb-1">{formData.characterType || 'Character'}</p>
-                              <p className="text-xs text-blue-600 font-medium">Click to Generate Sketch</p>
-                            </div>
-                          </button>
-                        )}
-                      </div>
-                    ) : (
+                  {/* Sketch tooltip link (description mode + no sketch yet) */}
+                  {characterMode === 'description' && !sketchGuideData && !isGeneratingSketch && (
+                    <div className="mb-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!formData.name || !formData.characterType) {
+                            setSketchError('Please fill in Character Name and Type first');
+                            return;
+                          }
+                          generateSketchGuide();
+                        }}
+                        disabled={isGeneratingSketch || !formData.name || !formData.characterType}
+                        className="text-sm text-blue-600 hover:underline disabled:text-gray-400 disabled:cursor-not-allowed disabled:no-underline"
+                      >
+                        📝 Want a step-by-step drawing guide?
+                      </button>
+                    </div>
+                  )}
+
+                  <div className={`grid grid-cols-1 ${characterMode === 'photo' || sketchGuideData || isGeneratingSketch ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-4 items-start`}>
+                    {/* Box 1 (conditional): Sketch (description + generated/generating) OR Reference Photo (photo mode) */}
+                    {characterMode === 'photo' ? (
                       <div className="text-center">
                         <p className="text-sm font-medium text-gray-700 mb-2">Reference Photo</p>
                         <div className="bg-gray-50 rounded-xl overflow-hidden aspect-square border border-gray-200">
@@ -1033,244 +1117,283 @@ export default function CharacterFormModal({
                           />
                         </div>
                       </div>
-                    )}
-
-                    {/* Box 2: 3D Pixar Option */}
-                    <div className="text-center">
-                      <div
-                        className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
-                          selectedStyle === 'pixar'
-                            ? 'border-purple-500 ring-2 ring-purple-200'
-                            : 'border-gray-200 hover:border-purple-300'
-                        } ${!previewOptions.pixar ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        onClick={() => previewOptions.pixar && !regeneratingStyle && handleSelectStyle('pixar')}
-                      >
-                        <div className="aspect-square bg-gray-50">
-                          {regeneratingStyle === 'pixar' ? (
-                            <div className="flex items-center justify-center h-full">
-                              <div className="text-center">
-                                <div className="w-8 h-8 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-2"></div>
-                                <p className="text-purple-600 font-medium text-xs">Regenerating...</p>
-                              </div>
-                            </div>
-                          ) : previewOptions.pixar ? (
-                            <img
-                              src={previewOptions.pixar}
-                              alt="3D Pixar Style"
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-center h-full text-gray-400">
-                              <span className="text-sm">Failed to generate</span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-2 bg-white border-t">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-sm text-gray-900">3D Pixar</span>
-                            {selectedStyle === 'pixar' && (
-                              <span className="text-purple-600 text-xs">✓ Selected</span>
-                            )}
+                    ) : isGeneratingSketch ? (
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-blue-700 mb-2">Drawing Guide</p>
+                        <div className="bg-blue-50 rounded-xl aspect-square flex items-center justify-center border-2 border-blue-300">
+                          <div className="text-center">
+                            <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
+                            <p className="text-blue-600 font-medium text-sm">Generating sketch...</p>
                           </div>
-                          <p className="text-xs text-gray-500">Disney/Pixar CGI style</p>
                         </div>
-                        {selectedStyle === 'pixar' && !regeneratingStyle && (
-                          <div className="absolute top-2 right-2 bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
-                            ✓
-                          </div>
-                        )}
                       </div>
-                      {previewOptions.pixar && (
+                    ) : sketchGuideData ? (
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-blue-700 mb-2">Drawing Guide</p>
+                        <div className="aspect-square border-2 border-gray-300 rounded-xl p-4 bg-white">
+                          <img
+                            key={sketchGuideData.guide_image_url}
+                            src={sketchGuideData.guide_image_url}
+                            alt="Simple sketch"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); handleRegenerateSingleStyle('pixar'); }}
-                          disabled={regeneratingStyle !== null || generatingPreview}
-                          className="mt-1 text-xs text-purple-600 hover:text-purple-800 font-medium disabled:opacity-50"
+                          onClick={() => generateSketchGuide()}
+                          disabled={isGeneratingSketch}
+                          className="mt-1 text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
                         >
                           ↻ Regenerate
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {/* Box 2: 2D Classic (LEFT) */}
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-amber-700 mb-2">2D Classic</p>
+                      {previewOptions.classic ? (
+                        <>
+                          <div
+                            className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
+                              selectedStyle === 'classic'
+                                ? 'border-amber-500 ring-2 ring-amber-200'
+                                : 'border-gray-200 hover:border-amber-300'
+                            }`}
+                            onClick={() => !regeneratingStyle && !generatingStyle && handleSelectStyle('classic')}
+                          >
+                            <div className="aspect-square bg-gray-50">
+                              {regeneratingStyle === 'classic' || generatingStyle === 'classic' ? (
+                                <div className="flex items-center justify-center h-full">
+                                  <div className="text-center">
+                                    <div className="w-8 h-8 border-2 border-amber-200 border-t-amber-600 rounded-full animate-spin mx-auto mb-2"></div>
+                                    <p className="text-amber-600 font-medium text-xs">Generating 2D…</p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <img
+                                  src={previewOptions.classic}
+                                  alt="2D Classic Style"
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                            {selectedStyle === 'classic' && !regeneratingStyle && !generatingStyle && (
+                              <div className="absolute top-2 right-2 bg-amber-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                                ✓
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleRegenerateSingleStyle('classic'); }}
+                            disabled={regeneratingStyle !== null || generatingStyle !== null || generatingPreview}
+                            className="mt-1 text-xs text-amber-600 hover:text-amber-800 font-medium disabled:opacity-50"
+                          >
+                            ↻ Regenerate
+                          </button>
+                        </>
+                      ) : generatingStyle === 'classic' ? (
+                        <div className="rounded-xl border-2 border-amber-300 overflow-hidden aspect-square bg-amber-50 flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="w-10 h-10 border-4 border-amber-200 border-t-amber-600 rounded-full animate-spin mx-auto mb-3"></div>
+                            <p className="text-amber-600 font-medium text-sm">Generating 2D…</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleGeneratePreview('classic')}
+                          disabled={generatingPreview || regeneratingStyle !== null || (characterMode === 'photo' ? !formData.imageUrl : !formData.characterType)}
+                          className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl aspect-square flex flex-col items-center justify-center border-2 border-dashed border-amber-300 hover:border-amber-500 hover:from-amber-100 hover:to-yellow-100 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed group w-full"
+                        >
+                          <div className="text-4xl mb-2 group-hover:scale-110 transition-transform">✨</div>
+                          <p className="text-sm text-amber-700 font-bold group-hover:text-amber-800">Click to Generate</p>
                         </button>
                       )}
                     </div>
 
-                    {/* Box 3: Classic Storybook Option */}
+                    {/* Box 3: 3D Pixar (RIGHT) */}
                     <div className="text-center">
-                      <div
-                        className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
-                          selectedStyle === 'classic'
-                            ? 'border-amber-500 ring-2 ring-amber-200'
-                            : 'border-gray-200 hover:border-amber-300'
-                        } ${!previewOptions.classic ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        onClick={() => previewOptions.classic && !regeneratingStyle && handleSelectStyle('classic')}
-                      >
-                        <div className="aspect-square bg-gray-50">
-                          {regeneratingStyle === 'classic' ? (
-                            <div className="flex items-center justify-center h-full">
-                              <div className="text-center">
-                                <div className="w-8 h-8 border-2 border-amber-200 border-t-amber-600 rounded-full animate-spin mx-auto mb-2"></div>
-                                <p className="text-amber-600 font-medium text-xs">Regenerating...</p>
+                      <p className="text-sm font-medium text-purple-700 mb-2">3D Pixar</p>
+                      {previewOptions.pixar ? (
+                        <>
+                          <div
+                            className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
+                              selectedStyle === 'pixar'
+                                ? 'border-purple-500 ring-2 ring-purple-200'
+                                : 'border-gray-200 hover:border-purple-300'
+                            }`}
+                            onClick={() => !regeneratingStyle && !generatingStyle && handleSelectStyle('pixar')}
+                          >
+                            <div className="aspect-square bg-gray-50">
+                              {regeneratingStyle === 'pixar' || generatingStyle === 'pixar' ? (
+                                <div className="flex items-center justify-center h-full">
+                                  <div className="text-center">
+                                    <div className="w-8 h-8 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-2"></div>
+                                    <p className="text-purple-600 font-medium text-xs">Generating 3D…</p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <img
+                                  src={previewOptions.pixar}
+                                  alt="3D Pixar Style"
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                            {selectedStyle === 'pixar' && !regeneratingStyle && !generatingStyle && (
+                              <div className="absolute top-2 right-2 bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                                ✓
                               </div>
-                            </div>
-                          ) : previewOptions.classic ? (
-                            <img
-                              src={previewOptions.classic}
-                              alt="Classic Storybook Style"
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-center h-full text-gray-400">
-                              <span className="text-sm">Failed to generate</span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-2 bg-white border-t">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-sm text-gray-900">Classic Storybook</span>
-                            {selectedStyle === 'classic' && (
-                              <span className="text-amber-600 text-xs">✓ Selected</span>
                             )}
                           </div>
-                          <p className="text-xs text-gray-500">Warm 2D illustration</p>
-                        </div>
-                        {selectedStyle === 'classic' && !regeneratingStyle && (
-                          <div className="absolute top-2 right-2 bg-amber-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
-                            ✓
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleRegenerateSingleStyle('pixar'); }}
+                            disabled={regeneratingStyle !== null || generatingStyle !== null || generatingPreview}
+                            className="mt-1 text-xs text-purple-600 hover:text-purple-800 font-medium disabled:opacity-50"
+                          >
+                            ↻ Regenerate
+                          </button>
+                        </>
+                      ) : generatingStyle === 'pixar' ? (
+                        <div className="rounded-xl border-2 border-purple-300 overflow-hidden aspect-square bg-purple-50 flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="w-10 h-10 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-3"></div>
+                            <p className="text-purple-600 font-medium text-sm">Generating 3D…</p>
                           </div>
-                        )}
-                      </div>
-                      {previewOptions.classic && (
+                        </div>
+                      ) : (
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); handleRegenerateSingleStyle('classic'); }}
-                          disabled={regeneratingStyle !== null || generatingPreview}
-                          className="mt-1 text-xs text-amber-600 hover:text-amber-800 font-medium disabled:opacity-50"
+                          onClick={() => handleGeneratePreview('pixar')}
+                          disabled={generatingPreview || regeneratingStyle !== null || (characterMode === 'photo' ? !formData.imageUrl : !formData.characterType)}
+                          className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl aspect-square flex flex-col items-center justify-center border-2 border-dashed border-purple-300 hover:border-purple-500 hover:from-purple-100 hover:to-blue-100 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed group w-full"
                         >
-                          ↻ Regenerate
+                          <div className="text-4xl mb-2 group-hover:scale-110 transition-transform">✨</div>
+                          <p className="text-sm text-purple-700 font-bold group-hover:text-purple-800">Click to Generate</p>
                         </button>
                       )}
                     </div>
                   </div>
                 </div>
               ) : (
-                /* Initial state - 2 clickable boxes: Left (Sketch) | Right (Animated Preview) */
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Left: Simple Sketch - CLICKABLE (only in description mode) */}
-                  {characterMode === 'description' ? (
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-blue-700 mb-2">
-                        {isGeneratingSketch || sketchGuideData ? 'ℹ️ Simple Sketch' : 'Simple Sketch'}
-                      </p>
+                /* Initial state — independent 2D and 3D cards. Each click = one API call. */
+                <div className="space-y-3">
+                  {/* Sketch tooltip link (description mode + no sketch yet) */}
+                  {characterMode === 'description' && !sketchGuideData && !isGeneratingSketch && (
+                    <div className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!formData.name || !formData.characterType) {
+                            setSketchError('Please fill in Character Name and Type first');
+                            return;
+                          }
+                          generateSketchGuide();
+                        }}
+                        disabled={isGeneratingSketch || !formData.name || !formData.characterType}
+                        className="text-sm text-blue-600 hover:underline disabled:text-gray-400 disabled:cursor-not-allowed disabled:no-underline"
+                      >
+                        📝 Want a step-by-step drawing guide?
+                      </button>
+                      {sketchError && (
+                        <div className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2 text-left">
+                          {sketchError}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                      {/* Loading state while generating sketch */}
-                      {isGeneratingSketch ? (
+                  {/* Cards grid — expands to 3 cols when sketch is generated/generating */}
+                  <div className={`grid grid-cols-1 ${(characterMode === 'description' && (sketchGuideData || isGeneratingSketch)) ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-4 items-start`}>
+                    {/* Box 0 (description mode + sketch): Sketch as a column */}
+                    {characterMode === 'description' && isGeneratingSketch && (
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-blue-700 mb-2">Drawing Guide</p>
                         <div className="bg-blue-50 rounded-xl aspect-square flex items-center justify-center border-2 border-blue-300">
                           <div className="text-center">
                             <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
                             <p className="text-blue-600 font-medium text-sm">Generating sketch...</p>
-                            <p className="text-xs text-blue-400 mt-1">~5 seconds</p>
                           </div>
                         </div>
-                      ) : sketchGuideData ? (
-                        /* Sketch generated - with visible regenerate link */
-                        <>
-                          <div className="w-full aspect-square border-2 border-gray-300 rounded-xl p-4 bg-white">
-                            <img
-                              key={sketchGuideData.guide_image_url}
-                              src={sketchGuideData.guide_image_url}
-                              alt="Simple sketch for learning"
-                              className="w-full h-full object-contain"
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => generateSketchGuide()}
-                            disabled={isGeneratingSketch}
-                            className="mt-1 text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
-                          >
-                            ↻ Regenerate sketch
-                          </button>
-                        </>
-                      ) : (
-                        /* No sketch yet - clickable to generate */
+                      </div>
+                    )}
+                    {characterMode === 'description' && sketchGuideData && !isGeneratingSketch && (
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-blue-700 mb-2">Drawing Guide</p>
+                        <div className="aspect-square border-2 border-gray-300 rounded-xl p-4 bg-white">
+                          <img
+                            key={sketchGuideData.guide_image_url}
+                            src={sketchGuideData.guide_image_url}
+                            alt="Simple sketch"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (!formData.name || !formData.characterType) {
-                              setSketchError('Please fill in Character Name and Type first');
-                              return;
-                            }
-                            generateSketchGuide();
-                          }}
-                          disabled={isGeneratingSketch || !formData.name || !formData.characterType}
-                          className="w-full aspect-square border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-xl flex items-center justify-center bg-gray-50 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                          onClick={() => generateSketchGuide()}
+                          disabled={isGeneratingSketch}
+                          className="mt-1 text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+                        >
+                          ↻ Regenerate
+                        </button>
+                      </div>
+                    )}
+                    {/* LEFT — 2D Classic */}
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-amber-700 mb-2">2D Classic Style</p>
+                      {generatingStyle === 'classic' ? (
+                        <div className="bg-amber-50 rounded-xl aspect-square flex items-center justify-center border-2 border-amber-300">
+                          <div className="text-center">
+                            <div className="w-10 h-10 border-4 border-amber-200 border-t-amber-600 rounded-full animate-spin mx-auto mb-3"></div>
+                            <p className="text-amber-600 font-medium text-sm">Generating 2D…</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleGeneratePreview('classic')}
+                          disabled={generatingPreview || (characterMode === 'photo' ? !formData.imageUrl : !formData.characterType)}
+                          className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl aspect-square flex items-center justify-center border-2 border-dashed border-amber-300 hover:border-amber-500 hover:from-amber-100 hover:to-yellow-100 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed group w-full"
                         >
                           <div className="text-center p-4">
-                            <div className="text-5xl mb-3">✏️</div>
-                            <p className="text-base font-bold text-gray-900 mb-2">{formData.characterType || 'Character type'}</p>
-                            <p className="text-sm text-blue-600 font-medium">Click to Generate</p>
+                            <div className="text-5xl mb-3 group-hover:scale-110 transition-transform">✨</div>
+                            <p className="text-base font-bold text-gray-900 mb-2">2D Classic</p>
+                            <p className="text-sm text-amber-700 font-bold group-hover:text-amber-800">Click to Generate</p>
                           </div>
                         </button>
                       )}
                     </div>
-                  ) : (
-                    /* Photo mode - show reference photo */
+
+                    {/* RIGHT — 3D Pixar */}
                     <div className="text-center">
-                      <p className="text-sm font-medium text-gray-700 mb-2">Reference Photo</p>
-                      <div className="bg-gray-50 rounded-xl overflow-hidden aspect-square border border-gray-200">
-                        <img
-                          src={formData.imageUrl}
-                          alt="Reference"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+                      <p className="text-sm font-medium text-purple-700 mb-2">3D Pixar Style</p>
+                      {generatingStyle === 'pixar' ? (
+                        <div className="bg-purple-50 rounded-xl aspect-square flex items-center justify-center border-2 border-purple-300">
+                          <div className="text-center">
+                            <div className="w-10 h-10 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-3"></div>
+                            <p className="text-purple-600 font-medium text-sm">Generating 3D…</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleGeneratePreview('pixar')}
+                          disabled={generatingPreview || (characterMode === 'photo' ? !formData.imageUrl : !formData.characterType)}
+                          className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl aspect-square flex items-center justify-center border-2 border-dashed border-purple-300 hover:border-purple-500 hover:from-purple-100 hover:to-blue-100 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed group w-full"
+                        >
+                          <div className="text-center p-4">
+                            <div className="text-5xl mb-3 group-hover:scale-110 transition-transform">✨</div>
+                            <p className="text-base font-bold text-gray-900 mb-2">3D Pixar</p>
+                            <p className="text-sm text-purple-700 font-bold group-hover:text-purple-800">Click to Generate</p>
+                          </div>
+                        </button>
+                      )}
                     </div>
-                  )}
-
-                  {/* Right: Animated Preview - CLICKABLE */}
-                  <div className="text-center">
-                    <p className="text-sm font-medium text-purple-700 mb-2">Animated Preview</p>
-
-                    {generatingPreview ? (
-                      /* Loading state */
-                      <div className="bg-purple-50 rounded-xl aspect-square flex items-center justify-center border-2 border-purple-300">
-                        <div className="text-center">
-                          <div className="w-10 h-10 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-3"></div>
-                          <p className="text-purple-600 font-medium text-sm">Generating styles...</p>
-                          <p className="text-xs text-purple-400 mt-1">~10 seconds</p>
-                        </div>
-                      </div>
-                    ) : (
-                      /* CLICKABLE BOX to generate or regenerate */
-                      <button
-                        type="button"
-                        onClick={handleGeneratePreview}
-                        disabled={generatingPreview || (characterMode === 'photo' ? !formData.imageUrl : !formData.characterType)}
-                        className="bg-gradient-to-br from-purple-50 to-amber-50 rounded-xl aspect-square flex items-center justify-center border-2 border-dashed border-purple-300 hover:border-purple-500 hover:from-purple-100 hover:to-amber-100 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed group w-full"
-                      >
-                        <div className="text-center p-4">
-                          <div className="text-5xl mb-3 group-hover:scale-110 transition-transform">✨</div>
-                          <p className="text-base font-bold text-gray-900 mb-2">Preview Styles</p>
-                          <p className="text-sm text-purple-600 font-bold group-hover:text-purple-700">
-                            {(previewOptions.pixar || previewOptions.classic) ? 'Click to Regenerate' : 'Click to Generate'}
-                          </p>
-                        </div>
-                      </button>
-                    )}
                   </div>
                 </div>
-              )}
-
-              {/* Generate Button - only shown before previews exist (regenerate is inline after) */}
-              {!(previewOptions.pixar || previewOptions.classic) && (
-                <button
-                  type="button"
-                  onClick={handleGeneratePreview}
-                  disabled={generatingPreview || (characterMode === 'photo' ? !formData.imageUrl : !formData.characterType)}
-                  className="mt-4 px-6 py-2 bg-gradient-to-r from-purple-600 to-amber-500 text-white rounded-lg hover:from-purple-700 hover:to-amber-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all"
-                >
-                  {generatingPreview
-                    ? 'Generating 2 Styles...'
-                    : 'Generate Preview Styles'}
-                </button>
               )}
 
               {/* Preview Error */}
@@ -1282,6 +1405,33 @@ export default function CharacterFormModal({
             </div>
           )}
         </div>
+
+        {/* Break into parts — only for saved characters that came from a multi-element
+            drawing (i.e., not themselves derived from a breakdown). */}
+        {onBreakdown &&
+          editingCharacter &&
+          !editingCharacter.derivedFromId &&
+          editingCharacter.animatedPreviewUrl && (
+          <div className="mt-6 border-t border-gray-200 pt-4">
+            <button
+              type="button"
+              onClick={() => onBreakdown(editingCharacter)}
+              className="group w-full text-left px-5 py-4 bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-xl hover:border-purple-400 hover:shadow-md transition-all"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-bold text-purple-900">Break into parts →</div>
+                  <div className="text-xs text-purple-700 mt-0.5">
+                    Extract individual characters or scene items from this drawing.
+                  </div>
+                </div>
+                <span className="px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-lg group-hover:bg-purple-700 transition-colors flex-shrink-0">
+                  Start
+                </span>
+              </div>
+            </button>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex gap-4 mt-6">

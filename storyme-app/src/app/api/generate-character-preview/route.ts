@@ -20,6 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientFromRequest } from '@/lib/supabase/server';
+import { logApiUsage } from '@/lib/utils/rate-limit';
 import {
   generateCharacterPreview,
   generateCharacterPreviewClassic,
@@ -30,7 +31,14 @@ import {
   detectSubjectType,
   isGeminiAvailable,
 } from '@/lib/gemini-image-client';
-import { CharacterDescription, SubjectType, normalizeImageProvider } from '@/lib/types/story';
+import {
+  CharacterDescription,
+  SubjectType,
+  ImageMedium,
+  normalizeImageProvider,
+  normalizeImageMedium,
+  isOpenAIProvider,
+} from '@/lib/types/story';
 import { resolveGeminiImageModel } from '@/lib/gemini-image-client';
 
 export const maxDuration = 120; // 2 minutes timeout
@@ -41,7 +49,8 @@ interface GeneratePreviewRequest {
   characterType?: string; // For description-only mode: "baby eagle", "friendly dragon", etc.
   subjectType?: SubjectType; // Pre-detected subject type from UI (avoids redundant detection)
   subjectDescription?: string; // Pre-detected description from UI
-  imageProvider?: string; // Image provider for Gemini model selection
+  imageProvider?: string; // Image provider — gemini-3.1 (default), gemini-2.5, openai-gpt-image-2, flux
+  medium?: ImageMedium; // Detected medium of reference image (real_photo / kid_creation / digital_art)
   style?: 'pixar' | 'classic'; // Optional - regenerate only one style instead of both
   description: {
     hairColor?: string;
@@ -76,13 +85,22 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: GeneratePreviewRequest = await request.json();
-    const { name, referenceImageUrl, characterType, subjectType: preDetectedType, subjectDescription: preDetectedDescription, description, imageProvider: requestedProvider, style: rawStyle } = body;
+    const { name, referenceImageUrl, characterType, subjectType: preDetectedType, subjectDescription: preDetectedDescription, description, imageProvider: requestedProvider, medium: requestedMedium, style: rawStyle } = body;
 
     // Validate optional style parameter
     const singleStyle = rawStyle === 'pixar' || rawStyle === 'classic' ? rawStyle : undefined;
 
-    // Resolve Gemini model ID from the provider selection
-    const geminiModelId = resolveGeminiImageModel(normalizeImageProvider(requestedProvider));
+    // Normalize provider + medium
+    const provider = normalizeImageProvider(requestedProvider);
+    const medium = normalizeImageMedium(requestedMedium);
+
+    // Resolve Gemini model ID — only used when provider is Gemini. Harmless when provider is openai
+    // (the generation function ignores modelId and delegates to the OpenAI sibling).
+    const geminiModelId = isOpenAIProvider(provider)
+      ? undefined
+      : resolveGeminiImageModel(provider);
+
+    console.log(`[API] Provider: ${provider}, Medium: ${medium}, Style: ${singleStyle || 'both'}`);
 
     // Validate required fields
     if (!name || !name.trim()) {
@@ -124,6 +142,7 @@ export async function POST(request: NextRequest) {
         characterType: characterType!,
         description: descriptionText,
         modelId: geminiModelId,
+        provider,
       };
 
       console.log(`[API] Generating from description: ${characterType} - ${descriptionText}`);
@@ -184,6 +203,8 @@ export async function POST(request: NextRequest) {
           referenceImageUrl: referenceImageUrl!,
           description: charDescription,
           modelId: geminiModelId,
+          provider,
+          medium,
         };
 
         console.log(`[API] Using human preview generation`);
@@ -206,6 +227,8 @@ export async function POST(request: NextRequest) {
           briefDescription: detectedDescription,
           additionalDetails: description?.otherFeatures,
           modelId: geminiModelId,
+          provider,
+          medium,
         };
 
         console.log(`[API] Using non-human preview generation for ${detectedSubjectType}`);
@@ -262,6 +285,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Telemetry — one log entry per successful style so we can compare provider/medium cost & latency.
+    // Provider/medium/style encoded in endpoint string for grep-ability (api_usage_logs has no metadata column).
+    const generatedStyles: string[] = [];
+    if (pixar) generatedStyles.push('pixar');
+    if (classic) generatedStyles.push('classic');
+
+    for (const style of generatedStyles) {
+      await logApiUsage({
+        userId: user.id,
+        endpoint: `/api/generate-character-preview?provider=${provider}&medium=${medium}&style=${style}&subject=${detectedSubjectType}`,
+        method: 'POST',
+        statusCode: 200,
+        responseTimeMs: style === 'pixar' && pixar ? Math.round(pixar.generationTime * 1000) : (classic ? Math.round(classic.generationTime * 1000) : 0),
+        imagesGenerated: 1,
+      });
+    }
+
     return NextResponse.json({
       success: true,
       previews: {
@@ -273,6 +313,9 @@ export async function POST(request: NextRequest) {
       // Return detected subject type so UI can adjust form fields
       subjectType: detectedSubjectType,
       subjectDescription: detectedDescription,
+      // Echo back resolved provider/medium so the UI can show what was used
+      provider,
+      medium,
       totalTime: (Date.now() - startTime) / 1000,
     });
 
