@@ -12,7 +12,6 @@ import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import type { PDFFormat, PDFLayout } from '@/lib/services/pdf.service';
 import ExportPdfModal from '@/components/pdf/ExportPdfModal';
-import CanvasEditor from '@/components/canvas-editor/CanvasEditor';
 import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeViewer';
 import Tooltip from '@/components/ui/Tooltip';
 import TagSelector from '@/components/story/TagSelector';
@@ -31,8 +30,8 @@ export default function StoryViewerPage() {
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [showPdfDropdown, setShowPdfDropdown] = useState(false);
   const [showPdfModal, setShowPdfModal] = useState(false);
-  const [showCanvasEditor, setShowCanvasEditor] = useState(false);
-  const [editorConfig, setEditorConfig] = useState<{ format: PDFFormat; layout: PDFLayout } | null>(null);
+  // Canvas editor support is in-flight on a separate branch; refs removed here so the
+  // committed page builds without the unpushed component. Restore when canvas-editor lands.
   const [readingMode, setReadingMode] = useState(false);
   const [readingPages, setReadingPages] = useState<ReadingPage[]>([]);
   const [loadingAudio, setLoadingAudio] = useState(false);
@@ -1662,10 +1661,9 @@ export default function StoryViewerPage() {
                       setShowPdfModal(false);
                       handleDownloadPDF(format, layout);
                     }}
-                    onCustomize={(format, layout) => {
+                    onCustomize={() => {
+                      // Canvas editor disabled in this build (component lives on an unpushed branch).
                       setShowPdfModal(false);
-                      setEditorConfig({ format, layout });
-                      setShowCanvasEditor(true);
                     }}
                     exporting={generatingPDF}
                     savedCanvasState={project?.canvasState}
@@ -1825,35 +1823,7 @@ export default function StoryViewerPage() {
         />
       )}
 
-      {/* Canvas Editor */}
-      {showCanvasEditor && editorConfig && project && (
-        <CanvasEditor
-          storyData={{
-            title: project.title,
-            description: project.description,
-            coverImageUrl: project.coverImageUrl,
-            scenes: (project.scenes || [])
-              .filter((s: any) => s.images?.length > 0)
-              .sort((a: any, b: any) => a.sceneNumber - b.sceneNumber)
-              .map((s: any) => ({
-                sceneNumber: s.sceneNumber,
-                caption: s.caption || s.description,
-                caption_chinese: s.captionChinese || s.caption_chinese,
-                caption_secondary: s.captionSecondary || s.caption_secondary || s.captionChinese,
-                description: s.description,
-                imageUrl: s.images[0].imageUrl,
-              })),
-          }}
-          format={editorConfig.format}
-          layout={editorConfig.layout}
-          savedCanvasState={project.canvasState}
-          projectId={projectId}
-          onClose={() => {
-            setShowCanvasEditor(false);
-            setEditorConfig(null);
-          }}
-        />
-      )}
+      {/* Canvas Editor: removed in this build — see comment near state declarations above. */}
 
       {/* Public Confirmation Modal */}
       {showPublicConfirm && (
