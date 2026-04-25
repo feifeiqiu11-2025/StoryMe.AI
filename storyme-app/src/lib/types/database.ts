@@ -50,6 +50,13 @@ export interface CharacterLibrary {
   lora_trained_at?: string;
   art_style_preference?: 'cartoon' | 'watercolor' | 'realistic';
 
+  // Subject type (20260112): human | animal | creature | object | scenery
+  subject_type?: string;
+
+  // Designer info (20260322): child artist's name + age
+  designer_name?: string | null;
+  designer_age?: number | null;
+
   // Breakdown feature (20260423): extracted characters vs. scene elements
   // + traceability back to the source multi-element character.
   role?: 'character' | 'scene_element';

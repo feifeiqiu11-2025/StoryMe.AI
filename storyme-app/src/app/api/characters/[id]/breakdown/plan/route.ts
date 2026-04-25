@@ -26,6 +26,12 @@ const MAX_ELEMENTS = 8;
 const MIN_BBOX_AREA_FRACTION = 0.02; // reject bboxes smaller than 2% of image
 const OUTPUT_SIZE = 1024;
 
+// Fractional margin applied to each side of Gemini's bbox before cropping.
+// Gemini returns tight bboxes, so any minor inaccuracy (±10-20 px) clips limbs
+// or wands. A small uniform expansion absorbs that error at the cost of a bit
+// of surrounding whitespace. 0.10 = 10% of the longer edge on each side.
+const BBOX_MARGIN_FRACTION = 0.10;
+
 interface PlanRequest {
   instruction: string;
 }
@@ -55,6 +61,25 @@ function normalizedToPixel(
   if (width <= 0 || height <= 0) return null;
 
   return { left: pxX1, top: pxY1, width, height };
+}
+
+/**
+ * Expand a pixel rect by a fraction of its longer edge on each side, clamped
+ * to image bounds. Counters Gemini's tight bbox output which sometimes clips
+ * limbs, wands, or flowing clothing by a few pixels.
+ */
+function expandRect(
+  rect: { left: number; top: number; width: number; height: number },
+  imageWidth: number,
+  imageHeight: number,
+  marginFraction: number
+): { left: number; top: number; width: number; height: number } {
+  const margin = Math.round(Math.max(rect.width, rect.height) * marginFraction);
+  const left = Math.max(0, rect.left - margin);
+  const top = Math.max(0, rect.top - margin);
+  const right = Math.min(imageWidth, rect.left + rect.width + margin);
+  const bottom = Math.min(imageHeight, rect.top + rect.height + margin);
+  return { left, top, width: right - left, height: bottom - top };
 }
 
 /** Slugify a name for the storage filename. */
@@ -144,17 +169,21 @@ export async function POST(
     for (const box of withBboxes) {
       if (!box.bbox) continue;
 
-      const pixelRect = normalizedToPixel(box.bbox, imageWidth, imageHeight);
-      if (!pixelRect) {
+      const tightRect = normalizedToPixel(box.bbox, imageWidth, imageHeight);
+      if (!tightRect) {
         rejected.push(`${box.name} (degenerate bbox)`);
         continue;
       }
-      if (pixelRect.width * pixelRect.height < minArea) {
+      // Area check uses the tight rect so noise-level bboxes still get filtered.
+      if (tightRect.width * tightRect.height < minArea) {
         rejected.push(`${box.name} (too small to extract)`);
         continue;
       }
 
-      // Crop the region from the rotated source
+      // Expand the bbox before cropping to avoid clipping limbs/wands/hats.
+      const pixelRect = expandRect(tightRect, imageWidth, imageHeight, BBOX_MARGIN_FRACTION);
+
+      // Crop the padded region from the rotated source
       const cropped = await sharp(rotatedBuffer)
         .extract(pixelRect)
         .toBuffer();

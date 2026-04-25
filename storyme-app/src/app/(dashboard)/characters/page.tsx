@@ -105,6 +105,7 @@ export default function CharactersPage() {
     characterType: '', // For description-only mode: "baby eagle", "friendly dragon", etc.
     designerName: '',
     designerAge: '',
+    role: 'character' as 'character' | 'scene_element',
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [analyzingImage, setAnalyzingImage] = useState(false); // Shows overlay while AI analyzes
@@ -137,7 +138,7 @@ export default function CharactersPage() {
   const [analysisFailed, setAnalysisFailed] = useState(false);
   // Admin image-model override (defaults to ChatGPT for character experiment)
   const [providerOverride, setProviderOverride] = useState<ImageProvider | null>(null);
-  const effectiveProvider: ImageProvider = providerOverride ?? 'openai-gpt-image-2';
+  const effectiveProvider: ImageProvider = providerOverride ?? 'gemini-3.1';
   // Public toggle confirmation modal
   const [publicModalCharacter, setPublicModalCharacter] = useState<{ id: string; name: string; makePublic: boolean } | null>(null);
   // Admin state for featured toggle
@@ -199,6 +200,7 @@ export default function CharactersPage() {
         designerName: char.designer_name ?? undefined,
         designerAge: char.designer_age ?? undefined,
         derivedFromId: char.derived_from_id ?? undefined,
+        role: (char.role as 'character' | 'scene_element' | undefined) ?? 'character',
       }));
 
       setCharacters(transformedCharacters);
@@ -442,6 +444,7 @@ export default function CharactersPage() {
         characterType: parsedCharacterType,
         designerName: character.designerName || '',
         designerAge: character.designerAge ? String(character.designerAge) : '',
+        role: character.role ?? 'character',
       });
       // Restore preview if character has an animated preview URL
       if (character.animatedPreviewUrl) {
@@ -485,6 +488,7 @@ export default function CharactersPage() {
         characterType: '',
         designerName: '',
         designerAge: '',
+        role: 'character',
       });
       setPreviewOptions({ pixar: null, classic: null });
       setSelectedStyle(null);
@@ -520,6 +524,7 @@ export default function CharactersPage() {
       characterType: '',
       designerName: '',
       designerAge: '',
+      role: 'character',
     });
   };
 
@@ -973,6 +978,7 @@ export default function CharactersPage() {
         subject_type: subjectType,
         designer_name: formData.designerName.trim() || null,
         designer_age: formData.designerAge ? parseInt(formData.designerAge, 10) : null,
+        role: formData.role,
       };
 
       console.log('Saving character data:', characterData);
@@ -1925,6 +1931,58 @@ export default function CharactersPage() {
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* Use as — compact role picker, sits above Designer Info */}
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <p className="text-sm font-medium text-gray-700 mb-2">Use as</p>
+                <div className="flex gap-5 text-sm">
+                  {/* Character option — fully custom indicator, doesn't depend on native radio styling */}
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, role: 'character' })}
+                    className="inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <span
+                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${
+                        formData.role === 'character'
+                          ? 'border-purple-600 bg-white'
+                          : 'border-gray-400 bg-white hover:border-gray-500'
+                      }`}
+                    >
+                      {formData.role === 'character' && (
+                        <span className="w-2 h-2 rounded-full bg-purple-600" />
+                      )}
+                    </span>
+                    <span className={formData.role === 'character' ? 'text-gray-900 font-medium' : 'text-gray-700'}>
+                      Character
+                    </span>
+                    <span className="text-xs text-gray-400">(protagonist / supporting)</span>
+                  </button>
+
+                  {/* Scene element option */}
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, role: 'scene_element' })}
+                    className="inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <span
+                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${
+                        formData.role === 'scene_element'
+                          ? 'border-amber-600 bg-white'
+                          : 'border-gray-400 bg-white hover:border-gray-500'
+                      }`}
+                    >
+                      {formData.role === 'scene_element' && (
+                        <span className="w-2 h-2 rounded-full bg-amber-600" />
+                      )}
+                    </span>
+                    <span className={formData.role === 'scene_element' ? 'text-gray-900 font-medium' : 'text-gray-700'}>
+                      Scene element
+                    </span>
+                    <span className="text-xs text-gray-400">(setting / prop)</span>
+                  </button>
+                </div>
               </div>
 
               {/* Designer Info (optional) */}

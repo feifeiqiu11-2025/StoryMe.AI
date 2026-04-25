@@ -138,7 +138,7 @@ export default function CharacterFormModal({
   // Story generation still uses the parent's provider — this only affects character preview.
   const [isAdmin, setIsAdmin] = useState(false);
   const [providerOverride, setProviderOverride] = useState<ImageProvider | null>(null);
-  const effectiveProvider: ImageProvider = providerOverride ?? 'openai-gpt-image-2';
+  const effectiveProvider: ImageProvider = providerOverride ?? 'gemini-3.1';
 
   // Load admin status on mount
   useEffect(() => {
