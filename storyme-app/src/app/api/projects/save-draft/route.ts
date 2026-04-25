@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
       characterIds,
       scenes,
       draftMetadata,
+      storyBible,  // Optional: story-bible payload (locations + resolved scenes) from enhance-scenes
     } = body;
 
     // Validate: must have at least something to save
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest) {
         ...draftMetadata,
         savedAt: new Date().toISOString(),
       },
+      storyBible: storyBible ?? null,
     });
 
     await log(200);

@@ -639,7 +639,9 @@ PROPORTIONS: Normal, healthy body proportions - not overly fat or chubby. If "bi
 
 IMPORTANT:
 - Generate an ILLUSTRATED 3D animated image, NOT a photograph
-- Reference photos show face/hair features only - transform into cute 3D animated characters
+- Characters WITH a reference image: the IMAGE is the AUTHORITATIVE source for visual identity (species, body shape, distinguishing features). If the name and the image disagree, FOLLOW THE IMAGE. Always render in the story's art style (no photo realism).
+- Characters WITHOUT a reference image: use the name and description text.
+- Blend each reference naturally into the scene — match the scene's lighting, perspective, and art style; render as a character or scene element based on context. No flat overlays.
 - NO religious figures (Jesus, Buddha, etc.)
 ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? `- CRITICAL: Human children have HUMAN faces. Animals have ANIMAL faces. NEVER mix - no human-animal hybrids, no human body with animal head, no animal body with human face.` : ''}
 
@@ -845,8 +847,9 @@ PROPORTIONS: Normal, healthy body proportions - not overly fat or chubby. If "bi
 
 IMPORTANT:
 - Generate a DIGITAL ILLUSTRATION, NOT a photograph, NOT watercolor
-- Characters MUST closely match reference photos (face shape, skin tone, hair color/style)
-- Transform into cute cartoon style while keeping recognizable likeness
+- Characters WITH a reference image: the IMAGE is the AUTHORITATIVE source for visual identity (species, body shape, distinguishing features). If the name and the image disagree, FOLLOW THE IMAGE. Always render in the story's art style (no photo realism).
+- Characters WITHOUT a reference image: use the name and description text.
+- Blend each reference naturally into the scene — match the scene's lighting, perspective, and art style; render as a character or scene element based on context. No flat overlays.
 - NO religious figures (Jesus, Buddha, etc.)
 ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? `- CRITICAL: Human children have HUMAN faces. Animals have ANIMAL faces. NEVER mix - no human-animal hybrids, no human body with animal head, no animal body with human face.` : ''}
 
@@ -1049,8 +1052,9 @@ MANDATORY REQUIREMENTS:
 PROPORTIONS: Normal healthy body proportions. If "big" is mentioned, interpret as LARGE/TALL, NOT fat.
 
 CHARACTER GUIDELINES:
-- Match reference photos for face shape and hair style
-- Render as simple LINE ART outlines only
+- Characters WITH a reference image: the IMAGE is the AUTHORITATIVE source for visual identity (species, body shape, distinguishing features). If the name and the image disagree, FOLLOW THE IMAGE. Render as simple BLACK LINE ART only — no color from the reference.
+- Characters WITHOUT a reference image: use the name and description text.
+- Blend each reference naturally into the scene as line art — match the perspective and outline style; render as a character or scene element based on context. No flat overlays.
 - NO religious figures
 ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? `- Human children have HUMAN faces. Animals have ANIMAL faces. NEVER mix.` : ''}
 

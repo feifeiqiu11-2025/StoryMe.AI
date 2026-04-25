@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { GeneratedImage, Character, ImageProvider, ClothingConsistency, EnhancedScene } from '@/lib/types/story';
 import { getLanguageLabel } from '@/lib/config/languages';
 import { detectCharactersInInstruction } from '@/lib/utils/character-matcher';
@@ -29,6 +29,14 @@ interface ImageGalleryProps {
   onTitleEdit?: (newTitle: string) => void;
   onDescriptionEdit?: (newDescription: string) => void;
   secondaryLanguage?: string | null;
+  // Story bible: enables Characters/Scene chip split display + chip editing (when edit
+  // handlers are provided). Edits update parent state and mark scenes stale; they don't
+  // trigger an inline image regeneration (a single-scene regen would desync the other
+  // scenes' settings, so we defer applying chip edits until the next full generation).
+  storyBible?: import('@/lib/ai/scene-enhancer').StoryBibleResult | null;
+  onSceneCharactersChange?: (sceneNumber: number, resolvedCharacterNames: string[]) => void;
+  onSceneLocationChange?: (sceneNumber: number, locationTempId: string) => void;
+  onRequestAddCharacter?: (sceneNumber: number) => void;
 }
 
 export default function ImageGallery({
@@ -49,7 +57,40 @@ export default function ImageGallery({
   onTitleEdit,
   onDescriptionEdit,
   secondaryLanguage,
+  storyBible = null,
+  onSceneCharactersChange,
+  onSceneLocationChange,
+  onRequestAddCharacter,
 }: ImageGalleryProps) {
+  // Scene-swap popover — one open at a time, keyed by scene number.
+  const [swapSceneForScene, setSwapSceneForScene] = useState<number | null>(null);
+  // Outside-click closes the open popover.
+  const swapPopoverWrapperRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (swapSceneForScene === null) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (swapPopoverWrapperRef.current && !swapPopoverWrapperRef.current.contains(e.target as Node)) {
+        setSwapSceneForScene(null);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [swapSceneForScene]);
+  // Bible lookups (identical shape to ScenePreviewApproval — empty when bible absent → fallback display).
+  const bibleSceneByNumber = React.useMemo(() => {
+    const map = new Map<number, { location_temp_id?: string | null; resolved_character_names?: string[] }>();
+    storyBible?.scenes?.forEach(s => {
+      if (typeof s.sceneNumber === 'number') map.set(s.sceneNumber, s);
+    });
+    return map;
+  }, [storyBible]);
+  const bibleLocationByTempId = React.useMemo(() => {
+    const map = new Map<string, { name: string; description: string; backing_character_name?: string | null }>();
+    storyBible?.locations?.forEach(loc => {
+      if (loc.temp_id) map.set(loc.temp_id, loc);
+    });
+    return map;
+  }, [storyBible]);
   // Debug logging
   console.log('[ImageGallery] Rendering with', {
     imageCount: generatedImages.length,
@@ -436,11 +477,140 @@ export default function ImageGallery({
                       </>
                     );
                   })()}
-                  {image.characterRatings && image.characterRatings.length > 0 && (
-                    <p className="text-xs text-blue-600 mt-2">
-                      Characters: {image.characterRatings.map(r => r.characterName).join(', ')}
-                    </p>
-                  )}
+                  {/* Characters + Scene chip display with editing. Chip edits update parent
+                      state but do not trigger inline image regeneration (see ImageGalleryProps
+                      comment on storyBible). When bible is absent, falls back to plain text. */}
+                  {(() => {
+                    const bibleScene = bibleSceneByNumber.get(image.sceneNumber);
+                    const bibleLocation = bibleScene?.location_temp_id
+                      ? bibleLocationByTempId.get(bibleScene.location_temp_id)
+                      : undefined;
+
+                    if (bibleScene || bibleLocation) {
+                      const backingName = bibleLocation?.backing_character_name?.toLowerCase();
+                      const fallbackNames = image.characterRatings?.map(r => r.characterName) ?? [];
+                      let charsForDisplay: string[] = bibleScene?.resolved_character_names ?? fallbackNames;
+                      if (backingName) {
+                        charsForDisplay = charsForDisplay.filter(c => c.toLowerCase() !== backingName);
+                      }
+
+                      const editingChars = !!(onSceneCharactersChange && bibleScene);
+                      const editingLocation = !!(onSceneLocationChange && bibleScene && bibleLocation);
+                      const canAddChar = editingChars && !!onRequestAddCharacter;
+                      const swappableLocations = editingLocation && storyBible?.locations
+                        ? storyBible.locations.filter(l => l.temp_id !== bibleScene.location_temp_id)
+                        : [];
+
+                      return (
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+                          {(charsForDisplay.length > 0 || canAddChar) && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-xs text-gray-500">Characters:</span>
+                              {charsForDisplay.map((name, i) => (
+                                <span
+                                  key={i}
+                                  className="text-xs pl-2 pr-1 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700 inline-flex items-center gap-1"
+                                >
+                                  <span>{name}</span>
+                                  {editingChars && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onSceneCharactersChange!(
+                                        image.sceneNumber,
+                                        charsForDisplay.filter(c => c !== name)
+                                      )}
+                                      className="rounded-full p-0.5 hover:bg-black/10"
+                                      aria-label={`Remove ${name} from scene ${image.sceneNumber}`}
+                                      title={`Remove ${name} from this scene`}
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 6l12 12M6 18L18 6" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </span>
+                              ))}
+                              {canAddChar && (
+                                <button
+                                  type="button"
+                                  onClick={() => onRequestAddCharacter!(image.sceneNumber)}
+                                  className="text-xs px-2 py-0.5 rounded-full font-medium border border-dashed border-gray-300 text-gray-500 hover:text-blue-700 hover:border-blue-400 hover:bg-blue-50 inline-flex items-center gap-0.5"
+                                  aria-label={`Add a character from library to scene ${image.sceneNumber}`}
+                                  title="Import a character from your library"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                  </svg>
+                                  Add
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {bibleLocation && (
+                            <div
+                              ref={swapSceneForScene === image.sceneNumber ? swapPopoverWrapperRef : undefined}
+                              className="flex flex-wrap items-center gap-1.5 relative"
+                            >
+                              <span className="text-xs text-gray-500">Scene:</span>
+                              {editingLocation ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSwapSceneForScene(prev =>
+                                    prev === image.sceneNumber ? null : image.sceneNumber
+                                  )}
+                                  className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200 inline-flex items-center gap-1"
+                                  title={bibleLocation.description}
+                                  aria-expanded={swapSceneForScene === image.sceneNumber}
+                                >
+                                  {bibleLocation.backing_character_name || bibleLocation.name}
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                              ) : (
+                                <span
+                                  className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-100 text-emerald-700 border border-emerald-200"
+                                  title={bibleLocation.description}
+                                >
+                                  {bibleLocation.backing_character_name || bibleLocation.name}
+                                </span>
+                              )}
+                              {swapSceneForScene === image.sceneNumber && swappableLocations.length > 0 && (
+                                <div
+                                  className="absolute z-20 mt-1 top-full left-0 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[12rem] max-h-60 overflow-y-auto"
+                                  role="listbox"
+                                >
+                                  {swappableLocations.map(loc => (
+                                    <button
+                                      key={`swap-${loc.temp_id}`}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onSceneLocationChange!(image.sceneNumber, loc.temp_id);
+                                        setSwapSceneForScene(null);
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-emerald-50"
+                                      role="option"
+                                      title={loc.description}
+                                    >
+                                      {loc.name}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    // Legacy fallback (non-bible stories): plain text list
+                    return image.characterRatings && image.characterRatings.length > 0 ? (
+                      <p className="text-xs text-blue-600 mt-2">
+                        Characters: {image.characterRatings.map(r => r.characterName).join(', ')}
+                      </p>
+                    ) : null;
+                  })()}
 
                   {/* Edit Image Button - Uses Gemini for text-guided image editing */}
                   {image.status === 'completed' && image.imageUrl && onRegenerateScene && (
@@ -452,6 +622,7 @@ export default function ImageGallery({
                         illustrationStyle={artStyle === 'classic' ? 'classic' : artStyle === 'coloring' ? 'coloring' : 'pixar'}
                         sceneDescription={image.sceneDescription}
                         characters={characters}
+                        bibleLocations={storyBible?.locations ?? undefined}
                         onEditComplete={(newImageUrl) => onRegenerateScene(image.id, {
                           ...image,
                           imageUrl: newImageUrl,

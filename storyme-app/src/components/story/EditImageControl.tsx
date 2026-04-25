@@ -13,7 +13,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { ImageProvider, Character } from '@/lib/types/story';
-import { detectCharactersInInstruction, DetectedCharacter } from '@/lib/utils/character-matcher';
+import { detectCharactersInInstruction, DetectedCharacter, detectLocationsInInstruction, DetectedLocation } from '@/lib/utils/character-matcher';
 
 interface EditImageControlProps {
   currentImageUrl: string;
@@ -29,6 +29,8 @@ interface EditImageControlProps {
   imageProvider?: ImageProvider;
   /** Story characters for auto-detection in edit instructions */
   characters?: Character[];
+  /** Story-bible locations for auto-detection (so "Enchanted Forest" gets picked up when it's a bible location, not a library character) */
+  bibleLocations?: Array<{ temp_id: string; name: string; description: string; reference_image_url?: string | null; backing_character_name?: string | null }>;
 }
 
 /** Resize an image file/blob to max dimension, returns base64 data URL */
@@ -70,6 +72,7 @@ export default function EditImageControl({
   sceneDescription,
   imageProvider,
   characters,
+  bibleLocations,
 }: EditImageControlProps) {
   // Core state
   const [isExpanded, setIsExpanded] = useState(false);
@@ -80,6 +83,9 @@ export default function EditImageControl({
   // Character detection state
   const [detectedCharacters, setDetectedCharacters] = useState<DetectedCharacter[]>([]);
   const [dismissedCharacterIds, setDismissedCharacterIds] = useState<Set<string>>(new Set());
+  // Bible-location detection state (so "Enchanted Forest" gets picked up when it's a bible location, not a library char)
+  const [detectedLocations, setDetectedLocations] = useState<DetectedLocation[]>([]);
+  const [dismissedLocationTempIds, setDismissedLocationTempIds] = useState<Set<string>>(new Set());
 
   // Manual reference image state
   const [manualReferenceImage, setManualReferenceImage] = useState<string | null>(null);
@@ -104,9 +110,28 @@ export default function EditImageControl({
     return () => clearTimeout(timer);
   }, [instruction, characters, dismissedCharacterIds]);
 
+  // Auto-detect bible locations in parallel (debounced). Without this "Enchanted Forest"
+  // is never detected because it's a bible location, not a library Character.
+  useEffect(() => {
+    if (!bibleLocations?.length || !instruction.trim()) {
+      setDetectedLocations([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      const detected = detectLocationsInInstruction(instruction, bibleLocations, dismissedLocationTempIds);
+      setDetectedLocations(detected);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [instruction, bibleLocations, dismissedLocationTempIds]);
+
   const dismissCharacter = useCallback((characterId: string) => {
     setDismissedCharacterIds(prev => new Set(prev).add(characterId));
     setDetectedCharacters(prev => prev.filter(d => d.character.id !== characterId));
+  }, []);
+
+  const dismissLocation = useCallback((tempId: string) => {
+    setDismissedLocationTempIds(prev => new Set(prev).add(tempId));
+    setDetectedLocations(prev => prev.filter(d => d.tempId !== tempId));
   }, []);
 
   // Handle file upload for manual reference
@@ -138,15 +163,27 @@ export default function EditImageControl({
     }
   }, [handleFileSelect]);
 
-  // Build character references for the API
+  // Build character references for the API. Includes both detected characters AND
+  // detected bible locations (as scenery references) so their images flow through
+  // to the regen pipeline the same way.
   const buildCharacterReferences = useCallback(() => {
-    if (detectedCharacters.length === 0) return undefined;
-    return detectedCharacters.map(({ character }) => ({
+    const charRefs = detectedCharacters.map(({ character }) => ({
       name: character.name,
       description: character.description?.fullDescription || undefined,
       referenceImageUrl: character.animatedPreviewUrl || character.referenceImage?.url || '',
     })).filter(ref => ref.referenceImageUrl);
-  }, [detectedCharacters]);
+
+    const locRefs = detectedLocations
+      .filter(l => l.referenceImageUrl)
+      .map(l => ({
+        name: l.name,
+        description: l.description,
+        referenceImageUrl: l.referenceImageUrl as string,
+      }));
+
+    const combined = [...charRefs, ...locRefs];
+    return combined.length > 0 ? combined : undefined;
+  }, [detectedCharacters, detectedLocations]);
 
   const handleEdit = async () => {
     if (!instruction.trim()) {
@@ -322,13 +359,13 @@ export default function EditImageControl({
         </p>
       </div>
 
-      {/* Detected Characters */}
-      {detectedCharacters.length > 0 && (
+      {/* Detected Characters + Scenes */}
+      {(detectedCharacters.length > 0 || detectedLocations.length > 0) && (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-gray-500">Detected:</span>
           {detectedCharacters.map(({ character }) => (
             <span
-              key={character.id}
+              key={`c-${character.id}`}
               className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium"
             >
               {character.name}
@@ -337,6 +374,25 @@ export default function EditImageControl({
                 onClick={() => dismissCharacter(character.id)}
                 className="text-purple-400 hover:text-purple-600 ml-0.5"
                 aria-label={`Remove ${character.name}`}
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          ))}
+          {detectedLocations.map(loc => (
+            <span
+              key={`l-${loc.tempId}`}
+              className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full text-xs font-medium"
+              title={loc.description}
+            >
+              {loc.name}
+              <button
+                type="button"
+                onClick={() => dismissLocation(loc.tempId)}
+                className="text-emerald-500 hover:text-emerald-700 ml-0.5"
+                aria-label={`Remove ${loc.name}`}
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

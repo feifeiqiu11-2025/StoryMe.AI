@@ -12,10 +12,12 @@ import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import type { PDFFormat, PDFLayout } from '@/lib/services/pdf.service';
 import ExportPdfModal from '@/components/pdf/ExportPdfModal';
+import CanvasEditor from '@/components/canvas-editor/CanvasEditor';
 import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeViewer';
 import Tooltip from '@/components/ui/Tooltip';
 import TagSelector from '@/components/story/TagSelector';
 import { getLanguageLabel } from '@/lib/config/languages';
+import { isAdminEmail } from '@/lib/auth/isAdmin';
 
 export default function StoryViewerPage() {
   const router = useRouter();
@@ -29,6 +31,8 @@ export default function StoryViewerPage() {
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [showPdfDropdown, setShowPdfDropdown] = useState(false);
   const [showPdfModal, setShowPdfModal] = useState(false);
+  const [showCanvasEditor, setShowCanvasEditor] = useState(false);
+  const [editorConfig, setEditorConfig] = useState<{ format: PDFFormat; layout: PDFLayout } | null>(null);
   const [readingMode, setReadingMode] = useState(false);
   const [readingPages, setReadingPages] = useState<ReadingPage[]>([]);
   const [loadingAudio, setLoadingAudio] = useState(false);
@@ -245,6 +249,41 @@ export default function StoryViewerPage() {
       }
     } catch (error) {
       console.error('Error checking Spotify status:', error);
+    }
+  };
+
+  // Admin-only: revert this story to draft and open it in the create flow
+  // (lands on the image review page since the project already has scenes + images).
+  // Refuses if the story is currently public — admin should make it private first.
+  const handleAdminEditStory = async () => {
+    if (!project) return;
+
+    if (project.visibility === 'public') {
+      alert('This story is currently public. Please make it private first, then click Edit again.');
+      return;
+    }
+
+    const ok = window.confirm(
+      `Edit "${project.title}"?\n\nThis will move the story back to draft status so you can change scenes and regenerate images. The story will not be deleted.`
+    );
+    if (!ok) return;
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'draft' }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `Failed to revert to draft (${response.status})`);
+      }
+      // Hand off to the create page's existing draft-resume flow.
+      // The create page reads `projectId` from search params (not `resumeProjectId`).
+      router.push(`/create?projectId=${projectId}`);
+    } catch (error) {
+      console.error('[admin-edit] Failed:', error);
+      alert(error instanceof Error ? error.message : 'Failed to start editing');
     }
   };
 
@@ -1464,6 +1503,18 @@ export default function StoryViewerPage() {
                   Story Actions
                 </h3>
                 <div className="flex flex-wrap gap-2">
+                  {/* Admin-only: Edit story — reverts to draft and opens the create flow */}
+                  {isAdminEmail(user?.email) && (
+                    <Tooltip text="Admin: revert to draft and edit scenes/images in the create flow">
+                      <button
+                        onClick={handleAdminEditStory}
+                        className="flex items-center gap-2 px-4 py-2 text-sm bg-amber-100 text-amber-800 border border-amber-300 rounded-lg hover:bg-amber-200 font-medium transition-all"
+                      >
+                        <span>✏️</span>
+                        <span>Edit</span>
+                      </button>
+                    </Tooltip>
+                  )}
                   {/* Read Mode */}
                   <Tooltip text="Read this story in fullscreen mode with narration">
                     <button
@@ -1583,8 +1634,8 @@ export default function StoryViewerPage() {
                     </button>
                   </Tooltip>
 
-                  {/* Export PDF */}
-                  <Tooltip text="Download this story as a PDF file">
+                  {/* Customize & Export */}
+                  <Tooltip text="Customize and export your story as a PDF">
                     <button
                       onClick={() => setShowPdfModal(true)}
                       disabled={generatingPDF}
@@ -1598,7 +1649,7 @@ export default function StoryViewerPage() {
                       ) : (
                         <>
                           <span>📄</span>
-                          <span>Export PDF</span>
+                          <span>Customize & Export</span>
                         </>
                       )}
                     </button>
@@ -1611,7 +1662,13 @@ export default function StoryViewerPage() {
                       setShowPdfModal(false);
                       handleDownloadPDF(format, layout);
                     }}
+                    onCustomize={(format, layout) => {
+                      setShowPdfModal(false);
+                      setEditorConfig({ format, layout });
+                      setShowCanvasEditor(true);
+                    }}
                     exporting={generatingPDF}
+                    savedCanvasState={project?.canvasState}
                   />
                 </div>
               </div>
@@ -1765,6 +1822,36 @@ export default function StoryViewerPage() {
           pages={readingPages}
           onExit={() => setReadingMode(false)}
           secondaryLanguage={project?.secondaryLanguage}
+        />
+      )}
+
+      {/* Canvas Editor */}
+      {showCanvasEditor && editorConfig && project && (
+        <CanvasEditor
+          storyData={{
+            title: project.title,
+            description: project.description,
+            coverImageUrl: project.coverImageUrl,
+            scenes: (project.scenes || [])
+              .filter((s: any) => s.images?.length > 0)
+              .sort((a: any, b: any) => a.sceneNumber - b.sceneNumber)
+              .map((s: any) => ({
+                sceneNumber: s.sceneNumber,
+                caption: s.caption || s.description,
+                caption_chinese: s.captionChinese || s.caption_chinese,
+                caption_secondary: s.captionSecondary || s.caption_secondary || s.captionChinese,
+                description: s.description,
+                imageUrl: s.images[0].imageUrl,
+              })),
+          }}
+          format={editorConfig.format}
+          layout={editorConfig.layout}
+          savedCanvasState={project.canvasState}
+          projectId={projectId}
+          onClose={() => {
+            setShowCanvasEditor(false);
+            setEditorConfig(null);
+          }}
         />
       )}
 

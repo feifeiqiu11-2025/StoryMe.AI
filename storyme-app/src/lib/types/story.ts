@@ -149,6 +149,9 @@ export interface Character {
   // this holds the source character's id. Used to hide the "Break into parts"
   // button on already-derived characters.
   derivedFromId?: string;
+  // Classification: normal 'character' (default) vs. 'scene_element' (background/setting).
+  // Set during breakdown or editable on the character form.
+  role?: 'character' | 'scene_element';
 }
 
 export interface Scene {
@@ -181,6 +184,10 @@ export interface EnhancedScene {
   isCover?: boolean;             // true if this is the cover (sceneNumber === 0)
   storyTitle?: string;           // Story title (only for cover/Scene 0)
   storyDescription?: string;     // Story description (only for cover/Scene 0)
+
+  // Story-bible fields (populated only when enhance-scenes runs with enableStoryBible=true)
+  location_temp_id?: string | null;        // References StoryBibleResult.locations[].temp_id
+  resolved_character_names?: string[];     // Pronoun-resolved character names present in this scene
 }
 
 // Enhanced scene with generated image

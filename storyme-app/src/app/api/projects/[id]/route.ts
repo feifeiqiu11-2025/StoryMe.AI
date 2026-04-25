@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ProjectService } from '@/lib/services/project.service';
+import { isAdminEmail } from '@/lib/auth/isAdmin';
 
 export async function GET(
   request: NextRequest,
@@ -74,10 +75,18 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { visibility } = body;
+    const { visibility, canvas_state, status } = body;
 
-    // Validate visibility
-    if (!visibility || (visibility !== 'private' && visibility !== 'public')) {
+    // Must provide at least one field to update
+    if (!visibility && canvas_state === undefined && !status) {
+      return NextResponse.json(
+        { error: 'No update fields provided' },
+        { status: 400 }
+      );
+    }
+
+    // Validate visibility if provided
+    if (visibility && visibility !== 'private' && visibility !== 'public') {
       return NextResponse.json(
         { error: 'Invalid visibility value. Must be "private" or "public"' },
         { status: 400 }
@@ -95,28 +104,84 @@ export async function PATCH(
       );
     }
 
-    // Reject visibility changes for draft projects
-    const { data: project } = await supabase
-      .from('projects')
-      .select('status')
-      .eq('id', id)
-      .single();
+    const projectService = new ProjectService(supabase);
 
-    if (project?.status === 'draft') {
-      return NextResponse.json(
-        { error: 'Draft stories cannot be made public. Complete the story first.' },
-        { status: 400 }
-      );
+    // Handle visibility update
+    if (visibility) {
+      // Reject visibility changes for draft projects
+      const { data: project } = await supabase
+        .from('projects')
+        .select('status')
+        .eq('id', id)
+        .single();
+
+      if (project?.status === 'draft') {
+        return NextResponse.json(
+          { error: 'Draft stories cannot be made public. Complete the story first.' },
+          { status: 400 }
+        );
+      }
+
+      await projectService.updateProject(id, user.id, { visibility });
     }
 
-    // Update project visibility
-    const projectService = new ProjectService(supabase);
-    await projectService.updateProject(id, user.id, { visibility });
+    // Handle canvas_state update
+    if (canvas_state !== undefined) {
+      await projectService.updateProject(id, user.id, { canvas_state });
+    }
+
+    // Handle status revert (admin-only) — used by the admin "Edit" button on the
+    // story detail page to move a completed story back into the create-flow's
+    // resume-draft path. Only 'draft' is allowed as a target value here; other
+    // status transitions are not exposed through this endpoint.
+    if (status) {
+      if (status !== 'draft') {
+        return NextResponse.json(
+          { error: 'Only status="draft" is supported for admin revert' },
+          { status: 400 }
+        );
+      }
+      if (!isAdminEmail(user.email)) {
+        return NextResponse.json(
+          { error: 'Forbidden: admin only' },
+          { status: 403 }
+        );
+      }
+
+      // Defense in depth: the client guard already prevents this, but reject server-side
+      // too so a public story can't end up with status='draft' via direct API call.
+      const { data: currentProject } = await supabase
+        .from('projects')
+        .select('visibility')
+        .eq('id', id)
+        .single();
+      if (currentProject?.visibility === 'public') {
+        return NextResponse.json(
+          { error: 'Make the story private first, then revert to draft.' },
+          { status: 400 }
+        );
+      }
+
+      // Rebuild a draft_metadata blob from the relational tables so the /create page's
+      // resume effect (which reads everything from draft_metadata) can re-hydrate state.
+      // Resume code path is not modified.
+      const rebuiltMetadata = await projectService.buildDraftMetadataFromCompletedProject(
+        id,
+        user.id
+      );
+      await projectService.updateProject(id, user.id, {
+        status: 'draft',
+        draft_metadata: rebuiltMetadata,
+      } as any);
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Story is now ${visibility}`,
-      visibility,
+      message: status
+        ? 'Story reverted to draft for editing'
+        : visibility ? `Story is now ${visibility}` : 'Canvas state saved',
+      ...(visibility && { visibility }),
+      ...(status && { status }),
     });
 
   } catch (error) {

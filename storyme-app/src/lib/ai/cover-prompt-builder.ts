@@ -9,6 +9,11 @@ export interface CoverPromptInput {
   description?: string;
   characterNames: string[];
   language?: 'en' | 'zh';
+  /** Optional story-bible primary location. When provided, its locked visual description
+   * is appended as a Setting: block so the cover anchors to the same place the first
+   * scene uses — prevents cover/first-scene forest drift. Callers should pass scene 1's
+   * location (or the first indexed location) when bible data is available. */
+  primaryLocation?: { name: string; description: string };
 }
 
 /**
@@ -22,7 +27,8 @@ export function buildCoverPrompt(input: CoverPromptInput): string {
     title,
     description,
     characterNames,
-    language = 'en'
+    language = 'en',
+    primaryLocation,
   } = input;
 
   // Extract character names for default scene
@@ -37,7 +43,10 @@ export function buildCoverPrompt(input: CoverPromptInput): string {
 
   // Build cover description
   const storyContext = description ? `Story theme: ${description}. ` : '';
-  const coverPrompt = `Book COVER for "${title}". ${storyContext}Show ${charactersText} in an exciting moment, dynamic poses, colorful background. ${textInstructions}`;
+  const settingBlock = primaryLocation
+    ? ` Setting: ${primaryLocation.description}`
+    : '';
+  const coverPrompt = `Book COVER for "${title}". ${storyContext}Show ${charactersText} — each character must match their attached reference image — in an exciting moment, dynamic poses, colorful background.${settingBlock} ${textInstructions}`;
 
   return coverPrompt;
 }

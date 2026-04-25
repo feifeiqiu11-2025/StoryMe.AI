@@ -16,6 +16,9 @@ export interface CharacterDescriptionDTO {
   clothing?: string;
   age?: string;
   otherFeatures?: string;
+  // Subject classification (mirror of character_library.subject_type). Critical for the
+  // story bible: 'scenery' / 'scene' signals the character can back a location entity.
+  subjectType?: string;
 }
 
 export interface CharacterDTO {
@@ -100,7 +103,9 @@ export interface ProjectDTO {
   shareCount?: number;
   tags?: StoryTag[];
   secondaryLanguage?: string;
+  canvasState?: Record<string, any>;
   draftMetadata?: Record<string, any>;
+  usesStoryBible?: boolean;
 }
 
 export interface CreateProjectDTO {
@@ -169,7 +174,22 @@ export interface SceneDTO {
   locationType?: string;
   locationDescription?: string;
   timeOfDay?: 'morning' | 'afternoon' | 'evening' | 'night';
+  locationId?: string;
+  resolvedCharacterIds?: string[];
+  promptStale?: boolean;
   createdAt: string;
+}
+
+export interface StoryLocationDTO {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  referenceImageUrl?: string;
+  backingCharacterId?: string;
+  firstSceneIndex?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateSceneDTO {

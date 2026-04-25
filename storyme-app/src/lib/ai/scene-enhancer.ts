@@ -19,6 +19,9 @@ export interface Character {
   name: string;
   description: string;
   isAnimal?: boolean; // AI-detected: true for animals/creatures, false for humans
+  // Optional fields used by the story-bible pipeline; ignored by the legacy enhancer.
+  id?: string;                 // character_library UUID (needed to resolve names → IDs after bible pass)
+  subjectType?: string;        // 'human' | 'animal' | 'animated_object' | 'scene' | 'scenery' — signals location candidates
 }
 
 export interface EnhancedSceneResult {
@@ -488,4 +491,326 @@ export function createFallbackEnhancement(
     caption: scene.rawDescription,         // Use raw as-is
     characterNames: scene.characterNames
   }));
+}
+
+// ============================================
+// STORY BIBLE — pronoun resolution + location clustering
+// ============================================
+//
+// The bible pass is a superset of the existing enhancer: in one LLM call it still
+// produces enhanced_prompt + caption per scene, AND additionally:
+//   - clusters distinct locations with locked visual descriptions,
+//   - resolves pronouns per scene into explicit character names,
+//   - links each scene to a location id (defaulting to the previous scene's
+//     location when the script doesn't indicate a change).
+//
+// Character and location identifiers in the LLM output are NAMES, not UUIDs
+// (LLMs preserve names reliably; UUIDs not so much). Callers map names back to
+// UUIDs using the input character list + the returned location temp_ids.
+
+export interface BibleLocation {
+  temp_id: string;            // stable within this response: loc_1, loc_2, ...
+  name: string;
+  description: string;        // 25–40 words, specific to THIS story
+  backing_character_name?: string | null; // matches a scene-type character by exact name, or null
+  first_scene_index: number;  // 0-based index of the first scene using this location
+  // Populated by /api/locations/generate-references after enhance (Phase 3). Null during
+  // the brief window between enhance returning and the background generation completing.
+  reference_image_url?: string | null;
+}
+
+export interface BibleScene extends EnhancedSceneResult {
+  location_temp_id?: string | null;     // references BibleLocation.temp_id
+  resolved_character_names?: string[];  // pronouns resolved to explicit names from the input list
+}
+
+export interface StoryBibleResult {
+  locations: BibleLocation[];
+  scenes: BibleScene[];
+}
+
+export function buildStoryBiblePrompt(
+  scenes: SceneToEnhance[],
+  characters: Character[],
+  readingLevel: number,
+  storyTone: StoryTone,
+  expansionLevel: ExpansionLevel = 'as_written',
+  templateBasePrompt?: string,
+  storyArchitecture?: StoryArchitecture,
+  rawScript?: string
+): string {
+  const characterNames = characters.map(c => c.name).join(', ');
+  const characterDescriptions = characters
+    .map(c => {
+      const typeTag = c.subjectType ? ` [subject_type=${c.subjectType}]` : '';
+      return `- ${c.name}${typeTag}: ${c.description}`;
+    })
+    .join('\n');
+
+  const sceneTypeCharacters = characters.filter(c =>
+    c.subjectType === 'scene' || c.subjectType === 'scenery'
+  );
+  const sceneCharNote = sceneTypeCharacters.length > 0
+    ? `\nSCENE-TYPE CHARACTERS (eligible to back a location):
+${sceneTypeCharacters.map(c => `- ${c.name}`).join('\n')}
+`
+    : '';
+
+  const targetSceneCount = getTargetSceneCount(scenes.length, readingLevel, expansionLevel);
+  const expansionInstructions = getExpansionInstructions(
+    expansionLevel,
+    scenes.length,
+    targetSceneCount,
+    characterNames,
+    storyArchitecture
+  );
+
+  return `You are a children's storybook expert AND a story analyst. You will both enhance scenes and produce a "story bible" that locks in location consistency and resolves pronouns.
+
+STORY SETTINGS:
+- Reading Level: ${readingLevel} years old
+- Story Tone: ${storyTone}
+- Input Scenes: ${scenes.length}
+- Target Output: ${targetSceneCount} scenes
+
+CHARACTER INFORMATION:
+${characterDescriptions}
+${sceneCharNote}${templateBasePrompt ? `
+STORY CATEGORY GUIDANCE:
+${templateBasePrompt}
+` : ''}
+${expansionInstructions}
+
+TONE GUIDELINES FOR "${storyTone.toUpperCase()}":
+${getToneGuidelines(storyTone)}
+
+READING LEVEL GUIDELINES:
+${getReadingLevelGuidelines(readingLevel)}
+
+YOUR TASK — produce TWO things together:
+
+A) LOCATIONS (story bible)
+   Identify every distinct setting used across the story. For each:
+   - Give it a short, human-readable name (2–5 words).
+   - Write a LOCKED visual description (25–40 words) specific to THIS story — concrete landmarks, lighting, mood. This description will be reused verbatim for every scene in that location, so make it specific enough that two separate images of this location would look the same.
+   - If a SCENE-TYPE CHARACTER listed above is clearly this location, set backing_character_name to that character's exact name AND set the location's name to the SAME exact name (do NOT invent variations like "Rainbow House Morning" — use just "Rainbow House"). Otherwise backing_character_name is null and you may pick any descriptive name.
+   - Assign a stable temp_id (loc_1, loc_2, ...) in order of first appearance.
+
+B) SCENES
+   For each scene produce:
+   - title, enhanced_prompt, caption, characterNames, characterTypes (as before)
+   - location_temp_id: which location from (A) this scene takes place in. DEFAULT to the previous scene's location unless the script explicitly indicates a change (e.g., "then she went home", "the next day at school"). Never leave this null unless no location can be inferred for the whole story.
+   - resolved_character_names: the full list of characters present in this scene, with ALL pronouns resolved to explicit names from the character list above. "He walked in" → if Connor is the most recent male subject, resolved_character_names includes "Connor". Never leave a pronoun unresolved.
+
+CRITICAL RULES:
+- Only reference character names from the provided list: ${characterNames}. Do not invent UUIDs.
+- Preserve character names exactly as provided.
+- location_temp_id values must match one of the temp_ids you returned in (A).
+- If a scene contains no characters at all (pure scenery), return an empty array for resolved_character_names.
+- Keep enhanced_prompt and caption semantics identical to a standard enhancement.
+
+3. CHARACTER TYPE DETECTION (per character in each scene):
+   - ANIMAL = cats, dogs, birds, dragons, unicorns, bears, rabbits, etc.
+   - HUMAN = people, boys, girls, mothers, fathers, grandparents, etc.
+
+${rawScript && expansionLevel !== 'as_written' ? `USER'S RAW INPUT (for context):
+"""
+${rawScript}
+"""
+
+IMPORTANT - INSTRUCTION DETECTION:
+The user's input above may contain a mix of:
+1. SCENE DESCRIPTIONS — narrative content.
+2. META-INSTRUCTIONS — directives about how to create the story.
+3. STORY CONCEPTS — a general idea without specific scenes.
+
+Apply meta-instructions as HIGH-PRIORITY CONSTRAINTS. Only generate scenes from actual story content.
+
+` : ''}INPUT SCENES:
+${scenes.map((s) => `Scene ${s.sceneNumber}: "${s.rawDescription}" (Characters: ${s.characterNames.join(', ') || 'all'})`).join('\n')}
+
+OUTPUT FORMAT:
+Return a single valid JSON OBJECT (not an array) with this exact shape:
+{
+  "locations": [
+    {
+      "temp_id": "loc_1",
+      "name": "short human-readable name",
+      "description": "25-40 words, specific visual description",
+      "backing_character_name": null,
+      "first_scene_index": 0
+    }
+  ],
+  "scenes": [
+    {
+      "sceneNumber": 1,
+      "title": "Brief scene title",
+      "enhanced_prompt": "detailed visual description preserving character names",
+      "caption": "age-appropriate story text",
+      "characterNames": ["Connor"],
+      "characterTypes": [{"name": "Connor", "isAnimal": false}],
+      "location_temp_id": "loc_1",
+      "resolved_character_names": ["Connor"]
+    }
+  ]
+}
+
+Return ONLY the JSON object, no additional text, no markdown fences.`;
+}
+
+// ============================================
+// STORY BIBLE — refresh stale scene prompts after chip edits
+// ============================================
+//
+// Used by /api/refresh-prompts. Given the full bible + characters + settings
+// plus a subset of "stale" scenes (those whose character list or location was
+// edited via chips), produce fresh enhanced_prompt for just those scenes.
+//
+// Captions are NEVER rewritten here — they belong to the user's voice and
+// stay exactly as written. Only the image-generation prompt updates so the
+// rendered image reflects the new characters / location.
+
+export interface SceneForRefresh {
+  sceneNumber: number;
+  raw_description: string;
+  resolved_character_names: string[];
+  location_temp_id?: string | null;
+}
+
+export interface RefreshedScene {
+  sceneNumber: number;
+  enhanced_prompt: string;
+}
+
+export function buildRefreshPromptsPrompt(
+  scenesToRefresh: SceneForRefresh[],
+  allScenesForContext: Array<{ sceneNumber: number; caption: string }>,
+  locations: BibleLocation[],
+  characters: Character[],
+  readingLevel: number,
+  storyTone: StoryTone
+): string {
+  const characterNames = characters.map(c => c.name).join(', ');
+  const characterDescriptions = characters
+    .map(c => `- ${c.name}: ${c.description}`)
+    .join('\n');
+  const locationsList = locations
+    .map(l => `- ${l.temp_id} (${l.name}): ${l.description}`)
+    .join('\n');
+  const contextList = allScenesForContext
+    .map(s => `Scene ${s.sceneNumber}: ${s.caption || '(no caption yet)'}`)
+    .join('\n');
+  const toRefreshList = scenesToRefresh.map(s => {
+    const loc = s.location_temp_id ? locations.find(l => l.temp_id === s.location_temp_id) : undefined;
+    return `Scene ${s.sceneNumber}:
+  raw: "${s.raw_description}"
+  characters now present: ${s.resolved_character_names.join(', ') || '(none — pure scenery)'}
+  location: ${loc ? `${loc.name} — ${loc.description}` : '(none)'}`;
+  }).join('\n\n');
+
+  return `You are updating image-generation prompts for a children's storybook after the user edited which characters appear in specific scenes or which location a scene takes place in. Rewrite ONLY the image-generation prompt for each affected scene.
+
+DO NOT produce captions. Captions are owned by the user and must not change here.
+
+STORY SETTINGS (for tone/vocabulary context only):
+- Reading level: ${readingLevel} years old
+- Tone: ${storyTone}
+
+CHARACTERS:
+${characterDescriptions}
+
+LOCATIONS (locked visual descriptions — use verbatim for setting):
+${locationsList}
+
+ALL SCENE CAPTIONS (for narrative context — DO NOT rewrite any of these):
+${contextList}
+
+SCENES TO REFRESH:
+${toRefreshList}
+
+For each scene listed above produce ONLY:
+- enhanced_prompt: vivid visual description under 200 chars; MUST include ONLY the characters now present (drop any character removed); MUST use the location's locked visual description as the setting.
+
+Preserve character names from this list exactly: ${characterNames}.
+
+Return ONLY a JSON object:
+{
+  "scenes": [
+    { "sceneNumber": N, "enhanced_prompt": "..." }
+  ]
+}
+No "caption" field. No markdown, no prose outside the JSON.`;
+}
+
+export function parseRefreshPromptsResponse(response: string): RefreshedScene[] {
+  const objMatch = response.match(/\{[\s\S]*\}/);
+  const jsonStr = objMatch ? objMatch[0] : response;
+  const parsed = JSON.parse(jsonStr);
+  const rawScenes = Array.isArray(parsed?.scenes) ? parsed.scenes : [];
+  return rawScenes
+    .filter((s: any) => typeof s?.sceneNumber === 'number' && typeof s?.enhanced_prompt === 'string')
+    .map((s: any) => ({
+      sceneNumber: s.sceneNumber,
+      enhanced_prompt: String(s.enhanced_prompt),
+    }));
+}
+
+export function parseStoryBibleResponse(
+  response: string,
+  originalScenes: SceneToEnhance[]
+): StoryBibleResult {
+  // Extract JSON object (tolerate surrounding prose or markdown fences)
+  const objMatch = response.match(/\{[\s\S]*\}/);
+  const jsonStr = objMatch ? objMatch[0] : response;
+
+  const parsed = JSON.parse(jsonStr);
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Story bible response is not a JSON object');
+  }
+
+  const rawLocations = Array.isArray(parsed.locations) ? parsed.locations : [];
+  const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
+
+  if (rawScenes.length === 0) {
+    throw new Error('Story bible response contains no scenes');
+  }
+
+  const locations: BibleLocation[] = rawLocations
+    .filter((loc: any) => loc && typeof loc.temp_id === 'string' && typeof loc.name === 'string' && typeof loc.description === 'string')
+    .map((loc: any, idx: number) => ({
+      temp_id: String(loc.temp_id),
+      name: String(loc.name),
+      description: String(loc.description),
+      backing_character_name: loc.backing_character_name ?? null,
+      first_scene_index: typeof loc.first_scene_index === 'number' ? loc.first_scene_index : idx,
+    }));
+
+  const validTempIds = new Set(locations.map(l => l.temp_id));
+
+  const scenes: BibleScene[] = rawScenes.map((item: any, index: number) => {
+    const originalScene = originalScenes[Math.min(index, originalScenes.length - 1)];
+
+    const rawLocTempId = typeof item.location_temp_id === 'string' ? item.location_temp_id : null;
+    const locationTempId = rawLocTempId && validTempIds.has(rawLocTempId) ? rawLocTempId : null;
+
+    const resolvedNames = Array.isArray(item.resolved_character_names)
+      ? item.resolved_character_names.filter((n: unknown): n is string => typeof n === 'string' && n.length > 0)
+      : [];
+
+    return {
+      sceneNumber: item.sceneNumber || (index + 1),
+      title: item.title || `Scene ${index + 1}`,
+      raw_description: originalScene?.rawDescription || item.caption,
+      enhanced_prompt: item.enhanced_prompt || item.caption,
+      caption: item.caption || originalScene?.rawDescription || 'No description',
+      characterNames: item.characterNames || originalScene?.characterNames || [],
+      isNewCharacter: item.characterNames?.some((name: string) => typeof name === 'string' && name.includes('(NEW)')) || false,
+      characterTypes: item.characterTypes || undefined,
+      location_temp_id: locationTempId,
+      resolved_character_names: resolvedNames,
+    };
+  });
+
+  return { locations, scenes };
 }

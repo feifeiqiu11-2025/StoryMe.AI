@@ -60,6 +60,12 @@ export interface CharacterLibrary {
   character_embedding?: Record<string, unknown>;
   reference_images?: ReferenceImage[];
 
+  // Subject classification — determines how the character is treated by image gen
+  // and the story bible. Values seen in the codebase: 'human' | 'animal' | 'creature' |
+  // 'object' | 'scenery' | 'scene'. 'scenery' (and 'scene') marks a location-capable
+  // character that the bible can use as a backing for a story_locations row.
+  subject_type?: string;
+
   // Advanced Features
   lora_url?: string;
   lora_trained_at?: string;
@@ -129,8 +135,15 @@ export interface Project {
   // Bilingual / Multi-language
   secondary_language?: string;    // 'zh', 'ko', etc. — chosen secondary language for this project
 
+  // Canvas editor state (serialized CanvasProjectState)
+  canvas_state?: Record<string, any>;
+
   // Draft state (UI-specific data not in structured columns)
   draft_metadata?: Record<string, any>;
+
+  // Story bible flag: TRUE when this project was enhanced via the story-bible
+  // pipeline (pronoun resolution + location clustering). FALSE = legacy path.
+  uses_story_bible?: boolean;
 
   created_at: string;
   updated_at: string;
@@ -181,7 +194,42 @@ export interface Scene {
   location_description?: string;
   time_of_day?: 'morning' | 'afternoon' | 'evening' | 'night';
 
+  // Story bible: pointer to the resolved location for this scene.
+  // NULL on legacy (pre-bible) scenes — image gen falls back to location_description.
+  location_id?: string;
+
+  // Story bible: pronoun-resolved character UUIDs present in this scene.
+  // Empty array on legacy scenes — image gen falls back to character_ids.
+  resolved_character_ids?: string[];
+
+  // TRUE when the user edited scene characters/location after the prompt was generated,
+  // so enhanced_prompt + caption should be refreshed before the next image regeneration.
+  prompt_stale?: boolean;
+
   created_at: string;
+}
+
+// ============================================
+// STORY LOCATION MODELS (story bible)
+// ============================================
+
+export interface StoryLocation {
+  id: string;
+  project_id: string;
+
+  name: string;               // short, human-readable ("the old pine forest")
+  description: string;        // locked visual description used for prompt + ref image
+  reference_image_url?: string;
+
+  // When set, the location is backed by a library character (subject_type='scene').
+  // Image gen reuses that character's reference image instead of generating a fresh one.
+  backing_character_id?: string;
+
+  first_scene_index?: number; // ordering hint for UI
+
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
 }
 
 // ============================================
@@ -356,3 +404,8 @@ export type SceneInput = Omit<Scene, 'id' | 'created_at'>;
 export type GeneratedImageInput = Omit<GeneratedImage, 'id' | 'created_at'>;
 
 export type ProjectCharacterInput = Omit<ProjectCharacter, 'id' | 'created_at'>;
+
+export type StoryLocationInput = Omit<
+  StoryLocation,
+  'id' | 'created_at' | 'updated_at' | 'deleted_at'
+>;

@@ -18,6 +18,7 @@ import GenerationProgress from '@/components/story/GenerationProgress';
 import ImageGallery from '@/components/story/ImageGallery';
 import FeedbackModal from '@/components/feedback/FeedbackModal';
 import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScene, ExpansionLevel, ClothingConsistency, ImageProvider, DEFAULT_IMAGE_PROVIDER } from '@/lib/types/story';
+import type { StoryBibleResult } from '@/lib/ai/scene-enhancer';
 import { StoryTemplateId, STORY_TEMPLATES } from '@/lib/ai/story-templates';
 import { parseScriptIntoScenes } from '@/lib/scene-parser';
 import Link from 'next/link';
@@ -74,6 +75,20 @@ function CreateStoryPageInner() {
   // Enhancement state (NEW)
   const [enhancedScenes, setEnhancedScenes] = useState<EnhancedScene[]>([]);
   const [isEnhancing, setIsEnhancing] = useState(false);
+
+  // Story bible (pronoun-resolved scenes + locked locations). Produced by enhance-scenes
+  // when enableStoryBible=true and threaded through generate-images + save for persistence.
+  const [storyBible, setStoryBible] = useState<StoryBibleResult | null>(null);
+  // Bible location temp_ids the user has already promoted to their character library via the
+  // "Save to library" bookmark. Used to disable the bookmark button after a successful save.
+  const [savedLocationTempIds, setSavedLocationTempIds] = useState<Set<string>>(new Set());
+  // Scenes whose prompts/captions need rewriting because the user edited characters/location on them.
+  // Cleared after the Approve-time refresh-prompts call succeeds.
+  const [stalePromptSceneNumbers, setStalePromptSceneNumbers] = useState<Set<number>>(new Set());
+  // When the user clicks "+ Add" on a scene's chip row, we reuse the existing Import modal.
+  // This number tells the import handler to ALSO append the character to that scene's bible entry
+  // and mark the scene stale. Null outside of that flow. Cleared on modal close or success.
+  const [addCharToSceneNumber, setAddCharToSceneNumber] = useState<number | null>(null);
 
   // Story metadata state (NEW - generated during enhancement)
   const [storyTitle, setStoryTitle] = useState<string>('');
@@ -292,6 +307,13 @@ function CreateStoryPageInner() {
           setEnhancedScenes(meta.enhancedScenes);
         }
 
+        // Restore story bible (Characters/Scene chips + editors rehydrate from this).
+        // Only surfaces for drafts saved AFTER the bible changes; older drafts have no storyBible
+        // field and the user can re-click Enhance to generate one.
+        if (meta.storyBible) {
+          setStoryBible(meta.storyBible as StoryBibleResult);
+        }
+
         // Restore story metadata
         if (project.title && project.title !== 'Untitled Draft') setStoryTitle(project.title);
         if (project.description) setStoryDescription(project.description);
@@ -371,6 +393,9 @@ function CreateStoryPageInner() {
           clothing: char.clothing,
           age: char.age,
           otherFeatures: char.other_features,
+          // subject_type plumbing: 'scenery'/'scene' marks a location-capable character.
+          // Without this the bible can't link Rainbow House (a scene-type char) as a location backer.
+          subjectType: char.subject_type || undefined,
         },
         isPrimary: false,
         order: 0,
@@ -409,6 +434,7 @@ function CreateStoryPageInner() {
           clothing: char.clothing,
           age: char.age,
           otherFeatures: char.other_features,
+          subjectType: char.subject_type || undefined,
         },
         isPrimary: false,
         order: 0,
@@ -424,22 +450,46 @@ function CreateStoryPageInner() {
   };
 
   const handleImportCharacter = (character: Character) => {
-    // Check if character already exists
     const exists = characters.find(c => c.id === character.id);
-    if (exists) {
+
+    // If opened from a scene chip's "+ Add", always route to the scene even for
+    // already-in-story characters. Otherwise keep the legacy "already added" alert.
+    if (exists && addCharToSceneNumber === null) {
       alert('This character is already added to your story');
       return;
     }
 
-    // Add character to story
-    // Set first character as primary automatically
-    const importedCharacter = {
-      ...character,
-      isPrimary: characters.length === 0, // First character is primary
-      order: characters.length + 1,
-      isFromLibrary: true, // Mark as imported from library
-    };
-    setCharacters([...characters, importedCharacter]);
+    // Add to story if new; otherwise skip the import but still handle scene routing below.
+    if (!exists) {
+      const importedCharacter = {
+        ...character,
+        isPrimary: characters.length === 0,
+        order: characters.length + 1,
+        isFromLibrary: true,
+      };
+      setCharacters([...characters, importedCharacter]);
+    }
+
+    // If the import was initiated from a scene chip, append the character to that scene's
+    // bible entry and mark the scene stale so its prompt gets refreshed on next generation.
+    if (addCharToSceneNumber !== null) {
+      const target = addCharToSceneNumber;
+      setStoryBible(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          scenes: prev.scenes.map(s => {
+            if (s.sceneNumber !== target) return s;
+            const current = s.resolved_character_names || [];
+            if (current.some(n => n.toLowerCase() === character.name.toLowerCase())) return s;
+            return { ...s, resolved_character_names: [...current, character.name] };
+          }),
+        };
+      });
+      setStalePromptSceneNumbers(prev => new Set(prev).add(target));
+      setAddCharToSceneNumber(null);
+    }
+
     setShowImportModal(false);
   };
 
@@ -550,6 +600,7 @@ function CreateStoryPageInner() {
           templateId: selectedTemplate,  // NEW: Pass template ID for story architecture
           secondaryLanguage, // NEW: For bilingual English stories with secondary language captions
           script: scriptInput,  // NEW: Pass raw script for title/description generation
+          enableStoryBible: contentLanguage === 'en',  // Turn on bible pass (English only in Phase 1/2)
           characters: characters.map(c => ({
             name: c.name,
             // Exclude clothing from character description - let scene enhancer decide
@@ -559,7 +610,9 @@ function CreateStoryPageInner() {
               c.description.hairColor ? `${c.description.hairColor} hair` : '',
               c.description.skinTone ? `${c.description.skinTone} skin` : '',
               c.description.otherFeatures || ''
-            ].filter(Boolean).join(', ')
+            ].filter(Boolean).join(', '),
+            // Signal scene-type characters so the bible can link locations to them (Dragonfly Land etc.)
+            subjectType: c.description.subjectType,
           }))
         })
       });
@@ -572,6 +625,50 @@ function CreateStoryPageInner() {
 
       if (data.warning) {
         alert('AI enhancement unavailable, using original descriptions');
+      }
+
+      // Capture the story bible (may be null if enableStoryBible=false or parse failed server-side).
+      // Persisted later via save-draft/save and forwarded to generate-images for pronoun + location resolution.
+      setStoryBible(data.storyBible ?? null);
+      // Reset the "already saved" set when a fresh bible arrives, so new locations show the bookmark active.
+      setSavedLocationTempIds(new Set());
+      // Fresh enhancement → no stale prompts yet.
+      setStalePromptSceneNumbers(new Set());
+
+      // Phase 3: kick off eager reference-image generation for non-backed locations
+      // in the background. Non-blocking — the review page loads immediately; URLs
+      // merge into storyBible.locations as the server responds. generate-images reads
+      // them from the bible prop and passes them as additional references to the provider.
+      if (data.storyBible?.locations?.length) {
+        (async () => {
+          try {
+            const resp = await fetch('/api/locations/generate-references', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ locations: data.storyBible.locations }),
+            });
+            if (!resp.ok) {
+              console.warn('[location refs] non-ok response, skipping reference images');
+              return;
+            }
+            const json = await resp.json();
+            const urlMap: Record<string, string> = json?.locations || {};
+            if (Object.keys(urlMap).length === 0) return;
+            setStoryBible(prev => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                locations: prev.locations.map(l =>
+                  urlMap[l.temp_id] ? { ...l, reference_image_url: urlMap[l.temp_id] } : l
+                ),
+              };
+            });
+            console.log(`✓ Location reference images ready for ${Object.keys(urlMap).length} locations`);
+          } catch (err) {
+            // Non-fatal: image gen will still work with locked-prose consistency
+            console.error('[location refs] Failed, continuing without reference images:', err);
+          }
+        })();
       }
 
       // Extract and store metadata (title, description)
@@ -994,6 +1091,10 @@ function CreateStoryPageInner() {
       quizQuestionCount,
       authorName,
       authorAge,
+      // Persist a snapshot of the story bible so reopening the draft can rehydrate the
+      // client UI (Characters/Scene chips, + Add button, Scene swap). The structured
+      // story_locations / scene columns remain authoritative for image gen and save.
+      storyBible,
     };
 
     const coverImage = imageGenerationStatus.find(img => img.sceneNumber === 0 && img.status === 'completed');
@@ -1013,6 +1114,7 @@ function CreateStoryPageInner() {
       characterIds: finalCharacterIds,
       scenes: scenesPayload,
       draftMetadata,
+      storyBible,  // Persist locations + resolved scene entities (null when bible disabled)
     });
 
     return { draftBody, scenesPayload };
@@ -1456,6 +1558,7 @@ function CreateStoryPageInner() {
         secondaryLanguage,
         scenes: scenesData,
         quizData: quizData || undefined,
+        storyBible,  // Persist locations + resolved scene entities
       });
 
       saveRequestSent({
@@ -1651,8 +1754,83 @@ function CreateStoryPageInner() {
     setImageGenerationStatus(initialStatus);
 
     try {
+      // Phase 4: if the user edited characters/location on any scene, refresh those
+      // scenes' enhanced_prompt + caption once (batched) before running image generation.
+      // We keep a local `scenesForGen` snapshot so downstream calls see the refreshed
+      // prompts even though setEnhancedScenes is asynchronous.
+      let scenesForGen = enhancedScenes;
+      if (storyBible && stalePromptSceneNumbers.size > 0 && contentLanguage === 'en') {
+        const staleList = Array.from(stalePromptSceneNumbers);
+        const scenesToRefresh = staleList
+          .map(n => {
+            const bibleScene = storyBible.scenes.find(s => s.sceneNumber === n);
+            const enhancedScene = enhancedScenes.find(s => s.sceneNumber === n);
+            if (!bibleScene || !enhancedScene) return null;
+            return {
+              sceneNumber: n,
+              raw_description: enhancedScene.raw_description || enhancedScene.caption || '',
+              resolved_character_names: bibleScene.resolved_character_names || [],
+              location_temp_id: bibleScene.location_temp_id ?? null,
+            };
+          })
+          .filter((s): s is NonNullable<typeof s> => s !== null);
+
+        if (scenesToRefresh.length > 0) {
+          try {
+            const refreshResp = await fetch('/api/refresh-prompts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                scenesToRefresh,
+                allScenesForContext: enhancedScenes
+                  .filter(s => !s.isCover)
+                  .map(s => ({ sceneNumber: s.sceneNumber, caption: s.caption })),
+                locations: storyBible.locations,
+                characters: characters.map(c => ({
+                  name: c.name,
+                  description: [
+                    c.description.age ? `${c.description.age} years old` : '',
+                    c.description.hairColor ? `${c.description.hairColor} hair` : '',
+                    c.description.skinTone ? `${c.description.skinTone} skin` : '',
+                    c.description.otherFeatures || ''
+                  ].filter(Boolean).join(', '),
+                  subjectType: c.description.subjectType,
+                })),
+                readingLevel,
+                storyTone,
+                language: 'en',
+              }),
+            });
+            if (refreshResp.ok) {
+              const refreshData = await refreshResp.json();
+              // Captions are owned by the user — refresh-prompts ONLY returns enhanced_prompt
+              // and we ONLY apply that. Caption text stays exactly as the user has it.
+              const updates = new Map<number, string>();
+              (refreshData.scenes || []).forEach((s: any) => {
+                if (typeof s?.sceneNumber === 'number' && typeof s?.enhanced_prompt === 'string') {
+                  updates.set(s.sceneNumber, s.enhanced_prompt);
+                }
+              });
+              // Apply updates to the local snapshot used for image gen this cycle
+              scenesForGen = enhancedScenes.map(scene => {
+                const newPrompt = updates.get(scene.sceneNumber);
+                return newPrompt ? { ...scene, enhanced_prompt: newPrompt } : scene;
+              });
+              // Also push into React state so future renders / saves see the refreshed values
+              setEnhancedScenes(scenesForGen);
+              setStalePromptSceneNumbers(new Set());
+              console.log(`✓ Refreshed image prompts for ${updates.size} stale scenes (captions preserved)`);
+            } else {
+              console.warn('[refresh-prompts] Non-ok response, continuing with stale prompts');
+            }
+          } catch (err) {
+            console.error('[refresh-prompts] Failed, continuing with stale prompts:', err);
+          }
+        }
+      }
+
       // NEW: Extract cover metadata (Scene 0)
-      const coverScene = enhancedScenes.find(s => s.isCover);
+      const coverScene = scenesForGen.find(s => s.isCover);
       const coverMetadata = coverScene ? {
         title: coverScene.storyTitle || storyTitle,
         description: coverScene.storyDescription || storyDescription,
@@ -1660,7 +1838,7 @@ function CreateStoryPageInner() {
       } : null;
 
       // Build script from enhanced prompts (excluding cover/Scene 0)
-      const enhancedScript = enhancedScenes
+      const enhancedScript = scenesForGen
         .filter(s => !s.isCover)  // Exclude cover from script
         .map(s => s.enhanced_prompt)
         .join('\n');
@@ -1668,7 +1846,7 @@ function CreateStoryPageInner() {
       // Extract character types from enhanced scenes (AI-detected animal vs human)
       // Merge all characterTypes from all scenes, using the most recent detection for each character
       const characterTypeMap = new Map<string, boolean>();
-      for (const scene of enhancedScenes) {
+      for (const scene of scenesForGen) {
         if (scene.characterTypes) {
           for (const ct of scene.characterTypes) {
             characterTypeMap.set(ct.name, ct.isAnimal);
@@ -1696,6 +1874,7 @@ function CreateStoryPageInner() {
           illustrationStyle: artStyle, // 'pixar' (3D) or 'classic' (2D storybook)
           clothingConsistency, // 'consistent' (default) or 'scene-based'
           coverMetadata,  // NEW: Cover metadata for Scene 0 generation
+          storyBible,  // Pronoun-resolved scenes + locked locations (null when bible disabled)
         }),
       });
 
@@ -1705,6 +1884,14 @@ function CreateStoryPageInner() {
       }
 
       const data = await response.json();
+
+      // Surface a non-fatal provider fallback notice (e.g., OpenAI gpt-image-2 isn't yet
+      // supported for scene generation; the server fell back to Gemini and tells us why).
+      // Single alert so the user understands their selection didn't fully take effect.
+      if (data.providerFallback) {
+        console.warn('[generate-images] Provider fallback:', data.providerFallback);
+        alert(data.providerFallback);
+      }
 
       // Update the image generation status with the actual results
       // Use positional matching: API renumbers scenes sequentially, so match by array position
@@ -1850,9 +2037,11 @@ function CreateStoryPageInner() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full h-[80vh] overflow-y-auto p-8">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">Import from Character Library</h2>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {addCharToSceneNumber !== null ? `Add a character to Scene ${addCharToSceneNumber}` : 'Import from Character Library'}
+                </h2>
                 <button
-                  onClick={() => setShowImportModal(false)}
+                  onClick={() => { setShowImportModal(false); setAddCharToSceneNumber(null); }}
                   className="text-gray-400 hover:text-gray-600 text-2xl"
                 >
                   ×
@@ -1944,13 +2133,25 @@ function CreateStoryPageInner() {
                         )}
                         <div className="p-2">
                           <h3 className="font-bold text-gray-900 text-sm mb-2 truncate">{character.name}</h3>
-                          <button
-                            onClick={() => handleImportCharacter(character)}
-                            disabled={characters.some(c => c.id === character.id)}
-                            className="w-full bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium text-xs disabled:bg-gray-300 disabled:cursor-not-allowed transition-all"
-                          >
-                            {characters.some(c => c.id === character.id) ? 'Added' : 'Import'}
-                          </button>
+                          {(() => {
+                            const alreadyInStory = characters.some(c => c.id === character.id);
+                            // When opened from a scene-chip "+Add", already-in-story characters remain
+                            // clickable (the handler routes them into the target scene). Otherwise keep
+                            // the original disabled-"Added" behavior.
+                            const disabled = alreadyInStory && addCharToSceneNumber === null;
+                            const label = addCharToSceneNumber !== null
+                              ? (alreadyInStory ? 'Add to scene' : 'Import & add to scene')
+                              : (alreadyInStory ? 'Added' : 'Import');
+                            return (
+                              <button
+                                onClick={() => handleImportCharacter(character)}
+                                disabled={disabled}
+                                className="w-full bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium text-xs disabled:bg-gray-300 disabled:cursor-not-allowed transition-all"
+                              >
+                                {label}
+                              </button>
+                            );
+                          })()}
                         </div>
                       </div>
                     ))}
@@ -2295,6 +2496,65 @@ function CreateStoryPageInner() {
               draftSaveLabel={draftProjectId ? 'Update Draft' : 'Save as Draft'}
               draftSaveMessage={draftSaveMessage || undefined}
               onDefineNewCharacter={(name) => setDefiningNewCharacterName(name)}
+              storyBible={storyBible}
+              savedLocationTempIds={savedLocationTempIds}
+              stalePromptSceneNumbers={stalePromptSceneNumbers}
+              onSceneCharactersChange={(sceneNumber, names) => {
+                setStoryBible(prev => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    scenes: prev.scenes.map(s =>
+                      s.sceneNumber === sceneNumber ? { ...s, resolved_character_names: names } : s
+                    ),
+                  };
+                });
+                setStalePromptSceneNumbers(prev => new Set(prev).add(sceneNumber));
+              }}
+              onSceneLocationChange={(sceneNumber, locationTempId) => {
+                setStoryBible(prev => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    scenes: prev.scenes.map(s =>
+                      s.sceneNumber === sceneNumber ? { ...s, location_temp_id: locationTempId } : s
+                    ),
+                  };
+                });
+                setStalePromptSceneNumbers(prev => new Set(prev).add(sceneNumber));
+              }}
+              onRequestAddCharacter={(sceneNumber) => {
+                setAddCharToSceneNumber(sceneNumber);
+                setShowImportModal(true);
+              }}
+              onSaveLocationToLibrary={async (location) => {
+                try {
+                  const response = await fetch('/api/characters/save-scene', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      name: location.name,
+                      description: location.description,
+                      // Pre-save there is no story_locations row yet; pass null.
+                      // Post-save (re-enhance on an existing project) could supply it in a later iteration.
+                      sourceStoryLocationId: null,
+                    }),
+                  });
+                  if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || 'Failed to save scene to library');
+                  }
+                  // Optimistic: mark this temp_id as saved so the bookmark flips to "already saved"
+                  setSavedLocationTempIds(prev => {
+                    const next = new Set(prev);
+                    next.add(location.temp_id);
+                    return next;
+                  });
+                } catch (error) {
+                  console.error('[save-scene] Failed:', error);
+                  alert(error instanceof Error ? error.message : 'Failed to save scene to library');
+                }
+              }}
             />
           </div>
         )}
@@ -2334,6 +2594,35 @@ function CreateStoryPageInner() {
               onTitleEdit={handleTitleEdit}
               onDescriptionEdit={handleDescriptionEdit}
               secondaryLanguage={secondaryLanguage}
+              storyBible={storyBible}
+              onSceneCharactersChange={(sceneNumber, names) => {
+                setStoryBible(prev => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    scenes: prev.scenes.map(s =>
+                      s.sceneNumber === sceneNumber ? { ...s, resolved_character_names: names } : s
+                    ),
+                  };
+                });
+                setStalePromptSceneNumbers(prev => new Set(prev).add(sceneNumber));
+              }}
+              onSceneLocationChange={(sceneNumber, locationTempId) => {
+                setStoryBible(prev => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    scenes: prev.scenes.map(s =>
+                      s.sceneNumber === sceneNumber ? { ...s, location_temp_id: locationTempId } : s
+                    ),
+                  };
+                });
+                setStalePromptSceneNumbers(prev => new Set(prev).add(sceneNumber));
+              }}
+              onRequestAddCharacter={(sceneNumber) => {
+                setAddCharToSceneNumber(sceneNumber);
+                setShowImportModal(true);
+              }}
               onRegenerateScene={(imageId, newImageData) => {
                 // Replace the image in the status array
                 setImageGenerationStatus(prev =>

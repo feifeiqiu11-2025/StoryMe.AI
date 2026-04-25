@@ -13,6 +13,7 @@ import type {
   ProjectWithScenes,
   ProjectFull,
   SceneWithImages,
+  StoryLocation,
 } from './models';
 
 import type {
@@ -29,6 +30,7 @@ import type {
   SceneWithImagesDTO,
   GeneratedImageDTO,
   CreateSceneDTO,
+  StoryLocationDTO,
 } from './dtos';
 
 // ============================================
@@ -53,6 +55,7 @@ export function characterToDTO(character: CharacterLibrary): CharacterDTO {
       clothing: character.clothing,
       age: character.age,
       otherFeatures: character.other_features,
+      subjectType: character.subject_type,
     },
     personalityTraits: character.personality_traits,
     loraUrl: character.lora_url,
@@ -123,7 +126,9 @@ export function projectToDTO(project: Project): ProjectDTO {
     viewCount: project.view_count,
     shareCount: project.share_count,
     secondaryLanguage: project.secondary_language,
+    canvasState: project.canvas_state,
     draftMetadata: project.draft_metadata,
+    usesStoryBible: project.uses_story_bible,
   };
 }
 
@@ -199,7 +204,28 @@ export function sceneToDTO(scene: Scene): SceneDTO {
     locationType: scene.location_type,
     locationDescription: scene.location_description,
     timeOfDay: scene.time_of_day,
+    locationId: scene.location_id,
+    resolvedCharacterIds: scene.resolved_character_ids,
+    promptStale: scene.prompt_stale,
     createdAt: scene.created_at,
+  };
+}
+
+// ============================================
+// STORY LOCATION CONVERTERS (story bible)
+// ============================================
+
+export function storyLocationToDTO(location: StoryLocation): StoryLocationDTO {
+  return {
+    id: location.id,
+    projectId: location.project_id,
+    name: location.name,
+    description: location.description,
+    referenceImageUrl: location.reference_image_url,
+    backingCharacterId: location.backing_character_id,
+    firstSceneIndex: location.first_scene_index,
+    createdAt: location.created_at,
+    updatedAt: location.updated_at,
   };
 }
 

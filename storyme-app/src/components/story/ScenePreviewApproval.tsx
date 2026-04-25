@@ -6,9 +6,10 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { EnhancedScene, ImageProvider, IMAGE_PROVIDER_OPTIONS, DEFAULT_IMAGE_PROVIDER } from '@/lib/types/story';
 import { getLanguageLabel } from '@/lib/config/languages';
+import type { StoryBibleResult } from '@/lib/ai/scene-enhancer';
 
 // Art style type
 type ArtStyleType = 'pixar' | 'classic' | 'coloring';
@@ -45,6 +46,25 @@ interface ScenePreviewApprovalProps {
   draftSaveMessage?: string;
   // Define new character (click on NEW chip to create character with reference)
   onDefineNewCharacter?: (characterName: string) => void;
+  // Story bible: enables the split Characters/Scene chip display and location context per scene
+  storyBible?: StoryBibleResult | null;
+  // Called when user clicks the bookmark on a Scene chip to promote a location to their character library.
+  // Receives the bible location; parent performs the POST and updates state.
+  onSaveLocationToLibrary?: (location: { temp_id: string; name: string; description: string; backing_character_name?: string | null }) => void;
+  // Set of location temp_ids that have already been saved to the user's library (disables the bookmark).
+  savedLocationTempIds?: Set<string>;
+  // Edit handlers (Phase 4). When provided, chips become interactive: character chips get a remove X,
+  // an add-character button appears, and the Scene chip opens a swap picker on click.
+  // Parent is responsible for updating the storyBible in its state and flagging prompt_stale.
+  onSceneCharactersChange?: (sceneNumber: number, resolvedCharacterNames: string[]) => void;
+  onSceneLocationChange?: (sceneNumber: number, locationTempId: string) => void;
+  // Called when user clicks "+ Add" on a scene's chip row. Parent opens the existing
+  // Import-from-Library modal targeted at this scene; the modal's import handler routes
+  // the chosen character into the scene's resolved_character_names.
+  onRequestAddCharacter?: (sceneNumber: number) => void;
+  // Set of scene numbers with stale prompts (edits made since last enhancement). Purely visual —
+  // surfaces a small indicator so the user knows a prompt refresh will happen on Approve.
+  stalePromptSceneNumbers?: Set<number>;
 }
 
 export default function ScenePreviewApproval({
@@ -74,6 +94,13 @@ export default function ScenePreviewApproval({
   draftSaveLabel = 'Save as Draft',
   draftSaveMessage,
   onDefineNewCharacter,
+  storyBible = null,
+  onSaveLocationToLibrary,
+  savedLocationTempIds,
+  onSceneCharactersChange,
+  onSceneLocationChange,
+  onRequestAddCharacter,
+  stalePromptSceneNumbers,
 }: ScenePreviewApprovalProps) {
   // Add Scene Modal State
   const [showAddSceneModal, setShowAddSceneModal] = useState(false);
@@ -82,6 +109,41 @@ export default function ScenePreviewApproval({
   const [selectedCharacters, setSelectedCharacters] = useState<string[]>([]);
   const [isEnhancingNewScene, setIsEnhancingNewScene] = useState(false);
   const [addSceneError, setAddSceneError] = useState('');
+
+  // Scene-swap popover state. "+ Add" character now opens the parent's existing Import modal
+  // (via onRequestAddCharacter), so no dropdown state lives here for that flow anymore.
+  const [swapSceneForScene, setSwapSceneForScene] = useState<number | null>(null);
+  // Wrapper ref for outside-click detection — when the user clicks anywhere outside the
+  // currently-open Scene swap popover, close it. Without this, the popover persists.
+  const swapPopoverWrapperRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (swapSceneForScene === null) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (swapPopoverWrapperRef.current && !swapPopoverWrapperRef.current.contains(e.target as Node)) {
+        setSwapSceneForScene(null);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [swapSceneForScene]);
+
+  // Bible lookups for the split Characters/Scene chip display.
+  // Empty maps when no bible is provided → chip rendering falls through to the legacy single-row display.
+  const bibleSceneByNumber = React.useMemo(() => {
+    const map = new Map<number, { location_temp_id?: string | null; resolved_character_names?: string[] }>();
+    storyBible?.scenes?.forEach(s => {
+      if (typeof s.sceneNumber === 'number') map.set(s.sceneNumber, s);
+    });
+    return map;
+  }, [storyBible]);
+
+  const bibleLocationByTempId = React.useMemo(() => {
+    const map = new Map<string, { name: string; description: string; backing_character_name?: string | null }>();
+    storyBible?.locations?.forEach(loc => {
+      if (loc.temp_id) map.set(loc.temp_id, loc);
+    });
+    return map;
+  }, [storyBible]);
 
   // Re-enhance All State
   const [isReEnhancing, setIsReEnhancing] = useState(false);
@@ -504,40 +566,197 @@ export default function ScenePreviewApproval({
                     )
                   )}
 
-                  {/* Characters in Scene */}
-                  {scene.characterNames && scene.characterNames.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      <span className="text-xs text-gray-500">Characters:</span>
-                      {scene.characterNames.map((char, idx) => {
-                        const isNew = newCharacters.includes(char);
-                        return isNew && onDefineNewCharacter ? (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => onDefineNewCharacter(char)}
-                            className="text-xs px-2 py-1 rounded-full font-medium bg-yellow-100 text-yellow-700 border border-yellow-300 hover:bg-yellow-200 hover:border-yellow-400 transition-colors cursor-pointer inline-flex items-center gap-0.5"
-                          >
-                            {char} (NEW)
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                          </button>
-                        ) : (
-                          <span
-                            key={idx}
-                            className={`text-xs px-2 py-1 rounded-full font-medium ${
-                              isNew
-                                ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
-                                : 'bg-blue-100 text-blue-700'
-                            }`}
-                          >
-                            {char}
-                            {isNew && ' (NEW)'}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
+                  {/* Characters + Scene chips. When a bible entry exists for this scene,
+                      we split: "Characters:" shows resolved (pronoun-resolved) characters
+                      excluding any that back the scene's location, and "Scene:" shows the
+                      location. When no bible, falls back to the legacy single-row display. */}
+                  {(() => {
+                    const bibleScene = bibleSceneByNumber.get(scene.sceneNumber);
+                    const bibleLocation = bibleScene?.location_temp_id
+                      ? bibleLocationByTempId.get(bibleScene.location_temp_id)
+                      : undefined;
+                    const backingName = bibleLocation?.backing_character_name?.toLowerCase();
+
+                    // Character list: bible-resolved names minus the location's backing char
+                    let charsForDisplay: string[] = scene.characterNames || [];
+                    if (bibleScene?.resolved_character_names?.length) {
+                      charsForDisplay = bibleScene.resolved_character_names;
+                    }
+                    if (backingName) {
+                      charsForDisplay = charsForDisplay.filter(c => c.toLowerCase() !== backingName);
+                    }
+
+                    const editingChars = !!(onSceneCharactersChange && bibleScene);
+                    const editingLocation = !!(onSceneLocationChange && bibleScene && bibleLocation);
+                    const canAddChar = editingChars && !!onRequestAddCharacter;
+                    const swappableLocations = editingLocation && storyBible?.locations
+                      ? storyBible.locations.filter(l => l.temp_id !== bibleScene.location_temp_id)
+                      : [];
+
+                    return (
+                      (charsForDisplay.length > 0 || editingChars || (bibleLocation && bibleScene?.location_temp_id)) && (
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-2">
+                          {(charsForDisplay.length > 0 || editingChars) && (
+                            <div className="flex flex-wrap items-center gap-2 relative">
+                              <span className="text-xs text-gray-500">Characters:</span>
+                              {charsForDisplay.map((char, idx) => {
+                                const isNew = newCharacters.includes(char);
+                                const base = `text-xs pl-2 pr-1 py-1 rounded-full font-medium inline-flex items-center gap-1 ${
+                                  isNew
+                                    ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
+                                    : 'bg-blue-100 text-blue-700'
+                                }`;
+                                return (
+                                  <span key={`${scene.sceneNumber}-char-${idx}`} className={base}>
+                                    {isNew && onDefineNewCharacter ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => onDefineNewCharacter(char)}
+                                        className="inline-flex items-center gap-0.5 hover:underline"
+                                      >
+                                        {char} (NEW)
+                                      </button>
+                                    ) : (
+                                      <span>{char}{isNew && ' (NEW)'}</span>
+                                    )}
+                                    {editingChars && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const next = charsForDisplay.filter(c => c !== char);
+                                          onSceneCharactersChange!(scene.sceneNumber, next);
+                                        }}
+                                        className="ml-0.5 rounded-full p-0.5 hover:bg-black/10"
+                                        aria-label={`Remove ${char} from scene ${scene.sceneNumber}`}
+                                        title={`Remove ${char} from this scene`}
+                                      >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 6l12 12M6 18L18 6" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                  </span>
+                                );
+                              })}
+
+                              {canAddChar && (
+                                <button
+                                  type="button"
+                                  onClick={() => onRequestAddCharacter!(scene.sceneNumber)}
+                                  className="text-xs px-2 py-1 rounded-full font-medium border border-dashed border-gray-300 text-gray-500 hover:text-blue-700 hover:border-blue-400 hover:bg-blue-50 inline-flex items-center gap-0.5"
+                                  aria-label={`Add a character from library to scene ${scene.sceneNumber}`}
+                                  title="Import a character from your library"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                  </svg>
+                                  Add
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          {bibleLocation && bibleScene?.location_temp_id && (
+                            <div
+                              ref={swapSceneForScene === scene.sceneNumber ? swapPopoverWrapperRef : undefined}
+                              className="flex flex-wrap items-center gap-2 relative"
+                            >
+                              <span className="text-xs text-gray-500">Scene:</span>
+                              {editingLocation ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSwapSceneForScene(prev => prev === scene.sceneNumber ? null : scene.sceneNumber)}
+                                  className="text-xs px-2 py-1 rounded-full font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200 inline-flex items-center gap-1"
+                                  title={bibleLocation.description}
+                                  aria-label={`Change scene location from ${bibleLocation.name}`}
+                                  aria-expanded={swapSceneForScene === scene.sceneNumber}
+                                >
+                                  {bibleLocation.backing_character_name || bibleLocation.name}
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                              ) : (
+                                <span
+                                  className="text-xs px-2 py-1 rounded-full font-medium bg-emerald-100 text-emerald-700 border border-emerald-200"
+                                  title={bibleLocation.description}
+                                >
+                                  {bibleLocation.backing_character_name || bibleLocation.name}
+                                </span>
+                              )}
+
+                              {swapSceneForScene === scene.sceneNumber && swappableLocations.length > 0 && (
+                                <div
+                                  className="absolute z-20 mt-1 top-full left-0 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[12rem] max-h-60 overflow-y-auto"
+                                  role="listbox"
+                                >
+                                  {swappableLocations.map(loc => (
+                                    <button
+                                      key={`swap-${loc.temp_id}`}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onSceneLocationChange!(scene.sceneNumber, loc.temp_id);
+                                        setSwapSceneForScene(null);
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-emerald-50"
+                                      role="option"
+                                      title={loc.description}
+                                    >
+                                      {loc.name}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* "Save scene" button is temporarily hidden — the save-to-library flow needs more
+                                  iteration before re-exposing it. Supporting code (endpoint, handler in
+                                  create/page.tsx, savedLocationTempIds state) is intact, so re-enabling is just
+                                  a matter of un-commenting the JSX block below. */}
+                              {/*
+                              {onSaveLocationToLibrary && !bibleLocation.backing_character_name && (() => {
+                                const tempId = bibleScene.location_temp_id as string;
+                                const alreadySaved = savedLocationTempIds?.has(tempId) ?? false;
+                                return (
+                                  <button
+                                    type="button"
+                                    disabled={alreadySaved}
+                                    onClick={() => {
+                                      if (alreadySaved) return;
+                                      const ok = window.confirm(
+                                        `Save "${bibleLocation.name}" to your character library so you can reuse this scene in future stories?`
+                                      );
+                                      if (!ok) return;
+                                      onSaveLocationToLibrary({
+                                        temp_id: tempId,
+                                        name: bibleLocation.name,
+                                        description: bibleLocation.description,
+                                        backing_character_name: bibleLocation.backing_character_name ?? null,
+                                      });
+                                    }}
+                                    title={alreadySaved ? 'Already in your character library' : 'Save this scene to your character library'}
+                                    aria-label={alreadySaved ? `${bibleLocation.name} is saved in your library` : `Save ${bibleLocation.name} to your library`}
+                                    className={`text-xs px-2 py-1 rounded-full font-medium border inline-flex items-center gap-1 transition-colors ${
+                                      alreadySaved
+                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200 cursor-default'
+                                        : 'bg-white text-gray-600 border-gray-300 hover:text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50 cursor-pointer'
+                                    }`}
+                                  >
+                                    <svg className="w-3 h-3" fill={alreadySaved ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                                    </svg>
+                                    {alreadySaved ? 'Saved' : 'Save scene'}
+                                  </button>
+                                );
+                              })()}
+                              */}
+                            </div>
+                          )}
+
+                        </div>
+                      )
+                    );
+                  })()}
 
                   {/* Image Prompt Preview - Editable */}
                   <details className="mt-2">

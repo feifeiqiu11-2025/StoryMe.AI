@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
 import { generateImageWithGemini, generateImageWithGeminiClassic, generateImageWithGeminiColoring, isGeminiAvailable, GeminiCharacterInfo, clearOutfitCache, resolveGeminiImageModel } from '@/lib/gemini-image-client';
 import { parseScriptIntoScenes, buildConsistentSceneSettings, extractSceneLocation } from '@/lib/scene-parser';
-import { GeneratedImage, Character, CharacterRating, ClothingConsistency, ImageProvider, normalizeImageProvider, isGeminiProvider, DEFAULT_IMAGE_PROVIDER } from '@/lib/types/story';
+import { GeneratedImage, Character, CharacterRating, ClothingConsistency, ImageProvider, normalizeImageProvider, isGeminiProvider, isOpenAIProvider, DEFAULT_IMAGE_PROVIDER } from '@/lib/types/story';
 import { createClientFromRequest } from '@/lib/supabase/server';
 import { checkImageGenerationLimit, logApiUsage } from '@/lib/utils/rate-limit';
 import { StorageService } from '@/lib/services/storage.service';
+import type { StoryBibleResult, BibleLocation, BibleScene } from '@/lib/ai/scene-enhancer';
 
 // Illustration style type
 type IllustrationStyle = 'pixar' | 'classic' | 'coloring';
@@ -25,8 +26,37 @@ export async function POST(request: NextRequest) {
       imageProvider: requestedProvider,
       illustrationStyle,
       clothingConsistency: requestedClothingConsistency,
-      coverMetadata  // NEW: Cover image metadata (title, description, prompt)
-    } = body;
+      coverMetadata,  // NEW: Cover image metadata (title, description, prompt)
+      storyBible  // Optional: story-bible payload (pronoun-resolved scenes + locked locations)
+    } = body as {
+      characters: Character[];
+      script: string;
+      artStyle?: string;
+      imageProvider?: string;
+      illustrationStyle?: IllustrationStyle;
+      clothingConsistency?: ClothingConsistency;
+      coverMetadata?: { title?: string; coverPrompt?: string; description?: string };
+      storyBible?: StoryBibleResult | null;
+    };
+
+    // Build bible lookups (empty maps when no bible → every lookup returns undefined,
+    // so the scene loop falls through to legacy regex-based behavior unchanged).
+    const bibleSceneByNumber = new Map<number, BibleScene>();
+    const bibleLocationByTempId = new Map<string, BibleLocation>();
+    if (storyBible?.scenes) {
+      for (const s of storyBible.scenes) {
+        if (typeof s.sceneNumber === 'number') bibleSceneByNumber.set(s.sceneNumber, s);
+      }
+    }
+    if (storyBible?.locations) {
+      for (const loc of storyBible.locations) {
+        if (typeof loc.temp_id === 'string') bibleLocationByTempId.set(loc.temp_id, loc);
+      }
+    }
+    const useStoryBible = bibleSceneByNumber.size > 0;
+    if (useStoryBible) {
+      console.log(`📖 Story bible active: ${bibleLocationByTempId.size} locations, ${bibleSceneByNumber.size} scenes`);
+    }
 
     // Determine clothing consistency mode (default to 'consistent')
     const clothingConsistency: ClothingConsistency = requestedClothingConsistency || 'consistent';
@@ -43,7 +73,20 @@ export async function POST(request: NextRequest) {
     // Determine which image provider to use
     // Priority: request param > env var > default
     const defaultProvider = normalizeImageProvider(process.env.IMAGE_PROVIDER);
-    const imageProvider: ImageProvider = normalizeImageProvider(requestedProvider) || defaultProvider;
+    const requestedProviderResolved: ImageProvider = normalizeImageProvider(requestedProvider) || defaultProvider;
+
+    // OpenAI gpt-image-2 is currently only implemented for character previews, NOT scene
+    // generation. If the user picked it for scenes, fall back to Gemini and surface a clear
+    // message. Without this, the route silently routes to FLUX and the user has no idea why
+    // their selection didn't take effect.
+    let imageProvider: ImageProvider = requestedProviderResolved;
+    let providerFallback: string | null = null;
+    if (isOpenAIProvider(requestedProviderResolved)) {
+      const fallbackTarget: ImageProvider = 'gemini-3.1';
+      providerFallback = `OpenAI gpt-image-2 isn't supported for scene generation yet (it's only available for character previews). Using ${fallbackTarget} for scenes.`;
+      console.warn(`[generate-images] ${providerFallback}`);
+      imageProvider = fallbackTarget;
+    }
 
     // Validate Gemini is available if requested
     if (isGeminiProvider(imageProvider) && !isGeminiAvailable()) {
@@ -84,11 +127,20 @@ export async function POST(request: NextRequest) {
     if (coverMetadata && coverMetadata.title && coverMetadata.coverPrompt) {
       console.log(`📖 Adding cover image (Scene 0): "${coverMetadata.title}"`);
 
+      // Filter cover characters to those with a usable reference image. AI-grouped names
+      // without references (e.g., "Friends" added by enhancement) end up rendered as
+      // invented stand-ins, which is exactly the cover-fidelity bug we want to avoid.
+      // For stories where all characters have references, this is a no-op.
       const coverScene = {
         id: 'cover',
         sceneNumber: 0,
         description: coverMetadata.coverPrompt,
-        characterNames: characters.map((c: Character) => c.name)
+        characterNames: characters
+          .filter((c: Character) =>
+            (c.animatedPreviewUrl && c.animatedPreviewUrl.trim()) ||
+            (c.referenceImage?.url && c.referenceImage.url.trim())
+          )
+          .map((c: Character) => c.name),
       };
 
       // Prepend cover to scenes array
@@ -194,18 +246,86 @@ export async function POST(request: NextRequest) {
       try {
         console.log(`Generating image for scene ${scene.sceneNumber}: ${scene.description}`);
 
-        // Extract scene location for consistency
-        const sceneLocation = extractSceneLocation(scene.description);
+        // Bible lookup for this scene. Cover (scene 0) has no bible entry of its own,
+        // so when a bible exists we borrow the primary location (scene 1's location
+        // → first-indexed → locations[0]) to anchor the cover to the same place scene 1
+        // uses. Prevents cover/scene-1 forest drift.
+        const isCoverScene = scene.sceneNumber === 0;
+        const bibleScene = bibleSceneByNumber.get(scene.sceneNumber);
+        let bibleLocation = bibleScene?.location_temp_id
+          ? bibleLocationByTempId.get(bibleScene.location_temp_id) ?? undefined
+          : undefined;
+
+        if (isCoverScene && !bibleLocation && useStoryBible && storyBible) {
+          const firstSceneLocId = storyBible.scenes?.[0]?.location_temp_id ?? null;
+          const primary = (firstSceneLocId ? storyBible.locations.find(l => l.temp_id === firstSceneLocId) : null)
+            || storyBible.locations.find(l => l.first_scene_index === 0)
+            || storyBible.locations[0]
+            || undefined;
+          if (primary) bibleLocation = primary;
+        }
+
+        // Scene description passed to the image provider. When the bible has a locked
+        // location description for this scene, we append it as a "Setting:" block so
+        // every scene in this location shares the same visual anchor — this is the
+        // Phase 2 prose-based background-consistency fix.
+        const sceneDescriptionForPrompt = bibleLocation
+          ? `${scene.description}\n\nSetting: ${bibleLocation.description}`
+          : scene.description;
+
+        // Legacy location consistency (regex-based) — only used when bible has no location.
+        const sceneLocation = bibleLocation ? null : extractSceneLocation(scene.description);
         const locationSetting = sceneLocation ? sceneSettings.get(sceneLocation) : undefined;
 
-        // Filter characters that appear in this scene (or use all if not specified)
-        const sceneCharacters = scene.characterNames && scene.characterNames.length > 0
-          ? characterPrompts.filter(char => scene.characterNames!.includes(char.name))
-          : characterPrompts;
+        // Build the per-scene character list.
+        // Priority: bible's pronoun-resolved names → legacy regex characterNames → all characters.
+        // This is the fix for the pronoun bug: "He walks in the forest" no longer produces
+        // an empty character list that silently drops the protagonist's reference image.
+        let sceneCharacters: CharacterPromptInfo[] = [];
+        if (bibleScene?.resolved_character_names?.length) {
+          const resolvedSet = new Set(
+            bibleScene.resolved_character_names.map(n => n.toLowerCase())
+          );
+          sceneCharacters = characterPrompts.filter(c => resolvedSet.has(c.name.toLowerCase()));
+        } else if (scene.characterNames && scene.characterNames.length > 0) {
+          sceneCharacters = characterPrompts.filter(char => scene.characterNames!.includes(char.name));
+        }
 
         if (sceneCharacters.length === 0) {
-          // If no characters detected, use all available characters
-          sceneCharacters.push(...characterPrompts);
+          // If no characters detected (legacy fallback), use all available characters.
+          // Under the bible path we skip this fallback and allow zero characters — pure
+          // scenery scenes like "The sun rose over the mountains" should render without
+          // forcing the protagonist in.
+          if (!bibleScene) {
+            sceneCharacters.push(...characterPrompts);
+          }
+        }
+
+        // If the bible's location is backed by a scene-type character (e.g., "Rainbow House"
+        // imported with subject_type='scene'), surface that character's reference image to
+        // the provider so the setting looks consistent across scenes. The provider already
+        // handles subjectType='scenery' characters by using the description as-is (no clothing
+        // logic), so this is a safe append.
+        if (bibleLocation?.backing_character_name) {
+          const backingName = bibleLocation.backing_character_name.toLowerCase();
+          const backingChar = characterPrompts.find(c => c.name.toLowerCase() === backingName);
+          if (backingChar && !sceneCharacters.some(c => c.name.toLowerCase() === backingName)) {
+            sceneCharacters.push(backingChar);
+          }
+        } else if (bibleLocation?.reference_image_url) {
+          // Phase 3: non-backed location with an auto-generated reference image.
+          // Surface it to the provider as a synthetic scenery entry — the reference image
+          // becomes another visual anchor for cross-scene background consistency. The
+          // Gemini/FLUX clients treat subjectType='scenery' by using the description as-is,
+          // so no clothing/animal logic interferes.
+          sceneCharacters.push({
+            name: bibleLocation.name,
+            referenceImageUrl: bibleLocation.reference_image_url,
+            description: {
+              fullDescription: bibleLocation.description,
+              subjectType: 'scenery',
+            },
+          });
         }
 
         // Generate image using selected provider
@@ -231,7 +351,7 @@ export async function POST(request: NextRequest) {
             console.log(`[Scene ${scene.sceneNumber}] Using Coloring Book style (B&W line art)`);
             result = await generateImageWithGeminiColoring({
               characters: geminiCharacters,
-              sceneDescription: scene.description,
+              sceneDescription: sceneDescriptionForPrompt,
               artStyle: artStyle || "children's coloring book, line art",
               clothingConsistency,
               modelId: geminiModelId,
@@ -240,7 +360,7 @@ export async function POST(request: NextRequest) {
             // Classic Storybook - 2D hand-drawn/watercolor style
             result = await generateImageWithGeminiClassic({
               characters: geminiCharacters,
-              sceneDescription: scene.description,
+              sceneDescription: sceneDescriptionForPrompt,
               artStyle: artStyle || "children's book illustration, colorful, whimsical",
               clothingConsistency,
               modelId: geminiModelId,
@@ -252,7 +372,7 @@ export async function POST(request: NextRequest) {
             }
             result = await generateImageWithGemini({
               characters: geminiCharacters,
-              sceneDescription: scene.description,
+              sceneDescription: sceneDescriptionForPrompt,
               artStyle: artStyle || "children's book illustration, colorful, whimsical",
               clothingConsistency,
               modelId: geminiModelId,
@@ -297,7 +417,7 @@ export async function POST(request: NextRequest) {
           // Use FLUX LoRA (text-based prompts only)
           result = await generateImageWithMultipleCharacters({
             characters: sceneCharacters,
-            sceneDescription: scene.description,
+            sceneDescription: sceneDescriptionForPrompt,
             artStyle: artStyle || "children's book illustration, colorful, whimsical",
             sceneLocation: locationSetting,
             emphasizeGenericCharacters: true,
@@ -402,6 +522,7 @@ export async function POST(request: NextRequest) {
       successfulScenes: successfulCount,
       limits: rateLimitCheck.limits,
       imageProvider: useGemini ? 'gemini' : 'flux', // Report which provider was used
+      providerFallback,  // Non-null when the requested provider isn't supported for scenes (e.g., openai-gpt-image-2 → Gemini)
     });
   } catch (error) {
     console.error('Generate images error:', error);

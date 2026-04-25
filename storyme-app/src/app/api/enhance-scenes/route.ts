@@ -13,9 +13,12 @@ import {
   buildEnhancementPrompt,
   parseEnhancementResponse,
   createFallbackEnhancement,
+  buildStoryBiblePrompt,
+  parseStoryBibleResponse,
   type SceneToEnhance,
   type Character,
-  type EnhancedSceneResult
+  type EnhancedSceneResult,
+  type StoryBibleResult
 } from '@/lib/ai/scene-enhancer';
 import {
   buildChineseEnhancementPrompt,
@@ -45,7 +48,8 @@ export async function POST(request: NextRequest) {
       secondaryLanguage: rawSecondaryLanguage,  // Generic: 'zh', 'ko', etc.
       script,  // Raw script text for title/description generation
       templateBasePrompt,  // Optional: story category guidance from selected template
-      templateId  // Optional: template ID for story architecture
+      templateId,  // Optional: template ID for story architecture
+      enableStoryBible = false  // Opt-in: run the story-bible pass (pronoun + location resolution)
     } = body;
 
     // Validate inputs
@@ -105,9 +109,23 @@ export async function POST(request: NextRequest) {
       console.log(`📐 Using story architecture for template: ${templateId}`);
     }
 
-    // Build prompt based on language
+    // Build prompt based on language. Story-bible path is English-only for Phase 1;
+    // Chinese flow keeps its existing enhancer.
     const isEnglish = language === 'en';
-    const prompt = isEnglish
+    const useStoryBible = enableStoryBible === true && isEnglish;
+
+    const prompt = useStoryBible
+      ? buildStoryBiblePrompt(
+          scenes as SceneToEnhance[],
+          characters as Character[],
+          readingLevel,
+          storyTone as StoryTone,
+          expansionLevel as ExpansionLevel,
+          templateBasePrompt,
+          storyArchitecture,
+          script
+        )
+      : isEnglish
       ? buildEnhancementPrompt(
           scenes as SceneToEnhance[],
           characters as Character[],
@@ -128,6 +146,10 @@ export async function POST(request: NextRequest) {
           storyArchitecture,
           script
         );
+
+    if (useStoryBible) {
+      console.log('📖 Story-bible enhancement path enabled (pronoun + location resolution)');
+    }
 
     // Get appropriate AI model for language
     const { client, model } = getModelForLanguage(language as 'en' | 'zh');
@@ -160,15 +182,27 @@ export async function POST(request: NextRequest) {
     // Log model usage
     logModelUsage(language as 'en' | 'zh', model, completion.usage);
 
-    // Parse response based on language
+    // Parse response based on language + bible mode
     let enhancedScenes: EnhancedSceneResult[];
+    let storyBible: StoryBibleResult | null = null;
 
     try {
-      enhancedScenes = language === 'zh'
-        ? parseChineseEnhancementResponse(responseText, scenes)
-        : parseEnhancementResponse(responseText, scenes);
+      if (useStoryBible) {
+        const bible = parseStoryBibleResponse(responseText, scenes);
+        storyBible = bible;
+        // The bible scenes are EnhancedSceneResult + bible-only fields; downstream
+        // consumers that read enhancedScenes keep working unchanged.
+        enhancedScenes = bible.scenes;
+      } else {
+        enhancedScenes = language === 'zh'
+          ? parseChineseEnhancementResponse(responseText, scenes)
+          : parseEnhancementResponse(responseText, scenes);
+      }
     } catch (parseError) {
       console.error('Failed to parse AI response, using fallback:', parseError);
+      // If the bible pass failed, drop the bible output and return the
+      // fallback so the user's story still generates.
+      storyBible = null;
       enhancedScenes = createFallbackEnhancement(scenes);
     }
 
@@ -197,6 +231,18 @@ export async function POST(request: NextRequest) {
       coverPrompt: ''
     };
 
+    // If the bible produced locations, pick the primary one (scene 1's location, else
+    // the location marked first_scene_index=0, else the first entry) so the cover can
+    // anchor to the same setting as the first content scene — prevents cover/scene-1 drift.
+    const primaryBibleLocation: { name: string; description: string } | undefined = (() => {
+      if (!storyBible?.locations?.length) return undefined;
+      const firstSceneLocId = storyBible.scenes?.[0]?.location_temp_id ?? null;
+      const byFirstScene = firstSceneLocId ? storyBible.locations.find(l => l.temp_id === firstSceneLocId) : null;
+      const byFirstIndex = storyBible.locations.find(l => l.first_scene_index === 0);
+      const chosen = byFirstScene || byFirstIndex || storyBible.locations[0];
+      return chosen ? { name: chosen.name, description: chosen.description } : undefined;
+    })();
+
     if (script && script.trim()) {
       try {
         console.log('🎨 Generating story title and description...');
@@ -213,7 +259,8 @@ export async function POST(request: NextRequest) {
           title: storyMetadata.title,
           description: storyMetadata.description,
           characterNames: characters.map((c: Character) => c.name),
-          language: language as 'en' | 'zh'
+          language: language as 'en' | 'zh',
+          primaryLocation: primaryBibleLocation,
         });
 
         metadata = {
@@ -235,7 +282,8 @@ export async function POST(request: NextRequest) {
             title: firstWords || 'My Amazing Story',
             description: 'A wonderful adventure awaits!',
             characterNames: characters.map((c: Character) => c.name),
-            language: language as 'en' | 'zh'
+            language: language as 'en' | 'zh',
+            primaryLocation: primaryBibleLocation,
           })
         };
       }
@@ -269,6 +317,10 @@ export async function POST(request: NextRequest) {
       enhancedScenes,
       readingLevel,
       storyTone,
+      // Null unless the request opted into the bible pass and parsing succeeded.
+      // Client/persistence layer uses this to populate story_locations + scene.location_id
+      // + scene.resolved_character_ids on save, and to flip project.uses_story_bible = true.
+      storyBible,
     });
 
   } catch (error) {

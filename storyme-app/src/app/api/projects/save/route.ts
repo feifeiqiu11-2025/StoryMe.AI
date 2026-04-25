@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
       visibility = 'private', // DEFAULT to private for safety
       language = 'en', // NEW: Language for the story (en or zh)
       secondaryLanguage = null, // Secondary language for bilingual captions (e.g., 'zh', 'ko')
+      storyBible,  // Optional: story-bible payload from enhance-scenes (locations + resolved scenes)
     } = body;
 
     // If projectId provided, verify it's a draft owned by this user
@@ -212,6 +213,7 @@ export async function POST(request: NextRequest) {
       characterIds,
       scenes,
       quizData,
+      storyBible: storyBible ?? null,
     });
 
     // INCREMENT STORY COUNT - Phase 2A subscription system
