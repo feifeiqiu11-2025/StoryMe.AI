@@ -9,6 +9,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { isAdminEmail } from '@/lib/auth/isAdmin';
 
 interface SupportSubmission {
   id: string;
@@ -27,8 +28,6 @@ interface SupportSubmission {
   created_at: string;
   updated_at: string;
 }
-
-const ADMIN_EMAIL = 'feifei_qiu@hotmail.com';
 
 const statusColors = {
   new: 'bg-blue-100 text-blue-800',
@@ -68,7 +67,7 @@ export default function AdminSupportPage() {
 
       setUser(supabaseUser);
 
-      if (supabaseUser.email !== ADMIN_EMAIL) {
+      if (!isAdminEmail(supabaseUser.email)) {
         router.push('/dashboard');
       }
     };
@@ -77,7 +76,7 @@ export default function AdminSupportPage() {
 
   // Load submissions
   useEffect(() => {
-    if (user?.email === ADMIN_EMAIL) {
+    if (isAdminEmail(user?.email)) {
       loadSubmissions();
     }
   }, [user, statusFilter]);
@@ -154,7 +153,7 @@ export default function AdminSupportPage() {
   };
 
   // Check if user is admin
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !isAdminEmail(user.email)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

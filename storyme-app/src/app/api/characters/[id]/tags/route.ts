@@ -9,13 +9,9 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
+import { isAdminEmail } from '@/lib/auth/isAdmin';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-
-const ADMIN_EMAILS = [
-  'feifei_qiu@hotmail.com',
-  'admin@kindlewoodstudio.ai',
-];
 
 const UpdateTagsSchema = z.object({
   tags: z
@@ -60,7 +56,7 @@ export async function PUT(
       Boolean
     );
 
-    const isAdmin = ADMIN_EMAILS.includes((user.email || '').toLowerCase());
+    const isAdmin = isAdminEmail(user.email);
 
     if (isAdmin) {
       // Admin: use service role to tag any character

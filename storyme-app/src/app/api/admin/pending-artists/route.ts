@@ -1,12 +1,11 @@
 /**
  * Admin API: Get all pending artist profiles
- * Only accessible by admin email: feifei_qiu@hotmail.com
+ * Restricted to admins (see lib/auth/isAdmin.ts).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-
-const ADMIN_EMAIL = 'feifei_qiu@hotmail.com';
+import { isAdminEmail } from '@/lib/auth/isAdmin';
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -22,7 +21,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Check if user is admin
-  if (user.email !== ADMIN_EMAIL) {
+  if (!isAdminEmail(user.email)) {
     return NextResponse.json(
       { error: 'Unauthorized - Admin access only' },
       { status: 403 }

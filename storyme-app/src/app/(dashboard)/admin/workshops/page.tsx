@@ -14,12 +14,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { isAdminEmail } from '@/lib/auth/isAdmin';
 import { WORKSHOP_PARTNERS } from '@/lib/workshops/constants';
-
-const ADMIN_EMAILS = [
-  'feifei_qiu@hotmail.com',
-  'panglu7373@gmail.com',
-];
 
 interface Registration {
   id: string;
@@ -102,7 +98,7 @@ export default function AdminWorkshopsPage() {
         return;
       }
 
-      if (!ADMIN_EMAILS.includes(user.email || '')) {
+      if (!isAdminEmail(user.email)) {
         router.push('/dashboard');
         return;
       }

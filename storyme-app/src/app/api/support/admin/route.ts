@@ -3,14 +3,12 @@
  * GET /api/support/admin - List all support submissions (admin only)
  * PATCH /api/support/admin - Update submission status/notes (admin only)
  *
- * Restricted to feifei_qiu@hotmail.com
+ * Restricted to admins (see lib/auth/isAdmin.ts).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-
-// Admin email - can be moved to environment variable if needed
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'feifei_qiu@hotmail.com';
+import { isAdminEmail } from '@/lib/auth/isAdmin';
 
 /**
  * Check if current user is admin
@@ -28,7 +26,7 @@ async function isAdmin(supabase: any): Promise<boolean> {
     .eq('id', user.id)
     .single();
 
-  return userData?.email === ADMIN_EMAIL;
+  return isAdminEmail(userData?.email);
 }
 
 /**
@@ -119,7 +117,7 @@ export async function PATCH(request: NextRequest) {
 
     // Build update object
     const updates: any = {
-      reviewed_by: user?.email || ADMIN_EMAIL,
+      reviewed_by: user?.email || 'admin',
       reviewed_at: new Date().toISOString(),
     };
 

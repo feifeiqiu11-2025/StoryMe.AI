@@ -47,6 +47,13 @@ const adminPages = [
     icon: '🖼️',
     color: 'from-cyan-500 to-blue-500',
   },
+  {
+    title: 'Teacher Training',
+    description: 'Classroom scenarios walkthrough for schools',
+    href: '/admin/training',
+    icon: '📖',
+    color: 'from-amber-500 to-rose-500',
+  },
 ];
 
 export default function AdminIndexPage() {

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { isAdminEmail } from '@/lib/auth/isAdmin';
 import Image from 'next/image';
 
 // Story cover images - using real community stories
@@ -20,8 +21,6 @@ const QR_APP_STORE = '/images/qr-kindlewood-ios.png';
 const QR_STUDIO = '/images/qr-kindlewood-studio.png';
 const QR_COMMUNITY = '/images/qr-community.png';
 const APP_PREVIEW = '/images/app-store-preview.png';
-
-const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'feifei_qiu@hotmail.com';
 
 export default function AdminPosterPage() {
   const router = useRouter();
@@ -41,7 +40,7 @@ export default function AdminPosterPage() {
 
       setUser(supabaseUser);
 
-      if (supabaseUser.email !== ADMIN_EMAIL) {
+      if (!isAdminEmail(supabaseUser.email)) {
         router.push('/dashboard');
       }
     };
@@ -89,7 +88,7 @@ export default function AdminPosterPage() {
     }
   };
 
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !isAdminEmail(user.email)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

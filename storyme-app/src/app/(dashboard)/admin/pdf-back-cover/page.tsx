@@ -3,9 +3,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { isAdminEmail } from '@/lib/auth/isAdmin';
 import Image from 'next/image';
-
-const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'feifei_qiu@hotmail.com';
 
 /**
  * Admin page to generate PDF back cover as HTML
@@ -28,7 +27,7 @@ export default function PdfBackCoverPage() {
 
       setUser(supabaseUser);
 
-      if (supabaseUser.email !== ADMIN_EMAIL) {
+      if (!isAdminEmail(supabaseUser.email)) {
         router.push('/dashboard');
       }
     };
@@ -61,7 +60,7 @@ export default function PdfBackCoverPage() {
     }
   };
 
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !isAdminEmail(user.email)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

@@ -9,11 +9,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
-
-const ADMIN_EMAILS = [
-  'feifei_qiu@hotmail.com',
-  'panglu7373@gmail.com',
-];
+import { isAdminEmail } from '@/lib/auth/isAdmin';
 
 export async function GET() {
   try {
@@ -25,7 +21,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!ADMIN_EMAILS.includes(user.email || '')) {
+    if (!isAdminEmail(user.email)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
