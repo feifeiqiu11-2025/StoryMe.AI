@@ -24,29 +24,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate supported formats for AI processing (OpenAI + Gemini)
-    // AVIF, HEIC, BMP, TIFF etc. are NOT supported by AI image APIs
-    const supportedFormats = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    // Character uploads now run through a client-side canvas re-encode that always
+    // outputs JPEG, so HEIC/PNG/WebP/etc. arriving here have already been normalized.
+    // We still block formats that canvas itself can't decode reliably across browsers.
+    const supportedFormats = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
     if (!supportedFormats.includes(file.type)) {
       return NextResponse.json(
         {
-          error: `Unsupported image format: ${file.type}. Please upload PNG, JPEG, GIF, or WebP images.`,
-          supportedFormats: ['PNG', 'JPEG', 'GIF', 'WebP']
+          error: `Unsupported image format: ${file.type}. Please upload JPG, PNG, HEIC, GIF, or WebP images.`,
+          supportedFormats: ['JPEG', 'PNG', 'HEIC', 'GIF', 'WebP']
         },
         { status: 400 }
       );
     }
 
-    // Also check file extension as backup (some browsers report wrong MIME type for AVIF/HEIC)
+    // Block formats canvas can't reliably decode (AVIF varies by browser; BMP/TIFF/SVG rare).
     const fileName = file.name.toLowerCase();
-    const unsupportedExtensions = ['.avif', '.heic', '.heif', '.bmp', '.tiff', '.tif', '.svg'];
+    const unsupportedExtensions = ['.avif', '.bmp', '.tiff', '.tif', '.svg'];
     const hasUnsupportedExt = unsupportedExtensions.some(ext => fileName.endsWith(ext));
     if (hasUnsupportedExt) {
       const ext = unsupportedExtensions.find(ext => fileName.endsWith(ext)) || 'unknown';
       return NextResponse.json(
         {
-          error: `Unsupported image format (${ext}). Please upload PNG, JPEG, GIF, or WebP images. AVIF and HEIC are not supported by AI image processing.`,
-          supportedFormats: ['PNG', 'JPEG', 'GIF', 'WebP']
+          error: `Unsupported image format (${ext}). Please upload JPG, PNG, HEIC, GIF, or WebP images.`,
+          supportedFormats: ['JPEG', 'PNG', 'HEIC', 'GIF', 'WebP']
         },
         { status: 400 }
       );

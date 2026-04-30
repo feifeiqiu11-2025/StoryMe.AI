@@ -1364,12 +1364,21 @@ STEP 2: Determine the subject type (what the image depicts, regardless of medium
 - "object": Inanimate item (toy, sword, car, house)
 - "scenery": Background, place, building
 
-STEP 3: Based on subject type, return the appropriate JSON:
+STEP 3: Choose the response shape based on MEDIUM first, then subject:
 
-IF HUMAN, return:
+A) IF medium is "kid_creation" — ALWAYS return briefDescription, regardless of subject:
+{
+  "subjectType": "human" | "animal" | "creature" | "object" | "scenery",
+  "medium": "kid_creation",
+  "confidence": 0.0 to 1.0,
+  "briefDescription": "detailed visual description (20-50 words) covering EVERY visible element — every figure, animal, object, decoration, and notable detail. Treat the whole drawing as a unified scene to be reproduced faithfully, NOT a single-subject portrait. Even if one figure looks central, mention companions and surrounding elements too."
+}
+DO NOT return humanDetails for kid_creation, even if you see a human-shaped figure. Kid drawings are creations meant to be reproduced as a whole; the structured human fields (hair color, skin tone, clothing) are not meaningful for crayon/marker work and lose information about the rest of the drawing.
+
+B) ELSE IF subject is "human" (and medium is real_photo or digital_art), return:
 {
   "subjectType": "human",
-  "medium": "real_photo" | "kid_creation" | "digital_art",
+  "medium": "real_photo" | "digital_art",
   "confidence": 0.0 to 1.0,
   "humanDetails": {
     "gender": "boy/girl/man/woman/baby boy/baby girl/toddler",
@@ -1381,16 +1390,16 @@ IF HUMAN, return:
   }
 }
 
-IF NOT HUMAN (animal, creature, object, scenery), return:
+C) ELSE (non-human subject in real_photo or digital_art), return:
 {
   "subjectType": "animal" | "creature" | "object" | "scenery",
-  "medium": "real_photo" | "kid_creation" | "digital_art",
+  "medium": "real_photo" | "digital_art",
   "confidence": 0.0 to 1.0,
   "briefDescription": "detailed visual description (15-30 words) including colors, features, style"
 }
 
 Important guidelines:
-- For children's drawings/sculptures: subjectType is what the artwork REPRESENTS (a dragon drawing = "creature"), and medium is "kid_creation"
+- For children's drawings/sculptures: subjectType is what the artwork REPRESENTS (a dragon drawing = "creature"), and medium is "kid_creation" — branch A applies
 - Be specific and descriptive for storybook character consistency
 - For gender: Use child-friendly terms (boy, girl) for children; man, woman for adults
 - NEVER mention brand names, logos, or copyrighted characters (Disney, Marvel, Spider-Man, etc.) in any field — describe the visual appearance generically instead
@@ -1399,7 +1408,8 @@ Important guidelines:
 Return the JSON now:`;
 
   // Retry-with-backoff for transient 429 (TPM throttle) errors.
-  // Large images can spike per-minute token usage even on Tier 2 keys.
+  // Tight 1s/2s waits so 3 retries fit comfortably inside the route's 30s maxDuration —
+  // the old 2/4/6s schedule could blow the timeout and surface as a generic 500.
   const maxRetries = 3;
   let result: Awaited<ReturnType<typeof genAI.models.generateContent>> | null = null;
   let lastError: unknown = null;
@@ -1407,7 +1417,7 @@ Return the JSON now:`;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       result = await genAI.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         contents: [
           { text: analysisPrompt },
           {
@@ -1422,9 +1432,11 @@ Return the JSON now:`;
     } catch (err) {
       lastError = err;
       const message = err instanceof Error ? err.message : String(err);
-      const isRateLimit = message.includes('429') || message.includes('RESOURCE_EXHAUSTED') || message.includes('quota');
+      // Genuine 429 only. Bare 'quota' substring would catch unrelated errors like
+      // "API key not valid for this quota project" and mistreat them as throttling.
+      const isRateLimit = message.includes('429') || message.includes('RESOURCE_EXHAUSTED');
       if (isRateLimit && attempt < maxRetries) {
-        const waitMs = Math.min(2000 * attempt, 10000); // 2s, 4s, 6s (capped 10s)
+        const waitMs = 1000 * attempt; // 1s, 2s
         console.warn(`[Gemini Analysis] Rate limited (attempt ${attempt}/${maxRetries}). Waiting ${waitMs}ms…`);
         await new Promise(resolve => setTimeout(resolve, waitMs));
         continue;
@@ -1519,8 +1531,37 @@ Return the JSON now:`;
     const validMediums: ImageMedium[] = ['real_photo', 'kid_creation', 'digital_art'];
     const medium: ImageMedium = validMediums.includes(parsed.medium) ? parsed.medium : 'real_photo';
 
+    // Kid drawings are scenes to reproduce as a whole, not single-subject portraits.
+    // Always go through briefDescription so multi-element drawings don't get reduced
+    // to one figure and structured human fields don't get filled with crayon-art noise.
+    // If Gemini followed the prompt it'll have populated briefDescription; if it slipped
+    // and returned humanDetails instead, synthesize a fallback from those fields so the
+    // user still gets *something* in Other Features rather than an empty string.
+    if (medium === 'kid_creation') {
+      let briefDescription = parsed.briefDescription;
+      if (!briefDescription && parsed.humanDetails) {
+        const h = parsed.humanDetails;
+        const parts = [
+          h.gender,
+          h.age ? `(${h.age})` : '',
+          h.hairColor && `${h.hairColor} hair`,
+          h.skinTone && `${h.skinTone} skin`,
+          h.clothing && `wearing ${h.clothing}`,
+          h.otherFeatures,
+        ].filter(Boolean);
+        briefDescription = `Kid's drawing of ${parts.join(', ')}`.trim();
+      }
+      console.log(`[Gemini Analysis] Kid creation (${subjectType}): ${briefDescription || ''}`);
+      return {
+        subjectType,
+        medium,
+        confidence,
+        briefDescription: briefDescription || `Kid's ${subjectType} drawing`,
+      };
+    }
+
     if (subjectType === 'human') {
-      // Human: return structured fields
+      // Human photo / digital art: return structured fields
       const details = parsed.humanDetails || {};
       console.log(`[Gemini Analysis] Human detected: ${details.gender || 'unknown'}, ${details.age || 'unknown age'} (medium: ${medium})`);
       return {
@@ -1537,7 +1578,7 @@ Return the JSON now:`;
         },
       };
     } else {
-      // Non-human: return description
+      // Non-human photo / digital art: return description
       console.log(`[Gemini Analysis] Non-human detected: ${subjectType} - ${parsed.briefDescription || ''} (medium: ${medium})`);
       return {
         subjectType,

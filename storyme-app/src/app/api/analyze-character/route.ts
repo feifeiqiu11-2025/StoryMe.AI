@@ -8,8 +8,8 @@
  *    - Human: Structured fields (gender, hairColor, skinTone, age, clothing, otherFeatures)
  *    - Non-human: Brief description text
  *
- * This replaces both /api/analyze-character-image (GPT) and /api/detect-subject-type (Gemini)
- * Benefits: Single API call (~1-2s vs ~3-5s), no fallback logic, consistent results
+ * Errors are returned with a structured `code` field so the client can show an
+ * accurate message instead of always blaming "rate limited" (the old behavior).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -24,26 +24,20 @@ interface AnalyzeCharacterRequest {
 }
 
 /**
- * Prepare image for Gemini: keep full dimensions (so small elements in
- * multi-element kid drawings remain analyzable), but compress aggressively
- * to keep upload fast and stay well under Gemini's 7MB-per-request inline
- * data limit. Cap at 4096px only as a safety guard against absurdly large
- * inputs. Token usage is dimension-based, so the retry logic handles rare
- * 429 throttles instead of us downscaling away detail.
+ * Resize for analysis: long-edge 4096 preserves detail in busy multi-element kid
+ * drawings (each figure stays large enough for Gemini to recognize as a distinct
+ * subject). The client already compresses to ≤4096 JPEG q0.9 before upload, so this
+ * cap is a no-op for normal flow and only kicks in as a safety net when other
+ * upload paths bypass the client compression. Token headroom is huge (~0.01% of
+ * TPM at typical volume), so the larger cap costs us nothing.
  */
 async function resizeForAnalysis(imageBuffer: Buffer): Promise<{ buffer: Buffer; mimeType: string }> {
-  try {
-    const resized = await sharp(imageBuffer)
-      .rotate() // honor EXIF orientation
-      .resize(4096, 4096, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 80, mozjpeg: true })
-      .toBuffer();
-    return { buffer: resized, mimeType: 'image/jpeg' };
-  } catch (err) {
-    // If sharp fails (e.g. unsupported format), fall back to the original.
-    console.warn('[API] Sharp resize failed, sending original:', err instanceof Error ? err.message : err);
-    return { buffer: imageBuffer, mimeType: 'image/jpeg' };
-  }
+  const resized = await sharp(imageBuffer)
+    .rotate() // honor EXIF orientation
+    .resize(4096, 4096, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 80, mozjpeg: true })
+    .toBuffer();
+  return { buffer: resized, mimeType: 'image/jpeg' };
 }
 
 export async function POST(request: NextRequest) {
@@ -54,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json(
-        { error: 'Authentication required' },
+        { error: 'Authentication required', code: 'UNAUTHORIZED' },
         { status: 401 }
       );
     }
@@ -62,7 +56,7 @@ export async function POST(request: NextRequest) {
     // Check if Gemini is available
     if (!isGeminiAvailable()) {
       return NextResponse.json(
-        { error: 'Image analysis service is not configured' },
+        { error: 'Image analysis service is not configured', code: 'SERVICE_UNCONFIGURED' },
         { status: 503 }
       );
     }
@@ -73,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     if (!imageUrl) {
       return NextResponse.json(
-        { error: 'Image URL is required' },
+        { error: 'Image URL is required', code: 'MISSING_IMAGE_URL' },
         { status: 400 }
       );
     }
@@ -81,14 +75,50 @@ export async function POST(request: NextRequest) {
     console.log(`[API] Analyzing character image...`);
 
     // Fetch image
-    const imageResponse = await fetch(imageUrl);
+    let imageResponse: Response;
+    try {
+      imageResponse = await fetch(imageUrl);
+    } catch (fetchErr) {
+      console.error('[API] Image fetch threw:', fetchErr);
+      return NextResponse.json(
+        {
+          error: 'Failed to fetch image from storage',
+          code: 'FETCH_IMAGE_FAILED',
+          details: fetchErr instanceof Error ? fetchErr.message : String(fetchErr),
+        },
+        { status: 502 }
+      );
+    }
     if (!imageResponse.ok) {
-      throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+      console.error(`[API] Image fetch returned ${imageResponse.status} for ${imageUrl}`);
+      return NextResponse.json(
+        { error: `Failed to fetch image (HTTP ${imageResponse.status})`, code: 'FETCH_IMAGE_FAILED' },
+        { status: 502 }
+      );
     }
 
-    // Resize before sending to Gemini — drops token usage ~5-10x on large iPhone photos
     const originalBuffer = Buffer.from(await imageResponse.arrayBuffer());
-    const { buffer: resizedBuffer, mimeType } = await resizeForAnalysis(originalBuffer);
+
+    // Resize before sending to Gemini. If sharp can't decode (rare now that the client
+    // always re-encodes to JPEG, but defensive), fail fast instead of forwarding bad
+    // bytes with a fake mime type — that path silently broke analysis for HEIC uploads.
+    let resizedBuffer: Buffer;
+    let mimeType: string;
+    try {
+      const result = await resizeForAnalysis(originalBuffer);
+      resizedBuffer = result.buffer;
+      mimeType = result.mimeType;
+    } catch (sharpErr) {
+      console.error('[API] Sharp resize failed:', sharpErr);
+      return NextResponse.json(
+        {
+          error: "Couldn't process this image. Please try a different photo.",
+          code: 'SHARP_FAILED',
+          details: sharpErr instanceof Error ? sharpErr.message : String(sharpErr),
+        },
+        { status: 422 }
+      );
+    }
     console.log(`[API] Image: ${originalBuffer.length} bytes → ${resizedBuffer.length} bytes (${Math.round(resizedBuffer.length / originalBuffer.length * 100)}%)`);
 
     const base64 = resizedBuffer.toString('base64');
@@ -104,13 +134,14 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('[API] Analyze character error:', error);
+    const errorClass = error instanceof Error ? error.constructor.name : typeof error;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[API] Analyze character error [${errorClass}]:`, errorMessage);
 
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-    // Surface rate-limit errors with proper status so the UI can prompt the user
-    // to pick medium manually instead of silently treating it as a successful analysis.
-    if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('quota')) {
+    // Genuine 429s only — drop the bare 'quota' substring match (it caught unrelated
+    // errors like "API key not valid for this quota project" and mislabeled them).
+    const isRateLimit = errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED');
+    if (isRateLimit) {
       return NextResponse.json(
         {
           error: 'Image analysis is rate-limited right now. Please pick whether this is a real photo or a kid\'s creation.',
@@ -121,9 +152,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Gemini SDK responses with no candidates / parse failures bubble up here.
+    if (errorMessage.includes('JSON') || errorMessage.includes('parse')) {
+      return NextResponse.json(
+        { error: 'Failed to parse analysis response', code: 'GEMINI_PARSE_FAILED', details: errorMessage },
+        { status: 502 }
+      );
+    }
+
     return NextResponse.json(
       {
         error: 'Failed to analyze character image',
+        code: 'ANALYSIS_FAILED',
         details: errorMessage,
       },
       { status: 500 }

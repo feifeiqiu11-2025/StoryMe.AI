@@ -21,6 +21,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { SketchStep } from '@/components/characters/SketchGuideViewer';
 import BreakdownModal from '@/components/characters/BreakdownModal';
+import { compressImageForUpload } from '@/lib/utils/compress-image';
 
 const CHARACTERS_STORAGE_KEY = 'storyme_character_library';
 
@@ -134,8 +135,9 @@ export default function CharactersPage() {
   const [generatingStyle, setGeneratingStyle] = useState<'pixar' | 'classic' | null>(null);
   // Detected medium of uploaded image — drives kid_creation prompt branching
   const [detectedMedium, setDetectedMedium] = useState<ImageMedium>('real_photo');
-  // True when analyze-character failed (e.g. Gemini rate-limited) — UI shows explicit medium picker
-  const [analysisFailed, setAnalysisFailed] = useState(false);
+  // Set when analyze-character failed — UI shows explicit medium picker. Distinguishes
+  // RATE_LIMITED (genuine 429) from other failures so we don't lie about the cause.
+  const [analysisError, setAnalysisError] = useState<{ code: string; message: string } | null>(null);
   // Admin image-model override (defaults to ChatGPT for character experiment)
   const [providerOverride, setProviderOverride] = useState<ImageProvider | null>(null);
   const effectiveProvider: ImageProvider = providerOverride ?? 'gemini-3.1';
@@ -785,21 +787,41 @@ export default function CharactersPage() {
   };
 
   const handleImageUpload = async (file: File) => {
-    // Client-side validation for supported formats
-    const supportedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    // Accept anything the browser can decode (incl. HEIC on Safari/iOS/macOS Chrome).
+    // The canvas re-encode normalizes everything to JPEG before upload, so the server
+    // and AI providers never see HEIC directly. AVIF/BMP/TIFF/SVG remain blocked
+    // because canvas decode is unreliable for them across browsers.
     const fileName = file.name.toLowerCase();
-    const unsupportedExtensions = ['.avif', '.heic', '.heif', '.bmp', '.tiff', '.tif', '.svg'];
+    const unsupportedExtensions = ['.avif', '.bmp', '.tiff', '.tif', '.svg'];
     const hasUnsupportedExt = unsupportedExtensions.some(ext => fileName.endsWith(ext));
-
-    if (!supportedTypes.includes(file.type) || hasUnsupportedExt) {
-      alert('Unsupported image format. Please use PNG, JPG, GIF, or WebP images.\n\nAVIF and HEIC formats are not supported by AI image processing.');
+    if (hasUnsupportedExt) {
+      alert('Unsupported image format. Please use JPG, PNG, HEIC, GIF, or WebP.');
       return;
     }
 
     setUploadingImage(true);
     try {
+      // Client-side normalize: decode → resize (long-edge ≤ 4096) → JPEG q0.9.
+      // Fixes large iPhone photos that previously caused slow fetches and timeouts
+      // the old UI mislabeled as "rate limited".
+      let uploadFile: File;
+      try {
+        const compressed = await compressImageForUpload(file);
+        console.log(
+          `[Characters] Compressed ${file.name}: ` +
+          `${(compressed.originalBytes / 1024).toFixed(0)}KB → ${(compressed.compressedBytes / 1024).toFixed(0)}KB ` +
+          `(${compressed.width}×${compressed.height})`
+        );
+        uploadFile = compressed.file;
+      } catch (compressError) {
+        console.error('[Characters] Image compression failed:', compressError);
+        alert(compressError instanceof Error ? compressError.message : 'Failed to read image. Please try a different file.');
+        setUploadingImage(false);
+        return;
+      }
+
       const formDataUpload = new FormData();
-      formDataUpload.append('file', file);
+      formDataUpload.append('file', uploadFile);
 
       const response = await fetch('/api/upload', {
         method: 'POST',
@@ -824,8 +846,8 @@ export default function CharactersPage() {
       console.log('Analyzing character image:', data.url);
       setAnalyzingImage(true);
 
-      // Reset analysis-failed flag for this new upload
-      setAnalysisFailed(false);
+      // Reset analysis error for this new upload
+      setAnalysisError(null);
 
       try {
         const analysisResponse = await fetch('/api/analyze-character', {
@@ -882,19 +904,34 @@ export default function CharactersPage() {
             }
           }
         } else {
-          // Analysis failed (likely 429 rate limit). Surface to UI so user can pick medium manually.
-          // Still save the imageUrl so the user can proceed without waiting.
-          console.error('Character analysis API failed:', analysisResponse.status);
-          setAnalysisFailed(true);
+          // Analysis failed. Read the structured error so we can show the *actual* cause
+          // instead of always claiming "rate limited" (the old behavior misled us for months).
+          let errorBody: { code?: string; error?: string } = {};
+          try {
+            errorBody = await analysisResponse.json();
+          } catch {
+            // body wasn't JSON (timeout, network error)
+          }
+          console.error('[Characters] Character analysis failed:', {
+            status: analysisResponse.status,
+            ...errorBody,
+          });
+          setAnalysisError({
+            code: errorBody.code || `HTTP_${analysisResponse.status}`,
+            message: errorBody.error || `Analysis failed (HTTP ${analysisResponse.status})`,
+          });
           setFormData((prev) => ({
             ...prev,
             imageUrl: data.url,
             imageFileName: file.name,
           }));
         }
-      } catch (analysisError) {
-        console.error('Auto-analysis error:', analysisError);
-        setAnalysisFailed(true);
+      } catch (analysisErr) {
+        console.error('[Characters] Auto-analysis error:', analysisErr);
+        setAnalysisError({
+          code: 'NETWORK_ERROR',
+          message: analysisErr instanceof Error ? analysisErr.message : 'Network error during analysis',
+        });
         setFormData((prev) => ({
           ...prev,
           imageUrl: data.url,
@@ -1309,7 +1346,7 @@ export default function CharactersPage() {
                       <input
                         id="image-upload-input"
                         type="file"
-                        accept="image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp"
+                        accept="image/png,image/jpeg,image/gif,image/webp,image/heic,image/heif,.png,.jpg,.jpeg,.gif,.webp,.heic,.heif"
                         className="hidden"
                         onChange={(e) => {
                           const files = e.target.files;
@@ -1321,14 +1358,13 @@ export default function CharactersPage() {
                       {uploadingImage ? (
                         <div>
                           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                          <p className="text-sm text-gray-600">Uploading...</p>
+                          <p className="text-sm text-gray-600">Processing image...</p>
                         </div>
                       ) : (
                         <div>
                           <div className="text-4xl mb-2">📷</div>
                           <p className="text-sm text-gray-600 mb-1">Click to upload or drag and drop</p>
-                          <p className="text-xs text-gray-500">PNG, JPG, GIF, WebP up to 10MB</p>
-                          <p className="text-xs text-gray-400">(AVIF/HEIC not supported)</p>
+                          <p className="text-xs text-gray-500">JPG, PNG, HEIC, GIF, WebP up to 10MB</p>
                         </div>
                       )}
                     </div>
@@ -1491,23 +1527,25 @@ export default function CharactersPage() {
                       </p>
                     )}
 
-                    {/* Analysis failed → explicit medium picker (no auto-detection available) */}
-                    {characterMode === 'photo' && formData.imageUrl && analysisFailed && (
+                    {/* Analysis failed → explicit medium picker. Honest copy based on actual error code. */}
+                    {characterMode === 'photo' && formData.imageUrl && analysisError && (
                       <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
                         <p className="mb-2">
-                          ⚠️ Couldn&apos;t auto-detect this image (rate limited). Please pick:
+                          {analysisError.code === 'RATE_LIMITED'
+                            ? '⚠️ Image analysis is rate-limited right now. Please pick:'
+                            : "⚠️ Couldn't auto-detect this image. Please pick:"}
                         </p>
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => { setDetectedMedium('real_photo'); setAnalysisFailed(false); }}
+                            onClick={() => { setDetectedMedium('real_photo'); setAnalysisError(null); }}
                             className={`px-3 py-1 text-xs rounded border ${detectedMedium === 'real_photo' ? 'bg-amber-200 border-amber-400 font-medium' : 'bg-white border-amber-300 hover:bg-amber-100'}`}
                           >
                             Real photo
                           </button>
                           <button
                             type="button"
-                            onClick={() => { setDetectedMedium('kid_creation'); setAnalysisFailed(false); }}
+                            onClick={() => { setDetectedMedium('kid_creation'); setAnalysisError(null); }}
                             className={`px-3 py-1 text-xs rounded border ${detectedMedium === 'kid_creation' ? 'bg-amber-200 border-amber-400 font-medium' : 'bg-white border-amber-300 hover:bg-amber-100'}`}
                           >
                             Kid&apos;s creation
@@ -1517,7 +1555,7 @@ export default function CharactersPage() {
                     )}
 
                     {/* Detected medium hint (photo mode + kid_creation) — borderless, lightweight */}
-                    {characterMode === 'photo' && formData.imageUrl && !analysisFailed && detectedMedium === 'kid_creation' && (
+                    {characterMode === 'photo' && formData.imageUrl && !analysisError && detectedMedium === 'kid_creation' && (
                       <p className="text-xs text-gray-500 mb-3">
                         Detected as a kid&apos;s creation.{' '}
                         <button
@@ -1529,7 +1567,7 @@ export default function CharactersPage() {
                         </button>
                       </p>
                     )}
-                    {characterMode === 'photo' && formData.imageUrl && !analysisFailed && detectedMedium === 'real_photo' && (
+                    {characterMode === 'photo' && formData.imageUrl && !analysisError && detectedMedium === 'real_photo' && (
                       <p className="text-xs text-gray-500 mb-3">
                         <button
                           type="button"
