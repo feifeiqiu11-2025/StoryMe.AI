@@ -8,6 +8,7 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import Testimonials from '@/components/landing/Testimonials';
 import ErrorHandler from '@/components/ErrorHandler';
 import LandingNav from '@/components/navigation/LandingNav';
@@ -117,7 +118,7 @@ export default function HomePage() {
             {/* Clean Journey Flow - Inspired by Slides */}
             <div className="mb-12">
               {/* Three Column Grid with Arrows */}
-              <div className="flex flex-col md:flex-row items-stretch justify-center gap-4 md:gap-2 mb-8">
+              <div className="flex flex-col md:flex-row items-center md:items-stretch justify-center gap-4 md:gap-2 mb-8">
 
                 {/* Column 1: Spark */}
                 <Reveal delay={0}>
@@ -191,87 +192,133 @@ export default function HomePage() {
           </div>
         </Reveal>
 
-        {/* How We Do It - With Background Image */}
+        {/* Online Tools - Reader to Creator Loop */}
         <Reveal>
           <div className="mb-12 sm:mb-16">
-            <div className="text-center mb-2">
+            <div className="text-center mb-14 sm:mb-10">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                How We Do It
+                Online Tools for the Creative Loop
               </h2>
             </div>
 
-            {/* Container with hands background image */}
-            <div
-              className="relative max-w-5xl mx-auto bg-no-repeat bg-center bg-contain"
-              style={{ backgroundImage: 'url(/images/HowWeDoBackground.png)' }}
-            >
-              <div className="relative grid md:grid-cols-2 gap-4 md:gap-8">
-                {/* Left: Online Tools */}
-                <Reveal delay={0}>
-                  <div className="p-6 sm:p-10 flex flex-col items-center text-center">
-                    <h3 className="text-lg font-semibold text-gray-900 uppercase tracking-wide">
-                      Online Tools
-                    </h3>
+            {/* Two cards with loop arrow between */}
+            <div className="max-w-6xl mx-auto grid md:grid-cols-[1fr_auto_1fr] gap-6 md:gap-4 items-center">
 
-                    <div className="space-y-5 mt-2">
-                      {/* KindleWood Studio */}
-                      <div>
-                        <h4 className="text-xl font-bold text-gray-900">
-                          KindleWood Studio <span className="text-sm font-normal text-gray-500">For Parents & Educators</span>
-                        </h4>
-                        <p className="text-gray-700 leading-relaxed mt-2">
-                          The creator platform that turns imagination—wild ideas, drawings, and photos—into digital storybooks and creative projects.{' '}
-                          <Link href="/signup" className="text-purple-600 hover:text-purple-700 font-medium transition-colors">
-                            Visit Studio →
-                          </Link>
-                        </p>
-                      </div>
-
-                      {/* KindleWood Kids */}
-                      <div>
-                        <h4 className="text-xl font-bold text-gray-900">
-                          KindleWood Kids <span className="text-sm font-normal text-gray-500">For Children</span>
-                        </h4>
-                        <p className="text-gray-700 leading-relaxed mt-2">
-                          A fun, engaging reading and learning app where kids enjoy their own stories and track their creative progress.{' '}
-                          <a
-                            href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                          >
-                            Download App →
-                          </a>
-                        </p>
-                      </div>
-                    </div>
+              {/* KindleWood Studio Card */}
+              <Reveal delay={0}>
+                <div className="relative bg-white rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all pt-20 sm:pt-24 px-6 pb-6 sm:px-8 sm:pb-8">
+                  {/* Creator dragon popping out top-left */}
+                  <div className="absolute -top-12 -left-2 sm:-top-24 sm:-left-6 w-28 h-28 sm:w-48 sm:h-48 pointer-events-none">
+                    <Image
+                      src="/images/dragon-creator.png"
+                      alt="Dragon writing with quill"
+                      fill
+                      className="object-contain drop-shadow-lg"
+                    />
                   </div>
-                </Reveal>
 
-                {/* Right: Learning Lab */}
-                <Reveal delay={150}>
-                  <div className="p-6 sm:p-10 flex flex-col items-center text-center">
-                    <h3 className="text-lg font-semibold text-gray-900 uppercase tracking-wide">
-                      In-Person Learning Lab
-                    </h3>
-                    <p className="text-gray-700 leading-relaxed mt-2">
-                      Hands-on workshops at <span className="font-bold text-gray-900">partner schools</span> and <span className="font-bold text-gray-900">KindleWood Learning Lab</span> where storytelling meets nature exploration and making.
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 flex-wrap">
+                      <h4 className="text-xl font-bold text-gray-900">KindleWood Studio</h4>
+                      <span className="inline-block bg-purple-100 text-purple-700 text-xs font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                        Web
+                      </span>
+                    </div>
+                    <p className="text-gray-700 leading-relaxed mt-3">
+                      Where imagination becomes digital storybooks — for parents, educators, and young creators.
                     </p>
-                    <p className="text-gray-700 mt-4 mb-2">Workshop activities:</p>
-                    <ul className="space-y-2 text-gray-700 text-sm sm:text-base">
-                      <li className="whitespace-nowrap">• Imagination to storybook with show & tell <span className="text-gray-500">(Ages 4–6)</span></li>
-                      <li className="whitespace-nowrap">• Nature exploration & creative story making <span className="text-gray-500">(Ages 7–9)</span></li>
-                      <li className="whitespace-nowrap">• Maker projects: 3D modeling, digital storytelling <span className="text-gray-500">(Ages 7–12+)</span></li>
-                    </ul>
+                    <p className="mt-4 text-sm text-amber-700 italic">
+                      We empower confident creators and writers.
+                    </p>
                     <p className="mt-4">
-                      <Link href="/workshops" className="text-green-600 hover:text-green-700 font-medium transition-colors">
-                        Explore Workshops →
+                      <Link href="/signup" className="text-purple-600 hover:text-purple-700 font-medium transition-colors">
+                        Start to Create →
                       </Link>
                     </p>
                   </div>
-                </Reveal>
+                </div>
+              </Reveal>
+
+              {/* Loop Arrow - Two long arrows showing bidirectional flow */}
+              <div className="flex md:flex-col items-center justify-center gap-2 py-2 md:py-0 md:px-2">
+                <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Share</span>
+                <div className="flex md:flex-col gap-2 md:gap-2 items-center">
+                  {/* Right-pointing arrow (long shaft) */}
+                  <svg
+                    viewBox="0 0 90 18"
+                    className="w-20 h-4 md:w-24 md:h-5 text-amber-600 rotate-90 md:rotate-0"
+                    aria-hidden="true"
+                  >
+                    <line x1="4" y1="9" x2="72" y2="9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                    <polygon points="86,9 72,2 72,16" fill="currentColor" />
+                  </svg>
+                  {/* Left-pointing arrow (long shaft) */}
+                  <svg
+                    viewBox="0 0 90 18"
+                    className="w-20 h-4 md:w-24 md:h-5 text-amber-600 rotate-90 md:rotate-0"
+                    aria-hidden="true"
+                  >
+                    <line x1="18" y1="9" x2="86" y2="9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                    <polygon points="4,9 18,2 18,16" fill="currentColor" />
+                  </svg>
+                </div>
+                <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Inspire</span>
               </div>
+
+              {/* KindleWood Kids Card */}
+              <Reveal delay={150}>
+                <div className="relative bg-white rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all pt-20 sm:pt-24 px-6 pb-6 sm:px-8 sm:pb-8">
+                  {/* Reader dragon popping out top-right (flipped to face left) */}
+                  <div className="absolute -top-12 -right-2 sm:-top-24 sm:-right-6 w-28 h-28 sm:w-48 sm:h-48 pointer-events-none scale-x-[-1]">
+                    <Image
+                      src="/images/dragon-reader.png"
+                      alt="Dragon reading a book"
+                      fill
+                      className="object-contain drop-shadow-lg"
+                    />
+                  </div>
+
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 flex-wrap">
+                      <h4 className="text-xl font-bold text-gray-900">KindleWood Kids</h4>
+                      <span className="inline-block bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                        Mobile
+                      </span>
+                      <span className="inline-block bg-gray-100 text-gray-700 text-xs font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                        Ages 3–12
+                      </span>
+                    </div>
+                    <p className="text-gray-700 leading-relaxed mt-3">
+                      Where kids read their stories and discover new ones from friends.
+                    </p>
+                    <p className="mt-4 text-sm text-amber-700 italic">
+                      We inspire a love of reading.
+                    </p>
+                    <p className="mt-4 text-gray-700">
+                      Download:{' '}
+                      <a
+                        href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                      >
+                        App Store →
+                      </a>
+                      <span className="mx-2 text-gray-400">·</span>
+                      <a
+                        href="https://play.google.com/store/apps/details?id=com.kindlewood.kindlewood_kids"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                      >
+                        Google Play →
+                      </a>
+                    </p>
+                  </div>
+                </div>
+              </Reveal>
             </div>
+
           </div>
         </Reveal>
 
@@ -283,7 +330,15 @@ export default function HomePage() {
                 Partnering with Schools & Educators
               </h2>
               <p className="text-gray-600 leading-relaxed max-w-3xl mx-auto">
-                We partner with schools, educators, and community organizations to bring creativity-driven storytelling and learning into classrooms and homes.
+                We partner with schools, educators, and community organizations to bring creativity-driven storytelling and hands-on learning into classrooms, homes, and the KindleWood Learning Lab.
+              </p>
+              <p className="mt-3">
+                <Link
+                  href="/workshops"
+                  className="text-green-600 hover:text-green-700 font-medium transition-colors"
+                >
+                  Explore Workshops &amp; Programs →
+                </Link>
               </p>
             </div>
 

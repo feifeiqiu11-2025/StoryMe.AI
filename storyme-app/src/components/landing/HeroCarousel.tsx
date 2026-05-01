@@ -310,7 +310,7 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
 
   if (loading) {
     return (
-      <div className={`relative h-[320px] sm:h-[380px] lg:h-[440px] ${className}`}>
+      <div className={`relative h-[370px] sm:h-[430px] lg:h-[490px] ${className}`}>
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="animate-pulse flex gap-2 sm:gap-3">
             {[...Array(3)].map((_, i) => (
@@ -332,7 +332,7 @@ export default function HeroCarousel({ className = '' }: HeroCarouselProps) {
   return (
     <div className={`relative ${className}`}>
       {/* Carousel Container */}
-      <div className="relative h-[320px] sm:h-[380px] lg:h-[440px]">
+      <div className="relative h-[370px] sm:h-[430px] lg:h-[490px]">
         {/* Cards */}
         <div className="relative h-full w-full">
           {displayStories.map((story, index) => renderCard(story, index, isMock))}

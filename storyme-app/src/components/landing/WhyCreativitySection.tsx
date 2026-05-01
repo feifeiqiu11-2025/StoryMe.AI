@@ -39,19 +39,26 @@ export default function WhyCreativitySection() {
 
       {/* Inspirational Message - 3 Lines */}
       <div
-        className={`text-center mb-10 sm:mb-12 max-w-3xl mx-auto transition-all duration-500 delay-100 ${
+        className={`text-center mb-2 max-w-3xl mx-auto transition-all duration-500 delay-100 ${
           isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
         }`}
       >
         <p className="text-base sm:text-lg text-gray-700 leading-relaxed mb-2">
-          <strong className="text-gray-900">Curiosity</strong> is the source of discovering problems.
-        </p>
-        <p className="text-base sm:text-lg text-gray-700 leading-relaxed mb-2">
-          <strong className="text-gray-900">Creativity</strong> is the power to solve them.
+          <strong className="text-gray-900">Curiosity</strong> is how children discover the world — hands on, eyes wide, hearts open.
         </p>
         <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
-          And <strong className="text-gray-900">resilience</strong>, <strong className="text-gray-900">teamwork</strong>, and{' '}
-          <strong className="text-gray-900">empathy</strong> are what carry you through the journey.
+          <strong className="text-gray-900">Creativity</strong> is how they make it their own.
+        </p>
+      </div>
+
+      {/* Differentiator Punch Line */}
+      <div
+        className={`text-center mb-10 sm:mb-12 max-w-3xl mx-auto transition-all duration-500 delay-150 ${
+          isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+        }`}
+      >
+        <p className="text-lg sm:text-xl font-semibold text-gray-900 leading-relaxed">
+          AI is just a tool to <span className="text-amber-700">nurture and amplify</span> these — not replace them.
         </p>
       </div>
 
