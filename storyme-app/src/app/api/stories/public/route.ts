@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '24');
     const offset = parseInt(searchParams.get('offset') || '0');
     const featured = searchParams.get('featured') === 'true';
+    const featuredOnly = searchParams.get('featuredOnly') === 'true';
     const featuredWithBackfill = searchParams.get('featuredWithBackfill') === 'true';
     const sortBy = searchParams.get('sortBy') || 'recent'; // 'popular' or 'recent'
     const tagSlugs = searchParams.get('tags')?.split(',').filter(Boolean) || [];
@@ -109,6 +110,79 @@ export async function GET(request: NextRequest) {
           },
         });
       }
+    }
+
+    // Step 1.4: Featured-only mode — used by the Community Stories featured carousel.
+    // Returns only stories marked featured=true, ordered newest-first. No backfill.
+    if (featuredOnly) {
+      const { data: featuredStories, error: featuredError } = await supabase
+        .from('projects')
+        .select(`
+          id, title, description, visibility, featured, view_count, like_count, share_count,
+          published_at, created_at, author_name, author_age, cover_image_url,
+          scenes (id, scene_number, description, caption, generated_images (id, image_url)),
+          project_tags (tag_id, story_tags (id, name, slug, icon, category, parent_id, is_leaf, display_order))
+        `)
+        .eq('visibility', 'public')
+        .eq('status', 'completed')
+        .eq('featured', true)
+        .order('published_at', { ascending: false })
+        .limit(limit);
+
+      if (featuredError) {
+        console.error('Error fetching featured-only stories:', featuredError);
+        return NextResponse.json({ error: 'Failed to fetch featured stories' }, { status: 500 });
+      }
+
+      const formatted = (featuredStories || []).map((project: any) => ({
+        id: project.id,
+        title: project.title,
+        description: project.description,
+        visibility: project.visibility,
+        featured: project.featured,
+        viewCount: project.view_count,
+        likeCount: project.like_count,
+        shareCount: project.share_count,
+        publishedAt: project.published_at,
+        createdAt: project.created_at,
+        authorName: project.author_name,
+        authorAge: project.author_age,
+        coverImageUrl: project.cover_image_url,
+        scenes: project.scenes?.map((scene: any) => ({
+          id: scene.id,
+          sceneNumber: scene.scene_number,
+          description: scene.description,
+          caption: scene.caption,
+          imageUrl: scene.generated_images?.[0]?.image_url || null,
+        })) || [],
+        tags: project.project_tags?.map((pt: any) => ({
+          id: pt.story_tags.id,
+          name: pt.story_tags.name,
+          slug: pt.story_tags.slug,
+          icon: pt.story_tags.icon,
+          category: pt.story_tags.category,
+          parentId: pt.story_tags.parent_id,
+          isLeaf: pt.story_tags.is_leaf ?? true,
+          displayOrder: pt.story_tags.display_order,
+        })) || [],
+      }));
+
+      return NextResponse.json({
+        success: true,
+        stories: formatted,
+        totalCount: formatted.length,
+        currentPage: 1,
+        totalPages: 1,
+        offset: 0,
+        limit,
+      }, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      });
     }
 
     // Step 1.5: Featured-with-backfill mode for HeroCarousel

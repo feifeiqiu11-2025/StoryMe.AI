@@ -144,10 +144,23 @@ export function StoryCard({
           </div>
         )}
 
-        {/* Top Right - Featured Badge */}
+        {/* Top Right - Featured Star (icon only — no label so cover art stays visible) */}
         {showFeaturedBadge && story.featured && (
-          <div className="absolute top-2 right-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-            ⭐ Featured
+          <div
+            aria-label="Featured"
+            title="Featured"
+            className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center"
+          >
+            <svg
+              className="w-7 h-7 text-yellow-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              stroke="white"
+              strokeWidth={1.25}
+              strokeLinejoin="round"
+            >
+              <path d="M12 2.5l2.95 5.97 6.59.96-4.77 4.65 1.13 6.57L12 17.55l-5.9 3.1 1.13-6.57L2.46 9.43l6.59-.96L12 2.5z" />
+            </svg>
           </div>
         )}
 
@@ -188,10 +201,14 @@ export function StoryCard({
         )}
       </div>
 
-      {/* Story Info */}
-      <div className="p-4">
+      {/* Story Info — community variant uses fixed height so the grid stays aligned */}
+      <div
+        className={`p-4 flex flex-col ${
+          variant === 'community' ? 'h-[180px]' : ''
+        }`}
+      >
         {/* Title */}
-        <h3 className="font-bold text-gray-900 text-lg mb-1 line-clamp-2">
+        <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1 line-clamp-2">
           {story.title}
         </h3>
 
@@ -208,36 +225,59 @@ export function StoryCard({
           </div>
         )}
 
-        {/* Tags + inline tag editor — always visible */}
-        {((story.tags && story.tags.length > 0) || tagEditor) && (
-          <div className="flex flex-wrap items-center gap-1 mb-2">
-            {(onRemoveTag ? story.tags : story.tags?.slice(0, 3))?.map(tag => (
-              <span
-                key={tag.id}
-                className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium"
-              >
-                {tag.icon && <span className="text-sm">{tag.icon}</span>}
-                {tag.name}
-                {onRemoveTag && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemoveTag(story.id, tag.id);
-                    }}
-                    className="ml-0.5 text-gray-400 hover:text-red-500"
-                  >
-                    &times;
-                  </button>
+        {/* Tags row — single line, reserved height (community) so cards align even when empty */}
+        {variant === 'community' ? (
+          <div className="flex items-center gap-1 mb-2 h-6 overflow-hidden">
+            {story.tags && story.tags.length > 0 && (
+              <>
+                <div className="flex flex-nowrap gap-1 overflow-hidden flex-1 min-w-0">
+                  {story.tags.slice(0, 3).map(tag => (
+                    <span
+                      key={tag.id}
+                      className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0"
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
+                </div>
+                {story.tags.length > 3 && (
+                  <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs flex-shrink-0">
+                    +{story.tags.length - 3}
+                  </span>
                 )}
-              </span>
-            ))}
-            {!onRemoveTag && story.tags && story.tags.length > 3 && (
-              <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs">
-                +{story.tags.length - 3}
-              </span>
+              </>
             )}
-            {tagEditor}
           </div>
+        ) : (
+          ((story.tags && story.tags.length > 0) || tagEditor) && (
+            <div className="flex flex-wrap items-center gap-1 mb-2">
+              {(onRemoveTag ? story.tags : story.tags?.slice(0, 3))?.map(tag => (
+                <span
+                  key={tag.id}
+                  className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium"
+                >
+                  {tag.name}
+                  {onRemoveTag && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveTag(story.id, tag.id);
+                      }}
+                      className="ml-1 text-gray-400 hover:text-red-500"
+                    >
+                      &times;
+                    </button>
+                  )}
+                </span>
+              ))}
+              {!onRemoveTag && story.tags && story.tags.length > 3 && (
+                <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs">
+                  +{story.tags.length - 3}
+                </span>
+              )}
+              {tagEditor}
+            </div>
+          )
         )}
 
         {/* Description */}
@@ -247,9 +287,9 @@ export function StoryCard({
           </p>
         )}
 
-        {/* Author Info (Community Stories) */}
+        {/* Author Info (Community Stories) — anchored to bottom of fixed-height info box */}
         {showAuthor && story.authorName && (
-          <p className="text-xs text-gray-500 italic">
+          <p className="text-xs text-gray-500 italic truncate mt-auto">
             by {story.authorName}
             {story.authorAge && `, age ${story.authorAge}`}
           </p>
