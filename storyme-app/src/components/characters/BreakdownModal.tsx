@@ -83,13 +83,21 @@ export default function BreakdownModal({
       const data = await response.json();
 
       if (!response.ok) {
-        if (response.status === 429) {
+        // Read the structured `code` so we show the actual cause instead of always
+        // claiming "rate limited" (the old behavior misled us — see analyze-character PR).
+        console.error('[Breakdown] Plan failed:', { status: response.status, ...data });
+        if (data.code === 'RATE_LIMITED') {
           setError('Image analysis is rate-limited right now. Please try again in a minute.');
         } else {
           setError(data.error || 'Failed to analyze the drawing.');
         }
         setPhase('error');
         return;
+      }
+
+      // 200 responses can include a code (e.g. BBOX_EMPTY) for diagnostics.
+      if (data.code) {
+        console.log(`[Breakdown] Plan succeeded with code=${data.code}`);
       }
 
       const planItems: PlanItem[] = (data.items || []).map((item: { tempKey: string; name: string; previewUrl: string }) => ({

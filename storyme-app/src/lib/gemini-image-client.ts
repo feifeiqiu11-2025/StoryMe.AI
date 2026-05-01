@@ -1684,7 +1684,9 @@ JSON array:`;
     } catch (err) {
       lastError = err;
       const message = err instanceof Error ? err.message : String(err);
-      const isRateLimit = message.includes('429') || message.includes('RESOURCE_EXHAUSTED') || message.includes('quota');
+      // Genuine 429 only. Bare 'quota' substring would catch unrelated errors like
+      // "API key not valid for this quota project" and mistreat them as throttling.
+      const isRateLimit = message.includes('429') || message.includes('RESOURCE_EXHAUSTED');
       if (isRateLimit && attempt < maxRetries) {
         const waitMs = Math.min(2000 * attempt, 10000);
         console.warn(`[Gemini BBox] Rate limited (attempt ${attempt}/${maxRetries}). Waiting ${waitMs}ms…`);

@@ -97,6 +97,10 @@ export async function POST(
 ) {
   const startTime = Date.now();
   const { id: characterId } = await params;
+  // Step marker so the outer catch can classify which stage failed. Lets us return
+  // structured error codes instead of always blaming "rate limited" (the old behavior
+  // misled us for months — same false-positive disease as analyze-character).
+  let step: 'fetch_preview' | 'sharp_prep' | 'bbox_detection' | 'unknown' = 'unknown';
 
   try {
     // Auth
@@ -131,9 +135,10 @@ export async function POST(
       return NextResponse.json({ error: 'instruction too long (max 500 chars)' }, { status: 400 });
     }
 
-    console.log(`[Breakdown Plan] source=${characterId} user=${user.id} instruction="${instruction}"`);
+    console.log(`[Breakdown Plan] source=${characterId} user=${user.id} instruction="${instruction}" preview_url=${sourceCharacter.animated_preview_url}`);
 
     // Fetch the animated preview image as a buffer
+    step = 'fetch_preview';
     const imageResponse = await fetch(sourceCharacter.animated_preview_url);
     if (!imageResponse.ok) {
       throw new Error(`Failed to fetch source image: HTTP ${imageResponse.status}`);
@@ -141,23 +146,31 @@ export async function POST(
     const originalBuffer = Buffer.from(await imageResponse.arrayBuffer());
 
     // Apply EXIF rotation once so vision coords and crop coords align.
+    step = 'sharp_prep';
     const rotatedBuffer = await sharp(originalBuffer).rotate().toBuffer();
     const metadata = await sharp(rotatedBuffer).metadata();
     const imageWidth = metadata.width ?? OUTPUT_SIZE;
     const imageHeight = metadata.height ?? OUTPUT_SIZE;
+    console.log(`[Breakdown Plan] source image: ${originalBuffer.length} bytes, ${imageWidth}×${imageHeight}`);
 
     // Call Gemini for bboxes. Send the rotated buffer as JPEG (smaller, faster).
     const jpegForVision = await sharp(rotatedBuffer)
       .jpeg({ quality: 85, mozjpeg: true })
       .toBuffer();
     const base64 = jpegForVision.toString('base64');
+    step = 'bbox_detection';
     const boxes = await detectElementBoundingBoxes(base64, 'image/jpeg', instruction);
 
     const withBboxes = boxes.filter((b) => b.bbox !== null).slice(0, MAX_ELEMENTS);
+    console.log(`[Breakdown Plan] Gemini returned ${boxes.length} entries, ${withBboxes.length} with bboxes`);
     if (withBboxes.length === 0) {
+      // Distinguish "model couldn't locate any of these elements" from real failures.
+      // Return 200 (the modal already shows planMessage in this case) but include
+      // a code so the client can log it for debugging.
       return NextResponse.json({
         items: [],
         message: "Couldn't find any of those elements in the drawing. Try more specific names?",
+        code: 'BBOX_EMPTY',
       });
     }
 
@@ -250,11 +263,15 @@ export async function POST(
       sourceCharacter: { id: sourceCharacter.id, name: sourceCharacter.name },
     });
   } catch (error) {
-    console.error('[Breakdown Plan] Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorClass = error instanceof Error ? error.constructor.name : typeof error;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[Breakdown Plan] Error at step=${step} [${errorClass}]:`, errorMessage);
 
-    // Rate-limit passthrough (same pattern as analyze-character route)
-    if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('quota')) {
+    // Genuine 429 only. Bare 'quota' substring previously caught unrelated errors
+    // (e.g. "API key not valid for this quota project") and mistreated them as
+    // throttling — that's why users saw "rate limited" for non-rate-limit failures.
+    const isRateLimit = errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED');
+    if (isRateLimit) {
       return NextResponse.json(
         {
           error: 'Image analysis is rate-limited right now. Please try again in a minute.',
@@ -265,8 +282,41 @@ export async function POST(
       );
     }
 
+    // Classify by which step failed.
+    if (step === 'fetch_preview') {
+      return NextResponse.json(
+        {
+          error: "Couldn't load the character's preview image.",
+          code: 'FETCH_PREVIEW_FAILED',
+          details: errorMessage,
+        },
+        { status: 502 }
+      );
+    }
+    if (step === 'sharp_prep') {
+      return NextResponse.json(
+        {
+          error: "Couldn't process the preview image. Please try regenerating the character preview first.",
+          code: 'SHARP_FAILED',
+          details: errorMessage,
+        },
+        { status: 422 }
+      );
+    }
+    if (step === 'bbox_detection') {
+      // Includes JSON parse failures and SDK errors that bubble out of detectElementBoundingBoxes.
+      return NextResponse.json(
+        {
+          error: "Couldn't analyze the drawing for those elements. Try more specific names.",
+          code: 'BBOX_DETECTION_FAILED',
+          details: errorMessage,
+        },
+        { status: 502 }
+      );
+    }
+
     return NextResponse.json(
-      { error: 'Failed to plan breakdown', details: errorMessage },
+      { error: 'Failed to plan breakdown', code: 'BREAKDOWN_FAILED', details: errorMessage },
       { status: 500 }
     );
   }
