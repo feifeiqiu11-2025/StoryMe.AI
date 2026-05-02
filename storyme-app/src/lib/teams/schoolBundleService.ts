@@ -14,7 +14,9 @@
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { stripe, getPriceId } from '@/lib/stripe/config';
 
-const CHECKOUT_EXPIRY_SECONDS = 30 * 24 * 60 * 60; // Stripe max
+// Stripe Checkout Sessions hard-cap at 24h. Use 23h for a safety margin
+// against clock skew between our server and Stripe's API.
+const CHECKOUT_EXPIRY_SECONDS = 23 * 60 * 60;
 const MAX_BUNDLE_MEMBERS = 4;
 
 export type BundleStatus =

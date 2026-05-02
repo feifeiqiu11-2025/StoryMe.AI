@@ -220,7 +220,7 @@ export default function AdminSchoolBundlesPage() {
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-green-900 mb-1">Checkout link ready — send to school primary</p>
               <p className="text-sm text-green-800 mb-2">
-                Expires {formatDate(latestCheckout.expiresAt)} (30 days). Have the school admin click to add a card.
+                Expires {formatDate(latestCheckout.expiresAt)} (~24 hours — Stripe&apos;s hard cap). Send to the school admin promptly. If it expires, click <strong>Regenerate</strong> on the bundle row for a fresh link.
               </p>
               <code className="block text-xs bg-white border border-green-200 rounded px-2 py-1.5 break-all">
                 {latestCheckout.url}
