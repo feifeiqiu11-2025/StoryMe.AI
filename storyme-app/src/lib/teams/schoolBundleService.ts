@@ -186,7 +186,6 @@ export async function createBundle(input: CreateBundleInput): Promise<{
         line_items: [{ price: priceId, quantity: 1 }],
         automatic_tax: { enabled: true },
         billing_address_collection: 'required',
-        customer_creation: 'always',
         // tax_id_collection lets schools enter exemption IDs at checkout
         tax_id_collection: { enabled: true },
         subscription_data: {
@@ -445,7 +444,6 @@ export async function regenerateCheckout(
     line_items: [{ price: priceId, quantity: 1 }],
     automatic_tax: { enabled: true },
     billing_address_collection: 'required',
-    customer_creation: 'always',
     tax_id_collection: { enabled: true },
     subscription_data: {
       metadata: {
