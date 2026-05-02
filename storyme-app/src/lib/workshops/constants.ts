@@ -399,40 +399,40 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
           ],
         },
       },
-      // Series 2: Curious Minds (preview — not enrollable yet)
+      // Series 2: Curious Minds (now enrolling — Community Helpers + Finance & Value)
       {
         id: 'avocado-s2-wk1',
         dateLabel: 'Week 7',
-        theme: 'STEM Thinking',
-        themeDescription: 'Story Spark: discover patterns & logic, craft a detective character, and build a guided story plot',
+        theme: 'Community Helpers',
+        themeDescription: 'Story Spark: discover community roles & connections, craft a helper character, and build a guided story plot',
         series: 2,
-        enrollable: false,
+        enrollable: true,
         morning: {
           time: 'TBD',
           ageRange: 'Ages 3–6',
-          title: 'Pattern Detective — Story Spark',
+          title: 'Community Helpers — Story Spark',
           description:
-            'Children discover patterns and logic through hands-on activities, create a detective character, and build a guided problem-solving story plot.',
+            'Children explore the people who shape their community — firefighters, teachers, doctors, neighbors — and discover how each role connects to caring for others. They craft a helper character and build a guided story plot about helping.',
           highlights: [
-            'Pattern recognition & logical thinking',
+            'Discover community roles & connections',
             'Story character creation & plot building',
-            'Problem-solving narrative structure',
+            'Empathy & helping through narrative',
           ],
         },
       },
       {
         id: 'avocado-s2-wk2',
         dateLabel: 'Week 8',
-        theme: 'STEM Thinking',
+        theme: 'Community Helpers',
         themeDescription: 'Book Making: complete the story, produce a physical storybook, sign & show-and-tell',
         series: 2,
-        enrollable: false,
+        enrollable: true,
         morning: {
           time: 'TBD',
           ageRange: 'Ages 3–6',
-          title: 'Pattern Detective — Storybook',
+          title: 'Community Helpers — Storybook',
           description:
-            'Children complete their pattern detective story with detailed illustrations, produce a physical storybook, sign their work, and share it in a show-and-tell circle.',
+            'Children complete their community helpers story with detailed illustrations, produce a physical storybook, sign their work, and share it in a show-and-tell circle.',
           highlights: [
             'Detailed story completion & illustration',
             'Physical storybook production',
@@ -443,36 +443,36 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       {
         id: 'avocado-s2-wk3',
         dateLabel: 'Week 9',
-        theme: 'Financial Awareness',
-        themeDescription: 'Story Spark: explore saving & sharing, craft a character, and build a guided story plot',
+        theme: 'Finance & Value',
+        themeDescription: 'Story Spark: explore saving, sharing & value, craft a character, and build a guided story plot',
         series: 2,
-        enrollable: false,
+        enrollable: true,
         morning: {
           time: 'TBD',
           ageRange: 'Ages 3–6',
-          title: 'My First Piggy Bank — Story Spark',
+          title: 'Finance & Value — Story Spark',
           description:
-            'Kids explore saving, spending, and sharing through creative play, craft a story character, and build a guided plot about making choices with resources.',
+            'Kids explore saving, sharing, and what makes things valuable through creative play. They craft a story character and build a guided plot about choices and trade-offs.',
           highlights: [
-            'Value awareness through creative play',
+            'Saving, sharing & value awareness',
             'Story character creation & plot building',
-            'Decision-making & trade-off thinking',
+            'Decision-making narrative',
           ],
         },
       },
       {
         id: 'avocado-s2-wk4',
         dateLabel: 'Week 10',
-        theme: 'Financial Awareness',
+        theme: 'Finance & Value',
         themeDescription: 'Book Making: complete the story, produce a physical storybook, sign & show-and-tell',
         series: 2,
-        enrollable: false,
+        enrollable: true,
         morning: {
           time: 'TBD',
           ageRange: 'Ages 3–6',
-          title: 'My First Piggy Bank — Storybook',
+          title: 'Finance & Value — Storybook',
           description:
-            'Kids complete their piggy bank story with detailed illustrations, produce a physical storybook, sign their work, and present it in a show-and-tell circle.',
+            'Kids complete their finance & value story with detailed illustrations, produce a physical storybook, sign their work, and present it in a show-and-tell circle.',
           highlights: [
             'Detailed story completion & illustration',
             'Physical storybook production',

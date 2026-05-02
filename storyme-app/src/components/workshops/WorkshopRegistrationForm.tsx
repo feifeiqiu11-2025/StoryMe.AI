@@ -54,14 +54,12 @@ export default function WorkshopRegistrationForm({
   const isSeriesMode = partner.enrollmentMode === 'series';
   const hasLocations = (partner.locations?.length ?? 0) > 0;
 
-  // For series mode, get enrollable sessions (series 1)
-  const enrollableSessions = isSeriesMode ? getEnrollableSessions(partner, 1) : [];
-  const enrollableIds = enrollableSessions.map((s) => s.id);
-
-  // Series 2 sessions for preview
-  const previewSessions = isSeriesMode
-    ? partner.sessions.filter((s) => s.series === 2)
-    : [];
+  // For series mode, get all enrollable sessions across both series.
+  // Past-week filtering (based on selected location's date schedule) happens
+  // separately so the UI can render past sessions with line-through.
+  const enrollableSessions = isSeriesMode ? getEnrollableSessions(partner) : [];
+  const series1Sessions = enrollableSessions.filter((s) => s.series === 1);
+  const series2Sessions = enrollableSessions.filter((s) => s.series === 2);
 
   const {
     register,
@@ -75,7 +73,9 @@ export default function WorkshopRegistrationForm({
     resolver: zodResolver(WorkshopRegistrationSchema) as any,
     defaultValues: {
       partnerId: partner.id,
-      selectedWorkshopIds: isSeriesMode ? enrollableIds : [],
+      // Selection is finalized in the location/date useEffect below; start empty
+      // for series mode so we don't pre-select past sessions before location loads.
+      selectedWorkshopIds: [],
       selectedSessionType: isSingleMode
         ? 'single'
         : (defaultSessionType as 'morning' | 'afternoon') || undefined,
@@ -111,13 +111,31 @@ export default function WorkshopRegistrationForm({
   const selectedLocation = watch('selectedLocation');
   const selectedTimeSlot = watch('selectedTimeSlot');
 
-  // Auto-set workshop IDs for series mode
+  // Auto-select all FUTURE enrollable sessions for series mode.
+  // Recomputed when the selected location changes (Bellevue/Kirkland have
+  // different date schedules so future-vs-past differs by location).
   useEffect(() => {
-    if (isSeriesMode && enrollableIds.length > 0) {
-      setValue('selectedWorkshopIds', enrollableIds, { shouldValidate: true });
-    }
+    if (!isSeriesMode || enrollableSessions.length === 0) return;
+    const loc = selectedLocation
+      ? partner.locations?.find((l) => l.slug === selectedLocation)
+      : undefined;
+    const dates = loc ? getSessionDates(loc, enrollableSessions.length) : null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const futureIds = enrollableSessions
+      .filter((_, idx) => {
+        if (!dates) return true; // no location → keep all enrollable selected
+        const iso = dates[idx]?.date;
+        if (!iso) return true;
+        const sessionDate = new Date(iso + 'T00:00:00');
+        return sessionDate >= today;
+      })
+      .map((s) => s.id);
+
+    setValue('selectedWorkshopIds', futureIds, { shouldValidate: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSeriesMode]);
+  }, [isSeriesMode, selectedLocation, enrollableSessions.length]);
 
   // Auto-set session type for single mode
   useEffect(() => {
@@ -310,8 +328,7 @@ export default function WorkshopRegistrationForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit, (fieldErrors) => {
-      console.error('[REGISTRATION] Validation errors:', fieldErrors);
-      // Scroll to first error field
+      // Scroll to first error field — inline errors render next to each field already
       const firstErrorKey = Object.keys(fieldErrors)[0];
       if (firstErrorKey) {
         const el = document.querySelector(`[name="${firstErrorKey}"]`) || document.querySelector(`[name^="${firstErrorKey}"]`);
@@ -613,135 +630,285 @@ export default function WorkshopRegistrationForm({
       {/* Section — Series: Series Overview / Dual: Workshop Dates */}
       {/* ═══════════════════════════════════════════════════════ */}
       {isSeriesMode ? (
-        /* --- SERIES MODE: Read-only series overview --- */
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">
-            {hasTimeSlots ? '3' : '2'}. Series Overview
-          </h3>
+        /* --- SERIES MODE: Two enrollable series w/ past-week strikethrough --- */
+        (() => {
+          const loc = selectedLocation
+            ? partner.locations?.find((l) => l.slug === selectedLocation)
+            : undefined;
+          const sessionDates = loc
+            ? getSessionDates(loc, enrollableSessions.length)
+            : null;
 
-          {/* Series 1 — Enrolling Now */}
-          <div className="bg-amber-50/50 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h4 className="font-semibold text-gray-900">
-                  Series 1: Core Life Skills
-                </h4>
-                <p className="text-sm text-gray-600 mt-0.5">
-                  {enrollableSessions.length} sessions · 35 mins each · {Math.floor(enrollableSessions.length / 2)} physical storybooks
-                </p>
-              </div>
-              <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
-                Now Enrolling
-              </span>
-            </div>
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const isPastByGlobalIdx = (globalIdx: number): boolean => {
+            const iso = sessionDates?.[globalIdx]?.date;
+            if (!iso) return false;
+            return new Date(iso + 'T00:00:00') < today;
+          };
 
-            <div className="space-y-2">
-              {(() => {
-                const loc = selectedLocation
-                  ? partner.locations?.find(l => l.slug === selectedLocation)
-                  : undefined;
-                const sessionDates = loc
-                  ? getSessionDates(loc, enrollableSessions.length)
-                  : null;
-
-                return enrollableSessions.map((session, index) => (
-                  <div
-                    key={session.id}
-                    className="flex items-start gap-3 p-3 bg-white/70 rounded-lg"
-                  >
-                    <div className="flex-shrink-0 w-7 h-7 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-sm font-bold">
-                      {index + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">
-                          {session.theme}
-                        </span>
-                        <span className="text-xs text-gray-600 font-medium">
-                          {sessionDates?.[index]?.formatted || session.dateLabel}
-                        </span>
-                      </div>
-                      {session.themeDescription && (
-                        <p className="text-sm text-gray-500 mt-0.5">
-                          {session.themeDescription}
-                        </p>
-                      )}
-                    </div>
-                    {index % 2 === 1 && (
-                      <span className="flex-shrink-0 text-xs font-medium text-amber-700 bg-amber-100/80 px-2.5 py-1 rounded-md whitespace-nowrap">
-                        Storybook {Math.floor(index / 2) + 1} produced
-                      </span>
-                    )}
+          const renderSessionRow = (
+            session: typeof enrollableSessions[number],
+            globalIdx: number,
+          ) => {
+            const isPast = isPastByGlobalIdx(globalIdx);
+            const dateText = sessionDates?.[globalIdx]?.formatted || session.dateLabel;
+            const isStorybookWeek = globalIdx % 2 === 1;
+            const storybookNumber = Math.floor(globalIdx / 2) + 1;
+            return (
+              <div
+                key={session.id}
+                className={`flex items-start gap-3 p-3 rounded-lg ${
+                  isPast ? 'bg-gray-50/60 opacity-60' : 'bg-white/70'
+                }`}
+              >
+                <div
+                  className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${
+                    isPast
+                      ? 'bg-gray-200 text-gray-400'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}
+                >
+                  {globalIdx + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`font-medium ${
+                        isPast ? 'text-gray-400 line-through' : 'text-gray-900'
+                      }`}
+                    >
+                      {session.theme}
+                    </span>
+                    <span
+                      className={`text-xs font-medium ${
+                        isPast ? 'text-gray-400 line-through' : 'text-gray-600'
+                      }`}
+                    >
+                      {dateText}
+                    </span>
                   </div>
-                ));
-              })()}
-            </div>
-
-            {/* Series pricing */}
-            <div className="mt-4 pt-3 border-t border-amber-200/60 space-y-1.5">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">
-                  {numberOfChildren > 1
-                    ? `${numberOfChildren} children × ${enrollableSessions.length} sessions × ${formatWorkshopPrice(pricePerSession)}`
-                    : `${enrollableSessions.length} sessions × ${formatWorkshopPrice(pricePerSession)}`}
-                </span>
-                <span className="text-sm text-gray-700">
-                  {formatWorkshopPrice(totalPrice)}
-                </span>
+                  {session.themeDescription && (
+                    <p
+                      className={`text-sm mt-0.5 ${
+                        isPast ? 'text-gray-400 line-through' : 'text-gray-500'
+                      }`}
+                    >
+                      {session.themeDescription}
+                    </p>
+                  )}
+                </div>
+                {isStorybookWeek && (
+                  <span
+                    className={`flex-shrink-0 text-xs font-medium px-2.5 py-1 rounded-md whitespace-nowrap ${
+                      isPast
+                        ? 'text-gray-400 bg-gray-100'
+                        : 'text-amber-700 bg-amber-100/80'
+                    }`}
+                  >
+                    Storybook {storybookNumber} produced
+                  </span>
+                )}
               </div>
-              {taxRate > 0 && (
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">
-                    Sales tax ({(taxRate * 100).toFixed(1)}%)
-                  </span>
-                  <span className="text-sm text-gray-600">
-                    {formatWorkshopPrice(taxAmount)}
-                  </span>
+            );
+          };
+
+          // Per-series toggle: future-only sessions in a series go in/out of selection
+          const futureIdsForSeries = (sessions: typeof enrollableSessions): string[] => {
+            return sessions
+              .filter((s) => {
+                const idx = enrollableSessions.findIndex((es) => es.id === s.id);
+                return idx >= 0 && !isPastByGlobalIdx(idx);
+              })
+              .map((s) => s.id);
+          };
+          const series1FutureIds = futureIdsForSeries(series1Sessions);
+          const series2FutureIds = futureIdsForSeries(series2Sessions);
+
+          const allSelected = (ids: string[]): boolean =>
+            ids.length > 0 && ids.every((id) => selectedWorkshopIds?.includes(id));
+
+          const toggleSeries = (futureIds: string[], allSeriesIds: string[]) => {
+            const current = selectedWorkshopIds || [];
+            const isOn = allSelected(futureIds);
+            // OFF: drop every session in this series (past or future, though past won't be in there anyway)
+            // ON: add all future ids in this series
+            const next = isOn
+              ? current.filter((id) => !allSeriesIds.includes(id))
+              : Array.from(new Set([...current, ...futureIds]));
+            setValue('selectedWorkshopIds', next, { shouldValidate: true });
+          };
+
+          // Storybooks completed = pairs (spark, book) where BOTH are selected
+          let storybooksCompleted = 0;
+          for (let pair = 0; pair < Math.floor(enrollableSessions.length / 2); pair++) {
+            const sparkId = enrollableSessions[pair * 2]?.id;
+            const bookId = enrollableSessions[pair * 2 + 1]?.id;
+            if (
+              sparkId &&
+              bookId &&
+              selectedWorkshopIds?.includes(sparkId) &&
+              selectedWorkshopIds?.includes(bookId)
+            ) {
+              storybooksCompleted += 1;
+            }
+          }
+
+          const futureCount = workshopCount; // selectedWorkshopIds is future-only
+
+          return (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                {hasTimeSlots ? '3' : '2'}. Series Overview
+              </h3>
+
+              {/* Series 1 — Now Enrolling */}
+              {series1Sessions.length > 0 && (
+                <div className="bg-amber-50/50 rounded-xl p-5">
+                  <div className="flex items-center justify-between mb-3 gap-3">
+                    <label className={`flex items-start gap-3 ${series1FutureIds.length === 0 ? 'opacity-60' : 'cursor-pointer'}`}>
+                      <input
+                        type="checkbox"
+                        checked={allSelected(series1FutureIds)}
+                        disabled={series1FutureIds.length === 0}
+                        onChange={() => toggleSeries(series1FutureIds, series1Sessions.map((s) => s.id))}
+                        className="sr-only peer"
+                        aria-label="Toggle Series 1 enrollment"
+                      />
+                      <div className={`flex-shrink-0 w-5 h-5 mt-1 rounded border-2 flex items-center justify-center transition-colors ${
+                        series1FutureIds.length === 0
+                          ? 'border-gray-300 bg-gray-100'
+                          : allSelected(series1FutureIds)
+                          ? 'bg-amber-500 border-amber-500'
+                          : 'border-gray-300 bg-white'
+                      }`}>
+                        {allSelected(series1FutureIds) && series1FutureIds.length > 0 && (
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900">
+                          Series 1: Core Life Skills
+                        </h4>
+                        <p className="text-sm text-gray-600 mt-0.5">
+                          {series1Sessions.length} sessions · 35 mins each · {Math.floor(series1Sessions.length / 2)} physical storybooks
+                          {series1FutureIds.length > 0 && series1FutureIds.length < series1Sessions.length && (
+                            <span className="ml-1.5 text-amber-700">
+                              · {series1FutureIds.length} upcoming
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </label>
+                    <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full whitespace-nowrap">
+                      Now Enrolling
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {series1Sessions.map((session, idx) => renderSessionRow(session, idx))}
+                  </div>
                 </div>
               )}
-              <div className="flex justify-between items-center pt-1.5 border-t border-amber-200/40">
-                <span className="text-sm font-semibold text-gray-800">
-                  Total
-                </span>
-                <span className="text-lg font-bold text-gray-900">
-                  {formatWorkshopPrice(totalWithTax)}
-                </span>
-              </div>
-              <p className="text-xs text-gray-500">
-                Includes {Math.floor(enrollableSessions.length / 2)} physical storybooks your child creates during the series
-              </p>
-            </div>
-          </div>
 
-          {/* Series 2 — Coming Soon Preview */}
-          {previewSessions.length > 0 && (
-            <div className="mt-4 bg-gray-50 rounded-xl p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h4 className="font-semibold text-gray-700">
-                    Series 2: Curious Minds
-                  </h4>
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    4 sessions · 35 mins each · 2 physical storybooks
-                  </p>
-                </div>
-                <span className="text-xs font-semibold text-gray-600 bg-gray-200 px-2.5 py-1 rounded-full">
-                  Coming Soon
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {[...new Set(previewSessions.map((s) => s.theme))].map((theme) => (
-                  <div
-                    key={theme}
-                    className="text-sm text-gray-600 p-2 bg-white/80 rounded-lg"
-                  >
-                    {theme}
+              {/* Series 2 — Now Enrolling */}
+              {series2Sessions.length > 0 && (
+                <div className="mt-4 bg-amber-50/50 rounded-xl p-5">
+                  <div className="flex items-center justify-between mb-3 gap-3">
+                    <label className={`flex items-start gap-3 ${series2FutureIds.length === 0 ? 'opacity-60' : 'cursor-pointer'}`}>
+                      <input
+                        type="checkbox"
+                        checked={allSelected(series2FutureIds)}
+                        disabled={series2FutureIds.length === 0}
+                        onChange={() => toggleSeries(series2FutureIds, series2Sessions.map((s) => s.id))}
+                        className="sr-only peer"
+                        aria-label="Toggle Series 2 enrollment"
+                      />
+                      <div className={`flex-shrink-0 w-5 h-5 mt-1 rounded border-2 flex items-center justify-center transition-colors ${
+                        series2FutureIds.length === 0
+                          ? 'border-gray-300 bg-gray-100'
+                          : allSelected(series2FutureIds)
+                          ? 'bg-amber-500 border-amber-500'
+                          : 'border-gray-300 bg-white'
+                      }`}>
+                        {allSelected(series2FutureIds) && series2FutureIds.length > 0 && (
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900">
+                          Series 2: Curious Minds
+                        </h4>
+                        <p className="text-sm text-gray-600 mt-0.5">
+                          {series2Sessions.length} sessions · 35 mins each · {Math.floor(series2Sessions.length / 2)} physical storybooks
+                          {series2FutureIds.length > 0 && series2FutureIds.length < series2Sessions.length && (
+                            <span className="ml-1.5 text-amber-700">
+                              · {series2FutureIds.length} upcoming
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </label>
+                    <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full whitespace-nowrap">
+                      Now Enrolling
+                    </span>
                   </div>
-                ))}
+                  <div className="space-y-2">
+                    {series2Sessions.map((session, idx) =>
+                      renderSessionRow(session, series1Sessions.length + idx),
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Combined cost block — future-only sessions */}
+              <div className="mt-4 bg-amber-50/50 rounded-xl p-5">
+                {futureCount === 0 ? (
+                  <div className="text-sm text-gray-700">
+                    No upcoming sessions for this location. Check back when the next series is announced.
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">
+                        {numberOfChildren > 1
+                          ? `${numberOfChildren} children × ${futureCount} upcoming sessions × ${formatWorkshopPrice(pricePerSession)}`
+                          : `${futureCount} upcoming sessions × ${formatWorkshopPrice(pricePerSession)}`}
+                      </span>
+                      <span className="text-sm text-gray-700">
+                        {formatWorkshopPrice(totalPrice)}
+                      </span>
+                    </div>
+                    {taxRate > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-500">
+                          Sales tax ({(taxRate * 100).toFixed(1)}%)
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          {formatWorkshopPrice(taxAmount)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center pt-1.5 border-t border-amber-200/40">
+                      <span className="text-sm font-semibold text-gray-800">Total</span>
+                      <span className="text-lg font-bold text-gray-900">
+                        {formatWorkshopPrice(totalWithTax)}
+                      </span>
+                    </div>
+                    {storybooksCompleted > 0 && (
+                      <p className="text-xs text-gray-500">
+                        Includes {storybooksCompleted} physical storybook{storybooksCompleted === 1 ? '' : 's'} your child creates during the upcoming sessions
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </div>
+          );
+        })()
       ) : (
         /* --- INDIVIDUAL MODE: Select Workshop Dates --- */
         <div>
