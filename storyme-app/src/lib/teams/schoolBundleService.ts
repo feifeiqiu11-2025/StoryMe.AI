@@ -13,6 +13,7 @@
 
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { stripe, getPriceId } from '@/lib/stripe/config';
+import { sendSchoolBundleCheckoutEmail } from '@/lib/email/school-bundle-checkout';
 
 // Stripe Checkout Sessions hard-cap at 24h. Use 23h for a safety margin
 // against clock skew between our server and Stripe's API.
@@ -481,6 +482,174 @@ export async function regenerateCheckout(
     .eq('id', teamId);
 
   return { checkoutUrl: session.url, checkoutExpiresAt };
+}
+
+/**
+ * Add a teacher to an existing bundle.
+ *   - If bundle is 'pending', just stamp team_id (webhook flips tier on Checkout).
+ *   - If bundle is 'active'/'past_due'/'incomplete', also flip tier='team' immediately
+ *     so the new teacher gets access without waiting for the next webhook.
+ *   - Refuses on 'cancelled' bundles.
+ */
+export async function addMember(teamId: string, email: string): Promise<{ userId: string }> {
+  const supabase = createServiceRoleClient();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    throw new BundleError('VALIDATION_FAILED', 'Email required');
+  }
+
+  // Fetch bundle + member count
+  const { data: team, error: teamError } = await supabase
+    .from('teams')
+    .select('id, max_members, member_count, subscription_status')
+    .eq('id', teamId)
+    .single();
+  if (teamError || !team) {
+    throw new BundleError('NOT_FOUND', 'Bundle not found');
+  }
+
+  if (team.subscription_status === 'cancelled') {
+    throw new BundleError('INVALID_STATE', 'Cannot add members to a cancelled bundle');
+  }
+
+  if ((team.member_count || 0) >= (team.max_members || 4)) {
+    throw new BundleError('BUNDLE_FULL', `Bundle is at max ${team.max_members} members`);
+  }
+
+  // Look up the user (case-insensitive)
+  const { data: users, error: lookupError } = await supabase
+    .from('users')
+    .select('id, email, team_id, stripe_subscription_id, subscription_tier')
+    .ilike('email', normalizedEmail);
+  if (lookupError) {
+    throw new BundleError('DB_ERROR', 'Failed to look up user', lookupError);
+  }
+  const user = (users || [])[0];
+  if (!user) {
+    throw new BundleError(
+      'USER_NOT_FOUND',
+      `${email} is not a registered KW user. Have them sign up first.`
+    );
+  }
+
+  if (user.team_id) {
+    if (user.team_id === teamId) {
+      throw new BundleError('ALREADY_MEMBER', `${email} is already in this bundle`);
+    }
+    throw new BundleError('USER_ON_OTHER_TEAM', `${email} is already on another team`);
+  }
+  if (user.stripe_subscription_id && user.subscription_tier !== 'free') {
+    throw new BundleError(
+      'USER_HAS_EXISTING_SUBSCRIPTION',
+      `${email} has an active paid subscription — cancel it first`
+    );
+  }
+
+  // Stamp team_id. If bundle is already active, also flip tier so new teacher
+  // gets access immediately (skipping the wait for next webhook).
+  const userUpdate: Record<string, unknown> = {
+    team_id: teamId,
+    is_team_primary: false,
+  };
+  const isActive = team.subscription_status === 'active'
+    || team.subscription_status === 'incomplete'
+    || team.subscription_status === 'past_due';
+  if (isActive) {
+    userUpdate.subscription_tier = 'team';
+    userUpdate.subscription_status = 'active';
+    userUpdate.stories_limit = 15;
+    userUpdate.trial_status = 'completed';
+  }
+
+  const { error: stampError } = await supabase.from('users').update(userUpdate).eq('id', user.id);
+  if (stampError) {
+    throw new BundleError('DB_ERROR', `Failed to add ${email}`, stampError);
+  }
+
+  // Increment team member_count
+  await supabase
+    .from('teams')
+    .update({ member_count: (team.member_count || 0) + 1 })
+    .eq('id', teamId);
+
+  return { userId: user.id };
+}
+
+/**
+ * List all members of a bundle (for admin UI expansion).
+ */
+export async function listMembers(teamId: string): Promise<Array<{
+  userId: string;
+  email: string;
+  isPrimary: boolean;
+  tier: string | null;
+}>> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, email, is_team_primary, subscription_tier')
+    .eq('team_id', teamId)
+    .order('is_team_primary', { ascending: false });
+  if (error) throw new BundleError('DB_ERROR', 'Failed to list members', error);
+  return (data || []).map((u) => ({
+    userId: u.id,
+    email: u.email || '(no email)',
+    isPrimary: !!u.is_team_primary,
+    tier: u.subscription_tier,
+  }));
+}
+
+/**
+ * Email the Checkout link to the primary teacher.
+ * Fails if the bundle has no fresh Checkout link.
+ */
+export async function emailCheckoutLinkToPrimary(teamId: string): Promise<void> {
+  const supabase = createServiceRoleClient();
+
+  const { data: team, error } = await supabase
+    .from('teams')
+    .select('id, team_name, primary_user_id, subscription_status, checkout_url, checkout_expires_at')
+    .eq('id', teamId)
+    .single();
+  if (error || !team) throw new BundleError('NOT_FOUND', 'Bundle not found');
+
+  if (team.subscription_status !== 'pending' && team.subscription_status !== 'checkout_expired') {
+    throw new BundleError(
+      'INVALID_STATE',
+      `Cannot email Checkout link for status='${team.subscription_status}'`
+    );
+  }
+
+  if (!team.checkout_url || !team.checkout_expires_at) {
+    throw new BundleError('NO_CHECKOUT_URL', 'Bundle has no Checkout link — Regenerate first');
+  }
+
+  // Reject if link is already past its expiry (admin should Regenerate)
+  if (new Date(team.checkout_expires_at).getTime() < Date.now()) {
+    throw new BundleError(
+      'CHECKOUT_EXPIRED',
+      'Checkout link has expired — click Regenerate first'
+    );
+  }
+
+  // Resolve primary teacher's email
+  const { data: primary } = await supabase
+    .from('users')
+    .select('email')
+    .eq('id', team.primary_user_id)
+    .single();
+  if (!primary?.email) {
+    throw new BundleError('PRIMARY_NOT_FOUND', 'Primary teacher email missing');
+  }
+
+  await sendSchoolBundleCheckoutEmail({
+    primaryFirstName: null, // users table has no name column; fall back to "there"
+    primaryEmail: primary.email,
+    schoolName: team.team_name || 'your school',
+    checkoutUrl: team.checkout_url,
+    priceFormatted: '$129.99',
+  });
 }
 
 /**

@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { Fragment, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { isAdminEmail } from '@/lib/auth/isAdmin';
@@ -24,6 +24,13 @@ interface BundleSummary {
   taxExempt: boolean;
   checkoutUrl: string | null;
   checkoutExpiresAt: string | null;
+}
+
+interface Member {
+  userId: string;
+  email: string;
+  isPrimary: boolean;
+  tier: string | null;
 }
 
 const statusBadge: Record<string, string> = {
@@ -57,6 +64,14 @@ export default function AdminSchoolBundlesPage() {
   const [member2, setMember2] = useState('');
   const [member3, setMember3] = useState('');
   const [member4, setMember4] = useState('');
+
+  // expansion + member management state
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+  const [membersByTeam, setMembersByTeam] = useState<Record<string, Member[]>>({});
+  const [membersLoading, setMembersLoading] = useState<Record<string, boolean>>({});
+  const [addEmailInput, setAddEmailInput] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [memberError, setMemberError] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     const check = async () => {
@@ -188,6 +203,87 @@ export default function AdminSchoolBundlesPage() {
     navigator.clipboard.writeText(text).then(() => {
       // small visual ack
     });
+  };
+
+  const loadMembers = async (teamId: string) => {
+    setMembersLoading((s) => ({ ...s, [teamId]: true }));
+    try {
+      const res = await fetch(`/api/admin/school-bundles/${teamId}/members`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to load members');
+      setMembersByTeam((s) => ({ ...s, [teamId]: json.data || [] }));
+    } catch (e) {
+      setMemberError((s) => ({ ...s, [teamId]: e instanceof Error ? e.message : 'Failed' }));
+    } finally {
+      setMembersLoading((s) => ({ ...s, [teamId]: false }));
+    }
+  };
+
+  const handleToggleExpand = (teamId: string) => {
+    if (expandedTeamId === teamId) {
+      setExpandedTeamId(null);
+      return;
+    }
+    setExpandedTeamId(teamId);
+    setAddEmailInput('');
+    setMemberError((s) => ({ ...s, [teamId]: null }));
+    if (!membersByTeam[teamId]) loadMembers(teamId);
+  };
+
+  const handleAddMember = async (teamId: string) => {
+    if (!addEmailInput.trim()) return;
+    setAdding(true);
+    setMemberError((s) => ({ ...s, [teamId]: null }));
+    try {
+      const res = await fetch(`/api/admin/school-bundles/${teamId}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: addEmailInput.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setMemberError((s) => ({ ...s, [teamId]: json.error || 'Failed to add' }));
+        return;
+      }
+      setAddEmailInput('');
+      await Promise.all([loadMembers(teamId), loadBundles()]);
+    } catch (e) {
+      setMemberError((s) => ({ ...s, [teamId]: e instanceof Error ? e.message : 'Failed' }));
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleRemoveMember = async (teamId: string, userId: string, email: string) => {
+    if (!window.confirm(`Remove ${email} from this bundle? Their tier reverts to free.`)) return;
+    setMemberError((s) => ({ ...s, [teamId]: null }));
+    try {
+      const res = await fetch(`/api/admin/school-bundles/${teamId}/members/${userId}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setMemberError((s) => ({ ...s, [teamId]: json.error || 'Failed to remove' }));
+        return;
+      }
+      await Promise.all([loadMembers(teamId), loadBundles()]);
+    } catch (e) {
+      setMemberError((s) => ({ ...s, [teamId]: e instanceof Error ? e.message : 'Failed' }));
+    }
+  };
+
+  const handleEmailLink = async (teamId: string, primaryEmail: string) => {
+    try {
+      const res = await fetch(`/api/admin/school-bundles/${teamId}/send-email`, { method: 'POST' });
+      const json = await res.json();
+      if (!res.ok) {
+        alert(json.error || 'Failed to send email');
+        return;
+      }
+      alert(`Email sent to ${primaryEmail}`);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed');
+    }
   };
 
   if (!authorized) {
@@ -322,6 +418,7 @@ export default function AdminSchoolBundlesPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="w-8 px-2 py-3"></th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-700">School</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-700">Primary</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-700">Members</th>
@@ -337,64 +434,147 @@ export default function AdminSchoolBundlesPage() {
                 const isPending = status === 'pending' || status === 'checkout_expired';
                 const isActive = status === 'active' || status === 'past_due' || status === 'incomplete';
                 const isDeletable = status === 'pending' || status === 'checkout_expired' || status === 'cancelled';
+                const isExpanded = expandedTeamId === b.teamId;
+                const members = membersByTeam[b.teamId] || [];
+                const memErr = memberError[b.teamId];
+                const checkoutValid = !!b.checkoutUrl
+                  && !!b.checkoutExpiresAt
+                  && new Date(b.checkoutExpiresAt).getTime() > Date.now();
                 return (
-                  <tr key={b.teamId} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{b.schoolName}</td>
-                    <td className="px-4 py-3 text-gray-600">{b.primaryEmail}</td>
-                    <td className="px-4 py-3 text-gray-600">{b.memberCount}/4</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${statusBadge[status] || 'bg-gray-100 text-gray-700'}`}>
-                        {status}{b.cancelAtPeriodEnd ? ' (cancelling)' : ''}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{formatDate(b.currentPeriodEnd)}</td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleTaxExempt(b.teamId, b.taxExempt)}
-                        disabled={!isActive}
-                        className={`text-xs px-2 py-0.5 rounded border ${b.taxExempt ? 'bg-blue-50 border-blue-300 text-blue-800' : 'bg-white border-gray-300 text-gray-600'} disabled:opacity-40`}
-                        title={isActive ? 'Toggle tax-exempt status' : 'Available once active'}
-                      >
-                        {b.taxExempt ? 'Exempt' : 'Taxable'}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-1.5 flex-wrap">
-                        {isPending && b.checkoutUrl && (
-                          <button
-                            onClick={() => copyToClipboard(b.checkoutUrl!)}
-                            className="text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50"
-                          >
-                            Copy link
-                          </button>
-                        )}
-                        {isPending && (
-                          <button
-                            onClick={() => handleRegenerate(b.teamId)}
-                            className="text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50"
-                          >
-                            Regenerate
-                          </button>
-                        )}
-                        {isActive && (
-                          <button
-                            onClick={() => handleManageBilling(b.teamId)}
-                            className="text-xs px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
-                          >
-                            Manage Billing
-                          </button>
-                        )}
-                        {isDeletable && (
-                          <button
-                            onClick={() => handleDelete(b.teamId, b.schoolName)}
-                            className="text-xs px-2 py-1 bg-white border border-red-300 text-red-700 rounded hover:bg-red-50"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                  <Fragment key={b.teamId}>
+                    <tr className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-2 py-3 text-center">
+                        <button
+                          onClick={() => handleToggleExpand(b.teamId)}
+                          className="text-gray-400 hover:text-gray-700 text-xs"
+                          aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                        >
+                          {isExpanded ? '▼' : '▶'}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-gray-900">{b.schoolName}</td>
+                      <td className="px-4 py-3 text-gray-600">{b.primaryEmail}</td>
+                      <td className="px-4 py-3 text-gray-600">{b.memberCount}/4</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${statusBadge[status] || 'bg-gray-100 text-gray-700'}`}>
+                          {status}{b.cancelAtPeriodEnd ? ' (cancelling)' : ''}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{formatDate(b.currentPeriodEnd)}</td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleTaxExempt(b.teamId, b.taxExempt)}
+                          disabled={!isActive}
+                          className={`text-xs px-2 py-0.5 rounded border ${b.taxExempt ? 'bg-blue-50 border-blue-300 text-blue-800' : 'bg-white border-gray-300 text-gray-600'} disabled:opacity-40`}
+                          title={isActive ? 'Toggle tax-exempt status' : 'Available once active'}
+                        >
+                          {b.taxExempt ? 'Exempt' : 'Taxable'}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-1.5 flex-wrap">
+                          {isPending && b.checkoutUrl && (
+                            <button
+                              onClick={() => copyToClipboard(b.checkoutUrl!)}
+                              className="text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                            >
+                              Copy link
+                            </button>
+                          )}
+                          {isPending && checkoutValid && (
+                            <button
+                              onClick={() => handleEmailLink(b.teamId, b.primaryEmail)}
+                              className="text-xs px-2 py-1 bg-white border border-purple-300 text-purple-700 rounded hover:bg-purple-50"
+                              title="Email Checkout link to primary teacher"
+                            >
+                              Email link
+                            </button>
+                          )}
+                          {isPending && (
+                            <button
+                              onClick={() => handleRegenerate(b.teamId)}
+                              className="text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                            >
+                              Regenerate
+                            </button>
+                          )}
+                          {isActive && (
+                            <button
+                              onClick={() => handleManageBilling(b.teamId)}
+                              className="text-xs px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
+                            >
+                              Manage Billing
+                            </button>
+                          )}
+                          {isDeletable && (
+                            <button
+                              onClick={() => handleDelete(b.teamId, b.schoolName)}
+                              className="text-xs px-2 py-1 bg-white border border-red-300 text-red-700 rounded hover:bg-red-50"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr className="bg-gray-50 border-b border-gray-100">
+                        <td></td>
+                        <td colSpan={7} className="px-4 py-3">
+                          <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">Members</div>
+                          {membersLoading[b.teamId] ? (
+                            <div className="text-sm text-gray-500">Loading…</div>
+                          ) : members.length === 0 ? (
+                            <div className="text-sm text-gray-500">No members yet</div>
+                          ) : (
+                            <ul className="space-y-1.5 mb-3">
+                              {members.map((m) => (
+                                <li key={m.userId} className="flex items-center gap-3 text-sm">
+                                  <span className="text-gray-800">{m.email}</span>
+                                  {m.isPrimary && (
+                                    <span className="text-xs text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">primary · billing</span>
+                                  )}
+                                  <span className="text-xs text-gray-500">{m.tier || '—'}</span>
+                                  {!m.isPrimary && status !== 'cancelled' && (
+                                    <button
+                                      onClick={() => handleRemoveMember(b.teamId, m.userId, m.email)}
+                                      className="ml-auto text-xs text-red-700 hover:underline"
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {b.memberCount < 4 && status !== 'cancelled' && (
+                            <div className="flex gap-2 items-center pt-2 border-t border-gray-200">
+                              <input
+                                type="email"
+                                value={addEmailInput}
+                                onChange={(e) => setAddEmailInput(e.target.value)}
+                                placeholder="teacher@school.edu"
+                                className="flex-1 max-w-xs text-sm border border-gray-300 rounded px-2 py-1"
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleAddMember(b.teamId); }}
+                              />
+                              <button
+                                onClick={() => handleAddMember(b.teamId)}
+                                disabled={adding || !addEmailInput.trim()}
+                                className="text-sm px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+                              >
+                                {adding ? 'Adding…' : 'Add member'}
+                              </button>
+                            </div>
+                          )}
+                          {memErr && (
+                            <div className="mt-2 bg-red-50 border border-red-200 text-red-800 text-xs rounded px-2 py-1.5">
+                              {memErr}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </tbody>
