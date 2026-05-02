@@ -81,8 +81,18 @@ export async function POST(request: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.metadata?.type === 'workshop') {
           await handleWorkshopCheckoutCompleted(session);
+        } else if (session.metadata?.type === 'school_bundle') {
+          await handleSchoolBundleCheckoutCompleted(session);
         } else {
           await handleCheckoutCompleted(session);
+        }
+        break;
+      }
+
+      case 'checkout.session.expired': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.metadata?.type === 'school_bundle') {
+          await handleSchoolBundleCheckoutExpired(session);
         }
         break;
       }
@@ -165,6 +175,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
  * Handle subscription creation or update
  */
 async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
+  // School bundles route via team_id metadata, not supabase_user_id.
+  // Fan out updates to all 4 teacher accounts under the team.
+  const teamId = subscription.metadata?.team_id;
+  if (teamId) {
+    return handleTeamSubscriptionUpdate(subscription, teamId);
+  }
+
   const userId = subscription.metadata?.supabase_user_id;
   const tier = subscription.metadata?.tier;
 
@@ -346,6 +363,12 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
  * Handle subscription deletion/cancellation
  */
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  // School bundles route via team_id metadata
+  const teamId = subscription.metadata?.team_id;
+  if (teamId) {
+    return handleTeamSubscriptionDeleted(subscription, teamId);
+  }
+
   const userId = subscription.metadata?.supabase_user_id;
 
   if (!userId) {
@@ -486,6 +509,208 @@ async function handleWorkshopCheckoutCompleted(session: Stripe.Checkout.Session)
     amountPaid: session.amount_total || 0,
     location: first.location || null,
   });
+}
+
+/**
+ * School bundle: Checkout completed → capture customer + subscription IDs onto team.
+ * The subscription.created webhook (fired right after) does the user-level fan-out.
+ */
+async function handleSchoolBundleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  const teamId = session.metadata?.team_id;
+  if (!teamId) {
+    console.error('[WEBHOOK] school_bundle Checkout completed without team_id metadata');
+    return;
+  }
+
+  console.log(`[WEBHOOK] School bundle Checkout completed for team ${teamId}`);
+
+  await supabaseAdmin
+    .from('teams')
+    .update({
+      stripe_customer_id: session.customer as string,
+      stripe_subscription_id: session.subscription as string,
+      // status will be promoted to 'active' by handleTeamSubscriptionUpdate
+    })
+    .eq('id', teamId);
+}
+
+/**
+ * School bundle: Checkout session expired without payment.
+ * Mark team so admin sees it and can regenerate the link.
+ */
+async function handleSchoolBundleCheckoutExpired(session: Stripe.Checkout.Session) {
+  const teamId = session.metadata?.team_id;
+  if (!teamId) return;
+
+  console.log(`[WEBHOOK] School bundle Checkout expired for team ${teamId}`);
+
+  await supabaseAdmin
+    .from('teams')
+    .update({ subscription_status: 'checkout_expired' })
+    .eq('id', teamId)
+    .eq('checkout_session_id', session.id); // only flip if this is the current session
+}
+
+/**
+ * Map Stripe subscription status to our team CHECK-constraint values.
+ * Stripe spells 'canceled' (one L); we use 'cancelled'. Stripe also has
+ * statuses like 'trialing', 'unpaid', 'paused', 'incomplete_expired' that
+ * we collapse into our smaller set.
+ */
+function mapStripeStatusToBundleStatus(stripeStatus: Stripe.Subscription.Status): string {
+  switch (stripeStatus) {
+    case 'active': return 'active';
+    case 'past_due': return 'past_due';
+    case 'unpaid': return 'past_due';
+    case 'paused': return 'past_due';
+    case 'canceled': return 'cancelled';
+    case 'incomplete_expired': return 'cancelled';
+    case 'incomplete': return 'incomplete';
+    case 'trialing': return 'active'; // trialing = customer has access
+    default: return 'incomplete';
+  }
+}
+
+/**
+ * School bundle: Stripe subscription created/updated → fan out to all 4 teachers.
+ * past_due does NOT change stories_limit (preserve access during dunning).
+ */
+async function handleTeamSubscriptionUpdate(
+  subscription: Stripe.Subscription,
+  teamId: string
+) {
+  const mappedStatus = mapStripeStatusToBundleStatus(subscription.status);
+
+  console.log(`[WEBHOOK] Updating school bundle for team ${teamId}:`, {
+    subscriptionId: subscription.id,
+    stripeStatus: subscription.status,
+    mappedStatus,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+  });
+
+  // Update teams row with Stripe state
+  const teamUpdate: Record<string, unknown> = {
+    stripe_subscription_id: subscription.id,
+    stripe_customer_id: subscription.customer as string,
+    subscription_status: mappedStatus,
+    cancel_at_period_end: subscription.cancel_at_period_end,
+  };
+  if (subscription.current_period_end) {
+    teamUpdate.current_period_end = new Date(subscription.current_period_end * 1000).toISOString();
+  }
+
+  const { error: teamError } = await supabaseAdmin
+    .from('teams')
+    .update(teamUpdate)
+    .eq('id', teamId);
+
+  if (teamError) {
+    console.error('[WEBHOOK] Error updating team row:', teamError);
+    throw teamError;
+  }
+
+  // Fetch all members for fan-out
+  const { data: members, error: membersError } = await supabaseAdmin
+    .from('users')
+    .select('id, is_team_primary, billing_cycle_start, subscription_tier, stories_created_this_month')
+    .eq('team_id', teamId);
+
+  if (membersError || !members) {
+    console.error('[WEBHOOK] Error fetching team members:', membersError);
+    throw membersError ?? new Error('No members for team');
+  }
+
+  // Compute new billing cycle start (used to decide whether to reset story count)
+  const newBillingCycleStart = subscription.current_period_start
+    ? new Date(subscription.current_period_start * 1000)
+    : null;
+
+  // Fan out to each member
+  for (const member of members) {
+    const userUpdate: Record<string, unknown> = {
+      subscription_tier: 'team',
+      subscription_status: mappedStatus,
+      // stripe_customer_id and stripe_subscription_id only on the primary;
+      // other members reach billing via teams.stripe_customer_id.
+      trial_status: 'completed',
+    };
+
+    // Only set stories_limit on active/incomplete; preserve during past_due (dunning grace).
+    if (mappedStatus !== 'past_due') {
+      userUpdate.stories_limit = 15;
+    }
+
+    // Reset monthly count on new billing cycle (or first activation)
+    if (newBillingCycleStart) {
+      userUpdate.billing_cycle_start = newBillingCycleStart.toISOString();
+
+      const currentCycleStart = member.billing_cycle_start
+        ? new Date(member.billing_cycle_start).getTime()
+        : 0;
+      const newCycleStartMs = newBillingCycleStart.getTime();
+      const isNewCycle =
+        currentCycleStart === 0 || (newCycleStartMs > 0 && newCycleStartMs !== currentCycleStart);
+
+      if (isNewCycle) {
+        userUpdate.stories_created_this_month = 0;
+      }
+    }
+
+    // Only the primary stores Stripe IDs at the user level (for portal/billing lookups)
+    if (member.is_team_primary) {
+      userUpdate.stripe_subscription_id = subscription.id;
+      userUpdate.stripe_customer_id = subscription.customer as string;
+    }
+
+    const { error } = await supabaseAdmin.from('users').update(userUpdate).eq('id', member.id);
+    if (error) {
+      console.error(`[WEBHOOK] Error updating team member ${member.id}:`, error);
+      throw error;
+    }
+  }
+
+  console.log(`[WEBHOOK] School bundle ${teamId} synced: ${members.length} members (status=${mappedStatus})`);
+}
+
+/**
+ * School bundle: subscription cancelled → revert all 4 teachers to free tier
+ * and detach them from the team.
+ */
+async function handleTeamSubscriptionDeleted(
+  subscription: Stripe.Subscription,
+  teamId: string
+) {
+  console.log(`[WEBHOOK] School bundle cancelled for team ${teamId}`);
+
+  // Mark team cancelled (keep stripe IDs for audit)
+  await supabaseAdmin
+    .from('teams')
+    .update({
+      subscription_status: 'cancelled',
+      cancel_at_period_end: false,
+    })
+    .eq('id', teamId);
+
+  // Revert all members
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update({
+      subscription_tier: 'free',
+      subscription_status: 'cancelled',
+      stories_limit: 2,
+      team_id: null,
+      is_team_primary: false,
+      stripe_subscription_id: null,
+      billing_cycle_start: null,
+    })
+    .eq('team_id', teamId);
+
+  if (error) {
+    console.error(`[WEBHOOK] Error reverting team members for ${teamId}:`, error);
+    throw error;
+  }
+
+  console.log(`[WEBHOOK] Team ${teamId} members reverted to free tier`);
 }
 
 // Disable body parsing for webhook signature verification

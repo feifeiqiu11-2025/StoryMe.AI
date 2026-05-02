@@ -54,6 +54,13 @@ const adminPages = [
     icon: '📖',
     color: 'from-amber-500 to-rose-500',
   },
+  {
+    title: 'School Bundles',
+    description: 'Group 4 teacher accounts under one school for shared monthly billing',
+    href: '/admin/school-bundles',
+    icon: 'SB',
+    color: 'from-violet-500 to-fuchsia-500',
+  },
 ];
 
 export default function AdminIndexPage() {
