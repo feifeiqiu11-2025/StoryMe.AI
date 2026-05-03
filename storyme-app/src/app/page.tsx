@@ -17,6 +17,7 @@ import WhyCreativitySection from '@/components/landing/WhyCreativitySection';
 import VideoShowcase from '@/components/landing/VideoShowcase';
 import Reveal from '@/components/ui/Reveal';
 import PartnerMarquee from '@/components/landing/PartnerMarquee';
+import { BOOK_TILES } from '@/lib/marketing/bookTiles';
 import type { YouTubeVideo } from '@/app/api/v1/youtube/playlist/route';
 
 const LANDING_PLAYLIST_ID = 'PLyDpAVbXE4SUAEuc2SnXwhsbUMg9j3dy9';
@@ -84,7 +85,7 @@ export default function HomePage() {
 
   return (
     <>
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 overflow-x-hidden">
       {/* Error Banner - Wrapped in Suspense */}
       <Suspense fallback={null}>
         <ErrorHandler />
@@ -93,34 +94,35 @@ export default function HomePage() {
       {/* Navigation */}
       <LandingNav />
 
+      {/* Hero Section - Carousel (constrained width) */}
       <div className="max-w-6xl mx-auto px-4 pt-8 pb-2">
-        {/* Hero Section - Carousel */}
         <div className="mb-8 sm:mb-10">
-          {/* Hero Carousel */}
           <HeroCarousel />
         </div>
+      </div>
 
-        {/* Why Creativity Matters Section */}
+      {/* Why Creativity Matters Section (constrained, gradient bg) */}
+      <section className="max-w-6xl mx-auto px-4 py-3 sm:py-5">
         <Reveal>
           <WhyCreativitySection />
         </Reveal>
+      </section>
 
-        {/* The Creation Journey Section */}
+        {/* The Creation Journey Section — TEMPORARILY HIDDEN.
+            Replaced visually by the new "What you can make" strip inside Online Tools below.
+            Restore by uncommenting if needed. */}
+        {/*
         <Reveal>
           <div className="mb-12 sm:mb-16">
-            {/* Section Title */}
             <div className="text-center mb-8">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
                 The Creation Journey
               </h2>
             </div>
 
-            {/* Clean Journey Flow - Inspired by Slides */}
             <div className="mb-12">
-              {/* Three Column Grid with Arrows */}
               <div className="flex flex-col md:flex-row items-center md:items-stretch justify-center gap-4 md:gap-2 mb-8">
 
-                {/* Column 1: Spark */}
                 <Reveal delay={0}>
                   <div className="bg-white rounded-xl p-6 shadow-md border border-yellow-200 flex-1 max-w-sm h-full">
                     <h4 className="text-xl font-bold text-gray-900 text-center mb-4">Spark</h4>
@@ -137,7 +139,6 @@ export default function HomePage() {
                   </div>
                 </Reveal>
 
-                {/* Arrow 1 */}
                 <div className="hidden md:flex items-center justify-center px-2">
                   <span className="text-2xl text-gray-400">→</span>
                 </div>
@@ -145,7 +146,6 @@ export default function HomePage() {
                   <span className="text-2xl text-gray-400">↓</span>
                 </div>
 
-                {/* Column 2: Create */}
                 <Reveal delay={150}>
                   <div className="bg-white rounded-xl p-6 shadow-md border border-pink-200 flex-1 max-w-sm h-full">
                     <h4 className="text-xl font-bold text-gray-900 text-center mb-4">Create</h4>
@@ -162,7 +162,6 @@ export default function HomePage() {
                   </div>
                 </Reveal>
 
-                {/* Arrow 2 */}
                 <div className="hidden md:flex items-center justify-center px-2">
                   <span className="text-2xl text-gray-400">→</span>
                 </div>
@@ -170,7 +169,6 @@ export default function HomePage() {
                   <span className="text-2xl text-gray-400">↓</span>
                 </div>
 
-                {/* Column 3: Grow */}
                 <Reveal delay={300}>
                   <div className="bg-white rounded-xl p-6 shadow-md border border-green-200 flex-1 max-w-sm h-full">
                     <h4 className="text-xl font-bold text-gray-900 text-center mb-4">Grow</h4>
@@ -191,140 +189,72 @@ export default function HomePage() {
             </div>
           </div>
         </Reveal>
+        */}
 
-        {/* Online Tools - Reader to Creator Loop */}
-        <Reveal>
-          <div className="mb-12 sm:mb-16">
-            <div className="text-center mb-14 sm:mb-10">
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+        {/* Online Tools - Creative Loop (full-width band over the gradient) */}
+        <section className="bg-white/75 py-7 sm:py-10">
+          <Reveal>
+            <div className="text-center mb-12 max-w-5xl mx-auto px-4">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
                 Online Tools for the Creative Loop
               </h2>
+              <p className="text-gray-700 leading-relaxed">
+                <strong className="text-gray-900">KindleWood Studio</strong> web application for parents, educators, and young creators
+                to turn imagination into tangible books
+                <br />
+                and <strong className="text-gray-900">KindleWood Kids</strong> mobile apps for an immersive reading and learning experience.
+              </p>
+              <p className="mt-5 text-sm text-amber-700 italic">
+                Here’s what you can create
+              </p>
             </div>
 
-            {/* Two cards with loop arrow between */}
-            <div className="max-w-6xl mx-auto grid md:grid-cols-[1fr_auto_1fr] gap-6 md:gap-4 items-center">
-
-              {/* KindleWood Studio Card */}
-              <Reveal delay={0}>
-                <div className="relative bg-white rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all pt-20 sm:pt-24 px-6 pb-6 sm:px-8 sm:pb-8">
-                  {/* Creator dragon popping out top-left */}
-                  <div className="absolute -top-12 -left-2 sm:-top-24 sm:-left-6 w-28 h-28 sm:w-48 sm:h-48 pointer-events-none">
-                    <Image
-                      src="/images/dragon-creator.png"
-                      alt="Dragon writing with quill"
-                      fill
-                      className="object-contain drop-shadow-lg"
-                    />
-                  </div>
-
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-2 flex-wrap">
-                      <h4 className="text-xl font-bold text-gray-900">KindleWood Studio</h4>
-                      <span className="inline-block bg-purple-100 text-purple-700 text-xs font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide">
-                        Web
+            {/* 4 book covers — full page-width spacing, matching products page */}
+            <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 px-4">
+              {BOOK_TILES.map((tile) => (
+                <div
+                  key={tile.key}
+                  className={`group relative aspect-[210/297] transform ${tile.tilt} hover:rotate-0 hover:-translate-y-1 transition-all duration-300`}
+                >
+                  <div className="absolute inset-0 rounded-xl overflow-hidden bg-gradient-to-br from-purple-100 via-pink-100 to-amber-100 shadow-md group-hover:shadow-2xl transition-shadow duration-300">
+                    {tile.image && (
+                      <Image
+                        src={tile.image}
+                        alt={tile.title}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 50vw, 25vw"
+                      />
+                    )}
+                    {tile.comingSoon && (
+                      <span className="absolute bottom-2 left-2 bg-white/90 backdrop-blur text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide shadow">
+                        Coming soon
                       </span>
-                    </div>
-                    <p className="text-gray-700 leading-relaxed mt-3">
-                      Where imagination becomes digital storybooks — for parents, educators, and young creators.
-                    </p>
-                    <p className="mt-4 text-sm text-amber-700 italic">
-                      We empower confident creators and writers.
-                    </p>
-                    <p className="mt-4">
-                      <Link href="/signup" className="text-purple-600 hover:text-purple-700 font-medium transition-colors">
-                        Start to Create →
-                      </Link>
-                    </p>
+                    )}
                   </div>
-                </div>
-              </Reveal>
-
-              {/* Loop Arrow - Two long arrows showing bidirectional flow */}
-              <div className="flex md:flex-col items-center justify-center gap-2 py-2 md:py-0 md:px-2">
-                <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Share</span>
-                <div className="flex md:flex-col gap-2 md:gap-2 items-center">
-                  {/* Right-pointing arrow (long shaft) */}
-                  <svg
-                    viewBox="0 0 90 18"
-                    className="w-20 h-4 md:w-24 md:h-5 text-amber-600 rotate-90 md:rotate-0"
-                    aria-hidden="true"
+                  <span
+                    className={`absolute -top-3 -right-6 ${tile.chipColor} text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg ring-2 ring-white rotate-6 group-hover:rotate-3 transition-transform tracking-wide z-10`}
                   >
-                    <line x1="4" y1="9" x2="72" y2="9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                    <polygon points="86,9 72,2 72,16" fill="currentColor" />
-                  </svg>
-                  {/* Left-pointing arrow (long shaft) */}
-                  <svg
-                    viewBox="0 0 90 18"
-                    className="w-20 h-4 md:w-24 md:h-5 text-amber-600 rotate-90 md:rotate-0"
-                    aria-hidden="true"
-                  >
-                    <line x1="18" y1="9" x2="86" y2="9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                    <polygon points="4,9 18,2 18,16" fill="currentColor" />
-                  </svg>
+                    {tile.title}
+                  </span>
                 </div>
-                <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Inspire</span>
-              </div>
-
-              {/* KindleWood Kids Card */}
-              <Reveal delay={150}>
-                <div className="relative bg-white rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all pt-20 sm:pt-24 px-6 pb-6 sm:px-8 sm:pb-8">
-                  {/* Reader dragon popping out top-right (flipped to face left) */}
-                  <div className="absolute -top-12 -right-2 sm:-top-24 sm:-right-6 w-28 h-28 sm:w-48 sm:h-48 pointer-events-none scale-x-[-1]">
-                    <Image
-                      src="/images/dragon-reader.png"
-                      alt="Dragon reading a book"
-                      fill
-                      className="object-contain drop-shadow-lg"
-                    />
-                  </div>
-
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-2 flex-wrap">
-                      <h4 className="text-xl font-bold text-gray-900">KindleWood Kids</h4>
-                      <span className="inline-block bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide">
-                        Mobile
-                      </span>
-                      <span className="inline-block bg-gray-100 text-gray-700 text-xs font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide">
-                        Ages 3–12
-                      </span>
-                    </div>
-                    <p className="text-gray-700 leading-relaxed mt-3">
-                      Where kids read their stories and discover new ones from friends.
-                    </p>
-                    <p className="mt-4 text-sm text-amber-700 italic">
-                      We inspire a love of reading.
-                    </p>
-                    <p className="mt-4 text-gray-700">
-                      Download:{' '}
-                      <a
-                        href="https://apps.apple.com/us/app/kindlewood-kids/id6755075039"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                      >
-                        App Store →
-                      </a>
-                      <span className="mx-2 text-gray-400">·</span>
-                      <a
-                        href="https://play.google.com/store/apps/details?id=com.kindlewood.kindlewood_kids"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                      >
-                        Google Play →
-                      </a>
-                    </p>
-                  </div>
-                </div>
-              </Reveal>
+              ))}
             </div>
 
-          </div>
-        </Reveal>
+            <div className="mt-12 text-center">
+              <Link
+                href="/products"
+                className="inline-block bg-amber-600 hover:bg-amber-700 text-white px-7 py-3 rounded-lg font-semibold text-sm transition-colors"
+              >
+                Explore everything in KindleWood Ecosystem →
+              </Link>
+            </div>
+          </Reveal>
+        </section>
 
-        {/* Partnership Section */}
-        <Reveal>
-          <div className="mb-12 sm:mb-16">
+        {/* Partnership Section (constrained, gradient bg) */}
+        <section className="max-w-6xl mx-auto px-4 py-8 sm:py-10">
+          <Reveal>
             <div className="text-center mb-8">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
                 Partnering with Schools & Educators
@@ -332,10 +262,10 @@ export default function HomePage() {
               <p className="text-gray-600 leading-relaxed max-w-3xl mx-auto">
                 We partner with schools, educators, and community organizations to bring creativity-driven storytelling and hands-on learning into classrooms, homes, and the KindleWood Learning Lab.
               </p>
-              <p className="mt-3">
+              <p className="mt-6">
                 <Link
                   href="/workshops"
-                  className="text-green-600 hover:text-green-700 font-medium transition-colors"
+                  className="inline-block bg-green-600 hover:bg-green-700 text-white px-7 py-3 rounded-lg font-semibold text-sm transition-colors"
                 >
                   Explore Workshops &amp; Programs →
                 </Link>
@@ -343,60 +273,66 @@ export default function HomePage() {
             </div>
 
             <PartnerMarquee />
-          </div>
-        </Reveal>
+          </Reveal>
+        </section>
 
-        {/* Our Stories - Video Showcase (video left, text right) */}
-        <Reveal>
-          {videosLoading ? (
-            <div className="mb-12 sm:mb-16">
-              <div className="flex flex-col md:flex-row gap-8 md:gap-12 items-center">
-                <div className="w-full md:w-[55%]">
-                  <div className="aspect-video bg-gray-200 rounded-xl animate-pulse" />
-                </div>
-                <div className="w-full md:w-[45%] space-y-4">
-                  <div className="h-8 bg-gray-200 rounded animate-pulse w-1/2" />
-                  <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
-                  <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
-                </div>
+        {/* Our Stories - Video Showcase (full-width band over the gradient) */}
+        {(videosLoading || videos.length > 0) && (
+          <section className="bg-white/75 py-7 sm:py-10">
+            <Reveal>
+              <div className="max-w-6xl mx-auto px-4">
+                {videosLoading ? (
+                  <div className="flex flex-col md:flex-row gap-8 md:gap-12 items-center">
+                    <div className="w-full md:w-[55%]">
+                      <div className="aspect-video bg-gray-200 rounded-xl animate-pulse" />
+                    </div>
+                    <div className="w-full md:w-[45%] space-y-4">
+                      <div className="h-8 bg-gray-200 rounded animate-pulse w-1/2" />
+                      <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
+                      <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
+                    </div>
+                  </div>
+                ) : (
+                  <VideoShowcase
+                    videos={videos}
+                    title="Our Stories"
+                    introText="Learn about the vision, mission, and the story behind KindleWood Studio."
+                    layout="video-left"
+                    noMargin
+                  />
+                )}
               </div>
-            </div>
-          ) : videos.length > 0 ? (
-            <VideoShowcase
-              videos={videos}
-              title="Our Stories"
-              introText="Learn about the vision, mission, and the story behind KindleWood Studio."
-              layout="video-left"
-            />
-          ) : null}
-        </Reveal>
+            </Reveal>
+          </section>
+        )}
 
-        {/* Watch How It Works - Video Showcase (text left, video right) */}
-        <Reveal>
-          {demoVideosLoading ? (
-            <div className="mb-12 sm:mb-16">
-              <div className="flex flex-col md:flex-row-reverse gap-8 md:gap-12 items-center">
-                <div className="w-full md:w-[55%]">
-                  <div className="aspect-video bg-gray-200 rounded-xl animate-pulse" />
+        {/* Watch How It Works - Video Showcase (constrained, gradient bg) */}
+        {(demoVideosLoading || demoVideos.length > 0) && (
+          <section className="max-w-6xl mx-auto px-4 py-8 sm:py-10">
+            <Reveal>
+              {demoVideosLoading ? (
+                <div className="flex flex-col md:flex-row-reverse gap-8 md:gap-12 items-center">
+                  <div className="w-full md:w-[55%]">
+                    <div className="aspect-video bg-gray-200 rounded-xl animate-pulse" />
+                  </div>
+                  <div className="w-full md:w-[45%] space-y-4">
+                    <div className="h-8 bg-gray-200 rounded animate-pulse w-1/2" />
+                    <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
+                    <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
+                  </div>
                 </div>
-                <div className="w-full md:w-[45%] space-y-4">
-                  <div className="h-8 bg-gray-200 rounded animate-pulse w-1/2" />
-                  <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
-                  <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
-                </div>
-              </div>
-            </div>
-          ) : demoVideos.length > 0 ? (
-            <VideoShowcase
-              videos={demoVideos}
-              title="Watch How It Works"
-              introText="See how kids and parents create personalized stories, characters, and more."
-              layout="video-right"
-            />
-          ) : null}
-        </Reveal>
-
-      </div>
+              ) : (
+                <VideoShowcase
+                  videos={demoVideos}
+                  title="Watch How It Works"
+                  introText="See how kids and parents create personalized stories, characters, and more."
+                  layout="video-right"
+                  noMargin
+                />
+              )}
+            </Reveal>
+          </section>
+        )}
 
       {/* Testimonials Section */}
       <Reveal>

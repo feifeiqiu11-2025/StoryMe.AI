@@ -14,6 +14,8 @@ interface VideoShowcaseProps {
   title: string;
   introText: string;
   layout: 'video-left' | 'video-right';
+  /** Skip the default outer mb-12 sm:mb-16 — useful when the parent already provides spacing. */
+  noMargin?: boolean;
 }
 
 export default function VideoShowcase({
@@ -21,6 +23,7 @@ export default function VideoShowcase({
   title,
   introText,
   layout,
+  noMargin = false,
 }: VideoShowcaseProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -158,7 +161,7 @@ export default function VideoShowcase({
   );
 
   return (
-    <div className="mb-12 sm:mb-16">
+    <div className={noMargin ? '' : 'mb-12 sm:mb-16'}>
       <div className="text-center mb-8">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
           {title}
