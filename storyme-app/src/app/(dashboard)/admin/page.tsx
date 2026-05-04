@@ -5,13 +5,20 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Mail } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { isAdminEmail } from '@/lib/auth/isAdmin';
 
-const adminPages = [
+const adminPages: Array<{
+  title: string;
+  description: string;
+  href: string;
+  icon: ReactNode;
+  color: string;
+}> = [
   {
     title: 'Metrics',
     description: 'User registrations, story stats, and leaderboard',
@@ -60,6 +67,13 @@ const adminPages = [
     href: '/admin/school-bundles',
     icon: 'SB',
     color: 'from-violet-500 to-fuchsia-500',
+  },
+  {
+    title: 'Marketing Email',
+    description: 'Send story-format campaign emails — Spark letters and broadcasts',
+    href: '/admin/marketing-email',
+    icon: <Mail className="w-5 h-5" />,
+    color: 'from-amber-500 to-orange-500',
   },
 ];
 

@@ -184,6 +184,13 @@ export async function POST(req: NextRequest) {
 
   // Step 4: dry run reports and exits
   if (mode === 'dry_run') {
+    const { data: recentSends } = await supabase
+      .from('marketing_email_sends')
+      .select('email, status, sent_at, resend_message_id, error')
+      .eq('campaign_id', effectiveCampaignId)
+      .order('sent_at', { ascending: false })
+      .limit(20);
+
     return NextResponse.json({
       success: true,
       mode,
@@ -195,7 +202,8 @@ export async function POST(req: NextRequest) {
         eligible: eligible.length,
         will_send_in_this_batch: Math.min(eligible.length, cap),
       },
-      sample_eligible: eligible.slice(0, 5),
+      sample_eligible: eligible.slice(0, 10),
+      recent_sends: recentSends || [],
     });
   }
 
