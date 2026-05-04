@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
   } else {
     const [usersResp, workshopsResp] = await Promise.all([
       supabase.from('users').select('email').not('email', 'is', null),
-      supabase.from('workshop_registrations').select('email').not('email', 'is', null),
+      supabase.from('workshop_registrations').select('parent_email').not('parent_email', 'is', null),
     ]);
 
     if (usersResp.error || workshopsResp.error) {
@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
       if (e && e.includes('@')) all.add(e);
     }
     for (const row of workshopsResp.data || []) {
-      const e = (row as { email: string }).email?.toLowerCase().trim();
+      const e = (row as { parent_email: string }).parent_email?.toLowerCase().trim();
       if (e && e.includes('@')) all.add(e);
     }
     recipients = Array.from(all);
