@@ -20,7 +20,9 @@ export const SPARK_LETTER_1_SUBJECT = "Spark's first letter: KindleWood is on An
 export const SPARK_LETTER_1_PREHEADER = 'A note from a small dragon, with some big product news.';
 
 const IMAGE_BASE = 'https://www.kindlewoodstudio.ai/email/spark-letter-1';
-const COMIC_URL = `${IMAGE_BASE}/spark-comic.jpg`;
+// Bump the ?v= when an image's bytes change, so Gmail's image proxy refetches
+// instead of serving its cached copy of the previous version.
+const COMIC_URL = `${IMAGE_BASE}/spark-comic.jpg?v=2`;
 const DESK_URL = `${IMAGE_BASE}/spark-desk.png`;
 
 const APP_STORE_URL = 'https://apps.apple.com/us/app/kindlewood-kids/id6755075039';
