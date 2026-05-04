@@ -1,6 +1,6 @@
 /**
- * Admin Index Page
- * Navigation hub for all admin sub-pages
+ * Admin index — navigation hub for admin sub-pages.
+ * Pages are grouped into Insights / Operations / Tools.
  */
 
 'use client';
@@ -8,72 +8,95 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Mail } from 'lucide-react';
+import {
+  BarChart3,
+  LifeBuoy,
+  GraduationCap,
+  FileText,
+  Image as ImageIcon,
+  BookOpen,
+  Building2,
+  Mail,
+  ArrowUpRight,
+} from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { isAdminEmail } from '@/lib/auth/isAdmin';
 
-const adminPages: Array<{
+interface AdminPage {
   title: string;
   description: string;
   href: string;
   icon: ReactNode;
-  color: string;
-}> = [
+}
+
+interface AdminGroup {
+  title: string;
+  pages: AdminPage[];
+}
+
+const groups: AdminGroup[] = [
   {
-    title: 'Metrics',
-    description: 'User registrations, story stats, and leaderboard',
-    href: '/admin/metrics',
-    icon: '📊',
-    color: 'from-blue-500 to-indigo-500',
+    title: 'Insights',
+    pages: [
+      {
+        title: 'Metrics',
+        description: 'Users, stories, and tier breakdowns.',
+        href: '/admin/metrics',
+        icon: <BarChart3 className="w-[18px] h-[18px]" />,
+      },
+      {
+        title: 'Support tickets',
+        description: 'Demo requests and support inquiries.',
+        href: '/admin/support',
+        icon: <LifeBuoy className="w-[18px] h-[18px]" />,
+      },
+    ],
   },
   {
-    title: 'Support Tickets',
-    description: 'View and manage support requests and demo inquiries',
-    href: '/admin/support',
-    icon: '🎫',
-    color: 'from-purple-500 to-pink-500',
+    title: 'Operations',
+    pages: [
+      {
+        title: 'Workshops',
+        description: 'Events, sessions, registrations.',
+        href: '/admin/workshops',
+        icon: <GraduationCap className="w-[18px] h-[18px]" />,
+      },
+      {
+        title: 'School bundles',
+        description: 'Four-teacher teams on shared billing.',
+        href: '/admin/school-bundles',
+        icon: <Building2 className="w-[18px] h-[18px]" />,
+      },
+      {
+        title: 'Marketing email',
+        description: 'Story-format broadcasts — Spark letters.',
+        href: '/admin/marketing-email',
+        icon: <Mail className="w-[18px] h-[18px]" />,
+      },
+    ],
   },
   {
-    title: 'Workshops',
-    description: 'Manage workshop events and registrations',
-    href: '/admin/workshops',
-    icon: '🎓',
-    color: 'from-green-500 to-teal-500',
-  },
-  {
-    title: 'PDF Back Cover',
-    description: 'Customize PDF back cover templates',
-    href: '/admin/pdf-back-cover',
-    icon: '📄',
-    color: 'from-orange-500 to-red-500',
-  },
-  {
-    title: 'Poster',
-    description: 'Generate promotional posters',
-    href: '/admin/poster',
-    icon: '🖼️',
-    color: 'from-cyan-500 to-blue-500',
-  },
-  {
-    title: 'Teacher Training',
-    description: 'Classroom scenarios walkthrough for schools',
-    href: '/admin/training',
-    icon: '📖',
-    color: 'from-amber-500 to-rose-500',
-  },
-  {
-    title: 'School Bundles',
-    description: 'Group 4 teacher accounts under one school for shared monthly billing',
-    href: '/admin/school-bundles',
-    icon: 'SB',
-    color: 'from-violet-500 to-fuchsia-500',
-  },
-  {
-    title: 'Marketing Email',
-    description: 'Send story-format campaign emails — Spark letters and broadcasts',
-    href: '/admin/marketing-email',
-    icon: <Mail className="w-5 h-5" />,
-    color: 'from-amber-500 to-orange-500',
+    title: 'Tools',
+    pages: [
+      {
+        title: 'PDF back cover',
+        description: 'Back-cover templates for printable books.',
+        href: '/admin/pdf-back-cover',
+        icon: <FileText className="w-[18px] h-[18px]" />,
+      },
+      {
+        title: 'Poster generator',
+        description: 'Promotional posters for campaigns.',
+        href: '/admin/poster',
+        icon: <ImageIcon className="w-[18px] h-[18px]" />,
+      },
+      {
+        title: 'Teacher training',
+        description: 'Classroom walkthroughs for schools.',
+        href: '/admin/training',
+        icon: <BookOpen className="w-[18px] h-[18px]" />,
+      },
+    ],
   },
 ];
 
@@ -84,18 +107,17 @@ export default function AdminIndexPage() {
   useEffect(() => {
     const checkAuth = async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         router.push('/login');
         return;
       }
-
       if (!isAdminEmail(user.email)) {
         router.push('/dashboard');
         return;
       }
-
       setAuthorized(true);
     };
     checkAuth();
@@ -104,33 +126,52 @@ export default function AdminIndexPage() {
   if (!authorized) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+        <div className="animate-spin rounded-full h-7 w-7 border-2 border-gray-200 border-t-gray-900" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="text-gray-600 mt-1">Manage your KindleWood Studio platform</p>
-      </div>
+    <div className="max-w-5xl mx-auto px-4 py-12">
+      <header className="mb-10">
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-[0.14em]">
+          KindleWood Studio
+        </p>
+        <h1 className="mt-1 text-3xl font-semibold text-gray-900 tracking-tight">Admin</h1>
+      </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {adminPages.map((page) => (
-          <Link
-            key={page.href}
-            href={page.href}
-            className="bg-white rounded-xl shadow-md p-5 hover:shadow-lg transition-all hover:-translate-y-0.5 border border-gray-100"
-          >
-            <div className={`inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-r ${page.color} text-white text-xl mb-3`}>
-              {page.icon}
+      <div className="space-y-10">
+        {groups.map((group) => (
+          <section key={group.title}>
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-[0.12em] mb-3">
+              {group.title}
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {group.pages.map((page) => (
+                <AdminCard key={page.href} page={page} />
+              ))}
             </div>
-            <h3 className="font-semibold text-gray-900 mb-1">{page.title}</h3>
-            <p className="text-sm text-gray-500">{page.description}</p>
-          </Link>
+          </section>
         ))}
       </div>
     </div>
+  );
+}
+
+function AdminCard({ page }: { page: AdminPage }) {
+  return (
+    <Link
+      href={page.href}
+      className="group relative bg-white border border-gray-200 rounded-lg p-4 hover:border-gray-400 hover:bg-gray-50/40 transition-colors"
+    >
+      <div className="flex items-start gap-3">
+        <div className="text-gray-700 mt-[3px] flex-shrink-0">{page.icon}</div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold text-gray-900">{page.title}</h3>
+          <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{page.description}</p>
+        </div>
+        <ArrowUpRight className="w-4 h-4 text-gray-300 group-hover:text-gray-600 transition-colors flex-shrink-0" />
+      </div>
+    </Link>
   );
 }
