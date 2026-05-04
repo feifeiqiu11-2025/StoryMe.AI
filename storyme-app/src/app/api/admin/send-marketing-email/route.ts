@@ -43,7 +43,7 @@ export const maxDuration = 60;
 
 const REPLY_TO = 'Admin@KindleWoodStudio.ai';
 const THROTTLE_MS = 600;
-const TEST_RECIPIENTS = ['kindlewoodsai@gmail.com', 'feifei_qiu@hotmail.com'];
+const TEST_RECIPIENTS = ['feifei_qiu@hotmail.com', 'feifeiqiu11@gmail.com'];
 
 type CampaignRenderer = (email: string) => {
   subject: string;
