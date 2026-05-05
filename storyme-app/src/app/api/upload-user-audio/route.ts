@@ -234,9 +234,13 @@ export async function POST(request: NextRequest) {
           .eq('page_number', metadata.pageNumber)
           .single();
 
-        // Determine which field to update based on language
-        const audioUrlField = language === 'zh' ? 'audio_url_zh' : 'audio_url';
-        // Note: audio_filename column doesn't have a _zh variant, filename is shared
+        // Determine which field to update based on language.
+        // EN goes to audio_url; any non-EN secondary language (zh/ko/etc.) goes to
+        // audio_url_secondary, mirroring the AI generation pipeline (see
+        // generate-story-audio/route.ts). Legacy audio_url_zh column is no longer
+        // written to from the recording flow.
+        const audioUrlField = language === 'en' ? 'audio_url' : 'audio_url_secondary';
+        // Note: audio_filename column is shared (no per-language variants)
 
         let audioPage;
         let error: any;
@@ -248,8 +252,8 @@ export async function POST(request: NextRequest) {
             audio_source: 'user_recorded',
             voice_profile_id: voiceProfile.id,
             recorded_by_user_id: user.id,
-            // Keep original language if both languages exist
-            language: existingPage.audio_url && existingPage.audio_url_zh ? existingPage.language : language,
+            // Keep original language if both EN and secondary recordings exist
+            language: existingPage.audio_url && existingPage.audio_url_secondary ? existingPage.language : language,
             generation_status: 'completed',
             recording_metadata: {
               ...(existingPage.recording_metadata || {}),

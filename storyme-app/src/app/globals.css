@@ -25,8 +25,10 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* iOS Safari Input Fixes - Force dark text color on all inputs */
-input,
+/* iOS Safari Input Fixes - Force dark text color on text-style inputs.
+   Excludes checkbox/radio so the browser still renders the native control
+   (otherwise appearance:none collapses them to invisible 0×0 boxes). */
+input:not([type="checkbox"]):not([type="radio"]),
 textarea,
 select {
   -webkit-appearance: none;

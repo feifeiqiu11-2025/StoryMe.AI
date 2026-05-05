@@ -15,7 +15,8 @@ import ExportPdfModal from '@/components/pdf/ExportPdfModal';
 import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeViewer';
 import Tooltip from '@/components/ui/Tooltip';
 import TagSelector from '@/components/story/TagSelector';
-import { getLanguageLabel } from '@/lib/config/languages';
+import { getLanguageLabel, getLanguageConfig } from '@/lib/config/languages';
+import { SkipForward, SkipBack } from 'lucide-react';
 import { isAdminEmail } from '@/lib/auth/isAdmin';
 
 export default function StoryViewerPage() {
@@ -66,7 +67,8 @@ export default function StoryViewerPage() {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const [recordingChunks, setRecordingChunks] = useState<Blob[]>([]);
-  const [recordingLanguage, setRecordingLanguage] = useState<'en' | 'zh'>('en');
+  // Recording language: 'en' or the project's secondary language code (e.g. 'zh', 'ko')
+  const [recordingLanguage, setRecordingLanguage] = useState<string>('en');
   const [showAudioDropdown, setShowAudioDropdown] = useState(false);
   const audioDropdownRef = useRef<HTMLDivElement>(null);
   const audioPreviewRef = useRef<HTMLAudioElement>(null);
@@ -710,6 +712,26 @@ export default function StoryViewerPage() {
     } finally {
       setUploadingAudio(false);
     }
+  };
+
+  // Skip current page in Recording Mode: advance without uploading. Pages without
+  // a user recording continue to play their AI-generated narration at runtime.
+  // On the last page, Skip exits recording mode (Skip & Finish).
+  const handleSkipPage = () => {
+    if (isPlaying) stopPreview();
+    if (currentSceneIndex >= allPages.length - 1) {
+      handleExitRecordingMode();
+      return;
+    }
+    setCurrentSceneIndex(currentSceneIndex + 1);
+  };
+
+  // Step back to the previous page in Recording Mode. In-memory recordings on
+  // the current page are preserved so the user can return to them later.
+  const handlePreviousPage = () => {
+    if (isPlaying) stopPreview();
+    if (currentSceneIndex <= 0) return;
+    setCurrentSceneIndex(currentSceneIndex - 1);
   };
 
   // Legacy: Save all recordings at once (keep for backward compatibility)
@@ -1883,7 +1905,7 @@ export default function StoryViewerPage() {
                         setSelectedChildren(selectedChildren.filter(id => id !== child.id));
                       }
                     }}
-                    className="w-5 h-5 text-blue-500 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-5 h-5 accent-blue-600 cursor-pointer"
                   />
                   <span className="text-lg font-medium text-gray-900">
                     {child.name}
@@ -1915,7 +1937,10 @@ export default function StoryViewerPage() {
         </div>
       )}
 
-      {/* Recording Mode Overlay - Shows recording controls over the story viewer */}
+      {/* Recording Mode Overlay — active recording UI for the dashboard.
+          NOTE: components/story/AudioRecorder.tsx is a separate full-screen recorder
+          used only by app/stories/[id]/page.tsx. Keep both flows in sync if behavior
+          changes meaningfully. */}
       {recordingMode && (
         <>
           {/* Hidden audio element for preview */}
@@ -1961,39 +1986,53 @@ export default function StoryViewerPage() {
                   <span className="text-gray-500"> saved, </span>
                   <span className="text-gray-500">{allPages.length - savedPages.size} left</span>
                 </p>
-                {/* Language Selector */}
-                {hasBilingualContent && (
-                  <div className="flex rounded-md overflow-hidden border border-gray-300">
-                    <button
-                      onClick={() => setRecordingLanguage('en')}
-                      className={`px-2 py-0.5 text-xs font-medium transition-colors ${
-                        recordingLanguage === 'en'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      EN
-                    </button>
-                    <button
-                      onClick={() => setRecordingLanguage('zh')}
-                      className={`px-2 py-0.5 text-xs font-medium transition-colors ${
-                        recordingLanguage === 'zh'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      中
-                    </button>
-                  </div>
-                )}
+                {/* Language Selector — toggles EN ↔ project's secondary language (zh/ko/etc.) */}
+                {hasBilingualContent && project?.secondaryLanguage && (() => {
+                  const secondaryCode = project.secondaryLanguage as string;
+                  const secondaryLabel = getLanguageConfig(secondaryCode)?.nativeLabel
+                    ?? secondaryCode.toUpperCase();
+                  return (
+                    <div className="flex rounded-md overflow-hidden border border-gray-300">
+                      <button
+                        onClick={() => setRecordingLanguage('en')}
+                        className={`px-2 py-0.5 text-xs font-medium transition-colors ${
+                          recordingLanguage === 'en'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        EN
+                      </button>
+                      <button
+                        onClick={() => setRecordingLanguage(secondaryCode)}
+                        className={`px-2 py-0.5 text-xs font-medium transition-colors ${
+                          recordingLanguage === secondaryCode
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        {secondaryLabel}
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
 
-              {/* Save Button Row */}
-              <div className="mb-3">
+              {/* Save Button Row + Prev/Skip icons (navigate without saving = page keeps AI narration) */}
+              <div className="mb-3 flex gap-2">
+                <button
+                  onClick={handlePreviousPage}
+                  disabled={uploadingAudio || currentSceneIndex === 0}
+                  title="Previous page"
+                  aria-label="Previous page"
+                  className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  <SkipBack className="w-4 h-4" />
+                </button>
                 <button
                   onClick={handleSaveCurrentPage}
                   disabled={uploadingAudio || !pageRecordings.has(currentSceneIndex)}
-                  className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   {uploadingAudio ? (
                     <span className="flex items-center justify-center gap-2">
@@ -2005,6 +2044,19 @@ export default function StoryViewerPage() {
                   ) : (
                     'Save & Continue'
                   )}
+                </button>
+                <button
+                  onClick={handleSkipPage}
+                  disabled={uploadingAudio}
+                  title={
+                    currentSceneIndex === allPages.length - 1
+                      ? 'Skip and finish (this page keeps AI narration)'
+                      : 'Skip page (this page keeps AI narration)'
+                  }
+                  aria-label="Skip page"
+                  className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  <SkipForward className="w-4 h-4" />
                 </button>
               </div>
 

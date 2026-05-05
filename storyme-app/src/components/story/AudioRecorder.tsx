@@ -1,7 +1,11 @@
 /**
- * Audio Recorder Component
- * Page-by-page voice recording for stories
- * Supports user-recorded audio with preview and re-record
+ * Audio Recorder Component (full-screen)
+ * Page-by-page voice recording for stories.
+ *
+ * NOTE: This is the full-screen recorder used only by app/stories/[id]/page.tsx.
+ * The primary recording UI for the dashboard project view is the inline draggable
+ * panel inside app/(dashboard)/projects/[id]/page.tsx. Keep both flows in sync if
+ * recording behavior changes meaningfully (column mapping, language toggle, etc.).
  */
 
 'use client';

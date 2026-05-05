@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import { getLanguageLabel } from '@/lib/config/languages';
+import { Sparkles, BookOpen, Smartphone } from 'lucide-react';
 
 export interface ReadingPage {
   pageNumber: number;
@@ -59,7 +60,8 @@ export default function ReadingModeViewer({
   const [showAudioHint, setShowAudioHint] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  const KIDS_APP_URL = 'https://apps.apple.com/us/app/kindlewood-kids/id6755075039';
+  const KIDS_APP_URL_IOS = 'https://apps.apple.com/us/app/kindlewood-kids/id6755075039';
+  const KIDS_APP_URL_ANDROID = 'https://play.google.com/store/apps/details?id=com.kindlewood.kindlewood_kids';
 
   const currentPage = pages[currentPageIndex];
   const totalPages = pages.length;
@@ -466,61 +468,104 @@ export default function ReadingModeViewer({
 
       {/* Completion Screen */}
       {showCompletionScreen && (
-        <div className="absolute inset-0 bg-white flex items-center justify-center z-50 overflow-y-auto">
-          <div className="text-center p-6 max-w-lg w-full">
-            <div className="text-5xl mb-3">🎉</div>
-            <h2 className="text-gray-900 text-2xl font-bold mb-1">The End!</h2>
-            <p className="text-gray-600 text-sm mb-6">
-              You finished reading "{projectTitle}"
-            </p>
-
-            {/* App Download Section */}
-            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-4 mb-4 text-left">
-              <h3 className="text-gray-900 font-bold text-sm mb-2 flex items-center gap-2">
-                📱 Get KindleWood Kids App
-                <span className="bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full">FREE</span>
-              </h3>
-              <ul className="text-gray-600 text-xs space-y-1 mb-3">
-                <li>🎧 Listen to stories with audio narration</li>
-                <li>🔤 Tap any word to hear pronunciation</li>
-                <li>📊 Track reading progress & set goals</li>
-                <li>📚 Access Cool Jobs, Sports & Adventure stories</li>
-              </ul>
-              <a
-                href={KIDS_APP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full bg-blue-600 text-white px-4 py-2.5 rounded-lg font-semibold text-sm hover:bg-blue-700 transition-colors text-center"
-              >
-                Download Free App
-              </a>
+        <div className="absolute inset-0 bg-gradient-to-b from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="p-6 max-w-md w-full">
+            {/* Hero */}
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center gap-2 bg-white/70 backdrop-blur px-4 py-1.5 rounded-full shadow-sm mb-3">
+                <Sparkles className="w-4 h-4 text-purple-500" />
+                <span className="text-purple-700 text-xs font-semibold tracking-wide uppercase">Story complete</span>
+              </div>
+              <h2 className="text-gray-900 text-2xl font-bold mb-1">Yay, you finished!</h2>
+              <p className="text-gray-600 text-sm">
+                Hope you loved <span className="font-semibold text-gray-800">{projectTitle}</span>. Want to keep the magic going?
+              </p>
             </div>
 
-            {/* Create Story Section */}
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 mb-4 text-left">
-              <h3 className="text-gray-900 font-bold text-sm mb-2">
-                ✨ Create Your Own Story
-              </h3>
-              <ul className="text-gray-600 text-xs space-y-1 mb-3">
-                <li>✏️ Make your child the story character</li>
-                <li>🤖 Add AI voice narration</li>
-                <li>🎙️ Record your own voice to tell stories</li>
-                <li>📄 Export as PDF or physical book</li>
-              </ul>
-              <a
-                href="/signup"
-                className="block w-full bg-purple-600 text-white px-4 py-2.5 rounded-lg font-semibold text-sm hover:bg-purple-700 transition-colors text-center"
-              >
-                Start Creating Free
-              </a>
+            {/* Card 1 — Get the Kids App (slight left tilt) */}
+            <div className="relative bg-gradient-to-br from-sky-100 via-blue-100 to-indigo-100 rounded-[28px] p-5 mb-5 shadow-md border border-white/60 -rotate-1 hover:rotate-0 transition-transform duration-300">
+              <div className="absolute -top-3 left-5 inline-flex items-center gap-1.5 bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-md">
+                <Smartphone className="w-3 h-3" />
+                Free for families
+              </div>
+              <div className="mt-3">
+                <h3 className="text-gray-900 text-lg font-bold mb-1">Read with audio anywhere</h3>
+                <p className="text-gray-700 text-sm mb-4">
+                  Take stories on the go with narration, tap-to-read words, and reading goals.
+                </p>
+                <div className="flex gap-2">
+                  <a
+                    href={KIDS_APP_URL_IOS}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-1.5 bg-black text-white px-2 py-2 rounded-lg font-semibold text-xs hover:bg-gray-900 transition-colors"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M16.365 1.43c0 1.14-.435 2.255-1.295 3.114-.85.864-2.005 1.388-3.13 1.31-.13-1.116.42-2.27 1.27-3.13.85-.86 2.04-1.41 3.155-1.294zm4.555 17.45c-.85 1.31-1.99 2.65-3.535 2.665-1.475.015-1.96-.96-3.65-.96-1.69 0-2.21.94-3.625.985-1.46.05-2.575-1.42-3.435-2.72-1.785-2.585-3.155-7.31-1.32-10.485.91-1.575 2.535-2.575 4.31-2.6 1.43-.025 2.78.965 3.65.965.87 0 2.5-1.19 4.21-1.015.715.03 2.715.29 4.005 2.18-.105.07-2.39 1.395-2.36 4.165.025 3.31 2.92 4.42 2.95 4.43-.025.07-.46 1.575-1.51 3.21z"/>
+                    </svg>
+                    App Store
+                  </a>
+                  <a
+                    href={KIDS_APP_URL_ANDROID}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-1.5 bg-black text-white px-2 py-2 rounded-lg font-semibold text-xs hover:bg-gray-900 transition-colors"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.198l2.807 1.626a1 1 0 010 1.73l-2.808 1.626L15.198 12l2.5-2.491zM5.864 2.658L16.802 8.99l-2.302 2.303-8.636-8.635z"/>
+                    </svg>
+                    Google Play
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2 — Explore community stories (slight right tilt) */}
+            <div className="relative bg-gradient-to-br from-amber-100 via-orange-100 to-rose-100 rounded-[28px] p-5 mb-5 shadow-md border border-white/60 rotate-1 hover:rotate-0 transition-transform duration-300">
+              <div className="absolute -top-3 left-5 inline-flex items-center gap-1.5 bg-amber-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-md">
+                <BookOpen className="w-3 h-3" />
+                Free to read
+              </div>
+              <div className="mt-3">
+                <h3 className="text-gray-900 text-lg font-bold mb-1">More stories from other kids</h3>
+                <p className="text-gray-700 text-sm mb-4">
+                  Free stories dreamed up by other little storytellers — pick one and dive in.
+                </p>
+                <a
+                  href="/stories"
+                  className="block w-full bg-amber-600 text-white px-4 py-3 rounded-xl font-semibold text-sm hover:bg-amber-700 transition-colors text-center shadow-sm"
+                >
+                  Browse stories
+                </a>
+              </div>
+            </div>
+
+            {/* Card 3 — Create your own (slight left tilt, opposite of Card 1) */}
+            <div className="relative bg-gradient-to-br from-violet-100 via-purple-100 to-pink-100 rounded-[28px] p-5 mb-6 shadow-md border border-white/60 -rotate-1 hover:rotate-0 transition-transform duration-300">
+              <div className="absolute -top-3 left-5 inline-flex items-center gap-1.5 bg-purple-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-md">
+                <Sparkles className="w-3 h-3" />
+                Your turn!
+              </div>
+              <div className="mt-3">
+                <h3 className="text-gray-900 text-lg font-bold mb-1">Star in your own story</h3>
+                <p className="text-gray-700 text-sm mb-4">
+                  Make your child the hero of their very own adventure.
+                </p>
+                <a
+                  href="/signup"
+                  className="block w-full bg-purple-600 text-white px-4 py-3 rounded-xl font-semibold text-sm hover:bg-purple-700 transition-colors text-center shadow-sm"
+                >
+                  Create your story
+                </a>
+              </div>
             </div>
 
             {/* Exit Button */}
             <button
               onClick={onExit}
-              className="text-gray-500 text-sm hover:text-gray-700 transition-colors"
+              className="text-gray-400 hover:text-gray-600 text-xs transition-colors block mx-auto"
             >
-              ← Back to Story
+              Back to story
             </button>
           </div>
         </div>

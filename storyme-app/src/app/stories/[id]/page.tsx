@@ -645,13 +645,22 @@ function StoryViewer() {
           projectId={storyId}
           projectTitle={story?.title || 'Storybook'}
           pages={readingPages}
-          onExit={() => setReadingMode(false)}
+          onExit={() => {
+            setReadingMode(false);
+            // Strip ?mode=reading from URL so the auto-enter useEffect above
+            // doesn't immediately re-enter reading mode when the user exits.
+            if (searchParams.get('mode') === 'reading') {
+              router.replace(`/stories/${storyId}`, { scroll: false });
+            }
+          }}
           autoPlayAudio={searchParams.get('mode') === 'reading'}
           secondaryLanguage={story?.secondaryLanguage}
         />
       )}
 
-      {/* Audio Recorder */}
+      {/* Audio Recorder — full-screen alternate flow.
+          The primary recording UI lives in app/(dashboard)/projects/[id]/page.tsx
+          as an inline draggable panel; this full-screen version is only used here. */}
       {showRecorder && recordingPages.length > 0 && (
         <AudioRecorder
           projectId={storyId}
