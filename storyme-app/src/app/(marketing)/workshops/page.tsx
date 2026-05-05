@@ -24,7 +24,6 @@ import {
   WORKSHOP_PARTNERS,
   WORKSHOP_FAQS,
   formatWorkshopPrice,
-  getPartnerSessionPricing,
 } from '@/lib/workshops/constants';
 
 export default function WorkshopsPage() {
@@ -292,9 +291,6 @@ export default function WorkshopsPage() {
                     <p className="text-amber-800 font-medium mb-3">
                       Where every drawing becomes a story character, and every child grows into a confident storyteller.
                     </p>
-                    <p className="text-gray-500 mb-3">
-                      Ages 3–6 · 2 series · Series 1 with 6 sessions · Series 2 with 4 sessions
-                    </p>
                     <p className="text-gray-700 leading-relaxed mb-4">
                       Each session follows a Montessori-inspired creative arc: Story Spark →
                       Craft Creation → Guided Story Build → Share Circle. Every two sessions,
@@ -313,31 +309,14 @@ export default function WorkshopsPage() {
                         ),
                       )}
                     </ul>
-                    {/* Register CTA + Series Pricing */}
-                    <div className="flex items-center gap-4 flex-wrap">
+                    {/* Register CTA */}
+                    <div>
                       <Link
                         href={`/workshops/register?partner=${partner.slug}`}
                         className="inline-block px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg"
                       >
-                        Register for Series 1
+                        Secure your spot
                       </Link>
-                      <div>
-                        {(() => {
-                          const pricing = getPartnerSessionPricing(partner, 'single');
-                          const enrollable = partner.sessions.filter(s => s.enrollable !== false && s.series === 1);
-                          const seriesTotal = pricing.promoPrice * enrollable.length;
-                          return (
-                            <>
-                              <span className="text-2xl font-bold text-amber-700">
-                                {formatWorkshopPrice(seriesTotal)}
-                              </span>
-                              <span className="text-gray-500 text-sm ml-1">
-                                / series ({enrollable.length} sessions × {formatWorkshopPrice(pricing.promoPrice)})
-                              </span>
-                            </>
-                          );
-                        })()}
-                      </div>
                     </div>
                   </Reveal>
 
