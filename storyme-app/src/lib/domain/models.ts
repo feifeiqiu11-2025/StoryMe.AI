@@ -118,7 +118,8 @@ export interface Project {
   transcription?: string;
 
   // Privacy & Sharing
-  visibility?: 'private' | 'public';
+  visibility?: 'private' | 'unlisted' | 'public';
+  share_token?: string | null;
   featured?: boolean;
   view_count?: number;
   share_count?: number;

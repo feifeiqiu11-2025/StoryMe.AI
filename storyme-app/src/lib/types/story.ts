@@ -27,6 +27,7 @@ export type ClothingConsistency =
 // Story visibility/privacy level
 export type StoryVisibility =
   | 'private'       // Only creator can see (default for safety)
+  | 'unlisted'      // Hidden from community page; accessible via share-link token only
   | 'public';       // Visible on landing page and public gallery
 
 // Story tag interface with hierarchical structure

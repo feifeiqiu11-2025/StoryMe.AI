@@ -13,6 +13,7 @@ export async function GET(
 ) {
   try {
     const { id } = params;
+    const tokenParam = request.nextUrl.searchParams.get('token');
 
     const supabase = await createClient();
 
@@ -24,6 +25,7 @@ export async function GET(
         title,
         description,
         visibility,
+        share_token,
         featured,
         view_count,
         like_count,
@@ -63,19 +65,32 @@ export async function GET(
       throw error;
     }
 
-    // Check if story is public
-    if (project.visibility !== 'public') {
+    // Access gate: public stories are open. Unlisted stories require a matching
+    // share-link token. Anything else (private, mismatched token) is rejected
+    // with the same 403 to avoid leaking visibility state to scrapers.
+    const isPublic = project.visibility === 'public';
+    const isUnlistedWithMatchingToken =
+      project.visibility === 'unlisted' &&
+      !!project.share_token &&
+      !!tokenParam &&
+      tokenParam === project.share_token;
+
+    if (!isPublic && !isUnlistedWithMatchingToken) {
       return NextResponse.json(
         { error: 'This story is private' },
         { status: 403 }
       );
     }
 
-    // Auto-increment view count when viewing
-    await supabase
-      .from('projects')
-      .update({ view_count: (project.view_count || 0) + 1 })
-      .eq('id', id);
+    // Counters are frozen for unlisted (token-served) views — only public
+    // views accrue analytics so unlisted stays a clean "preview" channel.
+    const incrementViews = isPublic;
+    if (incrementViews) {
+      await supabase
+        .from('projects')
+        .update({ view_count: (project.view_count || 0) + 1 })
+        .eq('id', id);
+    }
 
     // Format response
     const formattedProject = {
@@ -84,7 +99,7 @@ export async function GET(
       description: project.description,
       visibility: project.visibility,
       featured: project.featured,
-      viewCount: project.view_count + 1, // Return incremented count
+      viewCount: incrementViews ? (project.view_count || 0) + 1 : (project.view_count || 0),
       likeCount: project.like_count,
       shareCount: project.share_count,
       publishedAt: project.published_at,
@@ -155,6 +170,8 @@ export async function POST(
       );
     }
 
+    // Counters are only tracked for public stories. Unlisted views are a
+    // private channel and don't accrue view/share metrics.
     if (project.visibility !== 'public') {
       return NextResponse.json(
         { error: 'This story is private' },

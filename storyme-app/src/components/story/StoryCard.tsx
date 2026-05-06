@@ -19,7 +19,8 @@ export interface StoryCardData {
   authorAge?: number;
   viewCount?: number;
   featured?: boolean;
-  visibility?: 'public' | 'private';
+  visibility?: 'public' | 'private' | 'unlisted';
+  shareToken?: string | null;
   status?: 'draft' | 'processing' | 'completed' | 'error';
   sceneCount?: number;
   createdAt?: string;
@@ -43,7 +44,8 @@ export interface StoryCardProps {
   showSceneCount?: boolean;
   showDate?: boolean;
   showShareButton?: boolean;
-  onPrivacyToggle?: (storyId: string, currentVisibility: 'public' | 'private') => void;
+  onPrivacyToggle?: (storyId: string, currentVisibility: 'public' | 'private' | 'unlisted') => void;
+  onShareLink?: (storyId: string) => void;
   onDelete?: (storyId: string) => void;
   isUpdatingPrivacy?: boolean;
   adminActions?: React.ReactNode;
@@ -63,6 +65,7 @@ export function StoryCard({
   showDate = variant === 'myStories',
   showShareButton = variant === 'community',
   onPrivacyToggle,
+  onShareLink,
   onDelete,
   isUpdatingPrivacy = false,
   adminActions,
@@ -91,6 +94,7 @@ export function StoryCard({
 
   const isDraft = story.status === 'draft';
   const isPublic = story.visibility === 'public';
+  const isUnlisted = story.visibility === 'unlisted';
   const viewCount = story.viewCount || 0;
 
   // Format date for My Stories
@@ -134,6 +138,11 @@ export function StoryCard({
               <div className="flex items-center gap-1 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                 <span>🌍</span>
                 <span>Public</span>
+              </div>
+            ) : isUnlisted ? (
+              <div className="flex items-center gap-1 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                <span>🔗</span>
+                <span>Link only</span>
               </div>
             ) : (
               <div className="flex items-center gap-1 bg-gray-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
@@ -296,7 +305,7 @@ export function StoryCard({
         )}
 
         {/* Action Buttons (My Stories only) */}
-        {variant === 'myStories' && (onPrivacyToggle || onDelete || adminActions) && (
+        {variant === 'myStories' && (onPrivacyToggle || onShareLink || onDelete || adminActions) && (
           <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
             {isDraft ? (
               /* Draft: Show "Continue Editing" label instead of privacy toggle */
@@ -325,6 +334,29 @@ export function StoryCard({
                   </button>
                 </div>
               )
+            )}
+
+            {/* Share-link icon: opens popover to enable/disable/copy unlisted link.
+                Hidden for drafts (no story to share yet) and for public stories
+                (anyone can already get the URL from the community share button). */}
+            {!isDraft && onShareLink && !isPublic && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShareLink(story.id);
+                }}
+                className={`p-2 rounded-lg transition-all ${
+                  isUnlisted
+                    ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                    : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'
+                }`}
+                title={isUnlisted ? 'Share link active — manage' : 'Share by link'}
+                aria-label={isUnlisted ? 'Manage share link' : 'Share by link'}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+              </button>
             )}
 
             {/* Admin Actions (star, tag) - rendered inline next to delete */}

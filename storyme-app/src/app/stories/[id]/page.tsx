@@ -66,7 +66,13 @@ function StoryViewer() {
   const fetchStory = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/stories/public/${storyId}`);
+      // Forward ?token= so unlisted stories shared via link load for anyone
+      // holding the link, not just the owner.
+      const token = searchParams.get('token');
+      const url = token
+        ? `/api/stories/public/${storyId}?token=${encodeURIComponent(token)}`
+        : `/api/stories/public/${storyId}`;
+      const response = await fetch(url);
       const data = await response.json();
 
       if (response.ok && data.story) {
@@ -649,8 +655,14 @@ function StoryViewer() {
             setReadingMode(false);
             // Strip ?mode=reading from URL so the auto-enter useEffect above
             // doesn't immediately re-enter reading mode when the user exits.
+            // Preserve ?token= for unlisted-share viewers so a refresh still
+            // resolves through the token gate.
             if (searchParams.get('mode') === 'reading') {
-              router.replace(`/stories/${storyId}`, { scroll: false });
+              const token = searchParams.get('token');
+              const next = token
+                ? `/stories/${storyId}?token=${encodeURIComponent(token)}`
+                : `/stories/${storyId}`;
+              router.replace(next, { scroll: false });
             }
           }}
           autoPlayAudio={searchParams.get('mode') === 'reading'}

@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import type { StoryVisibility, StoryTag } from '@/lib/types/story';
 import { StoryCard, type StoryCardData } from '@/components/story/StoryCard';
+import { ShareLinkPopover } from '@/components/story/ShareLinkPopover';
 import { isAdminEmail } from '@/lib/auth/isAdmin';
 
 const PAGE_SIZE = 12; // 12 divides evenly by 1, 2, 3, 4 columns
@@ -196,6 +197,7 @@ function ProjectsContent() {
   const [privacyConfirm, setPrivacyConfirm] = useState<{ id: string; newVisibility: StoryVisibility } | null>(null);
   const [updatingPrivacy, setUpdatingPrivacy] = useState<string | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState<string | null>(null);
+  const [shareLinkProjectId, setShareLinkProjectId] = useState<string | null>(null);
 
   // Admin state
   const [isAdmin, setIsAdmin] = useState(false);
@@ -410,6 +412,9 @@ function ProjectsContent() {
   };
 
   const handlePrivacyToggle = (projectId: string, currentVisibility: StoryVisibility) => {
+    // The "Public" toggle is a binary public/non-public switch. Anything not
+    // currently public flips to public (with a confirm gate); public flips back
+    // to private. Unlisted (link-share) is set via the share-link popover only.
     const newVisibility: StoryVisibility = currentVisibility === 'public' ? 'private' : 'public';
 
     if (newVisibility === 'public') {
@@ -417,6 +422,20 @@ function ProjectsContent() {
     } else {
       updateProjectPrivacy(projectId, newVisibility);
     }
+  };
+
+  const handleShareLinkUpdated = (
+    projectId: string,
+    next: { visibility: StoryVisibility; shareToken: string | null }
+  ) => {
+    invalidateCache(validPage);
+    setProjects(prev =>
+      prev.map(p =>
+        p.id === projectId
+          ? { ...p, visibility: next.visibility, shareToken: next.shareToken }
+          : p
+      )
+    );
   };
 
   const updateProjectPrivacy = async (projectId: string, newVisibility: StoryVisibility) => {
@@ -693,6 +712,7 @@ function ProjectsContent() {
                 description: project.description,
                 coverImageUrl: project.coverImageUrl,
                 visibility: project.visibility,
+                shareToken: project.shareToken ?? null,
                 status: project.status,
                 viewCount: project.viewCount,
                 featured: project.featured,
@@ -716,6 +736,7 @@ function ProjectsContent() {
                     }}
                     variant="myStories"
                     onPrivacyToggle={isDraft ? undefined : handlePrivacyToggle}
+                    onShareLink={isDraft ? undefined : (storyId) => setShareLinkProjectId(storyId)}
                     onDelete={() => setDeleteConfirm(project.id)}
                     isUpdatingPrivacy={updatingPrivacy === project.id}
                     onRemoveTag={isAdmin && !isDraft ? (storyId, tagId) => {
@@ -927,6 +948,22 @@ function ProjectsContent() {
           </div>
         </div>
       )}
+
+      {/* Share-link Popover (unlisted sharing) */}
+      {shareLinkProjectId && (() => {
+        const project = projects.find(p => p.id === shareLinkProjectId);
+        if (!project) return null;
+        return (
+          <ShareLinkPopover
+            storyId={project.id}
+            storyTitle={project.title || 'Untitled story'}
+            visibility={project.visibility || 'private'}
+            shareToken={project.shareToken ?? null}
+            onClose={() => setShareLinkProjectId(null)}
+            onUpdated={(next) => handleShareLinkUpdated(project.id, next)}
+          />
+        );
+      })()}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (

@@ -156,6 +156,7 @@ export class ProjectRepository extends BaseRepository<Project> {
         cover_image_url,
         status,
         visibility,
+        share_token,
         featured,
         view_count,
         created_at,
@@ -208,7 +209,7 @@ export class ProjectRepository extends BaseRepository<Project> {
     }));
 
     return {
-      projects: processedData as ProjectWithScenes[],
+      projects: processedData as unknown as ProjectWithScenes[],
       total: count || 0,
     };
   }

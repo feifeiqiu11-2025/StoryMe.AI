@@ -97,7 +97,8 @@ export interface ProjectDTO {
   authorName?: string;
   authorAge?: number;
   coverImageUrl?: string;
-  visibility?: 'private' | 'public';
+  visibility?: 'private' | 'unlisted' | 'public';
+  shareToken?: string | null;
   featured?: boolean;
   viewCount?: number;
   shareCount?: number;

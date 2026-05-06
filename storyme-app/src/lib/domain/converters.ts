@@ -122,6 +122,7 @@ export function projectToDTO(project: Project): ProjectDTO {
     authorAge: (project as any).author_age,
     coverImageUrl: (project as any).cover_image_url,
     visibility: project.visibility,
+    shareToken: project.share_token,
     featured: project.featured,
     viewCount: project.view_count,
     shareCount: project.share_count,
