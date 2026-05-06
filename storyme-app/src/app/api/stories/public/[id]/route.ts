@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 
 export async function GET(
   request: NextRequest,
@@ -15,7 +16,12 @@ export async function GET(
     const { id } = params;
     const tokenParam = request.nextUrl.searchParams.get('token');
 
-    const supabase = await createClient();
+    // Use the service-role client for the read so unauthenticated visitors
+    // (e.g. parents opening a share link without an account) can fetch
+    // unlisted stories. RLS on the projects table only permits anon SELECTs
+    // for public rows; the visibility/token gate below is the actual auth
+    // boundary for this endpoint.
+    const supabase = createServiceRoleClient();
 
     // Fetch full story with all scenes and images
     const { data: project, error } = await supabase
