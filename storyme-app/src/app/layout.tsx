@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     title: "KindleWood Studio",
     description: "Where Imagination Grows into Learning — Read, Listen, and Learn Anywhere",
     siteName: "KindleWood Studio",
-    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'KindleWood Studio — Where Imagination Grows into Learning' }],
+    images: [{ url: '/og-image-v2.png', width: 1200, height: 630, alt: 'KindleWood Studio — Where Imagination Grows into Learning' }],
     locale: 'en_US',
     type: 'website',
   },
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: "KindleWood Studio",
     description: "Where Imagination Grows into Learning — Read, Listen, and Learn Anywhere",
-    images: ['/og-image.png'],
+    images: ['/og-image-v2.png'],
   },
 };
 
