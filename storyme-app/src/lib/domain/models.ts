@@ -90,9 +90,15 @@ export interface CharacterLibrary {
 // PROJECT MODELS
 // ============================================
 
+export type ProjectType = 'picture_book' | 'chapter_book';
+
 export interface Project {
   id: string;
   user_id: string;
+
+  // Project flavor — see migration 20260508. Existing rows default to
+  // 'picture_book' so legacy queries are unaffected.
+  project_type?: ProjectType;
 
   title?: string;
   description?: string;
@@ -136,7 +142,8 @@ export interface Project {
   // Bilingual / Multi-language
   secondary_language?: string;    // 'zh', 'ko', etc. — chosen secondary language for this project
 
-  // Canvas editor state (serialized CanvasProjectState)
+  // Editor document state. Repurposed by 20260508: for chapter_book projects
+  // this holds the Tiptap ProseMirror doc JSON. Unused for picture_book.
   canvas_state?: Record<string, any>;
 
   // Draft state (UI-specific data not in structured columns)

@@ -151,6 +151,7 @@ export class ProjectRepository extends BaseRepository<Project> {
       .select(`
         id,
         user_id,
+        project_type,
         title,
         description,
         cover_image_url,
@@ -294,6 +295,36 @@ export class ProjectRepository extends BaseRepository<Project> {
     }));
 
     return mapped as ProjectWithScenes[];
+  }
+
+  /**
+   * Load a chapter-book project by id without joining scenes.
+   * Chapter books store their content in projects.canvas_state (Tiptap JSON);
+   * scenes/generated_images are picture-book concerns. Keeping this method
+   * separate avoids paying for the scenes join on chapter-book reads.
+   */
+  async findChapterBookById(id: string): Promise<Project | null> {
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select('*')
+      .eq('id', id)
+      .eq('project_type', 'chapter_book')
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw error;
+    }
+
+    return data as Project;
+  }
+
+  /**
+   * Update the Tiptap document JSON on a chapter-book project. Owner check
+   * happens in the service layer; this method just writes.
+   */
+  async updateEditorDoc(id: string, doc: Record<string, unknown>): Promise<Project> {
+    return this.update(id, { canvas_state: doc } as Partial<Project>);
   }
 
   /**

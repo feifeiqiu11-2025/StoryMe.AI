@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
       const { data: featuredStories, error: featuredError } = await supabase
         .from('projects')
         .select(`
-          id, title, description, visibility, featured, view_count, like_count, share_count,
+          id, project_type, title, description, visibility, featured, view_count, like_count, share_count,
           published_at, created_at, author_name, author_age, cover_image_url,
           scenes (id, scene_number, description, caption, generated_images (id, image_url)),
           project_tags (tag_id, story_tags (id, name, slug, icon, category, parent_id, is_leaf, display_order))
@@ -136,6 +136,7 @@ export async function GET(request: NextRequest) {
 
       const formatted = (featuredStories || []).map((project: any) => ({
         id: project.id,
+        projectType: project.project_type,
         title: project.title,
         description: project.description,
         visibility: project.visibility,
@@ -189,7 +190,7 @@ export async function GET(request: NextRequest) {
     // Returns up to `limit` featured stories, backfilled with latest non-featured if needed
     if (featuredWithBackfill) {
       const selectFields = `
-        id, title, description, visibility, featured, view_count, like_count, share_count,
+        id, project_type, title, description, visibility, featured, view_count, like_count, share_count,
         published_at, created_at, author_name, author_age, cover_image_url,
         scenes (id, scene_number, description, caption, generated_images (id, image_url)),
         project_tags (tag_id, story_tags (id, name, slug, icon, category, parent_id, is_leaf, display_order))
@@ -239,6 +240,7 @@ export async function GET(request: NextRequest) {
 
       const formatStory = (project: any) => ({
         id: project.id,
+        projectType: project.project_type,
         title: project.title,
         description: project.description,
         visibility: project.visibility,
@@ -289,6 +291,7 @@ export async function GET(request: NextRequest) {
       .from('projects')
       .select(`
         id,
+        project_type,
         title,
         description,
         visibility,
@@ -369,6 +372,7 @@ export async function GET(request: NextRequest) {
     // Transform data to include only first image per scene and tags
     const formattedProjects = projects.map((project: any) => ({
       id: project.id,
+      projectType: project.project_type,
       title: project.title,
       description: project.description,
       visibility: project.visibility,

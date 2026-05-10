@@ -13,9 +13,21 @@ interface TagSelectorProps {
   projectId: string;
   initialTags?: StoryTag[];
   onTagsChange?: (tags: StoryTag[]) => void;
+  /** Drop the outer bg-white/rounded/shadow card so the parent can put
+      this inside its own card (e.g. the chapter-book details page). */
+  unwrapped?: boolean;
+  /** Hide the category emoji + per-tag emoji. Used by surfaces that
+      render without emoji decoration. */
+  hideEmojis?: boolean;
 }
 
-export default function TagSelector({ projectId, initialTags = [], onTagsChange }: TagSelectorProps) {
+export default function TagSelector({
+  projectId,
+  initialTags = [],
+  onTagsChange,
+  unwrapped = false,
+  hideEmojis = false,
+}: TagSelectorProps) {
   const [availableTags, setAvailableTags] = useState<StoryTag[]>([]);
   const [selectedTags, setSelectedTags] = useState<StoryTag[]>(initialTags);
   const [loading, setLoading] = useState(true);
@@ -90,9 +102,14 @@ export default function TagSelector({ projectId, initialTags = [], onTagsChange 
     }
   };
 
+  // Outer wrapper switches based on the `unwrapped` prop so this
+  // component can either render its own card (default — what picture
+  // books use) or render bare so the parent card owns the visual shell.
+  const wrapperClass = unwrapped ? '' : 'bg-white rounded-xl shadow-lg p-6';
+
   if (loading) {
     return (
-      <div className="bg-white rounded-xl shadow-lg p-6">
+      <div className={wrapperClass}>
         <div className="flex items-center gap-3">
           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
           <span className="text-gray-600">Loading tags...</span>
@@ -105,7 +122,7 @@ export default function TagSelector({ projectId, initialTags = [], onTagsChange 
   const groupedTags = groupTagsByCategory(availableTags);
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
+    <div className={wrapperClass}>
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
         Tags & Categories
       </h3>
@@ -119,7 +136,7 @@ export default function TagSelector({ projectId, initialTags = [], onTagsChange 
           <div key={group.category}>
             {/* Category Header */}
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-lg">{group.icon}</span>
+              {!hideEmojis && <span className="text-lg">{group.icon}</span>}
               <h4 className="text-sm font-semibold text-gray-700">
                 {group.name}
                 <span className="text-xs text-gray-500 ml-2 font-normal">
@@ -143,7 +160,7 @@ export default function TagSelector({ projectId, initialTags = [], onTagsChange 
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
                     }`}
                   >
-                    {tag.icon && <span className="text-base leading-none">{tag.icon}</span>}
+                    {!hideEmojis && tag.icon && <span className="text-base leading-none">{tag.icon}</span>}
                     <span>{tag.name}</span>
                   </button>
                 );

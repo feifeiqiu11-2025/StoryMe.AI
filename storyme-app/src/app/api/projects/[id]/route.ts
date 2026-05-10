@@ -75,10 +75,10 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { visibility, canvas_state, status } = body;
+    const { visibility, status } = body;
 
     // Must provide at least one field to update
-    if (!visibility && canvas_state === undefined && !status) {
+    if (!visibility && !status) {
       return NextResponse.json(
         { error: 'No update fields provided' },
         { status: 400 }
@@ -123,11 +123,6 @@ export async function PATCH(
       }
 
       await projectService.updateProject(id, user.id, { visibility });
-    }
-
-    // Handle canvas_state update
-    if (canvas_state !== undefined) {
-      await projectService.updateProject(id, user.id, { canvas_state });
     }
 
     // Handle status revert (admin-only) — used by the admin "Edit" button on the

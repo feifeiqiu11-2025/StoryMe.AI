@@ -1,0 +1,658 @@
+/**
+ * MediaPanel — side panel for the chapter book editor.
+ *
+ * Four ways to add an image:
+ *   - Characters: pick from the user's character_library via the shared
+ *     CharacterPickerModal (with search + community tab)
+ *   - Stickers:   pick from sticker_sheets (decompose mode)
+ *   - Generate:   text prompt + 0..N character refs + optional uploaded
+ *                 reference + art style + model picker → Gemini/Fal →
+ *                 preview pane (Use / Save & use / Try again / Discard)
+ *   - Upload:     pick a file from device → sharp-compressed → URL
+ */
+
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import {
+  IMAGE_PROVIDER_OPTIONS,
+  DEFAULT_IMAGE_PROVIDER,
+  type ImageProvider,
+} from '@/lib/types/story';
+import {
+  CharacterPickerModal,
+  type PickerCharacter,
+} from '@/components/character/CharacterPickerModal';
+
+type Tab = 'characters' | 'generate' | 'upload';
+
+interface PickOptions {
+  alt?: string;
+}
+
+interface MediaPanelProps {
+  onPick: (url: string, options?: PickOptions) => void;
+}
+
+interface CharacterRow {
+  id: string;
+  name: string;
+  animated_preview_url: string | null;
+  reference_image_url: string | null;
+}
+
+export function MediaPanel({ onPick }: MediaPanelProps) {
+  const [tab, setTab] = useState<Tab>('characters');
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="border-b border-gray-200">
+        <h2 className="px-4 py-3 text-sm font-semibold text-gray-700 uppercase tracking-wider">
+          Add Pictures
+        </h2>
+        <div className="flex border-t border-gray-100" role="tablist">
+          {(
+            [
+              ['characters', 'Characters'],
+              ['generate', 'Create New'],
+              ['upload', 'Upload'],
+            ] as Array<[Tab, string]>
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={tab === key}
+              onClick={() => setTab(key)}
+              className={`flex-1 min-h-[44px] px-2 text-xs font-semibold transition-colors ${
+                tab === key
+                  ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-b-2 border-transparent'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-3 max-h-[calc(100vh-220px)] overflow-y-auto">
+        {tab === 'characters' && <CharactersTab onPick={onPick} />}
+        {tab === 'generate' && <GenerateTab onPick={onPick} />}
+        {tab === 'upload' && <UploadTab onPick={onPick} />}
+      </div>
+    </div>
+  );
+}
+
+// ── Characters ─────────────────────────────────────────────────────────
+
+function CharactersTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
+  const [recent, setRecent] = useState<CharacterRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const supabase = createClient();
+        // Recent ~8 — the picker handles the long tail.
+        const { data, error } = await supabase
+          .from('character_library')
+          .select('id, name, animated_preview_url, reference_image_url')
+          .order('updated_at', { ascending: false })
+          .limit(8);
+        if (error) throw error;
+        setRecent((data || []) as CharacterRow[]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load characters.');
+      }
+    };
+    load();
+  }, []);
+
+  if (error) return <PanelError>{error}</PanelError>;
+  if (!recent) return <PanelLoading label="Loading your characters" />;
+
+  return (
+    <>
+      {recent.length === 0 ? (
+        <PanelEmpty>
+          No characters yet.{' '}
+          <a href="/characters" className="text-blue-600 hover:underline">
+            Create one
+          </a>{' '}
+          and come back.
+        </PanelEmpty>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            {recent.map((c) => {
+              const url = c.animated_preview_url || c.reference_image_url;
+              if (!url) return null;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => onPick(url, { alt: c.name })}
+                  className="aspect-square bg-gray-50 border border-gray-200 rounded-lg overflow-hidden hover:border-blue-400 hover:shadow-sm transition-all relative"
+                  title={`Insert ${c.name}`}
+                  aria-label={`Insert ${c.name}`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={c.name} className="w-full h-full object-cover" />
+                  <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[10px] font-medium py-1 px-1 truncate">
+                    {c.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="w-full mt-3 text-xs font-semibold text-blue-700 hover:text-blue-900 py-2 rounded-lg border border-blue-200 hover:bg-blue-50"
+          >
+            See all my characters
+          </button>
+        </>
+      )}
+
+      <CharacterPickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title="Pick a character"
+        mode="single"
+        itemCtaLabel={() => 'Insert'}
+        onPick={(c) => {
+          if (c.imageUrl) onPick(c.imageUrl, { alt: c.name });
+          setPickerOpen(false);
+        }}
+      />
+    </>
+  );
+}
+
+// ── Generate ───────────────────────────────────────────────────────────
+
+const ART_STYLE_OPTIONS: Array<{ value: 'pixar' | 'classic' | 'coloring' | ''; label: string }> = [
+  { value: '', label: 'Auto' },
+  { value: 'pixar', label: '3D (Pixar)' },
+  { value: 'classic', label: 'Watercolor' },
+  { value: 'coloring', label: 'Coloring Book' },
+];
+
+interface GenerationResult {
+  url: string;
+  prompt: string;
+  characterIds: string[];
+  artStyle: string;
+}
+
+function GenerateTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
+  const [prompt, setPrompt] = useState('');
+  const [selectedChars, setSelectedChars] = useState<Map<string, PickerCharacter>>(new Map());
+  const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
+  const [referenceUploading, setReferenceUploading] = useState(false);
+  // Default to 3D Pixar — matches the picture-book default (also 'pixar')
+  // so kids get a consistent first impression across the two flows.
+  const [artStyle, setArtStyle] = useState<'pixar' | 'classic' | 'coloring' | ''>('pixar');
+  const [imageProvider, setImageProvider] = useState<ImageProvider>(DEFAULT_IMAGE_PROVIDER);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [result, setResult] = useState<GenerationResult | null>(null);
+  const [saveAsName, setSaveAsName] = useState('');
+  const [savingChar, setSavingChar] = useState(false);
+
+  const uploadReference = useCallback(async (file: File) => {
+    if (referenceUploading) return;
+    setReferenceUploading(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/api/v1/editor/upload-image', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Upload failed');
+      setReferenceImageUrl(data.image.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setReferenceUploading(false);
+    }
+  }, [referenceUploading]);
+
+  const generate = useCallback(async () => {
+    if (!prompt.trim() || generating) return;
+    setGenerating(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fetch('/api/v1/editor/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          characterIds: Array.from(selectedChars.keys()),
+          referenceImageUrl: referenceImageUrl ?? undefined,
+          artStyle: artStyle || undefined,
+          imageProvider,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Generation failed');
+      setResult({
+        url: data.image.url,
+        prompt: prompt.trim(),
+        characterIds: Array.from(selectedChars.keys()),
+        artStyle: artStyle || 'auto',
+      });
+      // Default name suggestion for save-as-character
+      setSaveAsName(prompt.trim().slice(0, 40));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Generation failed');
+    } finally {
+      setGenerating(false);
+    }
+  }, [prompt, selectedChars, referenceImageUrl, artStyle, imageProvider, generating]);
+
+  const useResult = () => {
+    if (!result) return;
+    onPick(result.url, { alt: result.prompt.slice(0, 80) });
+    setResult(null);
+  };
+
+  const saveAndUse = useCallback(async () => {
+    if (!result || savingChar) return;
+    if (!saveAsName.trim()) return;
+    setSavingChar(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/v1/editor/save-as-character', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl: result.url,
+          name: saveAsName.trim(),
+          prompt: result.prompt,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Save failed');
+      onPick(result.url, { alt: saveAsName.trim() });
+      setResult(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setSavingChar(false);
+    }
+  }, [result, saveAsName, savingChar, onPick]);
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label htmlFor="gen-prompt" className="block text-xs font-semibold text-gray-700 mb-1">
+          What should the picture show?
+        </label>
+        <textarea
+          id="gen-prompt"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          rows={6}
+          maxLength={500}
+          placeholder="e.g. A small dragon reading a book by the river, surrounded by glowing fireflies on a summer night"
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+        />
+      </div>
+
+      {/* Selected character chips + Choose button. Picker handles the
+          long list; this row only ever shows what's currently selected. */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-700 mb-1">
+          Add characters from your library
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {Array.from(selectedChars.values()).map((c) => (
+            <span
+              key={c.id}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-blue-50 border border-blue-300 text-blue-700"
+            >
+              {c.imageUrl && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={c.imageUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
+              )}
+              {c.name}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedChars((prev) => {
+                    const next = new Map(prev);
+                    next.delete(c.id);
+                    return next;
+                  });
+                }}
+                aria-label={`Remove ${c.name}`}
+                className="ml-0.5 text-blue-500 hover:text-blue-800"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="px-2.5 py-1 rounded-full text-xs font-semibold border border-dashed border-gray-400 text-gray-700 hover:border-blue-400 hover:text-blue-700"
+          >
+            Pick characters
+          </button>
+        </div>
+      </div>
+
+      {/* Reference image upload */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-700 mb-1">
+          Add reference image
+        </label>
+        {referenceImageUrl ? (
+          <div className="flex items-center gap-2 p-2 border border-gray-200 rounded-lg">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={referenceImageUrl} alt="reference" className="w-12 h-12 rounded object-cover" />
+            <span className="text-xs text-gray-600 flex-1 truncate">Reference attached</span>
+            <button
+              type="button"
+              onClick={() => setReferenceImageUrl(null)}
+              className="text-xs text-gray-500 hover:text-red-600"
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <label className={`flex items-center justify-center min-h-[40px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer text-xs text-gray-600 transition-colors ${
+            referenceUploading ? 'bg-gray-50' : 'hover:border-blue-400 hover:bg-blue-50/30'
+          }`}>
+            {referenceUploading ? 'Uploading…' : 'Tap to attach a sketch or photo'}
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void uploadReference(file);
+                e.target.value = '';
+              }}
+              disabled={referenceUploading}
+            />
+          </label>
+        )}
+      </div>
+
+      {/* Art style + model (compact two-column) */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label htmlFor="gen-style" className="block text-xs font-semibold text-gray-700 mb-1">
+            Art style
+          </label>
+          <select
+            id="gen-style"
+            value={artStyle}
+            onChange={(e) => setArtStyle(e.target.value as typeof artStyle)}
+            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {ART_STYLE_OPTIONS.map((s) => (
+              <option key={s.value || 'auto'} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="gen-model" className="block text-xs font-semibold text-gray-700 mb-1">
+            Image Model
+          </label>
+          <select
+            id="gen-model"
+            value={imageProvider}
+            onChange={(e) => setImageProvider(e.target.value as ImageProvider)}
+            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {IMAGE_PROVIDER_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {error && <p className="text-xs text-red-600">{error}</p>}
+
+      <button
+        type="button"
+        onClick={generate}
+        disabled={generating || !prompt.trim()}
+        className="w-full min-h-[44px] bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        {generating ? 'Generating…' : 'Generate Picture'}
+      </button>
+      <p className="text-[11px] text-gray-500">
+        Generating a picture takes about 20–40 seconds.
+      </p>
+
+      {/* Preview pane after generation */}
+      {result && (
+        <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
+          <p className="text-xs font-semibold text-gray-700">How does it look?</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={result.url}
+            alt={result.prompt}
+            className="w-full max-h-48 object-contain rounded bg-white"
+          />
+          <div className="flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={useResult}
+              className="w-full min-h-[36px] bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700"
+            >
+              Use it
+            </button>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={saveAsName}
+                onChange={(e) => setSaveAsName(e.target.value)}
+                placeholder="Give it a name to save"
+                className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                maxLength={80}
+              />
+              <button
+                type="button"
+                onClick={saveAndUse}
+                disabled={savingChar || !saveAsName.trim()}
+                className="px-3 min-h-[34px] bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingChar ? 'Saving…' : 'Save & use'}
+              </button>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => generate()}
+                disabled={generating}
+                className="flex-1 py-1.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-white"
+              >
+                Try again
+              </button>
+              <button
+                type="button"
+                onClick={() => setResult(null)}
+                className="flex-1 py-1.5 border border-gray-300 rounded-lg text-gray-500 hover:bg-white"
+              >
+                Throw it away
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Picker for character references — multi-select up to 5. The
+          picker passes the full PickerCharacter on toggle so the chip
+          row above can render name + avatar without an extra fetch. */}
+      <CharacterPickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title="Choose characters as references"
+        mode="multi"
+        selectedIds={new Set(selectedChars.keys())}
+        maxSelections={5}
+        onToggle={(character, on) => {
+          setSelectedChars((prev) => {
+            const next = new Map(prev);
+            if (on) {
+              next.set(character.id, character);
+            } else {
+              next.delete(character.id);
+            }
+            return next;
+          });
+        }}
+        onConfirm={() => setPickerOpen(false)}
+      />
+    </div>
+  );
+}
+
+// ── Upload ─────────────────────────────────────────────────────────────
+
+interface UploadResult {
+  url: string;
+  filename: string;
+}
+
+function UploadTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Mirror the Generate tab's preview-then-confirm pattern: upload → show
+  // thumbnail → kid decides whether to insert. Avoids accidental inserts
+  // and gives a chance to back out if they picked the wrong file.
+  const [pending, setPending] = useState<UploadResult | null>(null);
+
+  const upload = useCallback(
+    async (file: File) => {
+      if (uploading) return;
+      setUploading(true);
+      setError(null);
+      try {
+        const form = new FormData();
+        form.append('file', file);
+        const res = await fetch('/api/v1/editor/upload-image', {
+          method: 'POST',
+          body: form,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || 'Upload failed');
+        setPending({ url: data.image.url, filename: file.name });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Upload failed');
+      } finally {
+        setUploading(false);
+      }
+    },
+    [uploading]
+  );
+
+  return (
+    <div className="space-y-3">
+      <label
+        htmlFor="image-upload"
+        className={`flex flex-col items-center justify-center min-h-[120px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer transition-colors ${
+          uploading ? 'bg-gray-50' : 'hover:border-blue-400 hover:bg-blue-50/30'
+        }`}
+      >
+        {uploading ? (
+          <>
+            <div
+              className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mb-2"
+              role="status"
+              aria-label="Uploading"
+            />
+            <span className="text-xs text-gray-600">Uploading…</span>
+          </>
+        ) : (
+          <>
+            <span className="text-sm font-medium text-gray-700">Tap to pick a photo</span>
+            <span className="text-[11px] text-gray-500 mt-1">JPG, PNG, HEIC up to 10 MB</span>
+          </>
+        )}
+        <input
+          id="image-upload"
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void upload(file);
+            e.target.value = '';
+          }}
+          disabled={uploading}
+        />
+      </label>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+
+      {pending && (
+        <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
+          <p className="text-xs font-semibold text-gray-700 truncate">
+            How does it look?
+          </p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={pending.url}
+            alt={pending.filename}
+            className="w-full max-h-48 object-contain rounded bg-white"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onPick(pending.url, { alt: pending.filename });
+                setPending(null);
+              }}
+              className="flex-1 min-h-[36px] bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700"
+            >
+              Use it
+            </button>
+            <button
+              type="button"
+              onClick={() => setPending(null)}
+              className="px-3 min-h-[36px] border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-white"
+            >
+              Throw it away
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Shared helpers ─────────────────────────────────────────────────────
+
+function PanelLoading({ label }: { label: string }) {
+  return (
+    <div className="text-center py-8">
+      <div
+        className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"
+        role="status"
+        aria-label={label}
+      />
+      <p className="text-xs text-gray-500">{label}…</p>
+    </div>
+  );
+}
+
+function PanelEmpty({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs text-gray-500 py-4 text-center">{children}</p>;
+}
+
+function PanelError({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs text-red-600 py-4 text-center">{children}</p>;
+}

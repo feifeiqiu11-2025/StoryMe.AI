@@ -76,6 +76,16 @@ function StoryViewer() {
       const data = await response.json();
 
       if (response.ok && data.story) {
+        // Chapter books use a different reader (Tiptap doc, paginated). Redirect
+        // before touching the picture-book audio/scenes pipeline below.
+        if (data.story.projectType === 'chapter_book') {
+          const token = searchParams.get('token');
+          const target = token
+            ? `/chapter-books/${storyId}/read?token=${encodeURIComponent(token)}`
+            : `/chapter-books/${storyId}/read`;
+          router.replace(target);
+          return;
+        }
         setStory(data.story);
         // Check if audio exists
         await checkAudioExists();

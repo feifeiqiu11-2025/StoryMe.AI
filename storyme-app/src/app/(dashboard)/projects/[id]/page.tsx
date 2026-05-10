@@ -31,8 +31,6 @@ export default function StoryViewerPage() {
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [showPdfDropdown, setShowPdfDropdown] = useState(false);
   const [showPdfModal, setShowPdfModal] = useState(false);
-  // Canvas editor support is in-flight on a separate branch; refs removed here so the
-  // committed page builds without the unpushed component. Restore when canvas-editor lands.
   const [readingMode, setReadingMode] = useState(false);
   const [readingPages, setReadingPages] = useState<ReadingPage[]>([]);
   const [loadingAudio, setLoadingAudio] = useState(false);
@@ -1683,12 +1681,7 @@ export default function StoryViewerPage() {
                       setShowPdfModal(false);
                       handleDownloadPDF(format, layout);
                     }}
-                    onCustomize={() => {
-                      // Canvas editor disabled in this build (component lives on an unpushed branch).
-                      setShowPdfModal(false);
-                    }}
                     exporting={generatingPDF}
-                    savedCanvasState={project?.canvasState}
                   />
                 </div>
               </div>

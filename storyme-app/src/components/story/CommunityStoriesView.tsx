@@ -15,6 +15,7 @@ import type { StoryTag } from '@/lib/types/story';
 interface PublicStory extends StoryCardData {
   publishedAt: string;
   tags?: StoryTag[];
+  projectType?: 'picture_book' | 'chapter_book';
 }
 
 export default function CommunityStoriesView() {
@@ -153,7 +154,16 @@ export default function CommunityStoriesView() {
     return pages;
   };
 
-  const handleStoryClick = (storyId: string) => {
+  const handleStoryClick = (
+    storyId: string,
+    projectType?: 'picture_book' | 'chapter_book'
+  ) => {
+    // Chapter books have their own paginated reader; picture books continue
+    // through the existing /stories/[id] route.
+    if (projectType === 'chapter_book') {
+      router.push(`/chapter-books/${storyId}/read`);
+      return;
+    }
     router.push(`/stories/${storyId}`);
   };
 
@@ -404,7 +414,7 @@ export default function CommunityStoriesView() {
                       <StoryCard
                         key={story.id}
                         story={story}
-                        onClick={() => handleStoryClick(story.id)}
+                        onClick={() => handleStoryClick(story.id, story.projectType)}
                         variant="community"
                         showFeaturedBadge={true}
                         showViewCount={true}
@@ -421,7 +431,7 @@ export default function CommunityStoriesView() {
                 <StoryCard
                   key={story.id}
                   story={story}
-                  onClick={() => handleStoryClick(story.id)}
+                  onClick={() => handleStoryClick(story.id, story.projectType)}
                   variant="community"
                   showFeaturedBadge={true}
                   showViewCount={true}

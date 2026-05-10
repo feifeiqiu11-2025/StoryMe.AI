@@ -111,6 +111,10 @@ function CreateStoryPageInner() {
   const [libraryCharacters, setLibraryCharacters] = useState<Character[]>([]);
   const [communityCharacters, setCommunityCharacters] = useState<Character[]>([]);
   const [importTab, setImportTab] = useState<'mine' | 'community'>('mine');
+  // Search filter for the import-from-library modal. Reused by both the
+  // top-level "Import from Library" button and the per-scene "+ Add to
+  // scene" entrypoint — keeps the picker usable as libraries grow large.
+  const [importSearch, setImportSearch] = useState('');
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveTitle, setSaveTitle] = useState('');
   const [saveDescription, setSaveDescription] = useState('');
@@ -2041,11 +2045,23 @@ function CreateStoryPageInner() {
                   {addCharToSceneNumber !== null ? `Add a character to Scene ${addCharToSceneNumber}` : 'Import from Character Library'}
                 </h2>
                 <button
-                  onClick={() => { setShowImportModal(false); setAddCharToSceneNumber(null); }}
+                  onClick={() => { setShowImportModal(false); setAddCharToSceneNumber(null); setImportSearch(''); }}
                   className="text-gray-400 hover:text-gray-600 text-2xl"
                 >
                   ×
                 </button>
+              </div>
+
+              {/* Search */}
+              <div className="mb-4">
+                <input
+                  type="text"
+                  value={importSearch}
+                  onChange={(e) => setImportSearch(e.target.value)}
+                  placeholder="Search by name…"
+                  aria-label="Search characters"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
               {/* Tabs */}
@@ -2073,18 +2089,25 @@ function CreateStoryPageInner() {
               </div>
 
               {(() => {
-                const displayChars = importTab === 'mine' ? libraryCharacters : communityCharacters;
+                const sourceList = importTab === 'mine' ? libraryCharacters : communityCharacters;
+                const q = importSearch.trim().toLowerCase();
+                const displayChars = q
+                  ? sourceList.filter((c) => c.name.toLowerCase().includes(q))
+                  : sourceList;
 
                 if (displayChars.length === 0) {
+                  const isFilteredEmpty = q.length > 0 && sourceList.length > 0;
                   return (
                     <div className="text-center py-12">
-                      <div className="text-6xl mb-4">{importTab === 'mine' ? '👦👧' : '🌍'}</div>
+                      <div className="text-6xl mb-4">{isFilteredEmpty ? '🔍' : (importTab === 'mine' ? '👦👧' : '🌍')}</div>
                       <p className="text-gray-600 mb-4">
-                        {importTab === 'mine'
-                          ? 'No characters in your library yet!'
-                          : 'No community characters available yet.'}
+                        {isFilteredEmpty
+                          ? `No characters match "${importSearch}".`
+                          : importTab === 'mine'
+                            ? 'No characters in your library yet!'
+                            : 'No community characters available yet.'}
                       </p>
-                      {importTab === 'mine' && (
+                      {!isFilteredEmpty && importTab === 'mine' && (
                         <Link
                           href="/characters"
                           className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold shadow-lg transition-all"

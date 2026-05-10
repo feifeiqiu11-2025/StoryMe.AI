@@ -8,6 +8,12 @@ interface ExportPdfModalProps {
   onClose: () => void;
   onExport: (format: PDFFormat, layout: PDFLayout) => void;
   exporting: boolean;
+  /**
+   * 'picture_book' (default) shows the layout picker (1/2/4 scenes per
+   * page). 'chapter_book' hides it because flowing-text books only have
+   * one logical layout — the format selector still applies.
+   */
+  projectType?: 'picture_book' | 'chapter_book';
 }
 
 const layouts: { value: PDFLayout; label: string; description: string }[] = [
@@ -36,14 +42,16 @@ function LayoutIcon({ layout }: { layout: PDFLayout }) {
 
   if (layout === 'comic') {
     return (
-      <div className={`${base} flex-col gap-1`}>
-        <div className="flex-1 flex flex-col gap-0.5">
-          <div className="flex-1 bg-indigo-200 rounded-sm" />
-          <div className="h-1.5 bg-gray-300 rounded-sm" />
+      <div className={`${base} flex-col gap-0.5`}>
+        {/* Top: image left, caption right */}
+        <div className="flex-1 flex gap-0.5">
+          <div className="flex-[65] bg-indigo-200 rounded-sm" />
+          <div className="flex-[35] bg-gray-300 rounded-sm" />
         </div>
-        <div className="flex-1 flex flex-col gap-0.5">
-          <div className="flex-1 bg-indigo-200 rounded-sm" />
-          <div className="h-1.5 bg-gray-300 rounded-sm" />
+        {/* Bottom: caption left, image right (zigzag) */}
+        <div className="flex-1 flex gap-0.5">
+          <div className="flex-[35] bg-gray-300 rounded-sm" />
+          <div className="flex-[65] bg-indigo-200 rounded-sm" />
         </div>
       </div>
     );
@@ -76,14 +84,19 @@ function LayoutIcon({ layout }: { layout: PDFLayout }) {
   );
 }
 
-export default function ExportPdfModal({ open, onClose, onExport, exporting }: ExportPdfModalProps) {
-  const [layout, setLayout] = useState<PDFLayout>('comic');
+export default function ExportPdfModal({
+  open, onClose, onExport, exporting, projectType = 'picture_book',
+}: ExportPdfModalProps) {
+  const isChapterBook = projectType === 'chapter_book';
+  // Chapter books always pass 'classic' through to the picture-book layout
+  // type — the chapter-book renderer ignores it. We just need a valid
+  // value to satisfy the onExport signature.
+  const [layout, setLayout] = useState<PDFLayout>(isChapterBook ? 'classic' : 'comic');
   const [format, setFormat] = useState<PDFFormat>('a4');
 
   // Legal is not supported for Comic layout
   const isFormatDisabled = (f: PDFFormat) => f === 'large' && layout === 'comic';
 
-  // If user switches to Comic while Legal is selected, reset to A5
   const handleLayoutChange = (newLayout: PDFLayout) => {
     setLayout(newLayout);
     if (newLayout === 'comic' && format === 'large') {
@@ -98,10 +111,10 @@ export default function ExportPdfModal({ open, onClose, onExport, exporting }: E
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white rounded-xl shadow-2xl w-[340px] sm:w-[400px] p-6 relative">
+      <div className="bg-white rounded-xl shadow-2xl w-[340px] sm:w-[420px] p-6 relative">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-lg font-bold text-gray-900">Export PDF</h3>
+          <h3 className="text-lg font-bold text-gray-900">Customize & Export</h3>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -113,31 +126,35 @@ export default function ExportPdfModal({ open, onClose, onExport, exporting }: E
           </button>
         </div>
 
-        {/* Layout Selection */}
-        <div className="mb-5">
-          <label className="text-sm font-semibold text-gray-700 mb-2 block">Layout</label>
-          <div className="grid grid-cols-3 gap-3">
-            {layouts.map((l) => (
-              <button
-                key={l.value}
-                onClick={() => handleLayoutChange(l.value)}
-                className={`flex flex-col items-center p-2 rounded-lg border-2 transition-all ${
-                  layout === l.value
-                    ? 'border-indigo-500 bg-indigo-50'
-                    : 'border-gray-200 hover:border-gray-300 bg-white'
-                }`}
-              >
-                <div className="w-14 h-18 sm:w-16 sm:h-20 mb-1.5">
-                  <LayoutIcon layout={l.value} />
-                </div>
-                <span className={`text-xs font-medium ${layout === l.value ? 'text-indigo-700' : 'text-gray-700'}`}>
-                  {l.label}
-                </span>
-                <span className="text-[10px] text-gray-400">{l.description}</span>
-              </button>
-            ))}
+        {/* Layout Selection — picture books only. Chapter books have
+            flowing text + kid-defined page breaks, so the per-page scene
+            layout picker doesn't translate. */}
+        {!isChapterBook && (
+          <div className="mb-5">
+            <label className="text-sm font-semibold text-gray-700 mb-2 block">Layout</label>
+            <div className="grid grid-cols-3 gap-3">
+              {layouts.map((l) => (
+                <button
+                  key={l.value}
+                  onClick={() => handleLayoutChange(l.value)}
+                  className={`flex flex-col items-center p-2 rounded-lg border-2 transition-all ${
+                    layout === l.value
+                      ? 'border-indigo-500 bg-indigo-50'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                  }`}
+                >
+                  <div className="w-14 h-18 sm:w-16 sm:h-20 mb-1.5">
+                    <LayoutIcon layout={l.value} />
+                  </div>
+                  <span className={`text-xs font-medium ${layout === l.value ? 'text-indigo-700' : 'text-gray-700'}`}>
+                    {l.label}
+                  </span>
+                  <span className="text-[10px] text-gray-400">{l.description}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Page Size Selection */}
         <div className="mb-6">
@@ -166,11 +183,11 @@ export default function ExportPdfModal({ open, onClose, onExport, exporting }: E
           </div>
         </div>
 
-        {/* Export Button */}
+        {/* Action Button */}
         <button
           onClick={() => onExport(format, layout)}
           disabled={exporting}
-          className="w-full py-2.5 px-4 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg font-medium shadow-md hover:from-orange-700 hover:to-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full py-2.5 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium shadow-md hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {exporting ? (
             <>
@@ -178,10 +195,7 @@ export default function ExportPdfModal({ open, onClose, onExport, exporting }: E
               <span>Exporting...</span>
             </>
           ) : (
-            <>
-              <span>📄</span>
-              <span>Export PDF</span>
-            </>
+            <span>Export PDF</span>
           )}
         </button>
       </div>

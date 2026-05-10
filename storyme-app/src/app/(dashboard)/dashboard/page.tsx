@@ -297,7 +297,25 @@ export default function DashboardPage() {
           <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-4">
             More to Explore
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Link
+              href="/chapter-books/new"
+              className="bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300 hover:shadow-sm transition-all group"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <h4 className="font-semibold text-gray-900">Write a Chapter Book</h4>
+                <span className="bg-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
+                  Preview
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">
+                Open a blank book and write your own story, page by page
+              </p>
+              <p className="text-sm text-blue-600 font-medium mt-3 group-hover:underline">
+                Start Writing
+              </p>
+            </Link>
+
             <Link
               href="/photos"
               className="bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300 hover:shadow-sm transition-all group"

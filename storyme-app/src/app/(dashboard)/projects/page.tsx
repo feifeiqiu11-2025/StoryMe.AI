@@ -705,9 +705,11 @@ function ProjectsContent() {
             {projects.map((project) => {
               const isDraft = project.status === 'draft';
               const isPublic = project.visibility === 'public';
+              const isChapterBook = project.projectType === 'chapter_book';
               const projectTags: StoryTag[] = project.tags || [];
               const storyData: StoryCardData = {
                 id: project.id,
+                projectType: project.projectType,
                 title: project.title || 'Untitled Draft',
                 description: project.description,
                 coverImageUrl: project.coverImageUrl,
@@ -728,6 +730,18 @@ function ProjectsContent() {
                   key={project.id}
                     story={storyData}
                     onClick={() => {
+                      if (isChapterBook) {
+                        // Chapter books: drafts open the editor; completed
+                        // (saved) books go to the details page so kids see
+                        // privacy / share / PDF / future actions, mirroring
+                        // picture books.
+                        router.push(
+                          isDraft
+                            ? `/chapter-books/${project.id}/edit`
+                            : `/chapter-books/${project.id}`
+                        );
+                        return;
+                      }
                       if (isDraft) {
                         router.push(`/create?projectId=${project.id}`);
                       } else {

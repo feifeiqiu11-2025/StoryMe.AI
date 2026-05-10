@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
+import { docToPages } from '@/lib/chapter-book/docToPages';
 
 export async function GET(
   request: NextRequest,
@@ -23,13 +24,17 @@ export async function GET(
     // boundary for this endpoint.
     const supabase = createServiceRoleClient();
 
-    // Fetch full story with all scenes and images
+    // Fetch full story with all scenes and images. canvas_state is the
+    // Tiptap doc for chapter books — null/unused for picture books, but
+    // we always pull it so a single query covers both project types.
     const { data: project, error } = await supabase
       .from('projects')
       .select(`
         id,
+        project_type,
         title,
         description,
+        canvas_state,
         visibility,
         share_token,
         featured,
@@ -98,9 +103,13 @@ export async function GET(
         .eq('id', id);
     }
 
-    // Format response
-    const formattedProject = {
+    // Format response. Picture books expose `scenes`; chapter books
+    // expose `pages` (server-rendered HTML + plain text + image URLs)
+    // so the mobile app can render without parsing Tiptap doc JSON.
+    const isChapterBook = project.project_type === 'chapter_book';
+    const baseProject = {
       id: project.id,
+      projectType: project.project_type,
       title: project.title,
       description: project.description,
       visibility: project.visibility,
@@ -116,19 +125,32 @@ export async function GET(
       authorName: project.author_name,
       authorAge: project.author_age,
       secondaryLanguage: project.secondary_language,
-      scenes: project.scenes
-        ?.sort((a: any, b: any) => a.scene_number - b.scene_number)
-        .map((scene: any) => ({
-          id: scene.id,
-          sceneNumber: scene.scene_number,
-          description: scene.description,
-          caption: scene.caption,
-          captionChinese: scene.caption_chinese,
-          captionSecondary: scene.caption_secondary,
-          imageUrl: scene.generated_images?.[0]?.image_url || null,
-          prompt: scene.generated_images?.[0]?.prompt || null,
-        })) || [],
     };
+    const formattedProject = isChapterBook
+      ? {
+          ...baseProject,
+          // pages: same shape mobile expects for chapter books — see
+          // src/lib/chapter-book/docToPages.ts
+          pages: docToPages(project.canvas_state ?? null),
+          // Empty scenes array for legacy clients that always read
+          // `.scenes` regardless of project_type — they get a no-op.
+          scenes: [],
+        }
+      : {
+          ...baseProject,
+          scenes: project.scenes
+            ?.sort((a: any, b: any) => a.scene_number - b.scene_number)
+            .map((scene: any) => ({
+              id: scene.id,
+              sceneNumber: scene.scene_number,
+              description: scene.description,
+              caption: scene.caption,
+              captionChinese: scene.caption_chinese,
+              captionSecondary: scene.caption_secondary,
+              imageUrl: scene.generated_images?.[0]?.image_url || null,
+              prompt: scene.generated_images?.[0]?.prompt || null,
+            })) || [],
+        };
 
     return NextResponse.json({
       success: true,

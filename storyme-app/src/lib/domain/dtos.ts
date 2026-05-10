@@ -81,9 +81,12 @@ export interface UpdateCharacterDTO {
 // PROJECT DTOs
 // ============================================
 
+export type ProjectTypeDTO = 'picture_book' | 'chapter_book';
+
 export interface ProjectDTO {
   id: string;
   userId: string;
+  projectType?: ProjectTypeDTO;
   title?: string;
   description?: string;
   status: 'draft' | 'processing' | 'completed' | 'error';

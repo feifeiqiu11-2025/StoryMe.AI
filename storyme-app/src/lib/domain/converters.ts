@@ -108,6 +108,7 @@ export function projectToDTO(project: Project): ProjectDTO {
   return {
     id: project.id,
     userId: project.user_id,
+    projectType: project.project_type,
     title: project.title,
     description: project.description,
     status: project.status,

@@ -12,6 +12,9 @@ import type { StoryTag } from '@/lib/types/story';
 
 export interface StoryCardData {
   id: string;
+  // Picture book is the default; chapter_book gets a small badge so users
+  // know what they're clicking into. Optional so legacy callers keep working.
+  projectType?: 'picture_book' | 'chapter_book';
   title: string;
   description?: string;
   coverImageUrl?: string;
@@ -95,6 +98,7 @@ export function StoryCard({
   const isDraft = story.status === 'draft';
   const isPublic = story.visibility === 'public';
   const isUnlisted = story.visibility === 'unlisted';
+  const isChapterBook = story.projectType === 'chapter_book';
   const viewCount = story.viewCount || 0;
 
   // Format date for My Stories
@@ -123,6 +127,19 @@ export function StoryCard({
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <span className="text-6xl">📖</span>
+          </div>
+        )}
+
+        {/* Chapter book badge — picture books are the default and don't get one,
+            so we don't drown the cover in labels. Sits top-left when no privacy
+            badge is shown, otherwise stacks beneath it. */}
+        {isChapterBook && (
+          <div
+            className={`absolute left-2 ${showPrivacyBadge ? 'top-11' : 'top-2'}`}
+          >
+            <span className="bg-purple-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+              Chapter Book
+            </span>
           </div>
         )}
 

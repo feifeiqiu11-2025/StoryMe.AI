@@ -16,7 +16,10 @@ interface FeaturedStory extends StoryCardData {
 }
 
 interface FeaturedStoriesCarouselProps {
-  onStoryClick: (storyId: string) => void;
+  onStoryClick: (
+    storyId: string,
+    projectType?: 'picture_book' | 'chapter_book'
+  ) => void;
 }
 
 const AUTO_ADVANCE_MS = 4000;
@@ -153,7 +156,7 @@ export default function FeaturedStoriesCarousel({ onStoryClick }: FeaturedStorie
           >
             <StoryCard
               story={story}
-              onClick={() => onStoryClick(story.id)}
+              onClick={() => onStoryClick(story.id, story.projectType)}
               variant="community"
               showFeaturedBadge={true}
               showViewCount={true}
