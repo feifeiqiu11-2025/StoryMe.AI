@@ -47,13 +47,14 @@ import { randomUUID } from 'crypto';
 
 const BUCKET = 'generated-images';
 
+// Canonical chapter-book art styles, matching the picture-book flow
+// (ScenePreviewApproval): 'pixar' (3D), 'classic' (watercolor 2D),
+// 'coloring' (B&W line art). Each maps to a prompt fragment passed to
+// the image model. The MediaPanel UI sends these exact keys.
 const ART_STYLES = {
-  watercolor: "soft watercolor children's book illustration, painterly, gentle colors",
-  cartoon: "bold cartoon style, thick outlines, vibrant flat colors, kid-friendly",
-  pencil: 'pencil sketch, hand-drawn, soft graphite shading, storybook feel',
-  anime: 'anime style, expressive eyes, clean linework, soft cel shading',
-  realistic: "realistic children's book illustration, detailed, warm lighting",
-  photo: 'photorealistic, natural lighting, sharp detail',
+  pixar: '3D Pixar style, modern 3D animation look, soft lighting, expressive characters',
+  classic: "classic 2D children's book illustration, watercolor, gentle colors, painterly",
+  coloring: 'black and white coloring book line art, clean outlines, no fill, printable',
 } as const;
 
 type ArtStyleKey = keyof typeof ART_STYLES;
