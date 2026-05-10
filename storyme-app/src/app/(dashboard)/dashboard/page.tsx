@@ -300,14 +300,18 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Link
               href="/chapter-books/new"
-              className="bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300 hover:shadow-sm transition-all group"
+              className="relative bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300 hover:shadow-sm transition-all group"
             >
-              <div className="flex items-center gap-2 mb-1">
-                <h4 className="font-semibold text-gray-900">Write a Chapter Book</h4>
-                <span className="bg-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
-                  Preview
-                </span>
-              </div>
+              {/* Sticker-style Preview badge: anchored to the top-right
+                  corner, popped out beyond the card edge, slightly
+                  rotated for a hand-applied feel. */}
+              <span
+                className="absolute -top-2 -right-2 bg-amber-400 text-amber-900 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full rotate-12 shadow-md ring-2 ring-white pointer-events-none"
+                aria-label="Preview feature"
+              >
+                Preview
+              </span>
+              <h4 className="font-semibold text-gray-900">Write a Chapter Book</h4>
               <p className="text-sm text-gray-500 mt-1">
                 Open a blank book and write your own story, page by page
               </p>

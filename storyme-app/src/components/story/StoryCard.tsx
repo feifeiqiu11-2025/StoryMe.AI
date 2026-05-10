@@ -130,43 +130,66 @@ export function StoryCard({
           </div>
         )}
 
-        {/* Chapter book badge — picture books are the default and don't get one,
-            so we don't drown the cover in labels. Sits top-left when no privacy
-            badge is shown, otherwise stacks beneath it. */}
-        {isChapterBook && (
-          <div
-            className={`absolute left-2 ${showPrivacyBadge ? 'top-11' : 'top-2'}`}
-          >
-            <span className="bg-purple-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-              Chapter Book
-            </span>
+        {/* Privacy + chapter-book badges — icon-only round pills so the
+            cover art stays visible. Title attribute provides the label
+            on hover; aria-label keeps screen readers informed. */}
+        {showPrivacyBadge && (
+          <div className="absolute top-2 left-2 flex flex-col gap-1.5">
+            {isDraft ? (
+              <span
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-amber-500 text-white text-base shadow-md ring-2 ring-white/40"
+                title="Draft"
+                aria-label="Draft"
+              >
+                ✏️
+              </span>
+            ) : isPublic ? (
+              <span
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-green-500 text-white text-base shadow-md ring-2 ring-white/40"
+                title="Public"
+                aria-label="Public"
+              >
+                🌍
+              </span>
+            ) : isUnlisted ? (
+              <span
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-blue-500 text-white text-base shadow-md ring-2 ring-white/40"
+                title="Link only"
+                aria-label="Link only"
+              >
+                🔗
+              </span>
+            ) : (
+              <span
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-600 text-white text-base shadow-md ring-2 ring-white/40"
+                title="Private"
+                aria-label="Private"
+              >
+                🔒
+              </span>
+            )}
+            {isChapterBook && (
+              <span
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-purple-600 text-white text-base shadow-md ring-2 ring-white/40"
+                title="Chapter Book"
+                aria-label="Chapter Book"
+              >
+                📖
+              </span>
+            )}
           </div>
         )}
 
-        {/* Top Left - Status Badge */}
-        {showPrivacyBadge && (
+        {/* Chapter-book badge alone (no privacy badge shown) */}
+        {!showPrivacyBadge && isChapterBook && (
           <div className="absolute top-2 left-2">
-            {isDraft ? (
-              <div className="flex items-center gap-1 bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                <span>✏️</span>
-                <span>Draft</span>
-              </div>
-            ) : isPublic ? (
-              <div className="flex items-center gap-1 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                <span>🌍</span>
-                <span>Public</span>
-              </div>
-            ) : isUnlisted ? (
-              <div className="flex items-center gap-1 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                <span>🔗</span>
-                <span>Link only</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 bg-gray-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                <span>🔒</span>
-                <span>Private</span>
-              </div>
-            )}
+            <span
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-purple-600 text-white text-base shadow-md ring-2 ring-white/40"
+              title="Chapter Book"
+              aria-label="Chapter Book"
+            >
+              📖
+            </span>
           </div>
         )}
 

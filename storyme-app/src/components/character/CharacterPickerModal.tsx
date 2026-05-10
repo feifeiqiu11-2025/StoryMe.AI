@@ -307,6 +307,11 @@ function PickerCard({
           <img
             src={character.imageUrl}
             alt={character.name}
+            // Browser-native lazy load — only fetches when the card is
+            // near the viewport. Critical for users with 100+ characters
+            // since the picker pulls the full library.
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover"
           />
         ) : (
