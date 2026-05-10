@@ -562,10 +562,14 @@ function PagePreview({ html }: { html: string }) {
       }),
     [html]
   );
+  // container-type on the prose div lets data-fullbleed='true' images
+  // stretch to the prose's full inner width via the @container rule
+  // below — without it, the cap below would shrink the cover to 180px.
   return (
     <div className="w-full h-full overflow-y-auto bg-white p-4 sm:p-6">
       <div
         className="chapter-book-prose"
+        style={{ containerType: 'inline-size', containerName: 'editor-card' }}
         dangerouslySetInnerHTML={{ __html: safe }}
       />
       <style jsx global>{`
@@ -600,6 +604,29 @@ function PagePreview({ html }: { html: string }) {
         .chapter-book-prose img:not([data-align]) { margin-left: auto; margin-right: auto; }
         .chapter-book-prose img[data-align='left']  { float: left;  margin-right: 0.5rem; max-width: 50%; clear: left; }
         .chapter-book-prose img[data-align='right'] { float: right; margin-left: 0.5rem;  max-width: 50%; clear: right; }
+        /* Full-bleed images escape the 180px cap so book covers (page 1)
+           render at the full page-frame width instead of looking like a
+           postage stamp. Declared LAST + !important to override align/cap. */
+        @container editor-card (min-width: 1px) {
+          .chapter-book-prose img[data-fullbleed='true'] {
+            width: 100cqi !important;
+            max-width: none !important;
+            max-height: none !important;
+            height: auto !important;
+            margin: 0.5rem 0 !important;
+            float: none !important;
+            display: block !important;
+          }
+        }
+        @supports not (container-type: inline-size) {
+          .chapter-book-prose img[data-fullbleed='true'] {
+            width: 100% !important;
+            max-width: none !important;
+            max-height: none !important;
+            height: auto !important;
+            float: none !important;
+          }
+        }
         .chapter-book-prose mark { background-color: #fde68a; padding: 0 2px; border-radius: 2px; }
       `}</style>
     </div>

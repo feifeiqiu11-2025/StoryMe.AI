@@ -309,14 +309,24 @@ async function renderFirstPageCover(): Promise<string | null> {
   const editorRoot = document.querySelector('.chapter-book-prose');
   if (!editorRoot) return null;
 
+  // html2canvas 1.4.1 does NOT support CSS container queries, so the
+  // editor's @container rule that gives full-bleed images width:100cqi
+  // is invisible to the snapshotter. Without intervention, fullbleed
+  // images fall back to max-width:100% and we get 48px of white margin
+  // on each side of the saved cover. We work around this by explicitly
+  // inlining the edge-to-edge sizing on each fullbleed wrapper/image
+  // we find in the clone, below.
+  const CLONE_WIDTH = 680;
+  const CLONE_PADDING = 48;
+
   const clone = document.createElement('div');
   clone.style.cssText = `
     position: fixed;
     top: -10000px;
     left: -10000px;
-    width: 680px;
+    width: ${CLONE_WIDTH}px;
     background: white;
-    padding: 48px;
+    padding: ${CLONE_PADDING}px;
     font-family: 'Lora', Georgia, serif;
     font-size: 20px;
     line-height: 1.7;
@@ -335,6 +345,33 @@ async function renderFirstPageCover(): Promise<string | null> {
   }
 
   if (!clone.children.length) return null;
+
+  // Force every full-bleed image (wrapper or bare img) to stretch edge-
+  // to-edge with explicit pixel math. We can't lean on container
+  // queries because html2canvas doesn't evaluate them.
+  const fullBleedNodes = clone.querySelectorAll<HTMLElement>('[data-fullbleed="true"]');
+  fullBleedNodes.forEach((el) => {
+    el.style.width = `${CLONE_WIDTH}px`;
+    el.style.maxWidth = 'none';
+    el.style.marginLeft = `-${CLONE_PADDING}px`;
+    el.style.marginRight = `-${CLONE_PADDING}px`;
+    el.style.float = 'none';
+    el.style.display = 'block';
+    // First-child fullbleed = book cover; pull it flush to the top so
+    // there's no white strip above the artwork in the saved PNG.
+    if (el === clone.firstElementChild) {
+      el.style.marginTop = `-${CLONE_PADDING}px`;
+    }
+    // If the wrapper contains a child img (editor's NodeView path),
+    // make sure the inner img fills the wrapper.
+    const innerImg = el.querySelector('img');
+    if (innerImg) {
+      innerImg.style.width = '100%';
+      innerImg.style.maxWidth = 'none';
+      innerImg.style.height = 'auto';
+      innerImg.style.display = 'block';
+    }
+  });
 
   document.body.appendChild(clone);
   try {

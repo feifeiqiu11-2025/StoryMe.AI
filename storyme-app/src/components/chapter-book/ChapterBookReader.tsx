@@ -64,7 +64,10 @@ export function ChapterBookReader({ title, authorName, doc, onExit }: ChapterBoo
         Color,
         FontFamily,
         FontSize,
-        TextAlign,
+        // Must mirror the editor's TextAlign config — without `types`, the
+        // textAlign attr is silently dropped and centered/right-aligned
+        // text from the editor renders left-aligned in the reader.
+        TextAlign.configure({ types: ['heading', 'paragraph'] }),
         Highlight,
         PageBreak,
       ]);
@@ -137,8 +140,12 @@ export function ChapterBookReader({ title, authorName, doc, onExit }: ChapterBoo
           style={{ containerType: 'inline-size', containerName: 'editor-card' }}
           aria-label={`Page ${pageIndex + 1} of ${totalPages}`}
         >
+          {/* Padding mirrors the editor (py-10 px-6 md:px-10) so text wraps
+              around floated images at the same line breaks. Diverging
+              padding here was causing visible "the editor wrapped here,
+              but the reader wrapped one word later" mismatches. */}
           <div
-            className="chapter-book-prose px-6 py-8 sm:px-12 sm:py-10 max-w-[680px] mx-auto"
+            className="chapter-book-prose px-6 py-10 md:px-10 max-w-[680px] mx-auto"
             dangerouslySetInnerHTML={{ __html: currentPageHtml }}
           />
         </article>
@@ -177,6 +184,26 @@ export function ChapterBookReader({ title, authorName, doc, onExit }: ChapterBoo
           font-size: 20px;
           line-height: 1.7;
           color: #1f2937;
+        }
+        /* Kill the dead space at the very top/bottom of the page. The
+           prose div already provides padding; the first block's own
+           margin-top stacks on top of that and looks like a gap.
+           !important here is needed to beat the fullbleed @container
+           rule below, which would otherwise re-impose margin-top: 1rem
+           on a cover image. */
+        .chapter-book-prose > *:first-child { margin-top: 0 !important; }
+        .chapter-book-prose > *:last-child { margin-bottom: 0 !important; }
+        /* Cover-page treatment: when the page starts with a full-bleed
+           image, it's almost always a book cover. Drop the prose's top
+           padding so the cover truly fills the page edge-to-edge —
+           same intent as the storefront card. Requires :has() (Chrome
+           105+, Safari 15.4+, Firefox 121+); older browsers fall back
+           to the regular py-10 gap, which is acceptable. */
+        .chapter-book-prose:has(> img[data-fullbleed='true']:first-child) {
+          padding-top: 0;
+        }
+        .chapter-book-prose:has(> img[data-fullbleed='true']:last-child) {
+          padding-bottom: 0;
         }
         .chapter-book-prose h1 {
           font-size: 2.25rem;

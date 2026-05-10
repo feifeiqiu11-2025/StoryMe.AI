@@ -14,8 +14,24 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import type { JSONContent } from '@tiptap/react';
-import { ChapterBookReader } from '@/components/chapter-book/ChapterBookReader';
+
+// Render the reader client-only. ChapterBookReader transitively imports
+// `isomorphic-dompurify`, which pulls in jsdom; jsdom's SSR-side
+// `fs.readFileSync` for its default stylesheet resolves to a path that
+// webpack/Next.js can't satisfy in the server bundle, so SSR'ing this
+// page throws ENOENT before the user's HTML is ever produced. The
+// dashboard route used to mask this by short-circuiting with an auth
+// redirect; now that the page is anonymous-friendly, we have to keep
+// the reader off the server.
+const ChapterBookReader = dynamic(
+  () =>
+    import('@/components/chapter-book/ChapterBookReader').then(
+      (m) => m.ChapterBookReader
+    ),
+  { ssr: false }
+);
 
 interface BookForReader {
   id: string;
