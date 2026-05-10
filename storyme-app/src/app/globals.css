@@ -1,5 +1,69 @@
 @import "tailwindcss";
 
+/* Chapter-book typography fonts.
+   Bundled locally so the editor, the web reader, and the mobile WebView
+   all render the same glyphs regardless of which OS is running.
+   Without these, iOS falls back to system serif/cursive (e.g. Snell
+   Roundhand for the "Comic" stack), making mobile diverge from desktop.
+   The same files are registered with react-pdf in
+   src/lib/pdf/chapterBookRenderer.tsx so PDF exports also match. */
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/Lora-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/Lora-Bold.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/Lora-Italic.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/Lora-BoldItalic.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Comic Neue';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ComicNeue-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Comic Neue';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/ComicNeue-Bold.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Comic Neue';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ComicNeue-Italic.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Comic Neue';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/ComicNeue-BoldItalic.ttf') format('truetype');
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

@@ -789,10 +789,15 @@ function usePopover() {
   return { open, setOpen, triggerRef, popoverRef, pos };
 }
 
+// Lora and Comic Neue are bundled locally (see /public/fonts/ + the
+// @font-face block in globals.css) so they render identically on every
+// device. Comic Neue leads the Comic stack now: previously 'Comic Sans
+// MS' came first, which iOS doesn't ship, causing the chain to fall
+// through to system cursive (Snell Roundhand) on mobile.
 const FONT_FAMILIES: Array<{ key: string; label: string; stack: string }> = [
   { key: 'serif', label: 'Storybook', stack: "'Lora', Georgia, 'Times New Roman', serif" },
   { key: 'sans', label: 'Clean', stack: "ui-sans-serif, system-ui, -apple-system, sans-serif" },
-  { key: 'comic', label: 'Comic', stack: "'Comic Sans MS', 'Comic Neue', cursive" },
+  { key: 'comic', label: 'Comic', stack: "'Comic Neue', 'Comic Sans MS', cursive" },
   { key: 'mono', label: 'Typewriter', stack: "ui-monospace, 'Courier New', monospace" },
 ];
 

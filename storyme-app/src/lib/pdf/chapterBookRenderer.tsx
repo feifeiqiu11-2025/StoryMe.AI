@@ -23,20 +23,70 @@ import {
   View,
   Image as PdfImage,
   StyleSheet,
+  Font,
   pdf,
 } from '@react-pdf/renderer';
 import type { JSONContent } from '@tiptap/react';
 
-// react-pdf ships Times/Helvetica/Courier built-in; Times-Roman is our
-// chapter-book default. If we ever ship a custom serif via /public/fonts,
-// register it here with Font.register.
+// Register the same fonts the editor + web reader use, so a PDF export
+// looks like the kid's screen — not Times-Roman regardless of font
+// choice. The TTFs live in /public/fonts/ (also referenced by globals.css's
+// @font-face block). Registration is idempotent across hot-reloads.
+//
+// Why an absolute URL: react-pdf's Font.register fetches at render
+// time. In the browser, a relative `/fonts/...` path resolves against
+// document.location and works. The check below guards against any
+// unexpected SSR call so fontkit doesn't crash before window exists.
+const FONT_BASE =
+  typeof window !== 'undefined' ? `${window.location.origin}/fonts` : '/fonts';
+
+let fontsRegistered = false;
+function registerChapterBookFonts() {
+  if (fontsRegistered) return;
+  Font.register({
+    family: 'Lora',
+    fonts: [
+      { src: `${FONT_BASE}/Lora-Regular.ttf` },
+      { src: `${FONT_BASE}/Lora-Bold.ttf`, fontWeight: 700 },
+      { src: `${FONT_BASE}/Lora-Italic.ttf`, fontStyle: 'italic' },
+      { src: `${FONT_BASE}/Lora-BoldItalic.ttf`, fontWeight: 700, fontStyle: 'italic' },
+    ],
+  });
+  Font.register({
+    family: 'Comic Neue',
+    fonts: [
+      { src: `${FONT_BASE}/ComicNeue-Regular.ttf` },
+      { src: `${FONT_BASE}/ComicNeue-Bold.ttf`, fontWeight: 700 },
+      { src: `${FONT_BASE}/ComicNeue-Italic.ttf`, fontStyle: 'italic' },
+      { src: `${FONT_BASE}/ComicNeue-BoldItalic.ttf`, fontWeight: 700, fontStyle: 'italic' },
+    ],
+  });
+  fontsRegistered = true;
+}
+
+// Editor font-stack → react-pdf font-family. The editor stores the
+// full CSS stack on textStyle.fontFamily marks (see ChapterBookEditor's
+// FONT_FAMILIES). react-pdf only knows family names, so we sniff the
+// stack and pick the canonical one. Unknown stacks fall through to
+// Helvetica (built-in sans), matching the editor's "Clean" preset.
+function pickPdfFontFamily(stack: string | undefined): string | undefined {
+  if (!stack) return undefined;
+  if (/Lora/i.test(stack)) return 'Lora';
+  if (/Comic Neue|Comic Sans/i.test(stack)) return 'Comic Neue';
+  if (/monospace|Courier/i.test(stack)) return 'Courier';
+  if (/sans-serif|system-ui/i.test(stack)) return 'Helvetica';
+  return undefined;
+}
 
 const styles = StyleSheet.create({
   page: {
     paddingTop: 56,
     paddingBottom: 64,
     paddingHorizontal: 56,
-    fontFamily: 'Times-Roman',
+    // Lora is the editor's default body font ("Storybook"); matching
+    // it here means an unmarked-up doc renders the same on screen and
+    // in the PDF. Marks on individual runs override this per-Text below.
+    fontFamily: 'Lora',
     fontSize: 12,
     lineHeight: 1.55,
     color: '#1f2937',
@@ -234,9 +284,10 @@ function RenderBlock({ node }: { node: JSONContent }) {
  * Render a Tiptap inline content array to nested <Text> runs.
  * Marks compose via style props:
  *   - bold / italic / underline / strike: glyph styling
- *   - textStyle: font-size + color (font-family skipped — react-pdf
- *     requires Font.register'd fonts; we don't bundle Lora/Comic so we
- *     fall back to the page-level Times-Roman)
+ *   - textStyle: font-size + color + font-family. fontFamily is mapped
+ *     from the editor's CSS stack (e.g. 'Lora, Georgia, serif') down
+ *     to the canonical family name react-pdf knows about (Lora /
+ *     Comic Neue / Helvetica / Courier).
  *   - highlight: yellow background
  */
 function renderInline(content: JSONContent[] | undefined): React.ReactNode {
@@ -260,7 +311,11 @@ function renderInline(content: JSONContent[] | undefined): React.ReactNode {
             : 'line-through';
         }
         if (mark.type === 'textStyle') {
-          const attrs = (mark.attrs ?? {}) as { fontSize?: string; color?: string };
+          const attrs = (mark.attrs ?? {}) as {
+            fontSize?: string;
+            color?: string;
+            fontFamily?: string;
+          };
           if (attrs.fontSize) {
             const m = /^(\d+(?:\.\d+)?)px$/.exec(attrs.fontSize);
             if (m) {
@@ -271,6 +326,10 @@ function renderInline(content: JSONContent[] | undefined): React.ReactNode {
             }
           }
           if (attrs.color) style.color = attrs.color;
+          if (attrs.fontFamily) {
+            const family = pickPdfFontFamily(attrs.fontFamily);
+            if (family) style.fontFamily = family;
+          }
         }
         if (mark.type === 'highlight') {
           // react-pdf doesn't support text background-color natively, but
@@ -343,11 +402,19 @@ async function preloadImages(doc: JSONContent | null): Promise<JSONContent | nul
       const res = await fetch(url, { mode: 'cors' });
       if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
       const blob = await res.blob();
+      // react-pdf only handles JPEG / PNG / GIF — it throws "Base64 image
+      // invalid format: webp" on a WebP data URL. The image generation
+      // pipeline (and several Supabase storage uploads) emit WebP for
+      // size, so we transcode here at PDF-build time. Browsers can
+      // decode WebP into a canvas, then we re-encode the canvas as PNG.
+      const isWebP = blob.type === 'image/webp' || /\.webp(\?|$)/i.test(url);
+      const finalBlob = isWebP ? await transcodeBlobToPng(blob) : blob;
+
       const dataUrl: string = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
         reader.onerror = reject;
-        reader.readAsDataURL(blob);
+        reader.readAsDataURL(finalBlob);
       });
       cache.set(url, dataUrl);
       return dataUrl;
@@ -355,6 +422,32 @@ async function preloadImages(doc: JSONContent | null): Promise<JSONContent | nul
       console.warn('[chapterBookPDF] image preload failed for', url, err);
       cache.set(url, url); // fall through with original URL
       return url;
+    }
+  }
+
+  async function transcodeBlobToPng(blob: Blob): Promise<Blob> {
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const i = new Image();
+        i.crossOrigin = 'anonymous';
+        i.onload = () => resolve(i);
+        i.onerror = () => reject(new Error('webp decode failed'));
+        i.src = objectUrl;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('canvas 2d context unavailable');
+      ctx.drawImage(img, 0, 0);
+      const png: Blob | null = await new Promise((resolve) =>
+        canvas.toBlob(resolve, 'image/png')
+      );
+      if (!png) throw new Error('webp → png re-encode produced empty blob');
+      return png;
+    } finally {
+      URL.revokeObjectURL(objectUrl);
     }
   }
 
@@ -386,6 +479,7 @@ export async function generateChapterBookPDF(
   doc: JSONContent | null,
   options: RenderOptions
 ): Promise<Blob> {
+  registerChapterBookFonts();
   const inlinedDoc = await preloadImages(doc);
   return pdf(<ChapterBookPdf doc={inlinedDoc} options={options} />).toBlob();
 }
