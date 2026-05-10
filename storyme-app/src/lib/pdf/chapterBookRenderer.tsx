@@ -78,16 +78,29 @@ function pickPdfFontFamily(stack: string | undefined): string | undefined {
   return undefined;
 }
 
+// CSS px → PDF pt scale factor. The editor stores image widths in CSS
+// pixels (1 px = 1/96 in), react-pdf measures in points (1 pt = 1/72 in).
+// Without this conversion, a kid's 280-px image renders at 280 pt =
+// 373 CSS-px-equivalent on the printed page — roughly 1.33× larger than
+// what they saw in the editor.
+const CSS_PX_TO_PDF_PT = 72 / 96; // 0.75
+
 const styles = StyleSheet.create({
   page: {
-    paddingTop: 56,
-    paddingBottom: 64,
-    paddingHorizontal: 56,
+    // Tightened from 56pt all around so typical 10-page kid stories fit
+    // their chapter-book pageBreaks 1:1 against PDF pages instead of
+    // spilling across multiple PDF pages.
+    paddingTop: 48,
+    paddingBottom: 56,
+    paddingHorizontal: 36,
     // Lora is the editor's default body font ("Storybook"); matching
     // it here means an unmarked-up doc renders the same on screen and
     // in the PDF. Marks on individual runs override this per-Text below.
     fontFamily: 'Lora',
-    fontSize: 12,
+    // Editor body is 20 CSS px ≈ 15 pt — we slot just under that to
+    // leave headroom on smaller PDF page sizes (a5) while staying
+    // readable on `large`. Per-mark fontSize overrides still apply.
+    fontSize: 13,
     lineHeight: 1.55,
     color: '#1f2937',
   },
@@ -124,12 +137,27 @@ const styles = StyleSheet.create({
   },
   pageNumber: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 24,
     left: 0,
     right: 0,
     textAlign: 'center',
-    fontSize: 10,
+    fontSize: 9,
     color: '#9ca3af',
+  },
+  // Tier 2 approximate text-wrap: image + adjacent paragraphs sit in a
+  // flex row so we get one "block" of wrap-around for free, mirroring
+  // the editor's float behavior. react-pdf can't actually flow text
+  // around a float, so this only fakes wrap for the leading paragraphs;
+  // anything beyond resumes full width below.
+  floatRow: {
+    flexDirection: 'row',
+    marginVertical: 10,
+  },
+  floatRowImage: {
+    borderRadius: 4,
+  },
+  floatRowText: {
+    flex: 1,
   },
 });
 
@@ -162,15 +190,16 @@ function ChapterBookPdf({
   options: RenderOptions;
 }) {
   const pages = splitDocByPageBreaks(doc);
-  const size = PAGE_SIZE_MAP[options.format ?? 'a5'];
+  // Default to `large` (504×612pt) — gives chapter-book pages enough
+  // vertical room that a typical "image + a few paragraphs" page lands
+  // on one PDF page instead of spilling. Callers can still pick a5/a4.
+  const size = PAGE_SIZE_MAP[options.format ?? 'large'];
 
   return (
     <Document title={options.title ?? 'Chapter Book'}>
       {pages.map((pageDoc, idx) => (
         <Page key={idx} size={size} style={styles.page}>
-          {(pageDoc.content ?? []).map((node, i) => (
-            <RenderBlock key={i} node={node} />
-          ))}
+          {renderPageBlocks(pageDoc.content ?? [])}
           <Text
             style={styles.pageNumber}
             render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
@@ -179,6 +208,103 @@ function ChapterBookPdf({
         </Page>
       ))}
     </Document>
+  );
+}
+
+/**
+ * Walk a page's top-level nodes, grouping a left/right-aligned image
+ * with the up-to-N paragraphs that follow it into a flex-row "float
+ * row". This is the Tier 2 approximation of CSS float in a renderer
+ * that has no real float support — kids see image-beside-paragraph
+ * the same way they would in a book.
+ *
+ * Why N is capped: react-pdf can't measure image height in advance,
+ * so we can't know when the paragraphs have "outgrown" the image. A
+ * cap of 3 paragraphs keeps the column from staying narrow forever
+ * when a kid writes a long stretch of text. After the cap (or any
+ * non-paragraph block), remaining content flows full-width below.
+ */
+const MAX_PARAGRAPHS_BESIDE_IMAGE = 3;
+
+function renderPageBlocks(content: JSONContent[]): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  let i = 0;
+  while (i < content.length) {
+    const node = content[i];
+    if (isFloatedSideImage(node)) {
+      const paragraphs: JSONContent[] = [];
+      let j = i + 1;
+      while (
+        j < content.length &&
+        content[j].type === 'paragraph' &&
+        paragraphs.length < MAX_PARAGRAPHS_BESIDE_IMAGE
+      ) {
+        paragraphs.push(content[j]);
+        j += 1;
+      }
+      if (paragraphs.length > 0) {
+        out.push(<FloatRow key={i} image={node} paragraphs={paragraphs} />);
+        i = j;
+        continue;
+      }
+    }
+    out.push(<RenderBlock key={i} node={node} />);
+    i += 1;
+  }
+  return out;
+}
+
+function isFloatedSideImage(node: JSONContent): boolean {
+  if (node.type !== 'image') return false;
+  if (node.attrs?.fullBleed) return false;
+  const align = node.attrs?.align;
+  return align === 'left' || align === 'right';
+}
+
+function FloatRow({
+  image,
+  paragraphs,
+}: {
+  image: JSONContent;
+  paragraphs: JSONContent[];
+}) {
+  const align = (image.attrs?.align as string) || 'left';
+  const isLeft = align === 'left';
+  const widthAttr = image.attrs?.width as string | undefined;
+  const m = widthAttr ? /^(\d+(?:\.\d+)?)px$/.exec(widthAttr) : null;
+  // Fall back to a sensible default if the kid never resized the image.
+  const imgWidthPt = m ? Number(m[1]) * CSS_PX_TO_PDF_PT : 180;
+  const src = image.attrs?.src as string | undefined;
+  if (!src) {
+    return <>{paragraphs.map((p, i) => <RenderBlock key={i} node={p} />)}</>;
+  }
+
+  const imgBlock = (
+    <PdfImage
+      src={src}
+      style={[styles.floatRowImage, { width: imgWidthPt }]}
+    />
+  );
+  const textBlock = (
+    <View style={styles.floatRowText}>
+      {paragraphs.map((p, i) => <RenderBlock key={i} node={p} />)}
+    </View>
+  );
+
+  return (
+    <View style={styles.floatRow}>
+      {isLeft ? (
+        <>
+          <View style={{ marginRight: 12 }}>{imgBlock}</View>
+          {textBlock}
+        </>
+      ) : (
+        <>
+          {textBlock}
+          <View style={{ marginLeft: 12 }}>{imgBlock}</View>
+        </>
+      )}
+    </View>
   );
 }
 
@@ -244,7 +370,9 @@ function RenderBlock({ node }: { node: JSONContent }) {
       const src = node.attrs?.src as string | undefined;
       if (!src) return null;
       // Full-bleed images stretch to the page content width. Otherwise
-      // honor the kid's pixel width from the corner-drag handle.
+      // honor the kid's pixel width from the corner-drag handle —
+      // converted px → pt so the printed size visually matches the
+      // editor (see CSS_PX_TO_PDF_PT note above).
       const fullBleed = !!node.attrs?.fullBleed;
       const widthAttr = node.attrs?.width as string | undefined;
       const widthStyle: { width?: number | string } = {};
@@ -252,7 +380,7 @@ function RenderBlock({ node }: { node: JSONContent }) {
         widthStyle.width = '100%';
       } else if (widthAttr) {
         const m = /^(\d+(?:\.\d+)?)px$/.exec(widthAttr);
-        if (m) widthStyle.width = Number(m[1]);
+        if (m) widthStyle.width = Number(m[1]) * CSS_PX_TO_PDF_PT;
       }
       // Alignment maps to flex self-alignment within the page column.
       // Full-bleed images ignore align since they fill the row.
