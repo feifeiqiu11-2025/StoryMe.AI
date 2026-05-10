@@ -51,13 +51,23 @@ async function downloadImageAsBuffer(url: string): Promise<Buffer> {
 
 interface CallOpenAIParams {
   prompt: string;
-  referenceImageBuffer?: Buffer;
+  /**
+   * Reference image(s) for `images.edit`. Accepts:
+   *   - undefined → routes to `images.generate` (text-only)
+   *   - Buffer    → single reference (existing call sites; sticker + character previews)
+   *   - Buffer[]  → multiple references (new chapter-book Generate flow)
+   *
+   * For multi-image, the function tries the array first; on failure it
+   * automatically retries with just the first buffer so a single bad
+   * model response doesn't kill the request entirely.
+   */
+  referenceImageBuffer?: Buffer | Buffer[];
   size?: '1024x1024' | '1024x1536' | '1536x1024';
   logTag: string;
 }
 
 /** Single call wrapper used by all preview functions. Handles retries + edit vs generate. */
-async function callOpenAIImage({
+export async function callOpenAIImage({
   prompt,
   referenceImageBuffer,
   size = '1024x1024',
@@ -65,15 +75,41 @@ async function callOpenAIImage({
 }: CallOpenAIParams): Promise<{ b64: string; mimeType: string }> {
   const { client, toFile } = await getOpenAIClient();
 
+  // Normalize to an array. [] = text-only generate; [single] = legacy
+  // single-edit; [a, b, …] = multi-image edit.
+  const buffers: Buffer[] = referenceImageBuffer
+    ? Array.isArray(referenceImageBuffer)
+      ? referenceImageBuffer
+      : [referenceImageBuffer]
+    : [];
+
   let lastError: Error | null = null;
+  // Tracks whether we've already fallen back from array → single image
+  // for this call. Set after a multi-image edit fails so subsequent
+  // retry attempts use the single-image path.
+  let multiImageFellBack = false;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[${logTag}] OpenAI ${OPENAI_IMAGE_MODEL} attempt ${attempt}/${MAX_RETRIES}`);
+      console.log(`[${logTag}] OpenAI ${OPENAI_IMAGE_MODEL} attempt ${attempt}/${MAX_RETRIES} (refs=${buffers.length})`);
 
       let response;
-      if (referenceImageBuffer) {
-        const imageFile = await toFile(referenceImageBuffer, 'reference.png', { type: 'image/png' });
+      if (buffers.length === 0) {
+        response = await client.images.generate({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          model: OPENAI_IMAGE_MODEL as any,
+          prompt,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          size: size as any,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          quality: 'high' as any,
+          n: 1,
+        });
+      } else if (buffers.length === 1 || multiImageFellBack) {
+        // Existing single-image edit path — used by stickers, character
+        // previews, and the multi-image fallback when an array was rejected.
+        const onlyBuffer = buffers[0];
+        const imageFile = await toFile(onlyBuffer, 'reference.png', { type: 'image/png' });
         response = await client.images.edit({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           model: OPENAI_IMAGE_MODEL as any,
@@ -85,16 +121,39 @@ async function callOpenAIImage({
           quality: 'high' as any,
         });
       } else {
-        response = await client.images.generate({
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          model: OPENAI_IMAGE_MODEL as any,
-          prompt,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          size: size as any,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          quality: 'high' as any,
-          n: 1,
-        });
+        // Multi-image edit. SDK type accepts an array; gpt-image-2 may
+        // or may not — wrapped in try/catch so a 400/422 just falls
+        // back to the first ref.
+        try {
+          const files = await Promise.all(
+            buffers.map((buf, i) =>
+              toFile(buf, `reference-${i + 1}.png`, { type: 'image/png' })
+            )
+          );
+          response = await client.images.edit({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            model: OPENAI_IMAGE_MODEL as any,
+            image: files,
+            prompt,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            size: size as any,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            quality: 'high' as any,
+          });
+        } catch (multiErr) {
+          const msg = multiErr instanceof Error ? multiErr.message : String(multiErr);
+          // Rate-limit errors should bubble to the outer retry loop —
+          // they're transient and retrying with single-image won't help.
+          if (msg.includes('429') || msg.includes('rate') || msg.includes('quota')) {
+            throw multiErr;
+          }
+          console.warn(
+            `[${logTag}] multi-image edit failed (${buffers.length} refs) — retrying with first ref only:`,
+            msg
+          );
+          multiImageFellBack = true;
+          continue; // re-enter the loop, this time hits the single-image branch
+        }
       }
 
       const b64 = response.data?.[0]?.b64_json;

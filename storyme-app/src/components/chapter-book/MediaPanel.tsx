@@ -204,6 +204,10 @@ function GenerateTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [saveAsName, setSaveAsName] = useState('');
   const [savingChar, setSavingChar] = useState(false);
+  // The "Save as a character" form is collapsed by default — kids who
+  // just want to insert the picture don't see the name input. Expand
+  // on click of the link.
+  const [showSaveForm, setShowSaveForm] = useState(false);
 
   const uploadReference = useCallback(async (file: File) => {
     if (referenceUploading) return;
@@ -248,8 +252,11 @@ function GenerateTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
         characterIds: Array.from(selectedChars.keys()),
         artStyle: artStyle || 'auto',
       });
-      // Default name suggestion for save-as-character
-      setSaveAsName(prompt.trim().slice(0, 40));
+      // The save-as-character form starts empty + collapsed. Don't
+      // pre-fill with the prompt — that's misleading: the input is for
+      // a character name, not a continuation of the prompt.
+      setSaveAsName('');
+      setShowSaveForm(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Generation failed');
     } finally {
@@ -437,7 +444,13 @@ function GenerateTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
         Generating a picture takes about 20–40 seconds.
       </p>
 
-      {/* Preview pane after generation */}
+      {/* Preview pane after generation. Layout priorities:
+            1. Big primary action ("Insert into book") — clear verb,
+               separate from the kid's prompt text
+            2. Save-as-character is opt-in via a small collapsed link, so
+               most kids who just want the image aren't distracted by a
+               name field that previously got pre-filled with their prompt
+            3. Try again / Throw it away always last (less prominent) */}
       {result && (
         <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
           <p className="text-xs font-semibold text-gray-700">How does it look?</p>
@@ -447,49 +460,80 @@ function GenerateTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
             alt={result.prompt}
             className="w-full max-h-48 object-contain rounded bg-white"
           />
-          <div className="flex flex-col gap-1.5">
+
+          <button
+            type="button"
+            onClick={useResult}
+            className="w-full min-h-[40px] bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700"
+          >
+            Insert into book
+          </button>
+
+          {showSaveForm ? (
+            <div className="space-y-1.5 pt-1">
+              <label className="block text-[11px] font-semibold text-gray-700">
+                Name this character so you can use it again later
+              </label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={saveAsName}
+                  onChange={(e) => setSaveAsName(e.target.value)}
+                  placeholder="e.g. Spark the dragon"
+                  className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  maxLength={80}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={saveAndUse}
+                  disabled={savingChar || !saveAsName.trim()}
+                  className="px-3 min-h-[32px] bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingChar ? 'Saving…' : 'Save & insert'}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSaveForm(false);
+                  setSaveAsName('');
+                }}
+                className="text-[11px] text-gray-500 hover:text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
-              onClick={useResult}
-              className="w-full min-h-[36px] bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700"
+              onClick={() => setShowSaveForm(true)}
+              className="text-xs text-purple-700 hover:text-purple-900 font-medium"
             >
-              Use it
+              + Save as a character
             </button>
-            <div className="flex items-center gap-1.5">
-              <input
-                type="text"
-                value={saveAsName}
-                onChange={(e) => setSaveAsName(e.target.value)}
-                placeholder="Give it a name to save"
-                className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                maxLength={80}
-              />
-              <button
-                type="button"
-                onClick={saveAndUse}
-                disabled={savingChar || !saveAsName.trim()}
-                className="px-3 min-h-[34px] bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {savingChar ? 'Saving…' : 'Save & use'}
-              </button>
-            </div>
-            <div className="flex items-center gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => generate()}
-                disabled={generating}
-                className="flex-1 py-1.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-white"
-              >
-                Try again
-              </button>
-              <button
-                type="button"
-                onClick={() => setResult(null)}
-                className="flex-1 py-1.5 border border-gray-300 rounded-lg text-gray-500 hover:bg-white"
-              >
-                Throw it away
-              </button>
-            </div>
+          )}
+
+          <div className="flex items-center gap-2 text-xs pt-1 border-t border-gray-200 mt-2">
+            <button
+              type="button"
+              onClick={() => generate()}
+              disabled={generating}
+              className="flex-1 py-1.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-white disabled:opacity-50"
+            >
+              Try again
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setResult(null);
+                setShowSaveForm(false);
+                setSaveAsName('');
+              }}
+              className="flex-1 py-1.5 border border-gray-300 rounded-lg text-gray-500 hover:bg-white"
+            >
+              Throw it away
+            </button>
           </div>
         </div>
       )}
