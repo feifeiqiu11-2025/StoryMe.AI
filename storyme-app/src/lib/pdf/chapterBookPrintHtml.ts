@@ -15,7 +15,7 @@
 
 import { docToPages, type ChapterBookPage } from '@/lib/chapter-book/docToPages';
 
-export type ChapterBookPdfFormat = 'a5' | 'a4' | 'large';
+export type ChapterBookPdfFormat = 'a5' | 'a4' | 'large' | 'letter';
 
 interface BuildInput {
   /** Public deploy origin used to resolve absolute /fonts/ URLs from
@@ -41,6 +41,10 @@ const FORMATS: Record<ChapterBookPdfFormat, FormatGeometry> = {
   a4: { size: 'A4', margin: '16mm 20mm' },
   // 7" × 8.5" — matches the picture-book "large" template
   large: { size: '7in 8.5in', margin: '14mm 16mm' },
+  // US Letter — the default for chapter books. Generous vertical room
+  // so most kid-typical "cover + author info" pages fit on a single
+  // PDF page without spillage.
+  letter: { size: 'Letter', margin: '16mm 18mm' },
 };
 
 export function buildChapterBookPrintHtml(input: BuildInput): string {
@@ -162,8 +166,11 @@ html, body {
 
 body {
   font-family: 'Lora', Georgia, 'Times New Roman', serif;
-  font-size: 14pt;
-  line-height: 1.6;
+  /* Body 13pt (down from 14pt) reclaims ~10% vertical space per page
+     so chapter-book pages with image + several paragraphs are more
+     likely to fit a single PDF page without spilling. */
+  font-size: 13pt;
+  line-height: 1.55;
   color: #1f2937;
 }
 
@@ -269,24 +276,25 @@ body {
   clear: right;
 }
 
-/* Full-bleed cover images: stretch past the page margin so the cover
-   really fills the page edge-to-edge. The negative margins exactly
-   cancel @page's horizontal margin. */
+/* Full-bleed cover images: stretch toward the page edge while
+   ALSO honoring a height cap so trailing content (author, copyright,
+   first paragraph) has room on the same PDF page. Without the cap,
+   a near-square cover at full bleed eats the entire page.
+   - max-width: calc(100% + 32mm) -> would bleed past content margins
+     when image is naturally wide enough.
+   - max-height: 75vh -> never exceed 75% of the PDF page height,
+     leaving ~25% for trailing content.
+   - width/height auto -> preserve natural aspect ratio; browser
+     picks the largest size that fits both maxes. */
 .chapter-book-prose img[data-fullbleed='true'] {
-  width: calc(100% + 32mm);
-  max-width: none;
-  margin-left: -16mm;
-  margin-right: -16mm;
-  margin-top: 0;
-  margin-bottom: 0.6em;
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: calc(100% + 32mm);
+  max-height: 75vh;
+  margin: 0 auto 0.6em;
   border-radius: 0;
   float: none;
-}
-/* When the cover is the first child on a page, also pull it to the
-   very top edge (cancel @page top margin). */
-.print-page > .chapter-book-prose img[data-fullbleed='true']:first-child,
-.chapter-book-prose:has(> img[data-fullbleed='true']:first-child) {
-  margin-top: -14mm;
 }
 
 /* Inline text styling from textStyle marks (color/font-size/font-family)

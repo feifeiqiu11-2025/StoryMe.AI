@@ -10,7 +10,13 @@ import { StorybookTemplateLarge } from '@/components/pdf/StorybookTemplateLarge'
 import { StorybookTemplateComic } from '@/components/pdf/StorybookTemplateComic';
 import { StorybookTemplateGrid } from '@/components/pdf/StorybookTemplateGrid';
 
-export type PDFFormat = 'a5' | 'a4' | 'large';
+// 'letter' is offered only to chapter books today (the export modal
+// branches on projectType). It's part of the shared PDFFormat union
+// for type-safety as values flow modal → onExport → renderer; the
+// picture-book PAGE_SIZES below has an entry so the picture-book
+// service won't crash if someone ever extends the modal to offer
+// Letter for picture books too.
+export type PDFFormat = 'a5' | 'a4' | 'large' | 'letter';
 export type PDFLayout = 'classic' | 'comic' | 'grid';
 
 export interface StoryCharacterData {
@@ -42,6 +48,10 @@ const PAGE_SIZES: Record<PDFFormat, { width: number; height: number }> = {
   a5: { width: 420, height: 595 },
   a4: { width: 595, height: 842 },
   large: { width: 504, height: 612 },
+  // US Letter at 72 dpi: 8.5" × 11" = 612 × 792 pt. Picture-book
+  // templates haven't been tuned for this size yet, but the modal
+  // doesn't offer Letter for picture books, so this is defensive only.
+  letter: { width: 612, height: 792 },
 };
 
 /**

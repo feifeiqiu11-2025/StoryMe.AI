@@ -66,10 +66,20 @@ interface ChapterBookEditorProps {
 }
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
-// A5 PDF page (Times-Roman 12pt, 56pt margins) holds ~250 words of body
-// text comfortably. Soft warning at 220 leaves a little room before
-// react-pdf has to break mid-paragraph.
-const SOFT_WORDS_PER_PAGE = 220;
+// Soft warning threshold for "this page will spill in PDF export".
+// Calibrated for the default Letter page (8.5" × 11", 13pt body,
+// ~22 lines/page): ~380 words of pure body text comfortably fit. We
+// warn at 350 to give the kid a buffer before the actual overflow.
+// Kids exporting to A5 will see overflow sooner than this warns; the
+// modal lets them switch format if they hit it.
+const SOFT_WORDS_PER_PAGE = 350;
+// Full-bleed images consume ~75% of the PDF page height, leaving
+// only ~5 lines for trailing text. Counting one full-bleed image as
+// ~250 word-equivalents triggers the warning even on text-light pages
+// that nonetheless can't fit a second image or much follow-up text.
+// Floated/centered images are smaller — count them as ~80.
+const WORDS_PER_FULLBLEED_IMAGE = 250;
+const WORDS_PER_INLINE_IMAGE = 80;
 
 const TIP_DISMISSED_KEY = 'chapterBook.coverTipDismissed';
 
@@ -181,6 +191,10 @@ export function ChapterBookEditor({
       let onTargetPage = false;
       let pageIdx = 1;
       const buf: string[] = [];
+      // Image weight is added on top of the word count so a page with
+      // one fullbleed cover + a paragraph trips the warning, even
+      // though pure text is short.
+      let imageWeight = 0;
       for (const block of blocks) {
         if (block.type === 'pageBreak') {
           if (pageIdx === currentPage) break;
@@ -190,6 +204,7 @@ export function ChapterBookEditor({
         if (pageIdx === currentPage) {
           onTargetPage = true;
           buf.push(extractText(block));
+          imageWeight += countImageWeight(block);
         }
       }
       if (!onTargetPage) {
@@ -197,7 +212,8 @@ export function ChapterBookEditor({
         return;
       }
       const text = buf.join(' ').trim();
-      setPageWords(text ? text.split(/\s+/).length : 0);
+      const wordCount = text ? text.split(/\s+/).length : 0;
+      setPageWords(wordCount + imageWeight);
     };
 
     recompute();
@@ -309,7 +325,7 @@ export function ChapterBookEditor({
         </span>
         {pageOverflow && (
           <span className="text-amber-700 hidden sm:inline">
-            · This page is getting full — tap &ldquo;New Page&rdquo; to start the next one.
+            · This page might split when you export to PDF — tap &ldquo;New Page&rdquo; to keep it clean.
           </span>
         )}
       </div>
@@ -1019,4 +1035,20 @@ function extractText(node: JSONContent): string {
   if (!node) return '';
   if (node.type === 'text') return node.text ?? '';
   return (node.content ?? []).map(extractText).join(' ');
+}
+
+/** Estimate how much of a PDF page an image consumes, expressed as
+ *  "word-equivalents" so it can be added to a page's word counter for
+ *  the soft overflow warning. Fullbleed images dominate a page;
+ *  inline floated/centered images are smaller. */
+function countImageWeight(node: JSONContent): number {
+  if (!node) return 0;
+  if (node.type === 'image') {
+    return node.attrs?.fullBleed ? WORDS_PER_FULLBLEED_IMAGE : WORDS_PER_INLINE_IMAGE;
+  }
+  let total = 0;
+  for (const child of node.content ?? []) {
+    total += countImageWeight(child);
+  }
+  return total;
 }

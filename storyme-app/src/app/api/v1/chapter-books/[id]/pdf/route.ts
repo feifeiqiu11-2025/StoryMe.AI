@@ -46,7 +46,7 @@ export const runtime = 'nodejs';
 const MAX_PAGES_FOR_PDF = 15;
 
 const RequestSchema = z.object({
-  format: z.enum(['a5', 'a4', 'large']).default('large'),
+  format: z.enum(['a5', 'a4', 'large', 'letter']).default('letter'),
 });
 
 type ProjectRow = {
@@ -89,7 +89,7 @@ async function handle(
   const { id } = await params;
 
   // Format comes from POST body (PDF) or query string (debug HTML).
-  let format: ChapterBookPdfFormat = 'large';
+  let format: ChapterBookPdfFormat = 'letter';
   if (mode === 'pdf') {
     try {
       const body = await request.json().catch(() => ({}));
@@ -106,7 +106,7 @@ async function handle(
     }
   } else {
     const q = request.nextUrl.searchParams.get('format');
-    if (q === 'a5' || q === 'a4' || q === 'large') format = q;
+    if (q === 'a5' || q === 'a4' || q === 'large' || q === 'letter') format = q;
   }
 
   // Resolve access. Owner path (authed session) first; if not an

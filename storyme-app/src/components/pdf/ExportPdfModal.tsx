@@ -22,10 +22,21 @@ const layouts: { value: PDFLayout; label: string; description: string }[] = [
   { value: 'grid', label: 'Grid', description: '4 scenes per page' },
 ];
 
-const formats: { value: PDFFormat; label: string; description: string }[] = [
+// Picture books and chapter books offer different size options.
+// Picture-book templates are tuned for a5/a4/large only — adding Letter
+// here would require new templates. Chapter books render through the
+// headless-Chromium pipeline, where any @page size works, so we lead
+// with Letter (US default) for them.
+const PICTURE_BOOK_FORMATS: { value: PDFFormat; label: string; description: string }[] = [
   { value: 'a5', label: 'A5', description: 'Compact' },
   { value: 'a4', label: 'A4', description: 'Standard' },
   { value: 'large', label: 'Legal', description: 'Large' },
+];
+const CHAPTER_BOOK_FORMATS: { value: PDFFormat; label: string; description: string }[] = [
+  { value: 'letter', label: 'Letter', description: '8.5" × 11"' },
+  { value: 'a4', label: 'A4', description: 'Standard' },
+  { value: 'a5', label: 'A5', description: 'Compact' },
+  { value: 'large', label: 'Legal', description: '7" × 8.5"' },
 ];
 
 function LayoutIcon({ layout }: { layout: PDFLayout }) {
@@ -92,7 +103,11 @@ export default function ExportPdfModal({
   // type — the chapter-book renderer ignores it. We just need a valid
   // value to satisfy the onExport signature.
   const [layout, setLayout] = useState<PDFLayout>(isChapterBook ? 'classic' : 'comic');
-  const [format, setFormat] = useState<PDFFormat>('a4');
+  // Letter is the kid-friendly US default for chapter books; picture
+  // books continue to default to A4 since their templates were tuned
+  // for that size.
+  const [format, setFormat] = useState<PDFFormat>(isChapterBook ? 'letter' : 'a4');
+  const formats = isChapterBook ? CHAPTER_BOOK_FORMATS : PICTURE_BOOK_FORMATS;
 
   // Legal is not supported for Comic layout
   const isFormatDisabled = (f: PDFFormat) => f === 'large' && layout === 'comic';

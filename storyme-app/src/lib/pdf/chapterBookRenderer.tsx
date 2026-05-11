@@ -18,7 +18,7 @@
  * The server is now the source of truth for layout.
  */
 
-export type ChapterBookPdfFormat = 'a5' | 'a4' | 'large';
+export type ChapterBookPdfFormat = 'a5' | 'a4' | 'large' | 'letter';
 
 interface DownloadOptions {
   bookId: string;
@@ -33,7 +33,7 @@ interface DownloadOptions {
  * Build the PDF on the server, download the bytes as a file.
  */
 export async function downloadChapterBookPDF(options: DownloadOptions): Promise<void> {
-  const { bookId, title, format = 'large', shareToken } = options;
+  const { bookId, title, format = 'letter', shareToken } = options;
   const url = shareToken
     ? `/api/v1/chapter-books/${bookId}/pdf?token=${encodeURIComponent(shareToken)}`
     : `/api/v1/chapter-books/${bookId}/pdf`;
