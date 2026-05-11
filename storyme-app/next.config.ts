@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '10mb',
     },
   },
-  // Exclude FFmpeg binaries from Webpack bundling (fixes Turbopack compatibility)
+  // Exclude FFmpeg binaries from Webpack bundling (fixes Turbopack compatibility).
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.externals = config.externals || [];
@@ -30,6 +30,21 @@ const nextConfig: NextConfig = {
       });
     }
     return config;
+  },
+  // Don't bundle the headless-Chromium packages into the server build —
+  // let them resolve from node_modules at runtime. Without this, Next.js
+  // tries to webpack the binary asset and either fails or ships a broken
+  // copy. Next.js 15's serverExternalPackages is the modern replacement
+  // for the old webpack-externals dance.
+  serverExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
+  // And make sure Vercel's file-tracing pulls the chromium binary tarball
+  // into the chapter-book PDF function's deploy bundle. The glob is
+  // intentionally narrow to the one route so other functions don't
+  // bloat by ~50 MB.
+  outputFileTracingIncludes: {
+    '/api/v1/chapter-books/[id]/pdf': [
+      './node_modules/@sparticuz/chromium/bin/**',
+    ],
   },
   // Temporarily ignore ESLint errors during build for MVP deployment
   eslint: {

@@ -214,10 +214,13 @@ function Body() {
       if (!book) return;
       setExporting(true);
       try {
-        await downloadChapterBookPDF(book.editorDoc ?? null, {
-          title: book.title ?? 'Chapter Book',
-          authorName: book.authorName,
+        // Server-side renderer reads canvas_state from the DB now —
+        // we just hand it the bookId + format.
+        await downloadChapterBookPDF({
+          bookId: book.id,
+          title: book.title,
           format,
+          shareToken: book.shareToken ?? null,
         });
       } catch (err) {
         alert(err instanceof Error ? err.message : 'PDF export failed.');
