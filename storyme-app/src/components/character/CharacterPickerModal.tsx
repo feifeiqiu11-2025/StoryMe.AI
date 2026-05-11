@@ -21,10 +21,24 @@
 
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { X, Search } from 'lucide-react';
+
+/** How many "My Characters" rows we load per request. Past ~50 cards
+ *  the React mount cost is the bottleneck on slower devices (a user
+ *  with 400+ characters reported the picker hanging on open). The
+ *  community tab stays capped at 60 since it's already short. */
+const MINE_PAGE_SIZE = 60;
+
+/** Debounce the search box so we don't fire a query on every keystroke
+ *  — kid typing "dragon" should produce one request, not seven. */
+const SEARCH_DEBOUNCE_MS = 250;
+
+/** Hard cap on server-side search results. Search is meant to narrow
+ *  things down, not return the whole library. */
+const SEARCH_RESULT_LIMIT = 100;
 
 export interface PickerCharacter {
   id: string;
@@ -62,27 +76,66 @@ interface MultiModeProps extends BaseProps {
 
 type Props = SingleModeProps | MultiModeProps;
 
+type DbRow = {
+  id: string;
+  name: string;
+  animated_preview_url: string | null;
+  reference_image_url: string | null;
+};
+
+function toPicker(r: DbRow, source: 'mine' | 'community'): PickerCharacter {
+  return {
+    id: r.id,
+    name: r.name,
+    imageUrl: r.animated_preview_url ?? r.reference_image_url ?? null,
+    source,
+  };
+}
+
 export function CharacterPickerModal(props: Props) {
   const { open, onClose, title } = props;
   const [tab, setTab] = useState<Tab>('mine');
   const [search, setSearch] = useState('');
+  // "My Characters" browse-mode state. Paginated via the sentinel below.
+  // We split browse-mode rows from search-mode rows so clearing the
+  // search box doesn't lose the scroll position the kid built up.
   const [mineRows, setMineRows] = useState<PickerCharacter[] | null>(null);
+  const [hasMoreMine, setHasMoreMine] = useState(true);
+  const [loadingMoreMine, setLoadingMoreMine] = useState(false);
+  // Search-mode results live separately so we can swap them in/out
+  // without disturbing the paginated browse state.
+  const [searchRows, setSearchRows] = useState<PickerCharacter[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  // Community list is small (≤60) and already capped — single fetch,
+  // client-side search filter is plenty.
   const [commRows, setCommRows] = useState<PickerCharacter[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped each time the modal opens; effects compare against the
+  // captured value before committing state to avoid stale-response races
+  // (kid opens, closes, reopens before the first fetch returns).
+  const requestKey = useRef(0);
+  const isSearching = search.trim().length > 0;
 
-  // Fetch on open. Both lists are tiny (rows, not images) so loading both
-  // up front keeps tab-switching instant.
+  // Initial fetch on open: first page of My Characters + the small
+  // Community list. No more "pull everything in one shot."
   useEffect(() => {
     if (!open) return;
+    requestKey.current += 1;
+    const myKey = requestKey.current;
     const supabase = createClient();
-    const fetchAll = async () => {
+    setMineRows(null);
+    setHasMoreMine(true);
+    setSearchRows(null);
+
+    const fetchInitial = async () => {
       try {
         const [{ data: mineData, error: mineErr }, { data: commData, error: commErr }] = await Promise.all([
           supabase
             .from('character_library')
             .select('id, name, animated_preview_url, reference_image_url, is_favorite, updated_at')
             .order('is_favorite', { ascending: false })
-            .order('updated_at', { ascending: false }),
+            .order('updated_at', { ascending: false })
+            .range(0, MINE_PAGE_SIZE - 1),
           supabase
             .from('character_library')
             .select('id, name, animated_preview_url, reference_image_url')
@@ -90,39 +143,22 @@ export function CharacterPickerModal(props: Props) {
             .order('updated_at', { ascending: false })
             .limit(60),
         ]);
+        if (myKey !== requestKey.current) return; // stale
         if (mineErr) throw mineErr;
         if (commErr) {
           // Community list can fail silently — community tab is optional.
           console.warn('Community characters load failed:', commErr);
         }
-
-        type DbRow = {
-          id: string;
-          name: string;
-          animated_preview_url: string | null;
-          reference_image_url: string | null;
-        };
-        setMineRows(
-          (mineData ?? []).map((r) => ({
-            id: r.id,
-            name: r.name,
-            imageUrl: (r as DbRow).animated_preview_url ?? (r as DbRow).reference_image_url ?? null,
-            source: 'mine',
-          }))
-        );
-        setCommRows(
-          (commData ?? []).map((r) => ({
-            id: r.id,
-            name: r.name,
-            imageUrl: (r as DbRow).animated_preview_url ?? (r as DbRow).reference_image_url ?? null,
-            source: 'community',
-          }))
-        );
+        const mine = (mineData ?? []).map((r) => toPicker(r as DbRow, 'mine'));
+        setMineRows(mine);
+        setHasMoreMine(mine.length === MINE_PAGE_SIZE);
+        setCommRows((commData ?? []).map((r) => toPicker(r as DbRow, 'community')));
       } catch (err) {
+        if (myKey !== requestKey.current) return;
         setError(err instanceof Error ? err.message : 'Failed to load characters.');
       }
     };
-    void fetchAll();
+    void fetchInitial();
   }, [open]);
 
   // Reset search when re-opened so each session feels fresh.
@@ -130,13 +166,89 @@ export function CharacterPickerModal(props: Props) {
     if (open) setSearch('');
   }, [open]);
 
+  /**
+   * Load the next page of My Characters (browse mode). Called by the
+   * IntersectionObserver below when the sentinel scrolls into view.
+   * Guards against concurrent calls + stale modal sessions.
+   */
+  const loadMoreMine = useCallback(async () => {
+    if (!open || isSearching || loadingMoreMine || !hasMoreMine || !mineRows) return;
+    setLoadingMoreMine(true);
+    const myKey = requestKey.current;
+    const start = mineRows.length;
+    const supabase = createClient();
+    try {
+      const { data, error } = await supabase
+        .from('character_library')
+        .select('id, name, animated_preview_url, reference_image_url, is_favorite, updated_at')
+        .order('is_favorite', { ascending: false })
+        .order('updated_at', { ascending: false })
+        .range(start, start + MINE_PAGE_SIZE - 1);
+      if (myKey !== requestKey.current) return;
+      if (error) throw error;
+      const page = (data ?? []).map((r) => toPicker(r as DbRow, 'mine'));
+      setMineRows((prev) => (prev ? [...prev, ...page] : page));
+      setHasMoreMine(page.length === MINE_PAGE_SIZE);
+    } catch (err) {
+      if (myKey !== requestKey.current) return;
+      console.warn('Load more mine failed:', err);
+      setHasMoreMine(false);
+    } finally {
+      if (myKey === requestKey.current) setLoadingMoreMine(false);
+    }
+  }, [open, isSearching, loadingMoreMine, hasMoreMine, mineRows]);
+
+  /**
+   * Server-side search. Client-side filter on a paginated list misses
+   * characters that haven't been loaded yet — for a kid with 400+
+   * characters that produces phantom "no results" failures. Debounce
+   * keystrokes so we issue one query per pause, not one per character.
+   */
+  useEffect(() => {
+    if (!open) return;
+    if (!isSearching) {
+      setSearchRows(null);
+      return;
+    }
+    const q = search.trim();
+    const myKey = requestKey.current;
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      const supabase = createClient();
+      try {
+        const { data, error } = await supabase
+          .from('character_library')
+          .select('id, name, animated_preview_url, reference_image_url, is_favorite, updated_at')
+          .ilike('name', `%${q}%`)
+          .order('is_favorite', { ascending: false })
+          .order('updated_at', { ascending: false })
+          .limit(SEARCH_RESULT_LIMIT);
+        if (myKey !== requestKey.current) return;
+        if (error) throw error;
+        setSearchRows((data ?? []).map((r) => toPicker(r as DbRow, 'mine')));
+      } catch (err) {
+        if (myKey !== requestKey.current) return;
+        console.warn('Search failed:', err);
+        setSearchRows([]);
+      } finally {
+        if (myKey === requestKey.current) setSearching(false);
+      }
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [open, isSearching, search]);
+
   const filtered = useMemo(() => {
-    const rows = tab === 'mine' ? mineRows : commRows;
-    if (!rows) return null;
-    const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => r.name.toLowerCase().includes(q));
-  }, [tab, mineRows, commRows, search]);
+    if (tab === 'community') {
+      // Community is short, no pagination — client-side filter is fine.
+      if (!commRows) return null;
+      const q = search.trim().toLowerCase();
+      if (!q) return commRows;
+      return commRows.filter((r) => r.name.toLowerCase().includes(q));
+    }
+    // 'mine': either search-mode results (server-filtered) or paginated browse.
+    if (isSearching) return searchRows; // null = still loading
+    return mineRows;
+  }, [tab, mineRows, commRows, searchRows, isSearching, search]);
 
   const onCardClick = useCallback(
     (character: PickerCharacter) => {
@@ -229,21 +341,44 @@ export function CharacterPickerModal(props: Props) {
           ) : filtered.length === 0 ? (
             <PickerEmpty tab={tab} hasSearch={!!search.trim()} />
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {filtered.map((c) => (
-                <PickerCard
-                  key={c.id}
-                  character={c}
-                  mode={props.mode}
-                  selected={
-                    props.mode === 'multi' ? props.selectedIds.has(c.id) : false
-                  }
-                  alreadyAdded={(props.alreadyAddedIds ?? []).includes(c.id)}
-                  ctaLabel={props.itemCtaLabel}
-                  onClick={() => onCardClick(c)}
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {filtered.map((c) => (
+                  <PickerCard
+                    key={c.id}
+                    character={c}
+                    mode={props.mode}
+                    selected={
+                      props.mode === 'multi' ? props.selectedIds.has(c.id) : false
+                    }
+                    alreadyAdded={(props.alreadyAddedIds ?? []).includes(c.id)}
+                    ctaLabel={props.itemCtaLabel}
+                    onClick={() => onCardClick(c)}
+                  />
+                ))}
+              </div>
+              {/* Infinite-scroll sentinel — only in browse-mode (no
+                  search) on the My tab, only when more rows exist. */}
+              {tab === 'mine' && !isSearching && hasMoreMine && (
+                <InfiniteScrollSentinel
+                  onIntersect={loadMoreMine}
+                  loading={loadingMoreMine}
                 />
-              ))}
-            </div>
+              )}
+              {/* Search status copy keeps the kid oriented when results
+                  are capped or are still loading. */}
+              {tab === 'mine' && isSearching && filtered && (
+                <p className="text-center text-xs text-gray-500 mt-4">
+                  {searching
+                    ? 'Searching…'
+                    : `Showing ${filtered.length} match${filtered.length === 1 ? '' : 'es'}${
+                        filtered.length === SEARCH_RESULT_LIMIT
+                          ? ` (capped — try a more specific search)`
+                          : ''
+                      }`}
+                </p>
+              )}
+            </>
           )}
         </div>
 
@@ -340,6 +475,62 @@ function PickerCard({
           {label}
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Tiny div that triggers a callback when it scrolls into view. We use it
+ * as the bottom marker of the grid so the next page of My Characters
+ * loads automatically before the kid reaches the actual end. rootMargin
+ * pre-loads roughly one viewport before the sentinel is visible, so the
+ * jump between pages feels seamless rather than spinning-then-content.
+ *
+ * Why a component instead of inline useEffect: keeps the observer
+ * lifecycle scoped to a mounted/unmounted element. The sentinel is
+ * conditionally rendered (search hides it), and unmount cleanly
+ * disposes the observer.
+ */
+function InfiniteScrollSentinel({
+  onIntersect,
+  loading,
+}: {
+  onIntersect: () => void;
+  loading: boolean;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  // Keep the latest callback in a ref so we don't re-create the observer
+  // every time the parent rerenders (which happens on every scroll-tick
+  // in some browsers).
+  const cb = useRef(onIntersect);
+  cb.current = onIntersect;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) cb.current();
+      },
+      { rootMargin: '300px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="py-6 flex items-center justify-center">
+      {loading ? (
+        <div
+          className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"
+          role="status"
+          aria-label="Loading more characters"
+        />
+      ) : (
+        // Invisible spacer when not loading — sentinel still measurable
+        // by the observer but no visual noise at the bottom of the list.
+        <span aria-hidden className="block h-0" />
+      )}
     </div>
   );
 }
