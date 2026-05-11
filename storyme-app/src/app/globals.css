@@ -64,6 +64,18 @@
   src: url('/fonts/ComicNeue-BoldItalic.ttf') format('truetype');
 }
 
+/* Fredoka One — friendly rounded display font used for story card
+   titles on the community feed. The TTF has been in /public/fonts/
+   for a while but was never wired up; this @font-face makes it
+   reachable from CSS by family name. */
+@font-face {
+  font-family: 'Fredoka One';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/FredokaOne-Regular.ttf') format('truetype');
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

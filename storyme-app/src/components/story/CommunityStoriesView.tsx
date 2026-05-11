@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { StoryCard, type StoryCardData } from '@/components/story/StoryCard';
 import FeaturedStoriesCarousel from '@/components/story/FeaturedStoriesCarousel';
+import ChapterStoriesRow from '@/components/story/ChapterStoriesRow';
 import type { StoryTag } from '@/lib/types/story';
 
 interface PublicStory extends StoryCardData {
@@ -212,78 +213,21 @@ export default function CommunityStoriesView() {
     searchInput.trim() === '';
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* Page Header with Search */}
-      <div className="mb-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-1">
-              Community Stories
-            </h1>
-            <p className="text-gray-600">
-              Discover amazing stories created by kids and families around the world!
-            </p>
-          </div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      {/* Header: title on its own row, then filters + search + sort in
+          a single combined row below. The "Discover amazing stories…"
+          tagline came out — kids don't read landing copy and parents
+          don't either. */}
+      <div className="mb-3">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+          Community Stories
+        </h1>
 
-          {/* Search and Sort - Same row as title */}
-          <div className="flex items-center gap-3 w-full sm:w-auto flex-shrink-0">
-            <div className="relative flex-1 sm:w-64">
-              <svg
-                aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search by title or author name…"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setSearchQuery(searchInput);
-                    setCurrentPage(1);
-                  }
-                }}
-                className="w-full pl-9 pr-3 py-2 border border-gray-400 rounded-lg text-sm bg-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <label htmlFor="story-sort" className="text-sm text-gray-600 whitespace-nowrap">
-                Sort by:
-              </label>
-              <div className="relative">
-                <select
-                  id="story-sort"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'popular' | 'recent')}
-                  className="appearance-none pl-3 pr-8 py-2 border border-gray-400 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
-                >
-                  <option value="recent">Most Recent</option>
-                  <option value="popular">Most Popular</option>
-                </select>
-                <svg
-                  aria-hidden="true"
-                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tag Filters */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 flex-wrap">
+        {/* Filters + Search + Sort — single line on desktop (wraps on
+            phone). flex-wrap keeps the chips honest when there are
+            many filters, and the search/sort cluster sticks to the
+            right at md+. */}
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-gray-600">Filter by:</span>
           <button
             onClick={() => {
@@ -358,12 +302,72 @@ export default function CommunityStoriesView() {
               Clear All
             </button>
           )}
+
+          {/* Search + Sort — pushed to the right end of the filter row
+              so on desktop they share a line with the filter chips.
+              ml-auto floats the cluster right; wraps to the next line
+              with the chips on narrow screens. */}
+          <div className="flex items-center gap-2 ml-auto">
+            <div className="relative w-48 sm:w-56">
+              <svg
+                aria-hidden="true"
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setSearchQuery(searchInput);
+                    setCurrentPage(1);
+                  }
+                }}
+                className="w-full pl-8 pr-2.5 py-1.5 border border-gray-300 rounded-md text-sm bg-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div className="relative">
+              <select
+                id="story-sort"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'popular' | 'recent')}
+                aria-label="Sort stories"
+                className="appearance-none pl-2.5 pr-7 py-1.5 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+              >
+                <option value="recent">Newest</option>
+                <option value="popular">Popular</option>
+              </select>
+              <svg
+                aria-hidden="true"
+                className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Featured Stories Carousel — only on All Stories with no search */}
       {showFeaturedCarousel && (
         <FeaturedStoriesCarousel onStoryClick={handleStoryClick} />
+      )}
+
+      {/* Chapter Stories row — same visibility gate as Featured so it
+          disappears the moment the kid starts searching or filtering.
+          Surfaces chapter_book projects + picture books tagged
+          'chapterbook' that would otherwise get lost in the main grid. */}
+      {showFeaturedCarousel && (
+        <ChapterStoriesRow onStoryClick={handleStoryClick} />
       )}
 
       {/* Loading State */}
@@ -398,7 +402,7 @@ export default function CommunityStoriesView() {
       {!loading && !error && stories.length > 0 && (
         <div>
           {showFeaturedCarousel && (
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4 mt-2">
+            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-3">
               Newest Stories
             </h2>
           )}

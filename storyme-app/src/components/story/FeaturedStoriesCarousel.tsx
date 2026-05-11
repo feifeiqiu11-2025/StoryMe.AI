@@ -86,7 +86,7 @@ export default function FeaturedStoriesCarousel({ onStoryClick }: FeaturedStorie
 
   if (loading) {
     return (
-      <section aria-label="Featured stories" className="mb-8">
+      <section aria-label="Featured stories" className="mb-6">
         <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4">Featured Stories</h2>
         <div className="flex gap-4 overflow-hidden">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -111,14 +111,14 @@ export default function FeaturedStoriesCarousel({ onStoryClick }: FeaturedStorie
   return (
     <section
       aria-label="Featured stories"
-      className="mb-10"
+      className="mb-6"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
       onTouchStart={() => setPaused(true)}
     >
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Featured Stories</h2>
         <div className="flex items-center gap-2">
           <button

@@ -113,10 +113,22 @@ export function StoryCard({
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all transform hover:-translate-y-1 cursor-pointer"
+      // flex column lets the action footer (myStories variant) pin to
+      // the bottom via mt-auto. CSS Grid stretches each card to its
+      // row's tallest sibling automatically, so we don't need h-full
+      // here (h-full was over-stretching the lone chapter-book card
+      // inside its horizontal-scroll row, leaving a tall white gap
+      // between cover and title).
+      className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all transform hover:-translate-y-1 cursor-pointer flex flex-col"
     >
-      {/* Cover Image - Square aspect ratio for better space usage */}
-      <div className="relative aspect-square bg-gradient-to-br from-blue-100 to-purple-100">
+      {/* Cover Image — square frame, regardless of source aspect ratio.
+          overflow-hidden on the wrapper itself defends against portrait/
+          landscape source images stretching the wrapper past aspect-square
+          (which can happen in flex contexts where aspect-ratio yields to
+          larger content). The chapter-book cover is portrait 1020×1479
+          due to the html2canvas snapshot pipeline; without overflow
+          clipping here, those covers blow the card out vertically. */}
+      <div className="relative aspect-square bg-gradient-to-br from-blue-100 to-purple-100 overflow-hidden">
         {coverImage ? (
           <img
             src={coverImage}
@@ -180,18 +192,12 @@ export function StoryCard({
           </div>
         )}
 
-        {/* Chapter-book badge alone (no privacy badge shown) */}
-        {!showPrivacyBadge && isChapterBook && (
-          <div className="absolute top-2 left-2">
-            <span
-              className="w-7 h-7 flex items-center justify-center rounded-full bg-purple-600 text-white text-base shadow-md ring-2 ring-white/40"
-              title="Chapter Book"
-              aria-label="Chapter Book"
-            >
-              📖
-            </span>
-          </div>
-        )}
+        {/* The standalone chapter-book badge (shown on community cards
+            when there's no privacy badge stack) was removed because
+            chapter books now live in their own labeled "Chapter Stories"
+            row on community pages. The badge stays in myStories where
+            it stacks under the privacy pill — still useful there as
+            management context. */}
 
         {/* Top Right - Featured Star (icon only — no label so cover art stays visible) */}
         {showFeaturedBadge && story.featured && (
@@ -250,54 +256,54 @@ export function StoryCard({
         )}
       </div>
 
-      {/* Story Info — community variant uses fixed height so the grid stays aligned */}
+      {/* Story Info — community variant is compact (cover-dominant browse
+          card; description + tags belong on the detail page, not the
+          tile). MyStories variant stays richer because the owner needs
+          tags + action buttons inline. */}
       <div
-        className={`p-4 flex flex-col ${
-          variant === 'community' ? 'h-[180px]' : ''
+        // Community: fixed-height compact box (no action row, so a
+        // fixed clamp keeps the grid tidy).
+        // MyStories: flex-1 lets the info box claim all remaining
+        // vertical space inside the card, so the action footer below
+        // can be pinned to the bottom via mt-auto.
+        className={`flex flex-col ${
+          variant === 'community' ? 'px-3 py-2.5 h-[72px]' : 'p-4 flex-1'
         }`}
       >
-        {/* Title */}
-        <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1 line-clamp-2">
+        {/* Title — Comic Neue (rounded, kid-friendly script) at bold
+            weight on community variant. It's the same font kids can
+            pick from the chapter-book editor's "Comic" style, and it
+            reads warmer than Geist sans for a children's-content feed.
+            MyStories keeps bold Geist because the owner is scanning
+            their own library more like a list than a storefront. */}
+        <h3
+          className={`text-gray-900 leading-tight ${
+            variant === 'community'
+              ? 'text-base font-bold line-clamp-1'
+              : 'text-lg font-bold mb-1 line-clamp-2'
+          }`}
+          style={
+            variant === 'community'
+              ? { fontFamily: "'Comic Neue', 'Comic Sans MS', cursive" }
+              : undefined
+          }
+        >
           {story.title}
         </h3>
 
-        {/* Meta Info (Scene Count + Date for My Stories) */}
-        {(showSceneCount || showDate) && (
-          <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
-            {showSceneCount && story.sceneCount && (
-              <>
-                <span>{story.sceneCount} scenes</span>
-                {showDate && formattedDate && <span>•</span>}
-              </>
-            )}
-            {showDate && formattedDate && <span>{formattedDate}</span>}
-          </div>
+        {/* Meta Info — date only on My Stories. Scene count was removed
+            because (a) it didn't apply to chapter books (which have
+            pages, not scenes) and (b) the count was occasionally stale
+            relative to the actual project state. Date is enough context. */}
+        {showDate && formattedDate && (
+          <div className="text-xs text-gray-500 mb-2">{formattedDate}</div>
         )}
 
-        {/* Tags row — single line, reserved height (community) so cards align even when empty */}
-        {variant === 'community' ? (
-          <div className="flex items-center gap-1 mb-2 h-6 overflow-hidden">
-            {story.tags && story.tags.length > 0 && (
-              <>
-                <div className="flex flex-nowrap gap-1 overflow-hidden flex-1 min-w-0">
-                  {story.tags.slice(0, 3).map(tag => (
-                    <span
-                      key={tag.id}
-                      className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0"
-                    >
-                      {tag.name}
-                    </span>
-                  ))}
-                </div>
-                {story.tags.length > 3 && (
-                  <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs flex-shrink-0">
-                    +{story.tags.length - 3}
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-        ) : (
+        {/* Tags row — myStories only. The community variant drops tags
+            entirely; they were eating space for information that the
+            kid almost never read on a browse card. Tags still appear
+            on the detail page. */}
+        {variant === 'myStories' &&
           ((story.tags && story.tags.length > 0) || tagEditor) && (
             <div className="flex flex-wrap items-center gap-1 mb-2">
               {(onRemoveTag ? story.tags : story.tags?.slice(0, 3))?.map(tag => (
@@ -326,27 +332,35 @@ export function StoryCard({
               )}
               {tagEditor}
             </div>
-          )
-        )}
+          )}
 
-        {/* Description */}
-        {story.description && (
-          <p className="text-gray-600 text-sm mb-2 line-clamp-2">
-            {story.description}
-          </p>
-        )}
+        {/* Description removed across both variants — browse cards
+            shouldn't carry paragraph copy. The full description lives
+            on the detail page where the kid clicks to read more. */}
 
-        {/* Author Info (Community Stories) — anchored to bottom of fixed-height info box */}
+        {/* Author Info (Community Stories) — Comic Neue too so the
+            byline matches the title's family. Regular weight keeps it
+            subtle below the bolder title. */}
         {showAuthor && story.authorName && (
-          <p className="text-xs text-gray-500 italic truncate mt-auto">
+          <p
+            className="text-xs text-gray-500 truncate mt-0.5"
+            style={
+              variant === 'community'
+                ? { fontFamily: "'Comic Neue', 'Comic Sans MS', cursive" }
+                : undefined
+            }
+          >
             by {story.authorName}
             {story.authorAge && `, age ${story.authorAge}`}
           </p>
         )}
 
-        {/* Action Buttons (My Stories only) */}
+        {/* Action Buttons (My Stories only) — mt-auto pins the footer
+            to the bottom of the info box, so it sits at a consistent
+            vertical position across cards even when title/date/tags
+            above it have different heights. */}
         {variant === 'myStories' && (onPrivacyToggle || onShareLink || onDelete || adminActions) && (
-          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+          <div className="flex items-center gap-2 mt-auto pt-3 border-t border-gray-100">
             {isDraft ? (
               /* Draft: Show "Continue Editing" label instead of privacy toggle */
               <span className="flex-1 text-xs font-medium text-amber-600">

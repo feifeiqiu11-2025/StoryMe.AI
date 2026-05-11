@@ -18,6 +18,11 @@ export async function GET(request: NextRequest) {
     const featured = searchParams.get('featured') === 'true';
     const featuredOnly = searchParams.get('featuredOnly') === 'true';
     const featuredWithBackfill = searchParams.get('featuredWithBackfill') === 'true';
+    // Chapter-stories-only mode: returns chapter books + picture books
+    // explicitly tagged "chapterbook" (kids think of multi-chapter
+    // picture-book series as chapter books even though the project_type
+    // is different). Powers the Chapter Stories row on the community feed.
+    const chapterStoriesOnly = searchParams.get('chapterStoriesOnly') === 'true';
     const sortBy = searchParams.get('sortBy') || 'recent'; // 'popular' or 'recent'
     const tagSlugs = searchParams.get('tags')?.split(',').filter(Boolean) || [];
     const search = searchParams.get('search') || '';
@@ -275,6 +280,158 @@ export async function GET(request: NextRequest) {
         currentPage: 1,
         totalPages: 1,
         offset: 0,
+        limit,
+      }, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      });
+    }
+
+    // Step 1.6: Chapter-stories-only mode — used by the Chapter Stories
+    // row on the community feed. Returns the union of:
+    //   (a) real chapter_book projects
+    //   (b) picture_book projects tagged with story_tags.slug = 'chapterbook'
+    // Sorted by published_at desc, paginated via offset/limit so the row
+    // can lazy-load 6 at a time as the kid scrolls right.
+    //
+    // The merge happens in-memory rather than via Supabase .or() across
+    // a join because that syntax is fragile. Both source lists are small
+    // (only public + completed projects), so a merge + sort + slice is
+    // fine here. Revisit if either side grows past ~500 rows.
+    if (chapterStoriesOnly) {
+      const selectFields = `
+        id, project_type, title, description, visibility, featured, view_count, like_count, share_count,
+        published_at, created_at, author_name, author_age, cover_image_url,
+        scenes (id, scene_number, description, caption, generated_images (id, image_url)),
+        project_tags (tag_id, story_tags (id, name, slug, icon, category, parent_id, is_leaf, display_order))
+      `;
+
+      // Branch (a): real chapter books.
+      const chapterBooksQuery = supabase
+        .from('projects')
+        .select(selectFields)
+        .eq('visibility', 'public')
+        .eq('status', 'completed')
+        .eq('project_type', 'chapter_book')
+        .order('published_at', { ascending: false });
+
+      // Branch (b): picture books with a "chapter book" tag. Resolve
+      // the tag ids first, then look up project_ids in project_tags,
+      // then fetch those projects. Could be done with a single join
+      // but Supabase's JOIN+filter chain is touchy — two cheap queries
+      // are more robust.
+      //
+      // We match any slug like 'chapter%book%' (case-insensitive) so
+      // that user-created custom tag slugs (e.g. 'custom-chapterbook',
+      // 'chapter-book', 'chapterbook') all flow through. If your DB
+      // grows ambiguous chapter-like tags, tighten this filter.
+      let taggedPictureBooks: any[] = [];
+      const { data: chapterTagRows, error: chapterTagErr } = await supabase
+        .from('story_tags')
+        .select('id, slug')
+        .ilike('slug', '%chapter%book%');
+
+      if (chapterTagErr) {
+        console.warn('Chapter tag lookup failed:', chapterTagErr);
+      } else if (chapterTagRows && chapterTagRows.length > 0) {
+        const chapterTagIds = chapterTagRows.map((t) => t.id);
+        const { data: ptRows, error: ptErr } = await supabase
+          .from('project_tags')
+          .select('project_id')
+          .in('tag_id', chapterTagIds);
+        if (ptErr) {
+          console.warn('Chapter tag project lookup failed:', ptErr);
+        } else if (ptRows && ptRows.length > 0) {
+          const projectIds = ptRows.map((r) => r.project_id);
+          const { data: tagged, error: taggedErr } = await supabase
+            .from('projects')
+            .select(selectFields)
+            .eq('visibility', 'public')
+            .eq('status', 'completed')
+            .eq('project_type', 'picture_book')
+            .in('id', projectIds)
+            .order('published_at', { ascending: false });
+          if (taggedErr) {
+            console.warn('Tagged picture-books fetch failed:', taggedErr);
+          } else if (tagged) {
+            taggedPictureBooks = tagged;
+          }
+        }
+      }
+
+      const { data: chapterBooks, error: chapterErr } = await chapterBooksQuery;
+      if (chapterErr) {
+        console.error('Chapter books fetch failed:', chapterErr);
+        return NextResponse.json(
+          { error: 'Failed to fetch chapter stories' },
+          { status: 500 }
+        );
+      }
+
+      // Merge + dedupe by id (a project could be both — we'd show it
+      // once). Sort by published_at desc; null-published_at rows fall
+      // to the bottom by created_at as a tiebreaker.
+      const byId = new Map<string, any>();
+      for (const row of [...(chapterBooks ?? []), ...taggedPictureBooks]) {
+        if (!byId.has(row.id)) byId.set(row.id, row);
+      }
+      const merged = Array.from(byId.values()).sort((a, b) => {
+        const ap = a.published_at ? Date.parse(a.published_at) : 0;
+        const bp = b.published_at ? Date.parse(b.published_at) : 0;
+        if (ap !== bp) return bp - ap;
+        const ac = a.created_at ? Date.parse(a.created_at) : 0;
+        const bc = b.created_at ? Date.parse(b.created_at) : 0;
+        return bc - ac;
+      });
+
+      const totalCount = merged.length;
+      const page = merged.slice(offset, offset + limit);
+
+      const formatted = page.map((project: any) => ({
+        id: project.id,
+        projectType: project.project_type,
+        title: project.title,
+        description: project.description,
+        visibility: project.visibility,
+        featured: project.featured,
+        viewCount: project.view_count,
+        likeCount: project.like_count,
+        shareCount: project.share_count,
+        publishedAt: project.published_at,
+        createdAt: project.created_at,
+        authorName: project.author_name,
+        authorAge: project.author_age,
+        coverImageUrl: project.cover_image_url,
+        scenes: project.scenes?.map((scene: any) => ({
+          id: scene.id,
+          sceneNumber: scene.scene_number,
+          description: scene.description,
+          caption: scene.caption,
+          imageUrl: scene.generated_images?.[0]?.image_url || null,
+        })) || [],
+        tags: project.project_tags?.map((pt: any) => ({
+          id: pt.story_tags.id,
+          name: pt.story_tags.name,
+          slug: pt.story_tags.slug,
+          icon: pt.story_tags.icon,
+          category: pt.story_tags.category,
+          parentId: pt.story_tags.parent_id,
+          isLeaf: pt.story_tags.is_leaf ?? true,
+          displayOrder: pt.story_tags.display_order,
+        })) || [],
+      }));
+
+      return NextResponse.json({
+        success: true,
+        stories: formatted,
+        totalCount,
+        currentPage: Math.floor(offset / limit) + 1,
+        totalPages: Math.max(1, Math.ceil(totalCount / limit)),
+        offset,
         limit,
       }, {
         headers: {
