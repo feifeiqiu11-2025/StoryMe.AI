@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { docToPages } from '@/lib/chapter-book/docToPages';
 
 /**
  * POST /api/projects/[id]/publish-kids-app
@@ -66,126 +67,168 @@ export async function POST(
       );
     }
 
-    // 5. Validate project has all required content
-    const { data: scenes, error: scenesError } = await supabase
-      .from('scenes')
-      .select('id, scene_number')
-      .eq('project_id', projectId)
-      .order('scene_number', { ascending: true });
+    // 5. Validate project has the right content for its type. Validation
+    // diverges by project_type — picture books require scenes + images
+    // + audio + (optional) quiz audio; chapter books just need pages.
+    //
+    // Variables we set in both branches and reuse downstream for the
+    // publication metadata:
+    //   - sceneOrPageCount: number of pages/scenes in the book
+    //   - hasQuiz, quizQuestions: only ever true/populated for picture
+    //     books today (chapter books don't have quizzes yet)
+    const isChapterBook = project.project_type === 'chapter_book';
+    let sceneOrPageCount = 0;
+    type QuizQuestionRow = {
+      id: string;
+      question_order: number;
+      question: string;
+      option_a: string;
+      option_b: string;
+      option_c: string;
+      option_d: string;
+      correct_answer: string | null;
+      explanation: string | null;
+    };
+    let quizQuestions: QuizQuestionRow[] = [];
+    let hasQuiz = false;
 
-    if (scenesError || !scenes || scenes.length === 0) {
-      return NextResponse.json(
-        { error: 'Project has no scenes' },
-        { status: 400 }
-      );
-    }
-
-    const sceneIds = scenes.map(s => s.id);
-
-    // 6. Verify all scenes have images
-    const { data: images, error: imagesError } = await supabase
-      .from('generated_images')
-      .select('scene_id')
-      .in('scene_id', sceneIds);
-
-    if (imagesError) {
-      return NextResponse.json({ error: 'Error checking images' }, { status: 500 });
-    }
-
-    const scenesWithImages = new Set(images?.map(i => i.scene_id) || []);
-    const missingImages = scenes.filter(s => !scenesWithImages.has(s.id));
-
-    if (missingImages.length > 0) {
-      return NextResponse.json(
-        {
-          error: 'Some scenes are missing images',
-          missingScenes: missingImages.map(s => s.scene_number),
-          message: `Please generate images for scene(s): ${missingImages.map(s => s.scene_number).join(', ')}`
-        },
-        { status: 400 }
-      );
-    }
-
-    // 7. Verify all scenes have audio
-    const { data: audioFiles, error: audioError } = await supabase
-      .from('story_audio_pages')
-      .select('scene_id')
-      .in('scene_id', sceneIds)
-      .not('audio_url', 'is', null);
-
-    if (audioError) {
-      return NextResponse.json({ error: 'Error checking audio' }, { status: 500 });
-    }
-
-    const scenesWithAudio = new Set(audioFiles?.map(a => a.scene_id) || []);
-    const missingAudio = scenes.filter(s => !scenesWithAudio.has(s.id));
-
-    if (missingAudio.length > 0) {
-      return NextResponse.json(
-        {
-          error: 'Some scenes are missing audio',
-          missingScenes: missingAudio.map(s => s.scene_number),
-          message: `Please generate audio for scene(s): ${missingAudio.map(s => s.scene_number).join(', ')}`
-        },
-        { status: 400 }
-      );
-    }
-
-    // 7a. Fetch quiz questions (optional - story might not have quiz)
-    const { data: quizQuestions, error: quizError } = await supabase
-      .from('quiz_questions')
-      .select('id, question_order, question, option_a, option_b, option_c, option_d, correct_answer, explanation')
-      .eq('project_id', projectId)
-      .order('question_order', { ascending: true });
-
-    if (quizError) {
-      console.error('Error fetching quiz questions:', quizError);
-      // Don't fail publish if quiz fetch fails - quiz is optional
-    }
-
-    const hasQuiz = quizQuestions && quizQuestions.length > 0;
-
-    // 7b. If story has quiz, verify quiz audio exists
-    if (hasQuiz) {
-      const quizQuestionIds = quizQuestions.map(q => q.id);
-
-      // Check for quiz transition audio
-      const { data: quizTransitionAudio } = await supabase
-        .from('story_audio_pages')
-        .select('id, audio_url')
+    if (isChapterBook) {
+      // Chapter-book path: validate the doc has at least one page. Audio
+      // is OPTIONAL — chapter books support silent reading on the kids
+      // app while narration is being built out. The kids app must
+      // gracefully handle pages where audio is null.
+      const pages = docToPages(project.canvas_state ?? null);
+      if (pages.length === 0) {
+        return NextResponse.json(
+          { error: 'Chapter book has no content yet — write at least one page before publishing.' },
+          { status: 400 }
+        );
+      }
+      sceneOrPageCount = pages.length;
+      console.log(`📖 Chapter book validation passed: ${pages.length} page(s)`);
+    } else {
+      // Picture-book path — existing validation.
+      const { data: scenes, error: scenesError } = await supabase
+        .from('scenes')
+        .select('id, scene_number')
         .eq('project_id', projectId)
-        .eq('page_type', 'quiz_transition')
-        .not('audio_url', 'is', null)
-        .maybeSingle();
+        .order('scene_number', { ascending: true });
 
-      // Check for quiz question audio
-      const { data: quizQuestionAudio } = await supabase
-        .from('story_audio_pages')
-        .select('quiz_question_id, audio_url')
-        .in('quiz_question_id', quizQuestionIds)
-        .eq('page_type', 'quiz_question')
-        .not('audio_url', 'is', null);
+      if (scenesError || !scenes || scenes.length === 0) {
+        return NextResponse.json(
+          { error: 'Project has no scenes' },
+          { status: 400 }
+        );
+      }
 
-      const questionsWithAudio = new Set(quizQuestionAudio?.map(a => a.quiz_question_id) || []);
-      const missingQuizAudio = quizQuestions.filter(q => !questionsWithAudio.has(q.id));
+      const sceneIds = scenes.map((s) => s.id);
 
-      if (!quizTransitionAudio || missingQuizAudio.length > 0) {
+      // 6. Verify all scenes have images
+      const { data: images, error: imagesError } = await supabase
+        .from('generated_images')
+        .select('scene_id')
+        .in('scene_id', sceneIds);
+
+      if (imagesError) {
+        return NextResponse.json({ error: 'Error checking images' }, { status: 500 });
+      }
+
+      const scenesWithImages = new Set(images?.map((i) => i.scene_id) || []);
+      const missingImages = scenes.filter((s) => !scenesWithImages.has(s.id));
+
+      if (missingImages.length > 0) {
         return NextResponse.json(
           {
-            error: 'Quiz is missing audio',
-            details: {
-              hasTransitionAudio: !!quizTransitionAudio,
-              totalQuizQuestions: quizQuestions.length,
-              questionsWithAudio: questionsWithAudio.size,
-              missingAudioForQuestions: missingQuizAudio.map(q => q.question_order),
-            },
-            message: 'Please generate audio for the story. The quiz needs audio narration for all questions and the transition.'
+            error: 'Some scenes are missing images',
+            missingScenes: missingImages.map((s) => s.scene_number),
+            message: `Please generate images for scene(s): ${missingImages.map((s) => s.scene_number).join(', ')}`,
           },
           { status: 400 }
         );
       }
 
-      console.log(`✅ Quiz audio verified: transition + ${quizQuestions.length} questions`);
+      // 7. Verify all scenes have audio
+      const { data: audioFiles, error: audioError } = await supabase
+        .from('story_audio_pages')
+        .select('scene_id')
+        .in('scene_id', sceneIds)
+        .not('audio_url', 'is', null);
+
+      if (audioError) {
+        return NextResponse.json({ error: 'Error checking audio' }, { status: 500 });
+      }
+
+      const scenesWithAudio = new Set(audioFiles?.map((a) => a.scene_id) || []);
+      const missingAudio = scenes.filter((s) => !scenesWithAudio.has(s.id));
+
+      if (missingAudio.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'Some scenes are missing audio',
+            missingScenes: missingAudio.map((s) => s.scene_number),
+            message: `Please generate audio for scene(s): ${missingAudio.map((s) => s.scene_number).join(', ')}`,
+          },
+          { status: 400 }
+        );
+      }
+
+      // 7a. Fetch quiz questions (optional - story might not have quiz)
+      const { data: quizQuestionsData, error: quizError } = await supabase
+        .from('quiz_questions')
+        .select('id, question_order, question, option_a, option_b, option_c, option_d, correct_answer, explanation')
+        .eq('project_id', projectId)
+        .order('question_order', { ascending: true });
+
+      if (quizError) {
+        console.error('Error fetching quiz questions:', quizError);
+        // Don't fail publish if quiz fetch fails - quiz is optional
+      }
+
+      quizQuestions = (quizQuestionsData as QuizQuestionRow[] | null) ?? [];
+      hasQuiz = quizQuestions.length > 0;
+
+      // 7b. If story has quiz, verify quiz audio exists
+      if (hasQuiz) {
+        const quizQuestionIds = quizQuestions.map((q) => q.id);
+
+        const { data: quizTransitionAudio } = await supabase
+          .from('story_audio_pages')
+          .select('id, audio_url')
+          .eq('project_id', projectId)
+          .eq('page_type', 'quiz_transition')
+          .not('audio_url', 'is', null)
+          .maybeSingle();
+
+        const { data: quizQuestionAudio } = await supabase
+          .from('story_audio_pages')
+          .select('quiz_question_id, audio_url')
+          .in('quiz_question_id', quizQuestionIds)
+          .eq('page_type', 'quiz_question')
+          .not('audio_url', 'is', null);
+
+        const questionsWithAudio = new Set(quizQuestionAudio?.map((a) => a.quiz_question_id) || []);
+        const missingQuizAudio = quizQuestions.filter((q) => !questionsWithAudio.has(q.id));
+
+        if (!quizTransitionAudio || missingQuizAudio.length > 0) {
+          return NextResponse.json(
+            {
+              error: 'Quiz is missing audio',
+              details: {
+                hasTransitionAudio: !!quizTransitionAudio,
+                totalQuizQuestions: quizQuestions.length,
+                questionsWithAudio: questionsWithAudio.size,
+                missingAudioForQuestions: missingQuizAudio.map((q) => q.question_order),
+              },
+              message: 'Please generate audio for the story. The quiz needs audio narration for all questions and the transition.',
+            },
+            { status: 400 }
+          );
+        }
+
+        console.log(`✅ Quiz audio verified: transition + ${quizQuestions.length} questions`);
+      }
+
+      sceneOrPageCount = scenes.length;
     }
 
     // 8. Create or update publication record
@@ -207,7 +250,13 @@ export async function POST(
           category: category,
           language: 'en',
           child_count: childProfileIds.length,
-          scene_count: scenes.length,
+          // scene_count kept for back-compat with existing mobile reads;
+          // for chapter books it carries the page count instead since
+          // pages are the unit of content there. Mobile can use the
+          // new project_type field below to know which one this is.
+          scene_count: sceneOrPageCount,
+          page_count: sceneOrPageCount,
+          project_type: project.project_type,
           has_quiz: hasQuiz,
           quiz_question_count: hasQuiz ? quizQuestions.length : 0,
           reading_level: project.reading_level,
