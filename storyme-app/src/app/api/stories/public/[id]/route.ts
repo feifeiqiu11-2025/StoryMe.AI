@@ -359,10 +359,23 @@ export async function GET(
       scenes: legacyScenes,
     };
 
-    return NextResponse.json({
-      success: true,
-      story: formattedStory,
-    });
+    // CDN cache so a hot story doesn't hammer the function for every
+    // kid tap. The response is identical for every viewer of a public
+    // story — perfect cache candidate. Tradeoffs documented:
+    //   - view_count under-counts up to 60s during a cache hit window
+    //     (function not invoked → no increment). Acceptable for now.
+    //   - visibility flips (public ↔ private) take up to 60s + the
+    //     stale-while-revalidate window (~5min) to propagate. Same.
+    // Error branches (404/403/500) deliberately do NOT set this header
+    // so they remain uncached.
+    return NextResponse.json(
+      { success: true, story: formattedStory },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      }
+    );
 
   } catch (error) {
     console.error('Error fetching public story:', error);
