@@ -64,14 +64,10 @@ export async function GET(
       return NextResponse.json({ error: 'Chapter book not found' }, { status: 404 });
     }
 
-    // Best-effort view count bump (don't fail the read if this errors).
-    void supabase
-      .from('projects')
-      .update({ view_count: (project.view_count ?? 0) + 1 })
-      .eq('id', id)
-      .then((res) => {
-        if (res.error) console.error('view_count bump failed:', res.error);
-      });
+    // View count is tracked separately via POST /api/stories/public/[id]
+    // with { action: 'view' }. This endpoint is read-only — no
+    // auto-increment here, so CDN caching of detail reads doesn't
+    // suppress counts. See API_MOBILE.md for the client contract.
 
     return NextResponse.json({
       success: true,

@@ -217,6 +217,29 @@ Recommended cover flow:
 
 For picture books, page 1 is scene 1 (which is NOT the cover). For chapter books, page 1 is whatever the kid wrote on page 1 of the doc (often a cover-styled page with title + author info). Mobile decides whether to show a separate cover splash always, or detect cover-like pages and skip the splash. We recommend **always show the splash** for consistency.
 
+## View tracking — REQUIRED action on story open
+
+`GET /api/stories/public/[id]` is CDN-cached (60 s) and **does NOT
+increment view_count**. Mobile must explicitly POST to the same URL
+once per actual story-open event:
+
+```
+POST /api/stories/public/[id]
+Content-Type: application/json
+
+{ "action": "view" }
+```
+
+The POST is uncached, always reaches the function, and increments
+`projects.view_count` (only for stories where `visibility === 'public'`;
+unlisted-via-token reads remain untracked by design).
+
+Fire-and-forget — don't block the reader UI on this response. Failure
+should be silently ignored.
+
+The endpoint also accepts `{ "action": "share" }` for outbound-share
+counting (existing behavior, unchanged).
+
 ## Quiz handling
 
 If `story.quiz` is non-null:

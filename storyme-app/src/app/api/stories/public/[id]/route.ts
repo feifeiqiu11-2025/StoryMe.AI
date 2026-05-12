@@ -195,15 +195,15 @@ export async function GET(
       );
     }
 
-    // Counters are frozen for unlisted (token-served) views — only public
-    // views accrue analytics so unlisted stays a clean "preview" channel.
-    const incrementViews = isPublic;
-    if (incrementViews) {
-      await supabase
-        .from('projects')
-        .update({ view_count: (project.view_count || 0) + 1 })
-        .eq('id', id);
-    }
+    // View-count is no longer auto-incremented on GET. The 60s CDN cache
+    // (Cache-Control header at the bottom of this handler) made the
+    // counter miss most opens — repeat fetches hit the CDN, function
+    // doesn't run, no increment. Clients now call POST on this same
+    // endpoint with { action: 'view' } per actual story open. POST is
+    // uncached so every view counts.
+    //
+    // Unlisted (token-served) views still don't accrue analytics —
+    // POST also gates on visibility === 'public'.
 
     // Fetch audio + quiz in parallel — both feed the unified shape.
     // We always run these; for books with no audio / no quiz they
@@ -338,7 +338,7 @@ export async function GET(
       description: project.description,
       visibility: project.visibility,
       featured: project.featured,
-      viewCount: incrementViews ? (project.view_count || 0) + 1 : (project.view_count || 0),
+      viewCount: project.view_count || 0,
       likeCount: project.like_count,
       shareCount: project.share_count,
       publishedAt: project.published_at,

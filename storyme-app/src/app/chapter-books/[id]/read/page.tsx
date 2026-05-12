@@ -79,6 +79,17 @@ export default function ChapterBookReadPage() {
           authorName: data.project.authorName ?? null,
           editorDoc: data.project.editorDoc ?? null,
         });
+        // Fire-and-forget view tracking. Owner-preview mode and unlisted
+        // token reads don't count toward analytics. Public reads explicitly
+        // POST so the counter reflects actual opens (the GET endpoint is
+        // CDN-cached, so it can't be the source of truth for view counts).
+        if (!isPreview) {
+          void fetch(`/api/stories/public/${id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'view' }),
+          }).catch(() => {});
+        }
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load.'));
   }, [id, token, isPreview]);

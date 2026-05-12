@@ -74,6 +74,16 @@ export default function PublicStoryViewer({ storyId, onClose }: PublicStoryViewe
 
       if (response.ok && data.story) {
         setStory(data.story);
+        // Fire-and-forget view tracking. Server-side GET no longer
+        // auto-increments view_count (CDN caching made it under-count
+        // most opens). Each story-open from a real reader explicitly
+        // POSTs once so the counter reflects actual reads. Failure is
+        // silently ignored — analytics drift is better than a crash.
+        void fetch(`/api/stories/public/${storyId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'view' }),
+        }).catch(() => {});
       } else {
         throw new Error(data.error || 'Failed to load story');
       }
