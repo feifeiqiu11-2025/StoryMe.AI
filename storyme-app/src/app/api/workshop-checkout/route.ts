@@ -15,6 +15,7 @@ import {
   formatWorkshopPrice,
   getPartnerSessionPricing,
   getPartnerCapacity,
+  getEnrollmentMode,
 } from '@/lib/workshops/constants';
 import { createClient } from '@supabase/supabase-js';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     // Find partner configuration
     const partner = WORKSHOP_PARTNERS.find((p) => p.id === validated.partnerId);
-    if (!partner || partner.comingSoon) {
+    if (!partner || partner.status !== 'active') {
       return NextResponse.json(
         { error: 'Invalid or unavailable partner program' },
         { status: 400 },
@@ -54,6 +55,11 @@ export async function POST(request: NextRequest) {
 
     const isSingleMode = partner.sessionMode === 'single';
     const sessionTypeForQuery = isSingleMode ? 'single' : validated.selectedSessionType;
+    // Per-session-type enrollment mode (e.g. summer SteamOji: morning='topic-pair', afternoon='series')
+    const currentEnrollmentMode = getEnrollmentMode(
+      partner,
+      sessionTypeForQuery as 'morning' | 'afternoon' | 'single',
+    );
 
     // Validate location for multi-location partners
     if (partner.locations && partner.locations.length > 0) {
@@ -72,17 +78,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validate time slot for partners with time slots
-    const hasTimeSlots = partner.locations?.some(l => (l.timeSlots?.length ?? 0) > 0);
-    if (hasTimeSlots) {
+    // Validate time slot for partners with time slots.
+    // Slot picker only applies to:
+    //   - single-mode partners with locations[].timeSlots (e.g. Avocado)
+    //   - dual-mode partners with location.timeSlots AND topic-pair enrollment (e.g. summer SteamOji morning)
+    // For dual-mode singular-location series enrollment (e.g. summer SteamOji afternoon),
+    // no slot picker is shown so no validation is required.
+    const multiLocationHasSlots = partner.locations?.some(l => (l.timeSlots?.length ?? 0) > 0) ?? false;
+    const singularLocationHasSlots = (partner.location?.timeSlots?.length ?? 0) > 0;
+    const requiresSlotForThisRequest =
+      multiLocationHasSlots ||
+      (singularLocationHasSlots && currentEnrollmentMode === 'topic-pair');
+
+    if (requiresSlotForThisRequest) {
       if (!validated.selectedTimeSlot) {
         return NextResponse.json(
           { error: 'Time slot selection is required for this partner' },
           { status: 400 },
         );
       }
-      const loc = partner.locations?.find(l => l.slug === validated.selectedLocation);
-      const validSlot = loc?.timeSlots?.find(ts => ts.slug === validated.selectedTimeSlot);
+      const multiLoc = partner.locations?.find(l => l.slug === validated.selectedLocation);
+      const slotsForRequest = multiLoc?.timeSlots || partner.location?.timeSlots;
+      const validSlot = slotsForRequest?.find(ts => ts.slug === validated.selectedTimeSlot);
       if (!validSlot) {
         return NextResponse.json(
           { error: 'Invalid time slot selected' },
@@ -106,19 +123,24 @@ export async function POST(request: NextRequest) {
     // Check spot availability before proceeding
     const supabaseAvailability = createServiceRoleClient();
 
-    // Use v3 RPC for single-mode partners (location + time slot aware);
-    // Use v1 RPC for dual-mode partners (SteamOji)
-    const useLocationRpc = isSingleMode && validated.selectedLocation;
+    // Use v3 RPC (location + time slot aware) for any registration that requires
+    // a slot. This includes single-mode partners (Avocado) and dual-mode partners
+    // with singular-location topic-pair enrollment (summer SteamOji morning).
+    // Dual-mode partners without slots fall back to v1 RPC.
+    const useLocationRpc = requiresSlotForThisRequest;
     const rpcName = useLocationRpc
       ? 'get_workshop_registration_counts_v3'
       : 'get_workshop_registration_counts';
+
+    const effectiveLocationSlug =
+      validated.selectedLocation || partner.location?.slug || null;
 
     const rpcParams: Record<string, string | null> = {
       p_partner_id: validated.partnerId,
       p_session_type: sessionTypeForQuery,
     };
     if (useLocationRpc) {
-      rpcParams.p_location = validated.selectedLocation || null;
+      rpcParams.p_location = effectiveLocationSlug;
       rpcParams.p_time_slot = validated.selectedTimeSlot || null;
     }
 
@@ -203,8 +225,8 @@ export async function POST(request: NextRequest) {
           partner_id: validated.partnerId,
           selected_workshop_ids: validated.selectedWorkshopIds,
           selected_session_type: sessionTypeForQuery,
-          is_bundle: partner.enrollmentMode === 'series',
-          location: validated.selectedLocation || null,
+          is_bundle: currentEnrollmentMode === 'series' || currentEnrollmentMode === 'topic-pair',
+          location: effectiveLocationSlug,
           time_slot: validated.selectedTimeSlot || null,
           promo_code: null,
           waiver_accepted: true,
@@ -242,13 +264,47 @@ export async function POST(request: NextRequest) {
         }
       }
     } else {
-      sessionDescription = validated.selectedSessionType === 'morning'
-        ? 'Morning Session (Ages 4–6) · 10:00–11:00 AM'
-        : 'Afternoon Session (Ages 7–9) · 1:00–3:00 PM';
+      // Dual mode — prefer per-program config over hardcoded defaults
+      const program = validated.selectedSessionType === 'morning'
+        ? partner.morningProgram
+        : partner.afternoonProgram;
+      const programName = program?.name
+        || (validated.selectedSessionType === 'morning' ? 'Morning Session' : 'Afternoon Session');
+      const programAge = program?.ageLabel
+        || (validated.selectedSessionType === 'morning' ? 'Ages 4–6' : 'Ages 7–9');
+      const programTime = program?.timeLabel
+        || (validated.selectedSessionType === 'morning' ? '10:00–11:00 AM' : '1:00–3:00 PM');
+      sessionDescription = `${programName} (${programAge}) · ${programTime}`;
+      // Append slot label for singular-location dual-mode partners (summer SteamOji morning)
+      if (validated.selectedTimeSlot && partner.location?.timeSlots) {
+        const ts = partner.location.timeSlots.find(t => t.slug === validated.selectedTimeSlot);
+        if (ts) sessionDescription += ` · ${ts.label}`;
+      }
     }
 
-    // For series enrollment, create a single line item for the full series
-    const isSeriesEnrollment = partner.enrollmentMode === 'series';
+    // Bundle into a single Stripe line item when the registration is for a
+    // series or topic-pair (both represent multi-session purchases). Individual
+    // mode creates one line item per selected session.
+    const isBundle = currentEnrollmentMode === 'series' || currentEnrollmentMode === 'topic-pair';
+    const bundleLabel = (() => {
+      if (currentEnrollmentMode === 'series') {
+        // Use program name when available; falls back to "Series 1" for Avocado
+        const programName = validated.selectedSessionType === 'morning'
+          ? partner.morningProgram?.name
+          : partner.afternoonProgram?.name;
+        return programName || 'Series 1';
+      }
+      // topic-pair: list topics covered
+      const selectedSessions = partner.sessions.filter((s) =>
+        validated.selectedWorkshopIds.includes(s.id),
+      );
+      const topicLabels = Array.from(
+        new Set(selectedSessions.map((s) => s.topicLabel || s.topicId).filter(Boolean)),
+      );
+      return topicLabels.length > 0
+        ? `Topic Pair${topicLabels.length > 1 ? 's' : ''}: ${topicLabels.join(', ')}`
+        : 'Workshop Pair';
+    })();
     const lineItems: Array<{
       price_data: {
         currency: string;
@@ -256,12 +312,12 @@ export async function POST(request: NextRequest) {
         unit_amount: number;
       };
       quantity: number;
-    }> = isSeriesEnrollment
+    }> = isBundle
       ? [{
           price_data: {
             currency: partner.pricing.currency,
             product_data: {
-              name: `${partner.name} — Series 1`,
+              name: `${partner.name} — ${bundleLabel}`,
               description: `${sessionDescription} · ${validated.selectedWorkshopIds.length} sessions`,
             },
             unit_amount: unitAmount * validated.selectedWorkshopIds.length,
@@ -351,8 +407,10 @@ export async function POST(request: NextRequest) {
       workshopCount: validated.selectedWorkshopIds.length,
       childrenCount: numberOfChildren,
       partner: validated.partnerId,
-      location: validated.selectedLocation || null,
-      enrollmentMode: partner.enrollmentMode || 'individual',
+      sessionType: sessionTypeForQuery,
+      location: effectiveLocationSlug,
+      timeSlot: validated.selectedTimeSlot || null,
+      enrollmentMode: currentEnrollmentMode,
     });
 
     return NextResponse.json({

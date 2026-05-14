@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
-import { WORKSHOP_PARTNERS } from '@/lib/workshops/constants';
+import { WORKSHOP_PARTNERS, getEnrollmentMode } from '@/lib/workshops/constants';
 import type { SessionCounts } from '@/lib/workshops/types';
 
 export async function GET(request: NextRequest) {
@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     const partnerId = request.nextUrl.searchParams.get('partnerId');
     const location = request.nextUrl.searchParams.get('location');
     const timeSlot = request.nextUrl.searchParams.get('timeSlot');
+    const sessionTypeParam = request.nextUrl.searchParams.get('sessionType');
 
     if (!partnerId) {
       return NextResponse.json(
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     // Validate partner exists and is active
     const partner = WORKSHOP_PARTNERS.find((p) => p.id === partnerId);
-    if (!partner || partner.comingSoon) {
+    if (!partner || partner.status !== 'active') {
       return NextResponse.json(
         { success: false, error: 'Invalid or unavailable partner' },
         { status: 404 },
@@ -65,12 +66,29 @@ export async function GET(request: NextRequest) {
         }
       }
     } else {
-      // Dual-session partner (e.g., SteamOji) — fetch morning + afternoon in parallel
+      // Dual-mode partner — use v3 (slot-aware) when the partner has singular
+      // location.timeSlots AND the queried session type uses topic-pair enrollment
+      // (e.g. summer SteamOji morning). Otherwise fall back to v1.
+      const singularLocationHasSlots = (partner.location?.timeSlots?.length ?? 0) > 0;
+      const morningMode = getEnrollmentMode(partner, 'morning');
+      const morningUsesSlots = singularLocationHasSlots && morningMode === 'topic-pair';
+
+      // If the caller passes sessionType=morning AND a time_slot AND morning uses slots,
+      // use v3 for morning. We always fall back to v1 for afternoon (no slots in current model).
+      const morningRpc = morningUsesSlots && sessionTypeParam === 'morning' && timeSlot
+        ? supabase.rpc('get_workshop_registration_counts_v3', {
+            p_partner_id: partnerId,
+            p_session_type: 'morning',
+            p_location: location || partner.location?.slug || null,
+            p_time_slot: timeSlot,
+          })
+        : supabase.rpc('get_workshop_registration_counts', {
+            p_partner_id: partnerId,
+            p_session_type: 'morning',
+          });
+
       const [morningResult, afternoonResult] = await Promise.all([
-        supabase.rpc('get_workshop_registration_counts', {
-          p_partner_id: partnerId,
-          p_session_type: 'morning',
-        }),
+        morningRpc,
         supabase.rpc('get_workshop_registration_counts', {
           p_partner_id: partnerId,
           p_session_type: 'afternoon',

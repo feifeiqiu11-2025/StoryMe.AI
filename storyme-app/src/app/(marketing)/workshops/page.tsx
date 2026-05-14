@@ -5,13 +5,14 @@
  * KindleWood Learning Lab — in-person creative workshops
  * with partner organizations.
  *
- * Zigzag layout inspired by VideoShowcase component pattern.
- * Scroll-reveal animations using Intersection Observer.
+ * Renders partners with status === 'active' or 'coming_soon'.
+ * Completed partners are preserved in constants for reporting but
+ * not shown publicly.
  *
  * Layout branches:
- * - comingSoon: teaser with logos + contact CTA
+ * - coming_soon: teaser with logos + contact CTA
  * - single-mode (Avocado): partnership intro, video, curriculum grid, outcomes
- * - dual-mode (SteamOji): morning/afternoon slideshows with register CTAs
+ * - dual-mode (SteamOji Summer): morning/afternoon slideshows with register CTAs
  */
 
 'use client';
@@ -132,9 +133,9 @@ export default function WorkshopsPage() {
           </div>
         </Reveal>
 
-        {WORKSHOP_PARTNERS.map((partner) => (
+        {WORKSHOP_PARTNERS.filter((p) => p.status !== 'completed').map((partner) => (
           <div key={partner.id} id={partner.slug} className="scroll-mt-24 border-t border-gray-200 pt-12 first:border-t-0 first:pt-0">
-            {partner.comingSoon ? (
+            {partner.status === 'coming_soon' ? (
               /* ═══════════════════════════════════════════ */
               /* Coming Soon Partner — Teaser Layout        */
               /* ═══════════════════════════════════════════ */
@@ -445,36 +446,18 @@ export default function WorkshopsPage() {
                     <div className="w-full md:w-[55%]">
                       <div className="flex items-center gap-3 mb-2">
                         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                          Creative Explorers Workshop
+                          KindleWood × {partner.partnerName} Creative Storyteller Series
                         </h2>
                         <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-medium whitespace-nowrap">
                           Now Enrolling
                         </span>
                       </div>
-                      <p className="text-lg text-amber-800 font-medium mb-4">
-                        Where every story builds a thinker, and every adventure grows a creator.
-                      </p>
                       <p className="text-gray-700 leading-relaxed mb-4">
-                        <span className="font-semibold">KindleWood Studio</span> is excited to partner with{' '}
-                        <span className="font-semibold">{partner.partnerName}</span>{' '}
-                        to bring a 5-week themed storytelling series to kids in our
-                        community. Each week explores a new theme — Nature, Habits &amp;
-                        Health, Innovation, Value &amp; Choices, and Community — through
-                        structured creativity that builds real skills: executive function,
-                        literacy, and creative problem-solving.
+                        {partner.description}
                       </p>
                       {partner.partnerUrl ? (
                         <a
                           href={partner.partnerUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-4 inline-flex items-center text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                        >
-                          Learn more about {partner.partnerName} →
-                        </a>
-                      ) : partner.partnerDescription ? (
-                        <a
-                          href="https://www.steamoji.com/"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="mt-4 inline-flex items-center text-blue-600 hover:text-blue-700 font-medium transition-colors"
@@ -491,33 +474,39 @@ export default function WorkshopsPage() {
                   {/* Left: Morning session info */}
                   <Reveal className="w-full md:w-[55%]">
                     <h3 className="text-2xl font-bold text-gray-900 mb-1">
-                      Sunday Morning Session (Ages 4–6)
+                      Morning Session ({partner.morningProgram?.ageLabel || 'Ages 4–6'})
                     </h3>
                     <p className="text-amber-800 font-medium mb-3">
-                      Indoor: Little Crafter and Storyteller
+                      {partner.morningProgram?.shortDescription || 'Story Spark → Craft → Story Build → Share'}
                     </p>
                     <p className="text-gray-500 mb-3">
-                      10:00 – 11:00 AM · ~60 min · 5 Sundays
+                      Sundays · {partner.morningProgram?.timeLabel || '10:00 – 11:00 AM'} · {partner.sessions.length} sessions
                     </p>
                     <p className="text-gray-700 leading-relaxed mb-4">
-                      Each session follows a clear creative arc: Story Spark → Craft
-                      Creation → Guided Story Build → Share Circle. Children build
-                      sequencing skills, emotional labeling, verbal confidence, and
-                      early narrative logic — all through playful, structured creativity.
+                      Each session follows a clear creative arc: Drama Play → Story
+                      Spark → Craft Creation → Guided Story Build → Share Circle. Kids
+                      explore real-world topics through guided drama play, then build
+                      story characters and structured narratives — producing a printed
+                      storybook every other session.
                     </p>
-                    <ul className="space-y-2 mb-6">
-                      {partner.sessions[0]?.morning.highlights.map(
-                        (highlight, i) => (
-                          <li
-                            key={i}
-                            className="flex items-start gap-2 text-gray-600"
-                          >
-                            <span className="text-amber-500 mt-0.5">•</span>
-                            {highlight}
-                          </li>
-                        ),
-                      )}
-                    </ul>
+                    {/* What Your Child Takes Home — moved under description, above Register */}
+                    <div className="mb-5">
+                      <p className="text-sm font-semibold text-amber-900 mb-2">What Your Child Takes Home</p>
+                      <ul className="space-y-1.5 text-sm text-gray-600">
+                        <li className="flex items-start gap-2">
+                          <span className="text-amber-500 mt-0.5">✦</span>
+                          A printed storybook for each topic completed
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-amber-500 mt-0.5">✦</span>
+                          Original story characters &amp; crafts from drama play
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-amber-500 mt-0.5">✦</span>
+                          Stronger narrative thinking and confident self-expression
+                        </li>
+                      </ul>
+                    </div>
                     {/* Register CTA + Pricing */}
                     <div className="flex items-center gap-4 flex-wrap">
                       <Link
@@ -527,9 +516,11 @@ export default function WorkshopsPage() {
                         Register
                       </Link>
                       <div>
-                        <span className="line-through text-gray-400 text-lg">
-                          {formatWorkshopPrice(partner.pricing.morning.originalPrice)}
-                        </span>
+                        {partner.pricing.morning.originalPrice > partner.pricing.morning.promoPrice && (
+                          <span className="line-through text-gray-400 text-lg">
+                            {formatWorkshopPrice(partner.pricing.morning.originalPrice)}
+                          </span>
+                        )}
                         <span className="text-2xl font-bold text-amber-700 ml-2">
                           {formatWorkshopPrice(partner.pricing.morning.promoPrice)}
                         </span>
@@ -584,73 +575,63 @@ export default function WorkshopsPage() {
                         ))}
                       </div>
                     </div>
-                    <div className="rounded-xl p-4">
-                      <p className="text-sm font-semibold text-amber-900 mb-2">What Your Child Takes Home</p>
-                      <ul className="space-y-1.5 text-sm text-gray-600">
-                        <li className="flex items-start gap-2">
-                          <span className="text-amber-500 mt-0.5">✦</span>
-                          A completed craft &amp; structured story each week
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="text-amber-500 mt-0.5">✦</span>
-                          Their own story characters &amp; storybook
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="text-amber-500 mt-0.5">✦</span>
-                          Growing confidence in creative expression
-                        </li>
-                      </ul>
-                    </div>
                   </Reveal>
                 </div>
 
-                {/* Row 3: Afternoon Session (image left, text right) — reversed */}
+                {/* Row 3: Afternoon Session (image left, text right) — reversed, indigo accent */}
                 <div className="flex flex-col md:flex-row-reverse gap-8 md:gap-12 items-center mb-8">
                   {/* Right visually: Afternoon session info */}
                   <Reveal className="w-full md:w-[55%]">
                     <h3 className="text-2xl font-bold text-gray-900 mb-1">
-                      Sunday Afternoon Session (Ages 7–9)
+                      Afternoon Session ({partner.afternoonProgram?.ageLabel || 'Ages 7–12'})
                     </h3>
-                    <p className="text-amber-800 font-medium mb-3">
-                      Nature Explorer + Creativity Lab
+                    <p className="text-indigo-700 font-medium mb-3">
+                      {partner.afternoonProgram?.shortDescription || 'Chapter book project'}
                     </p>
                     <p className="text-gray-500 mb-3">
-                      1:00 – 3:00 PM · 120 min · 5 Sundays
+                      Sundays · {partner.afternoonProgram?.timeLabel || '1:00 – 3:00 PM'} · {partner.sessions.length}-session series
                     </p>
                     <p className="text-gray-700 leading-relaxed mb-4">
-                      A two-part session: 45-minute family nature exploration
-                      (Bridle Trails / Highland Park) followed by an indoor
-                      Creativity Lab. Children observe real-world systems, identify
-                      problems, then map stories and build solutions — developing
-                      executive function, cognitive flexibility, and creative
-                      problem-solving.
+                      A thoughtful and immersive writing journey for older kids
+                      ready to deepen their storytelling and create their own
+                      original chapter book. Children develop story structure,
+                      character, voice, visual storytelling, and book design across
+                      four guided sessions — blending creativity, sensory exploration,
+                      discussion, and real-world connections.
                     </p>
-                    <ul className="space-y-2 mb-6">
-                      {partner.sessions[0]?.afternoon?.highlights.map(
-                        (highlight, i) => (
-                          <li
-                            key={i}
-                            className="flex items-start gap-2 text-gray-600"
-                          >
-                            <span className="text-green-500 mt-0.5">•</span>
-                            {highlight}
-                          </li>
-                        ),
-                      )}
-                    </ul>
+                    {/* What Your Child Takes Home — moved under description, above Register */}
+                    <div className="mb-5">
+                      <p className="text-sm font-semibold text-indigo-900 mb-2">What Your Child Takes Home</p>
+                      <ul className="space-y-1.5 text-sm text-gray-600">
+                        <li className="flex items-start gap-2">
+                          <span className="text-indigo-500 mt-0.5">✦</span>
+                          Their own printed chapter book with cover and illustrations
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-indigo-500 mt-0.5">✦</span>
+                          Story structure, character development, and writing skills
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-indigo-500 mt-0.5">✦</span>
+                          Real-world connections — observation, imagination, and critical thinking
+                        </li>
+                      </ul>
+                    </div>
                     {/* Register CTA + Pricing */}
                     <div className="flex items-center gap-4 flex-wrap">
                       <Link
                         href={`/workshops/register?session=afternoon&partner=${partner.slug}`}
-                        className="inline-block px-6 py-3 bg-green-700 hover:bg-green-800 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg"
+                        className="inline-block px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg"
                       >
                         Register
                       </Link>
                       <div>
-                        <span className="line-through text-gray-400 text-lg">
-                          {formatWorkshopPrice(partner.pricing.afternoon.originalPrice)}
-                        </span>
-                        <span className="text-2xl font-bold text-green-700 ml-2">
+                        {partner.pricing.afternoon.originalPrice > partner.pricing.afternoon.promoPrice && (
+                          <span className="line-through text-gray-400 text-lg">
+                            {formatWorkshopPrice(partner.pricing.afternoon.originalPrice)}
+                          </span>
+                        )}
+                        <span className="text-2xl font-bold text-indigo-700 ml-2">
                           {formatWorkshopPrice(partner.pricing.afternoon.promoPrice)}
                         </span>
                         <span className="text-gray-500 text-sm ml-1">/ session</span>
@@ -702,23 +683,6 @@ export default function WorkshopsPage() {
                           />
                         ))}
                       </div>
-                    </div>
-                    <div className="rounded-xl p-4">
-                      <p className="text-sm font-semibold text-green-900 mb-2">What Your Child Takes Home</p>
-                      <ul className="space-y-1.5 text-sm text-gray-600">
-                        <li className="flex items-start gap-2">
-                          <span className="text-green-500 mt-0.5">✦</span>
-                          Storybooks, comics, blueprints &amp; maker projects
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="text-green-500 mt-0.5">✦</span>
-                          Real problem-solving and design-thinking skills
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="text-green-500 mt-0.5">✦</span>
-                          A portfolio of creative work across 5 themes
-                        </li>
-                      </ul>
                     </div>
                   </Reveal>
                 </div>

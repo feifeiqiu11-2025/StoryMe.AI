@@ -25,6 +25,8 @@ import {
   getPartnerCapacity,
   getEnrollableSessions,
   getSessionDates,
+  getEnrollmentMode,
+  getTopicPairs,
 } from '@/lib/workshops/constants';
 import type { WorkshopAvailabilityData } from '@/lib/workshops/types';
 
@@ -51,15 +53,21 @@ export default function WorkshopRegistrationForm({
 
   // Mode detection
   const isSingleMode = partner.sessionMode === 'single';
-  const isSeriesMode = partner.enrollmentMode === 'series';
   const hasLocations = (partner.locations?.length ?? 0) > 0;
+
+  // Per-program (session-type-aware) enrollment mode lookup. Falls back to
+  // partner.enrollmentMode when no per-program override is set. Used for
+  // dual-mode partners where morning/afternoon can use different enrollment
+  // patterns (e.g. summer SteamOji: morning=topic-pair, afternoon=series).
+  // For single-mode partners, always returns the partner-level mode.
+  const partnerLevelEnrollmentMode = partner.enrollmentMode || 'individual';
 
   // For series mode, get all enrollable sessions across both series.
   // Past-week filtering (based on selected location's date schedule) happens
   // separately so the UI can render past sessions with line-through.
-  const enrollableSessions = isSeriesMode ? getEnrollableSessions(partner) : [];
-  const series1Sessions = enrollableSessions.filter((s) => s.series === 1);
-  const series2Sessions = enrollableSessions.filter((s) => s.series === 2);
+  const allEnrollableSessions = getEnrollableSessions(partner);
+  const series1Sessions = allEnrollableSessions.filter((s) => s.series === 1);
+  const series2Sessions = allEnrollableSessions.filter((s) => s.series === 2);
 
   const {
     register,
@@ -111,14 +119,33 @@ export default function WorkshopRegistrationForm({
   const selectedLocation = watch('selectedLocation');
   const selectedTimeSlot = watch('selectedTimeSlot');
 
+  // Session-type-aware enrollment mode lookup (e.g. summer SteamOji has
+  // morning=topic-pair, afternoon=series). Falls back to partner.enrollmentMode.
+  const sessionTypeForMode: 'morning' | 'afternoon' | 'single' = isSingleMode
+    ? 'single'
+    : (selectedSessionType as 'morning' | 'afternoon') || 'morning';
+  const currentEnrollmentMode = getEnrollmentMode(partner, sessionTypeForMode);
+  const isSeriesMode = currentEnrollmentMode === 'series';
+  const isTopicPairMode = currentEnrollmentMode === 'topic-pair';
+  void partnerLevelEnrollmentMode; // referenced for clarity above
+
+  // Sessions considered for series UI (filters out enrollable: false rows).
+  const enrollableSessions = isSeriesMode ? allEnrollableSessions : [];
+
+  // Topic pairs for topic-pair enrollment mode (e.g. summer SteamOji morning).
+  const topicPairs = isTopicPairMode ? getTopicPairs(partner) : [];
+
   // Auto-select all FUTURE enrollable sessions for series mode.
   // Recomputed when the selected location changes (Bellevue/Kirkland have
   // different date schedules so future-vs-past differs by location).
   useEffect(() => {
     if (!isSeriesMode || enrollableSessions.length === 0) return;
-    const loc = selectedLocation
-      ? partner.locations?.find((l) => l.slug === selectedLocation)
-      : undefined;
+    // For Avocado (multi-location), use the location's date schedule. For
+    // single-location dual-mode partners (summer SteamOji afternoon), use
+    // partner.location.
+    const loc = hasLocations
+      ? (selectedLocation ? partner.locations?.find((l) => l.slug === selectedLocation) : undefined)
+      : partner.location;
     const dates = loc ? getSessionDates(loc, enrollableSessions.length) : null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -144,18 +171,41 @@ export default function WorkshopRegistrationForm({
     }
   }, [isSingleMode, setValue]);
 
-  // Refetch availability when location or time slot changes (Avocado only)
-  const hasTimeSlots = partner.locations?.some(l => (l.timeSlots?.length ?? 0) > 0) ?? false;
+  // Time slots are available if either multi-location (Avocado) or singular
+  // location (SteamOji summer) defines them.
+  const hasTimeSlots =
+    (partner.locations?.some(l => (l.timeSlots?.length ?? 0) > 0) ?? false) ||
+    ((partner.location?.timeSlots?.length ?? 0) > 0);
+
+  // For dual-mode partners with singular-location slots, we currently only
+  // surface the slot picker for topic-pair enrollment (i.e. summer SteamOji
+  // morning). Series-mode afternoon does not use a slot picker.
+  const showSlotPicker = hasTimeSlots && (
+    hasLocations // multi-location series (Avocado) always shows the picker
+      ? !!selectedLocation
+      : isTopicPairMode // singular-location dual (SteamOji summer) only for topic-pair
+  );
+
+  // Effective location slug — multi-location partners use selection; singular
+  // location partners use partner.location.slug.
+  const effectiveLocationSlug = hasLocations
+    ? selectedLocation
+    : partner.location?.slug;
+
+  // Refetch availability when location or time slot changes (slot-aware partners)
   useEffect(() => {
-    if (!hasTimeSlots || !selectedLocation) return;
+    if (!hasTimeSlots) return;
     // Only refetch when a time slot is selected
     if (!selectedTimeSlot) {
       setLocalAvailability(null);
       return;
     }
+    if (!effectiveLocationSlug) return;
     let cancelled = false;
     setLocalAvailabilityLoading(true);
-    fetch(`/api/v1/workshops/availability?partnerId=${partner.id}&location=${selectedLocation}&timeSlot=${selectedTimeSlot}`)
+    const url = `/api/v1/workshops/availability?partnerId=${partner.id}&location=${effectiveLocationSlug}&timeSlot=${selectedTimeSlot}` +
+      (isSingleMode ? '' : `&sessionType=${sessionTypeForMode}`);
+    fetch(url)
       .then(res => res.json())
       .then(json => {
         if (!cancelled && json.success && json.data) {
@@ -165,7 +215,7 @@ export default function WorkshopRegistrationForm({
       .catch(() => {})
       .finally(() => { if (!cancelled) setLocalAvailabilityLoading(false); });
     return () => { cancelled = true; };
-  }, [hasTimeSlots, partner.id, selectedLocation, selectedTimeSlot]);
+  }, [hasTimeSlots, partner.id, effectiveLocationSlug, selectedTimeSlot, isSingleMode, sessionTypeForMode]);
 
   // Pricing — use helpers for correct mode handling
   const sessionPricing = getPartnerSessionPricing(
@@ -270,13 +320,13 @@ export default function WorkshopRegistrationForm({
         }
       }
 
-      // SteamOji requires Code of Conduct
-      if (partner.id === 'steamoji' && !data.codeOfConductAccepted) {
+      // SteamOji requires Code of Conduct (any program: spring 'steamoji', summer 'steamoji-summer-2026', etc.)
+      if (partner.id.startsWith('steamoji') && !data.codeOfConductAccepted) {
         throw new Error('You must accept the Code of Conduct to register for SteamOji workshops.');
       }
 
-      // Partners with time slots require a time slot selection
-      if (hasTimeSlots && !data.selectedTimeSlot) {
+      // Slot picker partners require a time slot selection
+      if (showSlotPicker && !data.selectedTimeSlot) {
         throw new Error('Please select a time slot before registering.');
       }
 
@@ -321,9 +371,9 @@ export default function WorkshopRegistrationForm({
 
   const sessionTimeLabel =
     sessionTypeKey === 'morning'
-      ? '10:00 – 11:00 AM (1 hr)'
+      ? partner.morningProgram?.timeLabel || '10:00 – 11:00 AM (1 hr)'
       : sessionTypeKey === 'afternoon'
-        ? '1:00 – 3:00 PM (2 hrs)'
+        ? partner.afternoonProgram?.timeLabel || '1:00 – 3:00 PM (2 hrs)'
         : '';
 
   return (
@@ -478,16 +528,18 @@ export default function WorkshopRegistrationForm({
                 Morning Session
               </span>
               <span className="text-sm text-gray-500 mt-1">
-                Ages 4–6 · 10:00 – 11:00 AM · 1 hour
+                {partner.morningProgram?.ageLabel || 'Ages 4–6'} · {partner.morningProgram?.timeLabel || '10:00 – 11:00 AM · 1 hour'}
               </span>
               <div className="mt-2">
                 {hasDiscount && selectedSessionType === 'morning' ? (
                   <span className="text-sm">
-                    <span className="line-through text-gray-400 mr-1">
-                      {formatWorkshopPrice(
-                        partner.pricing.morning.originalPrice,
-                      )}
-                    </span>
+                    {partner.pricing.morning.originalPrice > partner.pricing.morning.promoPrice && (
+                      <span className="line-through text-gray-400 mr-1">
+                        {formatWorkshopPrice(
+                          partner.pricing.morning.originalPrice,
+                        )}
+                      </span>
+                    )}
                     <span className="font-bold text-amber-700">
                       {formatWorkshopPrice(partner.pricing.morning.promoPrice)}
                     </span>
@@ -495,11 +547,13 @@ export default function WorkshopRegistrationForm({
                   </span>
                 ) : (
                   <span className="text-sm">
-                    <span className="line-through text-gray-400 mr-1">
-                      {formatWorkshopPrice(
-                        partner.pricing.morning.originalPrice,
-                      )}
-                    </span>
+                    {partner.pricing.morning.originalPrice > partner.pricing.morning.promoPrice && (
+                      <span className="line-through text-gray-400 mr-1">
+                        {formatWorkshopPrice(
+                          partner.pricing.morning.originalPrice,
+                        )}
+                      </span>
+                    )}
                     <span className="font-semibold text-gray-700">
                       {formatWorkshopPrice(partner.pricing.morning.promoPrice)}
                     </span>
@@ -508,15 +562,15 @@ export default function WorkshopRegistrationForm({
                 )}
               </div>
               <p className="text-sm text-gray-500 mt-2">
-                Turn imagination into story characters, make physical books,
-                show &amp; tell
+                {partner.morningProgram?.shortDescription ||
+                  'Turn imagination into story characters, make physical books, show & tell'}
               </p>
             </label>
 
             <label
               className={`relative flex flex-col p-4 border-2 rounded-xl cursor-pointer transition-all ${
                 selectedSessionType === 'afternoon'
-                  ? 'border-green-500 bg-green-50'
+                  ? 'border-indigo-500 bg-indigo-50'
                   : 'border-gray-200 hover:border-gray-300'
               }`}
             >
@@ -530,17 +584,19 @@ export default function WorkshopRegistrationForm({
                 Afternoon Session
               </span>
               <span className="text-sm text-gray-500 mt-1">
-                Ages 7–9 · 1:00 – 3:00 PM · 2 hours
+                {partner.afternoonProgram?.ageLabel || 'Ages 7–12'} · {partner.afternoonProgram?.timeLabel || '1:00 – 3:00 PM · 2 hours'}
               </span>
               <div className="mt-2">
                 {hasDiscount && selectedSessionType === 'afternoon' ? (
                   <span className="text-sm">
-                    <span className="line-through text-gray-400 mr-1">
-                      {formatWorkshopPrice(
-                        partner.pricing.afternoon.originalPrice,
-                      )}
-                    </span>
-                    <span className="font-bold text-green-700">
+                    {partner.pricing.afternoon.originalPrice > partner.pricing.afternoon.promoPrice && (
+                      <span className="line-through text-gray-400 mr-1">
+                        {formatWorkshopPrice(
+                          partner.pricing.afternoon.originalPrice,
+                        )}
+                      </span>
+                    )}
+                    <span className="font-bold text-indigo-700">
                       {formatWorkshopPrice(
                         partner.pricing.afternoon.promoPrice,
                       )}
@@ -549,11 +605,13 @@ export default function WorkshopRegistrationForm({
                   </span>
                 ) : (
                   <span className="text-sm">
-                    <span className="line-through text-gray-400 mr-1">
-                      {formatWorkshopPrice(
-                        partner.pricing.afternoon.originalPrice,
-                      )}
-                    </span>
+                    {partner.pricing.afternoon.originalPrice > partner.pricing.afternoon.promoPrice && (
+                      <span className="line-through text-gray-400 mr-1">
+                        {formatWorkshopPrice(
+                          partner.pricing.afternoon.originalPrice,
+                        )}
+                      </span>
+                    )}
                     <span className="font-semibold text-gray-700">
                       {formatWorkshopPrice(
                         partner.pricing.afternoon.promoPrice,
@@ -564,7 +622,8 @@ export default function WorkshopRegistrationForm({
                 )}
               </div>
               <p className="text-sm text-gray-500 mt-2">
-                Nature exploration, creative thinking &amp; story making
+                {partner.afternoonProgram?.shortDescription ||
+                  'Nature exploration, creative thinking & story making'}
               </p>
             </label>
           </div>
@@ -613,28 +672,191 @@ export default function WorkshopRegistrationForm({
                   )}
                 </span>
               </div>
-              {sessionTypeKey === 'afternoon' && (
-                <p className="mt-2 ml-6 text-gray-600">
-                  Afternoon sessions begin with ~45 min of outdoor exploration at
-                  Bridle Trails, then transition to the indoor studio at{' '}
-                  {partner.location.name} for the creativity lab. Parents provide
-                  transportation between locations.
-                </p>
-              )}
+            </div>
+          )}
+
+          {/* Slot picker — singular-location partners (e.g. summer SteamOji morning).
+              Multi-location series partners (Avocado) have their slot picker
+              inside the location block above. */}
+          {showSlotPicker && !hasLocations && partner.location?.timeSlots && (
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                2. Choose Your Time Slot
+              </h3>
+              <p className="mb-3 text-sm text-amber-700">
+                Pick one time slot — your child attends every session at the slot you choose.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {partner.location.timeSlots.map((ts) => (
+                  <label
+                    key={ts.slug}
+                    className={`relative flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                      selectedTimeSlot === ts.slug
+                        ? 'border-amber-500 bg-amber-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      value={ts.slug}
+                      {...register('selectedTimeSlot')}
+                      className="sr-only peer"
+                    />
+                    <div className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                      selectedTimeSlot === ts.slug
+                        ? 'bg-amber-500 border-amber-500'
+                        : 'border-gray-300 bg-white'
+                    }`}>
+                      {selectedTimeSlot === ts.slug && (
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-base font-semibold text-gray-900">
+                      {ts.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
           )}
         </div>
       ) : null}
 
       {/* ═══════════════════════════════════════════════════════ */}
-      {/* Section — Series: Series Overview / Dual: Workshop Dates */}
+      {/* Section — Topic Pair / Series Overview / Workshop Dates */}
       {/* ═══════════════════════════════════════════════════════ */}
-      {isSeriesMode ? (
+      {isTopicPairMode ? (
+        /* --- TOPIC PAIR MODE: One card per topic, each topic = a pair of sessions --- */
+        (() => {
+          const loc = hasLocations
+            ? (selectedLocation ? partner.locations?.find((l) => l.slug === selectedLocation) : undefined)
+            : partner.location;
+          const allDates = loc ? getSessionDates(loc, partner.sessions.length) : null;
+          const dateByIndex = (idx: number): string =>
+            allDates?.[idx]?.formatted || partner.sessions[idx]?.dateLabel || '';
+
+          const togglePair = (pairSessionIds: string[]) => {
+            const current = selectedWorkshopIds || [];
+            const allOn = pairSessionIds.every((id) => current.includes(id));
+            const next = allOn
+              ? current.filter((id) => !pairSessionIds.includes(id))
+              : Array.from(new Set([...current, ...pairSessionIds]));
+            setValue('selectedWorkshopIds', next, { shouldValidate: true });
+          };
+
+          return (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                {showSlotPicker ? '3' : '2'}. Choose Your Topic{topicPairs.length > 1 ? 's' : ''}
+              </h3>
+              <p className="mb-4 text-sm text-gray-600">
+                Each topic is sold as a 2-session pair — first session sparks the story with drama play and craft, the next session produces a printed storybook.
+              </p>
+              <div className="space-y-3">
+                {topicPairs.map((pair) => {
+                  const ids = pair.sessions.map((s) => s.id);
+                  const allOn = ids.length > 0 && ids.every((id) => selectedWorkshopIds?.includes(id));
+                  const pairPrice = pricePerSession * ids.length;
+                  const sessionsWithIdx = pair.sessions.map((s) => ({
+                    session: s,
+                    globalIdx: partner.sessions.findIndex((p) => p.id === s.id),
+                  }));
+                  // First session in the pair carries the learning-outcome description for the topic.
+                  const topicDescription = pair.sessions[0]?.themeDescription;
+                  return (
+                    <label
+                      key={pair.topicId}
+                      className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                        allOn
+                          ? 'border-amber-500 bg-amber-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={allOn}
+                        onChange={() => togglePair(ids)}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                            allOn ? 'bg-amber-600 border-amber-600' : 'border-gray-300 bg-white'
+                          }`}>
+                            {allOn && (
+                              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-900">{pair.topicLabel}</div>
+                            <div className="text-sm text-gray-500">
+                              {ids.length} sessions · 1 printed storybook
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right text-sm">
+                          <div className="font-semibold text-gray-900">
+                            {formatWorkshopPrice(pairPrice)}
+                          </div>
+                          <div className="text-xs text-gray-500">per child · pair</div>
+                        </div>
+                      </div>
+                      {topicDescription && (
+                        <p className="mt-2 ml-8 text-sm text-gray-600 leading-relaxed">
+                          {topicDescription}
+                        </p>
+                      )}
+                      <ul className="mt-3 ml-8 space-y-1 text-sm text-gray-600">
+                        {sessionsWithIdx.map(({ session, globalIdx }) => (
+                          <li key={session.id} className="flex items-center gap-2">
+                            <span className="text-amber-500">•</span>
+                            <span className="font-medium text-gray-700">
+                              {dateByIndex(globalIdx)}
+                            </span>
+                            <span className="text-gray-500">— {session.morning.title}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {errors.selectedWorkshopIds && (
+                <p className={errorClassName} role="alert">
+                  {errors.selectedWorkshopIds.message}
+                </p>
+              )}
+
+              {workshopCount > 0 && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-700">
+                      {numberOfChildren > 1
+                        ? `${numberOfChildren} children × ${workshopCount} session${workshopCount !== 1 ? 's' : ''}`
+                        : `${workshopCount} session${workshopCount !== 1 ? 's' : ''} selected`}
+                    </span>
+                    <span className="text-lg font-bold text-gray-900">
+                      {formatWorkshopPrice(totalPrice)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()
+      ) : isSeriesMode ? (
         /* --- SERIES MODE: Two enrollable series w/ past-week strikethrough --- */
         (() => {
-          const loc = selectedLocation
-            ? partner.locations?.find((l) => l.slug === selectedLocation)
-            : undefined;
+          // Multi-location partners (Avocado) use selected location's schedule;
+          // singular-location partners (summer SteamOji afternoon) use partner.location.
+          const loc = hasLocations
+            ? (selectedLocation ? partner.locations?.find((l) => l.slug === selectedLocation) : undefined)
+            : partner.location;
           const sessionDates = loc
             ? getSessionDates(loc, enrollableSessions.length)
             : null;
@@ -863,6 +1085,117 @@ export default function WorkshopRegistrationForm({
                   </div>
                 </div>
               )}
+
+              {/* Fallback: dual-mode series with no series:1/2 grouping (e.g. summer SteamOji afternoon) */}
+              {series1Sessions.length === 0 && series2Sessions.length === 0 && enrollableSessions.length > 0 && (() => {
+                const allIds = enrollableSessions.map((s) => s.id);
+                const allFutureIds = enrollableSessions
+                  .filter((_, idx) => !isPastByGlobalIdx(idx))
+                  .map((s) => s.id);
+                const allOn = allFutureIds.length > 0 && allFutureIds.every((id) => selectedWorkshopIds?.includes(id));
+                const toggleAll = () => {
+                  const current = selectedWorkshopIds || [];
+                  const next = allOn
+                    ? current.filter((id) => !allIds.includes(id))
+                    : Array.from(new Set([...current, ...allFutureIds]));
+                  setValue('selectedWorkshopIds', next, { shouldValidate: true });
+                };
+                const programName = sessionTypeKey === 'afternoon'
+                  ? partner.afternoonProgram?.name
+                  : partner.morningProgram?.name;
+                return (
+                  <div className="bg-indigo-50/60 rounded-xl p-5">
+                    <div className="flex items-center justify-between mb-3 gap-3">
+                      <label className={`flex items-start gap-3 ${allFutureIds.length === 0 ? 'opacity-60' : 'cursor-pointer'}`}>
+                        <input
+                          type="checkbox"
+                          checked={allOn}
+                          disabled={allFutureIds.length === 0}
+                          onChange={toggleAll}
+                          className="sr-only peer"
+                          aria-label="Toggle full series enrollment"
+                        />
+                        <div className={`flex-shrink-0 w-5 h-5 mt-1 rounded border-2 flex items-center justify-center transition-colors ${
+                          allFutureIds.length === 0
+                            ? 'border-gray-300 bg-gray-100'
+                            : allOn
+                            ? 'bg-indigo-600 border-indigo-600'
+                            : 'border-gray-300 bg-white'
+                        }`}>
+                          {allOn && allFutureIds.length > 0 && (
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900">
+                            {programName || 'Full Series Enrollment'}
+                          </h4>
+                          <p className="text-sm text-gray-600 mt-0.5">
+                            {enrollableSessions.length} guided sessions
+                            {allFutureIds.length > 0 && allFutureIds.length < enrollableSessions.length && (
+                              <span className="ml-1.5 text-indigo-700">
+                                · {allFutureIds.length} upcoming
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </label>
+                      <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full whitespace-nowrap">
+                        Now Enrolling
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {enrollableSessions.map((session, idx) => {
+                        const isPast = isPastByGlobalIdx(idx);
+                        const dateText = sessionDates?.[idx]?.formatted || session.dateLabel;
+                        const slot =
+                          sessionTypeKey === 'afternoon'
+                            ? session.afternoon
+                            : session.morning;
+                        const rowTitle = slot?.title || session.theme;
+                        return (
+                          <div
+                            key={session.id}
+                            className={`flex items-start gap-3 p-3 rounded-lg ${
+                              isPast ? 'bg-gray-50/60 opacity-60' : 'bg-white/70'
+                            }`}
+                          >
+                            <div
+                              className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${
+                                isPast
+                                  ? 'bg-gray-200 text-gray-400'
+                                  : 'bg-indigo-100 text-indigo-700'
+                              }`}
+                            >
+                              {idx + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span
+                                  className={`font-medium ${
+                                    isPast ? 'text-gray-400 line-through' : 'text-gray-900'
+                                  }`}
+                                >
+                                  {rowTitle}
+                                </span>
+                                <span
+                                  className={`text-xs font-medium ${
+                                    isPast ? 'text-gray-400 line-through' : 'text-gray-600'
+                                  }`}
+                                >
+                                  {dateText}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Combined cost block — future-only sessions */}
               <div className="mt-4 bg-amber-50/50 rounded-xl p-5">
@@ -1468,35 +1801,13 @@ export default function WorkshopRegistrationForm({
                   workshop staff of any allergies, medical conditions, or special
                   needs my child may have prior to the first session.
                 </li>
-                {!isSingleMode && (
-                  <>
-                    <li>
-                      <strong>Outdoor Exploration (Afternoon Sessions):</strong>{' '}
-                      Afternoon sessions include supervised outdoor exploration at
-                      nearby parks and nature areas. I understand my child will
-                      participate in outdoor activities and I accept risks
-                      associated with outdoor environments, including weather
-                      conditions, uneven terrain, and exposure to natural
-                      elements. I will ensure my child has appropriate clothing,
-                      footwear, and sun protection.
-                    </li>
-                    <li>
-                      <strong>Parent Transportation:</strong> I understand that
-                      transportation between the indoor studio location and
-                      outdoor exploration sites during afternoon sessions is the
-                      parent/guardian&apos;s responsibility. I will provide my
-                      own vehicle and ensure my child is properly secured in an
-                      age-appropriate car seat or seatbelt during transit.
-                    </li>
-                  </>
-                )}
               </ul>
             </div>
           )}
         </div>
 
-        {/* Code of Conduct — SteamOji only (required) */}
-        {partner.id === 'steamoji' && (
+        {/* Code of Conduct — all SteamOji programs (spring, summer, future) require it */}
+        {partner.id.startsWith('steamoji') && (
           <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
             <label className="flex items-start gap-3 cursor-pointer">
               <input

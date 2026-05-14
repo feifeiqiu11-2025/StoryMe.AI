@@ -22,6 +22,19 @@ export interface WorkshopSession {
   afternoon?: WorkshopSessionSlot; // Optional for single-session partners
   series?: number; // 1, 2, etc. — for grouping sessions into enrollable series
   enrollable?: boolean; // defaults true; false = preview-only (not selectable)
+  topicId?: string; // groups sessions into topic-pair enrollment units (e.g. 'time-management')
+  topicLabel?: string; // human-readable topic name (e.g. 'Time Management')
+}
+
+// Per-session-type program config (dual-mode partners).
+// Lets each program have its own name, age range, time label, description,
+// and enrollment mode independent of the partner-level enrollmentMode.
+export interface DualModeProgram {
+  name: string; // e.g. 'Morning Session', 'Creative Storyteller'
+  ageLabel: string; // e.g. 'Ages 4–6'
+  timeLabel: string; // e.g. '10:00 – 11:00 AM · 1 hour' or '9:45–10:45 AM or 11:00 AM–12:00 PM'
+  shortDescription: string; // shown on the session-picker card
+  enrollmentMode?: 'individual' | 'series' | 'topic-pair'; // overrides partner-level mode
 }
 
 export interface WorkshopSessionPricing {
@@ -71,10 +84,12 @@ export interface WorkshopPartner {
   description: string;
   partnerDescription: string;
   logoUrl?: string;
-  theme: 'green' | 'amber' | 'blue' | 'purple';
-  comingSoon: boolean;
+  theme: 'green' | 'amber' | 'blue' | 'purple' | 'indigo';
+  status: 'active' | 'completed' | 'coming_soon'; // active = render on /workshops + register; completed = preserved for reporting, hidden from public; coming_soon = teaser only
   sessionMode: 'single' | 'dual'; // single = one session type; dual = morning + afternoon
-  enrollmentMode?: 'individual' | 'series'; // individual = pick sessions; series = enroll in full series
+  enrollmentMode?: 'individual' | 'series' | 'topic-pair'; // partner-level default; overridden by morningProgram/afternoonProgram.enrollmentMode
+  morningProgram?: DualModeProgram; // dual-mode partner morning program config
+  afternoonProgram?: DualModeProgram; // dual-mode partner afternoon program config
   sessions: WorkshopSession[];
   pricing: WorkshopPricing;
   capacity: WorkshopCapacity;
@@ -84,6 +99,192 @@ export interface WorkshopPartner {
 }
 
 export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
+  {
+    id: 'steamoji-summer-2026',
+    slug: 'steamoji-summer-2026',
+    name: 'KindleWood × SteamOji Summer 2026',
+    partnerName: 'SteamOji',
+    tagline: 'Where stories meet drama play, and curious kids become confident creators.',
+    logoUrl: '/images/steamoji-logo.png',
+    description:
+      'A summer storytelling series that blends drama play, hands-on craft, and structured storytelling. The morning program (ages 4–6) turns kids into Time Masters and Little Entrepreneurs across 4 sessions — each topic produces a printed storybook. The afternoon Creative Writer workshop (ages 7–12) guides older kids through a 4-session original chapter book project.',
+    partnerDescription:
+      'SteamOji is a maker academy for kids ages 6–14 that equips children with hands-on STEM skills and a maker mindset to solve real-world problems. Their curriculum spans coding, robotics, engineering, 3D printing, and digital arts — everything from the screen to the workbench.',
+    theme: 'green',
+    status: 'active',
+    sessionMode: 'dual',
+    enrollmentMode: 'individual', // partner-level fallback; per-program modes override
+    morningProgram: {
+      name: 'Creative Storyteller',
+      ageLabel: 'Ages 4–6',
+      timeLabel: '9:45–10:45 AM or 11:00 AM–12:00 PM',
+      shortDescription:
+        'Drama play, story spark, craft, and a printed storybook every other session',
+      enrollmentMode: 'topic-pair',
+    },
+    afternoonProgram: {
+      name: 'Creative Writer',
+      ageLabel: 'Ages 7–12',
+      timeLabel: '1:00 – 3:00 PM · 2 hours',
+      shortDescription:
+        'Chapter Book Project — a 4-session journey through story structure, creative writing, and real-world connections',
+      enrollmentMode: 'series',
+    },
+    partnerUrl: 'https://www.steamoji.com/',
+    sessions: [
+      // 4 Sundays — each entry holds both the morning (Creative Storyteller, ages 4–6)
+      // and afternoon (Creative Writer, ages 7–11) program for that date.
+      // topicId on each session groups MORNING sessions into topic pairs for enrollment.
+      // Afternoon side uses series enrollment (whole 4-session bundle).
+      {
+        id: 'steamoji-summer-wk1',
+        dateLabel: 'Sun, May 31, 2026',
+        theme: 'Time Master',
+        topicId: 'time-management',
+        topicLabel: 'Time Master',
+        themeDescription:
+          'Kids learn how to manage time — prioritize what matters, plan ahead, and follow through — wrapped into a drama-play adventure that becomes a printed storybook.',
+        morning: {
+          time: '9:45–10:45 AM or 11:00 AM–12:00 PM',
+          ageRange: 'Ages 4–6',
+          title: 'Time Master — Story Spark & Drama Play',
+          description:
+            'Kids step into a drama-play scenario about time, then build a story spark, design a character through craft, and shape the beginning of a guided story.',
+          highlights: [
+            'Guided drama play to explore real-world time',
+            'Story spark + character craft',
+            'Beginning of a structured story plot',
+          ],
+        },
+        afternoon: {
+          time: '1:00 – 3:00 PM',
+          ageRange: 'Ages 7–12',
+          title: 'Story Structure & Character Development',
+          description:
+            'Children learn the bones of a chapter book — characters, setting, conflict — and start mapping their own multi-chapter story.',
+          highlights: [
+            'Chapter book structure & outlining',
+            'Character development workshop',
+            'Worldbuilding & setting design',
+          ],
+        },
+      },
+      {
+        id: 'steamoji-summer-wk2',
+        dateLabel: 'Sun, Jun 7, 2026',
+        theme: 'Time Master',
+        topicId: 'time-management',
+        topicLabel: 'Time Master',
+        morning: {
+          time: '9:45–10:45 AM or 11:00 AM–12:00 PM',
+          ageRange: 'Ages 4–6',
+          title: 'Time Master — Book Production & Share',
+          description:
+            'Kids complete their Time Master story, produce a physical storybook, sign it, and present it in a share circle.',
+          highlights: [
+            'Story completion + detailed illustration',
+            'Physical storybook production',
+            'Book signing & share circle',
+          ],
+        },
+        afternoon: {
+          time: '1:00 – 3:00 PM',
+          ageRange: 'Ages 7–12',
+          title: 'Creative Writing & Visual Storytelling',
+          description:
+            'Children draft chapters, find their narrative voice, and explore how illustrations and prose strengthen each other.',
+          highlights: [
+            'Chapter drafting & narrative voice',
+            'Visual storytelling techniques',
+            'Sensory description & detail craft',
+          ],
+        },
+      },
+      {
+        id: 'steamoji-summer-wk3',
+        dateLabel: 'Sun, Jun 14, 2026',
+        theme: 'Little Entrepreneur',
+        topicId: 'little-entrepreneur',
+        topicLabel: 'Little Entrepreneur',
+        themeDescription:
+          'Kids discover the basics of entrepreneurship — turning ideas into action, understanding value, planning, and sharing — through hands-on drama play that becomes a printed storybook.',
+        morning: {
+          time: '9:45–10:45 AM or 11:00 AM–12:00 PM',
+          ageRange: 'Ages 4–6',
+          title: 'Little Entrepreneur — Story Spark & Drama Play',
+          description:
+            'Kids step into a drama-play scenario as a young entrepreneur — generating an idea, understanding what makes it valuable, and planning how to share it. They craft a character and shape the beginning of a guided story.',
+          highlights: [
+            'Drama play around ideas, value & sharing',
+            'Story spark + character craft',
+            'Beginning of a structured story plot',
+          ],
+        },
+        afternoon: {
+          time: '1:00 – 3:00 PM',
+          ageRange: 'Ages 7–12',
+          title: 'Artistic Design & Book Creation',
+          description:
+            'Children design book covers, lay out interior pages, and shape the visual identity of their chapter book.',
+          highlights: [
+            'Cover design & typography',
+            'Page layout & illustration',
+            'Visual identity of the book',
+          ],
+        },
+      },
+      {
+        id: 'steamoji-summer-wk4',
+        dateLabel: 'Sun, Jun 28, 2026',
+        theme: 'Little Entrepreneur',
+        topicId: 'little-entrepreneur',
+        topicLabel: 'Little Entrepreneur',
+        morning: {
+          time: '9:45–10:45 AM or 11:00 AM–12:00 PM',
+          ageRange: 'Ages 4–6',
+          title: 'Little Entrepreneur — Book Production & Share',
+          description:
+            'Kids complete their Little Entrepreneur story, produce a physical storybook, sign it, and present it in a share circle.',
+          highlights: [
+            'Story completion + detailed illustration',
+            'Physical storybook production',
+            'Book signing & share circle',
+          ],
+        },
+        afternoon: {
+          time: '1:00 – 3:00 PM',
+          ageRange: 'Ages 7–12',
+          title: 'Real-World Connections & Showcase',
+          description:
+            'Children deepen their books with real-world connections — science, technology, observation, and reflection — then present finished chapter books in a family showcase.',
+          highlights: [
+            'Story ↔ science / tech connections',
+            'Observation, imagination & critical thinking',
+            'Family showcase of finished chapter books',
+          ],
+        },
+      },
+    ],
+    pricing: {
+      morning: { originalPrice: 4000, promoPrice: 4000 }, // $40/session — no promo strikethrough
+      afternoon: { originalPrice: 7000, promoPrice: 7000 }, // $70/session
+      currency: 'usd',
+    },
+    capacity: { morning: 8, afternoon: 8 },
+    location: {
+      slug: 'bellevue',
+      name: 'SteamOji Bellevue Store',
+      address: '14315 NE 20th Street, Suite C-E, Bellevue, WA 98007',
+      mapUrl: 'https://maps.google.com/?q=14315+NE+20th+Street+Suite+C-E+Bellevue+WA+98007',
+      dayOfWeek: 'sunday',
+      startDate: '2026-05-31',
+      skipDates: ['2026-06-21'], // Father's Day weekend
+      timeSlots: [
+        { slug: 'slot-1', label: '9:45 – 10:45 AM', startTime: '09:45', endTime: '10:45' },
+        { slug: 'slot-2', label: '11:00 AM – 12:00 PM', startTime: '11:00', endTime: '12:00' },
+      ],
+    },
+  },
   {
     id: 'steamoji',
     slug: 'steamoji',
@@ -96,9 +297,25 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
     partnerDescription:
       'SteamOji is a maker academy for kids ages 6–14 that equips children with hands-on STEM skills and a maker mindset to solve real-world problems. Their curriculum spans coding, robotics, engineering, 3D printing, and digital arts — everything from the screen to the workbench.',
     theme: 'green',
-    comingSoon: false,
+    status: 'completed',
     sessionMode: 'dual',
     enrollmentMode: 'individual',
+    morningProgram: {
+      name: 'Morning Session',
+      ageLabel: 'Ages 4–6',
+      timeLabel: '10:00 – 11:00 AM · 1 hour',
+      shortDescription:
+        'Turn imagination into story characters, make physical books, show & tell',
+      enrollmentMode: 'individual',
+    },
+    afternoonProgram: {
+      name: 'Afternoon Session',
+      ageLabel: 'Ages 7–9',
+      timeLabel: '1:00 – 3:00 PM · 2 hours',
+      shortDescription:
+        'Nature exploration, creative thinking & story making',
+      enrollmentMode: 'individual',
+    },
     partnerUrl: 'https://www.steamoji.com/',
     sessions: [
       {
@@ -272,7 +489,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
     partnerDescription:
       'Avocado Montessori Academy nurtures young learners through the Montessori philosophy of independence, hands-on discovery, and respect for each child\'s natural development. With campuses in Bellevue and Kirkland, they serve families across the Eastside.',
     theme: 'amber',
-    comingSoon: false,
+    status: 'active',
     sessionMode: 'single',
     enrollmentMode: 'series',
     partnerUrl: 'https://avocado-montessori.com/',
@@ -548,7 +765,7 @@ export const WORKSHOP_FAQS = [
   {
     question: 'What age groups are the workshops for?',
     answer:
-      'SteamOji morning sessions (Ages 4–6, 1 hour) focus on imaginative play and storytelling. Afternoon sessions (Ages 7–9, 2 hours) include nature exploration and maker projects. Avocado Montessori sessions are designed for Ages 3–6 with a Montessori-aligned approach to creative storytelling.',
+      'SteamOji Creative Storyteller (Ages 4–6, 1 hour) focuses on drama play, storytelling, and physical storybook creation. Creative Writer (Ages 7–12, 2 hours) is a chapter book project with story structure, creative writing, and real-world connections. Avocado Montessori sessions are designed for Ages 3–6 with a Montessori-aligned approach to creative storytelling.',
   },
   {
     question: 'Where do the workshops take place?',
@@ -610,6 +827,48 @@ export function getEnrollableSessions(partner: WorkshopPartner, series?: number)
     if (series !== undefined && s.series !== series) return false;
     return true;
   });
+}
+
+// Helper to get the enrollment mode for a specific session type, falling back
+// to the partner-level mode when no per-program override is set.
+export function getEnrollmentMode(
+  partner: WorkshopPartner,
+  sessionType: 'morning' | 'afternoon' | 'single',
+): 'individual' | 'series' | 'topic-pair' {
+  if (sessionType === 'morning' && partner.morningProgram?.enrollmentMode) {
+    return partner.morningProgram.enrollmentMode;
+  }
+  if (sessionType === 'afternoon' && partner.afternoonProgram?.enrollmentMode) {
+    return partner.afternoonProgram.enrollmentMode;
+  }
+  return partner.enrollmentMode || 'individual';
+}
+
+// Helper to group enrollable sessions into topic pairs (topic-pair enrollment mode).
+// Returns one entry per distinct topicId, ordered by first appearance in sessions[].
+export interface TopicPair {
+  topicId: string;
+  topicLabel: string;
+  sessions: WorkshopSession[]; // sessions belonging to this topic, in order
+}
+
+export function getTopicPairs(partner: WorkshopPartner): TopicPair[] {
+  const enrollable = getEnrollableSessions(partner);
+  const pairsById = new Map<string, TopicPair>();
+  for (const session of enrollable) {
+    if (!session.topicId) continue;
+    const existing = pairsById.get(session.topicId);
+    if (existing) {
+      existing.sessions.push(session);
+    } else {
+      pairsById.set(session.topicId, {
+        topicId: session.topicId,
+        topicLabel: session.topicLabel || session.topicId,
+        sessions: [session],
+      });
+    }
+  }
+  return Array.from(pairsById.values());
 }
 
 // Helper to compute actual session dates from a location's schedule config.

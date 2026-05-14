@@ -59,8 +59,8 @@ function RegisterPageContent() {
 
   // Find the active partner by ?partner= param, or fall back to first active
   const activePartner = partnerParam
-    ? WORKSHOP_PARTNERS.find((p) => p.slug === partnerParam && !p.comingSoon)
-    : WORKSHOP_PARTNERS.find((p) => !p.comingSoon);
+    ? WORKSHOP_PARTNERS.find((p) => p.slug === partnerParam && p.status === 'active')
+    : WORKSHOP_PARTNERS.find((p) => p.status === 'active');
 
   // Determine default session type based on partner mode
   const defaultSession: 'morning' | 'afternoon' | 'single' =
@@ -137,14 +137,14 @@ function RegisterPageContent() {
           Register for Workshop
         </h1>
         <p className="text-gray-600">
-          Register for workshop and get 2 month free Casual Creator subscription!
+          Register for workshop and get 1 month free Casual Creator subscription!
         </p>
       </div>
 
       {/* Promo Banner */}
       <div className="mb-6 text-center">
         <Link
-          href="/pricing"
+          href="/products"
           className="text-sm text-purple-600 hover:text-purple-700 underline transition-colors"
         >
           Learn about our online products →

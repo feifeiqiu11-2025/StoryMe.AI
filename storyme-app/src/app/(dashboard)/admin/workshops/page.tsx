@@ -136,8 +136,9 @@ export default function AdminWorkshopsPage() {
     );
   }
 
-  // Get active partners for filter buttons
-  const activePartners = WORKSHOP_PARTNERS.filter((p) => !p.comingSoon);
+  // Admin needs to see both active AND completed partners (for reporting on past
+  // programs). Exclude only coming_soon teasers.
+  const activePartners = WORKSHOP_PARTNERS.filter((p) => p.status !== 'coming_soon');
 
   // Get selected partner config
   const selectedPartner = partnerFilter !== 'all'
