@@ -1005,12 +1005,11 @@ export default function WorkshopRegistrationForm({
               globalStartIdx: series1Sessions.length,
             },
           ];
-          const orderedSeriesBlocks = [...seriesBlocks].sort((a, b) => {
-            const aHas = a.futureIds.length > 0;
-            const bHas = b.futureIds.length > 0;
-            if (aHas !== bHas) return aHas ? -1 : 1;
-            return a.num - b.num;
-          });
+          // Hide series with no future sessions — completed series clutter the
+          // registration UI. Admin still sees full history elsewhere.
+          const orderedSeriesBlocks = seriesBlocks
+            .filter((s) => s.futureIds.length > 0)
+            .sort((a, b) => a.num - b.num);
 
           return (
             <div>
