@@ -127,7 +127,7 @@ export default function FounderJournalPage() {
         {/* Page Title */}
         <div className="text-center mb-12">
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
-            📝 Founder's Journal
+            Founder's Journal
           </h1>
           <div className="h-1 w-24 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full mx-auto mb-4"></div>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
@@ -143,7 +143,6 @@ export default function FounderJournalPage() {
               href="#learning-is-contagious"
               className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-all py-2 px-3 rounded-lg hover:bg-white/60 cursor-pointer group"
             >
-              <span className="text-lg">💫</span>
               <span className="font-semibold underline decoration-dotted">Learning Is Contagious</span>
               <span className="text-gray-500">—</span>
               <span className="text-sm text-gray-500">Oct 27, 2025</span>
@@ -153,7 +152,6 @@ export default function FounderJournalPage() {
               href="#the-power-of-a-moms-voice"
               className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-all py-2 px-3 rounded-lg hover:bg-white/60 cursor-pointer group"
             >
-              <span className="text-lg">✨</span>
               <span className="font-semibold underline decoration-dotted">The Power of a Mom's Voice</span>
               <span className="text-gray-500">—</span>
               <span className="text-sm text-gray-500">Oct 26, 2025</span>
@@ -163,7 +161,6 @@ export default function FounderJournalPage() {
               href="#the-viral-loop-of-imagination"
               className="flex items-center gap-2 text-gray-900 hover:text-indigo-600 transition-all py-2 px-3 rounded-lg hover:bg-white/60 cursor-pointer group"
             >
-              <span className="text-lg">🌈</span>
               <span className="font-semibold underline decoration-dotted">The Viral Loop of Imagination</span>
               <span className="text-gray-500">—</span>
               <span className="text-sm text-gray-500">Oct 19, 2025</span>
@@ -177,9 +174,6 @@ export default function FounderJournalPage() {
           {/* Entry Header */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center text-2xl shadow-md border-2 border-blue-200">
-                💫
-              </div>
               <div className="flex-1">
                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
                   Learning Is Contagious
@@ -328,9 +322,6 @@ export default function FounderJournalPage() {
           {/* Entry Header */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center text-2xl shadow-md border-2 border-purple-200">
-                ✨
-              </div>
               <div className="flex-1">
                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
                   The Power of a Mom's Voice
@@ -415,9 +406,6 @@ export default function FounderJournalPage() {
           {/* Entry Header */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center text-2xl shadow-md border-2 border-purple-200">
-                🌈
-              </div>
               <div className="flex-1">
                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
                   The Viral Loop of Imagination
@@ -509,9 +497,8 @@ export default function FounderJournalPage() {
                   Want to see what sparked this moment? Check out these two dragon stories from the boys — each one reflecting their unique imagination and perspective. 🐉✨
                 </p>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <span>🐉</span>
-                <span>The Dragon Stories</span>
+              <h3 className="text-xl font-bold text-gray-900 mb-4">
+                The Dragon Stories
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {dragonStories.map((story) => (
@@ -540,47 +527,30 @@ export default function FounderJournalPage() {
         </article>
 
         {/* More Entries Coming Soon Notice */}
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-6 border border-indigo-200 mb-8 text-center">
-          <p className="text-gray-700 font-medium">
+        <div className="mb-12 text-center">
+          <p className="text-gray-700">
             More journal entries coming soon. Follow our journey as we build KindleWood together.
           </p>
         </div>
 
-        {/* Newsletter Signup (Placeholder) */}
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-xl p-8 border border-indigo-200 mb-8">
-          <div className="text-center">
-            <h3 className="text-2xl font-bold text-gray-900 mb-3">
-              Get Notified When We Publish
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Want to be the first to read new journal entries? We'll let you know when new content is available.
-            </p>
-            <div className="max-w-md mx-auto">
-              <p className="text-sm text-gray-500 italic">
-                Newsletter signup coming soon. In the meantime, follow our journey by signing up for KindleWood Studio!
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* CTA Section */}
-        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl shadow-xl p-8 text-center border border-purple-200">
+        <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Join Us on This Journey
+            Join us on this journey
           </h2>
           <p className="text-gray-700 mb-6 max-w-xl mx-auto">
-            While the journal is being prepared, start creating stories with your family today!
+            While the journal is being prepared, start creating stories with your family today.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href="/signup"
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
+              className="bg-amber-700 hover:bg-amber-800 text-white px-7 py-3 rounded-lg font-semibold transition-colors min-h-[44px] inline-flex items-center justify-center"
             >
-              🎁 Start Free Trial
+              Start Free Trial
             </Link>
             <Link
               href="/founder-letter"
-              className="bg-white text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-50 font-semibold shadow-lg hover:shadow-xl transition-all border-2 border-gray-300 transform hover:-translate-y-1"
+              className="bg-white text-gray-700 px-7 py-3 rounded-lg font-semibold transition-colors border border-gray-300 hover:border-gray-400 min-h-[44px] inline-flex items-center justify-center"
             >
               Read the Founder's Letter
             </Link>

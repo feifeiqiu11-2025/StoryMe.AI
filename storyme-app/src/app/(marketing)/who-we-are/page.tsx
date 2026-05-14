@@ -165,12 +165,12 @@ function CtaSection() {
         Interested in joining our team? Reach out to us.
       </p>
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
-        <a
-          href="mailto:Admin@KindleWoodStudio.ai"
+        <Link
+          href="/careers"
           className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold text-base transition-colors"
         >
           Get in Touch
-        </a>
+        </Link>
         <Link
           href="/what-sparked-kindlewood"
           className="bg-white text-gray-700 px-8 py-3 rounded-lg font-semibold text-base transition-colors border-2 border-gray-300 hover:border-gray-400"
