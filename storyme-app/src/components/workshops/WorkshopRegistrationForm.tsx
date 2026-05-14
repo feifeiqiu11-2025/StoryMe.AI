@@ -156,7 +156,9 @@ export default function WorkshopRegistrationForm({
         const iso = dates[idx]?.date;
         if (!iso) return true;
         const sessionDate = new Date(iso + 'T00:00:00');
-        return sessionDate >= today;
+        // Strictly future — same-day registration isn't accepted since the
+        // session is already starting by the time enrollment processes.
+        return sessionDate > today;
       })
       .map((s) => s.id);
 
@@ -248,13 +250,13 @@ export default function WorkshopRegistrationForm({
     ? 'single'
     : selectedSessionType || 'morning';
 
-  // Check if a session date has passed
+  // Check if a session date has passed (same-day counts as past — can't register day-of)
   const isSessionPast = (dateLabel: string): boolean => {
     const sessionDate = new Date(dateLabel);
     if (isNaN(sessionDate.getTime())) return false; // "Week 1" etc. won't parse
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return sessionDate < today;
+    return sessionDate <= today;
   };
 
   // Spot availability helper — uses local availability for time-slot partners, prop for others
@@ -866,7 +868,8 @@ export default function WorkshopRegistrationForm({
           const isPastByGlobalIdx = (globalIdx: number): boolean => {
             const iso = sessionDates?.[globalIdx]?.date;
             if (!iso) return false;
-            return new Date(iso + 'T00:00:00') < today;
+            // Same-day counts as past — can't register day-of.
+            return new Date(iso + 'T00:00:00') <= today;
           };
 
           const renderSessionRow = (
@@ -978,113 +981,104 @@ export default function WorkshopRegistrationForm({
 
           const futureCount = workshopCount; // selectedWorkshopIds is future-only
 
+          // Series blocks ordered with upcoming-first, completed-after,
+          // so families see the currently-enrolling series at the top.
+          const seriesBlocks: Array<{
+            num: number;
+            sessions: typeof enrollableSessions;
+            futureIds: string[];
+            label: string;
+            globalStartIdx: number;
+          }> = [
+            {
+              num: 1,
+              sessions: series1Sessions,
+              futureIds: series1FutureIds,
+              label: 'Series 1: Core Life Skills',
+              globalStartIdx: 0,
+            },
+            {
+              num: 2,
+              sessions: series2Sessions,
+              futureIds: series2FutureIds,
+              label: 'Series 2: Curious Minds',
+              globalStartIdx: series1Sessions.length,
+            },
+          ];
+          const orderedSeriesBlocks = [...seriesBlocks].sort((a, b) => {
+            const aHas = a.futureIds.length > 0;
+            const bHas = b.futureIds.length > 0;
+            if (aHas !== bHas) return aHas ? -1 : 1;
+            return a.num - b.num;
+          });
+
           return (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">
                 {hasTimeSlots ? '3' : '2'}. Series Overview
               </h3>
 
-              {/* Series 1 — Now Enrolling */}
-              {series1Sessions.length > 0 && (
-                <div className="bg-amber-50/50 rounded-xl p-5">
-                  <div className="flex items-center justify-between mb-3 gap-3">
-                    <label className={`flex items-start gap-3 ${series1FutureIds.length === 0 ? 'opacity-60' : 'cursor-pointer'}`}>
-                      <input
-                        type="checkbox"
-                        checked={allSelected(series1FutureIds)}
-                        disabled={series1FutureIds.length === 0}
-                        onChange={() => toggleSeries(series1FutureIds, series1Sessions.map((s) => s.id))}
-                        className="sr-only peer"
-                        aria-label="Toggle Series 1 enrollment"
-                      />
-                      <div className={`flex-shrink-0 w-5 h-5 mt-1 rounded border-2 flex items-center justify-center transition-colors ${
-                        series1FutureIds.length === 0
-                          ? 'border-gray-300 bg-gray-100'
-                          : allSelected(series1FutureIds)
-                          ? 'bg-amber-500 border-amber-500'
-                          : 'border-gray-300 bg-white'
-                      }`}>
-                        {allSelected(series1FutureIds) && series1FutureIds.length > 0 && (
-                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
+              <div className="space-y-4">
+                {orderedSeriesBlocks.map(({ num, sessions, futureIds, label, globalStartIdx }) => {
+                  if (sessions.length === 0) return null;
+                  const hasFuture = futureIds.length > 0;
+                  const allOn = allSelected(futureIds);
+                  const sessionIds = sessions.map((s) => s.id);
+                  return (
+                    <div
+                      key={num}
+                      className={`rounded-xl p-5 ${hasFuture ? 'bg-amber-50/50' : 'bg-gray-50/60 opacity-90'}`}
+                    >
+                      <div className="flex items-center justify-between mb-3 gap-3">
+                        <label className={`flex items-start gap-3 ${!hasFuture ? 'opacity-60' : 'cursor-pointer'}`}>
+                          <input
+                            type="checkbox"
+                            checked={allOn}
+                            disabled={!hasFuture}
+                            onChange={() => toggleSeries(futureIds, sessionIds)}
+                            className="sr-only peer"
+                            aria-label={`Toggle ${label} enrollment`}
+                          />
+                          <div className={`flex-shrink-0 w-5 h-5 mt-1 rounded border-2 flex items-center justify-center transition-colors ${
+                            !hasFuture
+                              ? 'border-gray-300 bg-gray-100'
+                              : allOn
+                              ? 'bg-amber-500 border-amber-500'
+                              : 'border-gray-300 bg-white'
+                          }`}>
+                            {allOn && hasFuture && (
+                              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900">
+                              {label}
+                            </h4>
+                            <p className="text-sm text-gray-600 mt-0.5">
+                              {sessions.length} sessions · 35 mins each · {Math.floor(sessions.length / 2)} physical storybooks
+                              {hasFuture && futureIds.length < sessions.length && (
+                                <span className="ml-1.5 text-amber-700">
+                                  · {futureIds.length} upcoming
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </label>
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${
+                          hasFuture ? 'text-green-700 bg-green-100' : 'text-gray-500 bg-gray-200'
+                        }`}>
+                          {hasFuture ? 'Now Enrolling' : 'Completed'}
+                        </span>
                       </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-900">
-                          Series 1: Core Life Skills
-                        </h4>
-                        <p className="text-sm text-gray-600 mt-0.5">
-                          {series1Sessions.length} sessions · 35 mins each · {Math.floor(series1Sessions.length / 2)} physical storybooks
-                          {series1FutureIds.length > 0 && series1FutureIds.length < series1Sessions.length && (
-                            <span className="ml-1.5 text-amber-700">
-                              · {series1FutureIds.length} upcoming
-                            </span>
-                          )}
-                        </p>
+                      <div className="space-y-2">
+                        {sessions.map((session, idx) => renderSessionRow(session, globalStartIdx + idx))}
                       </div>
-                    </label>
-                    <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full whitespace-nowrap">
-                      Now Enrolling
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {series1Sessions.map((session, idx) => renderSessionRow(session, idx))}
-                  </div>
-                </div>
-              )}
-
-              {/* Series 2 — Now Enrolling */}
-              {series2Sessions.length > 0 && (
-                <div className="mt-4 bg-amber-50/50 rounded-xl p-5">
-                  <div className="flex items-center justify-between mb-3 gap-3">
-                    <label className={`flex items-start gap-3 ${series2FutureIds.length === 0 ? 'opacity-60' : 'cursor-pointer'}`}>
-                      <input
-                        type="checkbox"
-                        checked={allSelected(series2FutureIds)}
-                        disabled={series2FutureIds.length === 0}
-                        onChange={() => toggleSeries(series2FutureIds, series2Sessions.map((s) => s.id))}
-                        className="sr-only peer"
-                        aria-label="Toggle Series 2 enrollment"
-                      />
-                      <div className={`flex-shrink-0 w-5 h-5 mt-1 rounded border-2 flex items-center justify-center transition-colors ${
-                        series2FutureIds.length === 0
-                          ? 'border-gray-300 bg-gray-100'
-                          : allSelected(series2FutureIds)
-                          ? 'bg-amber-500 border-amber-500'
-                          : 'border-gray-300 bg-white'
-                      }`}>
-                        {allSelected(series2FutureIds) && series2FutureIds.length > 0 && (
-                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-900">
-                          Series 2: Curious Minds
-                        </h4>
-                        <p className="text-sm text-gray-600 mt-0.5">
-                          {series2Sessions.length} sessions · 35 mins each · {Math.floor(series2Sessions.length / 2)} physical storybooks
-                          {series2FutureIds.length > 0 && series2FutureIds.length < series2Sessions.length && (
-                            <span className="ml-1.5 text-amber-700">
-                              · {series2FutureIds.length} upcoming
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </label>
-                    <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full whitespace-nowrap">
-                      Now Enrolling
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {series2Sessions.map((session, idx) =>
-                      renderSessionRow(session, series1Sessions.length + idx),
-                    )}
-                  </div>
-                </div>
-              )}
+                    </div>
+                  );
+                })}
+              </div>
 
               {/* Fallback: dual-mode series with no series:1/2 grouping (e.g. summer SteamOji afternoon) */}
               {series1Sessions.length === 0 && series2Sessions.length === 0 && enrollableSessions.length > 0 && (() => {
