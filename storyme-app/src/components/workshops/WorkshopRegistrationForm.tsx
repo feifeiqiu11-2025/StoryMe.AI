@@ -135,6 +135,15 @@ export default function WorkshopRegistrationForm({
   // Topic pairs for topic-pair enrollment mode (e.g. summer SteamOji morning).
   const topicPairs = isTopicPairMode ? getTopicPairs(partner) : [];
 
+  // Clear selectedWorkshopIds when the session type changes so stale IDs from
+  // a previous tab (e.g. afternoon series auto-select) don't bleed into the
+  // morning topic-pair UI. Declared BEFORE the series-mode auto-select so the
+  // autoselect's setValue runs last and wins when entering series mode.
+  useEffect(() => {
+    setValue('selectedWorkshopIds', [], { shouldValidate: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSessionType]);
+
   // Auto-select all FUTURE enrollable sessions for series mode.
   // Recomputed when the selected location changes (Bellevue/Kirkland have
   // different date schedules so future-vs-past differs by location).
@@ -164,7 +173,7 @@ export default function WorkshopRegistrationForm({
 
     setValue('selectedWorkshopIds', futureIds, { shouldValidate: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSeriesMode, selectedLocation, enrollableSessions.length]);
+  }, [isSeriesMode, selectedLocation, enrollableSessions.length, selectedSessionType]);
 
   // Auto-set session type for single mode
   useEffect(() => {
@@ -233,22 +242,61 @@ export default function WorkshopRegistrationForm({
 
   const workshopCount = selectedWorkshopIds?.length || 0;
   const numberOfChildren = childrenFields.length;
-  const totalPrice = workshopCount * pricePerSession * numberOfChildren;
-  const totalOriginal =
-    workshopCount * originalPricePerSession * numberOfChildren;
-
-  // Sales tax — WA state requires tax on enrichment workshops (ESSB 5814)
-  const selectedLocationData = hasLocations && selectedLocation
-    ? partner.locations!.find((l) => l.slug === selectedLocation)
-    : null;
-  const taxRate = selectedLocationData?.taxRate ?? 0;
-  const taxAmount = Math.round(totalPrice * taxRate);
-  const totalWithTax = totalPrice + taxAmount;
 
   // Session type key for availability / capacity
   const sessionTypeKey = isSingleMode
     ? 'single'
     : selectedSessionType || 'morning';
+
+  // Bundle pricing for dual-mode series with intro + series-package split
+  // (e.g. summer SteamOji afternoon: $35 intro + $250 series package).
+  // When introPrice and seriesPackagePrice are both set on the relevant program,
+  // total is computed from which bundles the user selected, not per-session.
+  const programWithBundlePricing =
+    sessionTypeKey === 'afternoon'
+      ? partner.afternoonProgram
+      : sessionTypeKey === 'morning'
+        ? partner.morningProgram
+        : null;
+  const isBundlePricing =
+    !isSingleMode &&
+    !!programWithBundlePricing?.introPrice &&
+    !!programWithBundlePricing?.seriesPackagePrice;
+  const bundleIntroId = isBundlePricing ? allEnrollableSessions[0]?.id : undefined;
+  const bundleSeriesIds = isBundlePricing
+    ? allEnrollableSessions.slice(1).map((s) => s.id)
+    : [];
+  const bundleIntroSelected = !!(
+    bundleIntroId && selectedWorkshopIds?.includes(bundleIntroId)
+  );
+  const bundleSeriesSelected =
+    bundleSeriesIds.length > 0 &&
+    bundleSeriesIds.every((id) => selectedWorkshopIds?.includes(id));
+
+  // Base per-session math (used by non-bundle modes and as a fallback)
+  const perSessionTotalPrice =
+    workshopCount * pricePerSession * numberOfChildren;
+  const bundleTotalPrice = isBundlePricing
+    ? ((bundleIntroSelected ? programWithBundlePricing!.introPrice! : 0) +
+        (bundleSeriesSelected
+          ? programWithBundlePricing!.seriesPackagePrice!
+          : 0)) *
+      numberOfChildren
+    : null;
+  const totalPrice = bundleTotalPrice ?? perSessionTotalPrice;
+  const totalOriginal =
+    workshopCount * originalPricePerSession * numberOfChildren;
+
+  // Sales tax — WA state requires tax on enrichment workshops (ESSB 5814).
+  // Reads from the selected location for multi-location partners (Avocado) and
+  // falls back to the singular location's taxRate for partners like SteamOji.
+  const selectedLocationData = hasLocations && selectedLocation
+    ? partner.locations!.find((l) => l.slug === selectedLocation)
+    : null;
+  const taxRate =
+    selectedLocationData?.taxRate ?? partner.location?.taxRate ?? 0;
+  const taxAmount = Math.round(totalPrice * taxRate);
+  const totalWithTax = totalPrice + taxAmount;
 
   // Check if a session date has passed (same-day counts as past — can't register day-of)
   const isSessionPast = (dateLabel: string): boolean => {
@@ -836,15 +884,260 @@ export default function WorkshopRegistrationForm({
 
               {workshopCount > 0 && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-700">
-                      {numberOfChildren > 1
-                        ? `${numberOfChildren} children × ${workshopCount} session${workshopCount !== 1 ? 's' : ''}`
-                        : `${workshopCount} session${workshopCount !== 1 ? 's' : ''} selected`}
-                    </span>
-                    <span className="text-lg font-bold text-gray-900">
-                      {formatWorkshopPrice(totalPrice)}
-                    </span>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">
+                        {numberOfChildren > 1
+                          ? `Subtotal · ${numberOfChildren} children × ${workshopCount} session${workshopCount !== 1 ? 's' : ''}`
+                          : `Subtotal · ${workshopCount} session${workshopCount !== 1 ? 's' : ''}`}
+                      </span>
+                      <span className="text-sm text-gray-700">
+                        {formatWorkshopPrice(totalPrice)}
+                      </span>
+                    </div>
+                    {taxRate > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-500">
+                          Sales tax ({(taxRate * 100).toFixed(1)}%)
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          {formatWorkshopPrice(taxAmount)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center pt-1.5 border-t border-gray-200">
+                      <span className="text-sm font-semibold text-gray-800">Total</span>
+                      <span className="text-lg font-bold text-gray-900">
+                        {formatWorkshopPrice(totalWithTax)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()
+      ) : isSeriesMode && isBundlePricing ? (
+        /* --- BUNDLE PRICING (intro + series package) — e.g. summer SteamOji afternoon --- */
+        (() => {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const introSession = allEnrollableSessions[0];
+          const seriesSessions = allEnrollableSessions.slice(1);
+          const intro = programWithBundlePricing!;
+          const introDateObj = introSession ? new Date(introSession.dateLabel) : null;
+          const introIsPast = !!introDateObj && !isNaN(introDateObj.getTime()) && (introDateObj.setHours(0, 0, 0, 0), introDateObj.getTime() <= today.getTime());
+          const seriesFirstDateObj = seriesSessions[0] ? new Date(seriesSessions[0].dateLabel) : null;
+          const seriesLastDateObj = seriesSessions[seriesSessions.length - 1] ? new Date(seriesSessions[seriesSessions.length - 1].dateLabel) : null;
+          const seriesIsAllPast =
+            seriesSessions.length > 0 &&
+            seriesSessions.every((s) => {
+              const d = new Date(s.dateLabel);
+              if (isNaN(d.getTime())) return false;
+              d.setHours(0, 0, 0, 0);
+              return d.getTime() <= today.getTime();
+            });
+
+          const toggleIntro = () => {
+            if (!bundleIntroId || introIsPast) return;
+            const cur = selectedWorkshopIds || [];
+            setValue(
+              'selectedWorkshopIds',
+              bundleIntroSelected
+                ? cur.filter((id) => id !== bundleIntroId)
+                : [...cur, bundleIntroId],
+              { shouldValidate: true },
+            );
+          };
+          const toggleSeriesPackage = () => {
+            if (seriesIsAllPast || bundleSeriesIds.length === 0) return;
+            const cur = selectedWorkshopIds || [];
+            setValue(
+              'selectedWorkshopIds',
+              bundleSeriesSelected
+                ? cur.filter((id) => !bundleSeriesIds.includes(id))
+                : Array.from(new Set([...cur, ...bundleSeriesIds])),
+              { shouldValidate: true },
+            );
+          };
+
+          const seriesDateRange =
+            seriesFirstDateObj && seriesLastDateObj && !isNaN(seriesFirstDateObj.getTime()) && !isNaN(seriesLastDateObj.getTime())
+              ? `${seriesFirstDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${seriesLastDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+              : 'Jun 7 – Jun 28';
+
+          return (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                {hasTimeSlots ? '3' : '2'}. Choose Your Enrollment
+              </h3>
+              <p className="mb-4 text-sm text-gray-600">
+                Try the preview, commit to the full series, or both. Check both for the full Chapter Book journey.
+              </p>
+
+              <div className="space-y-3">
+                {/* Intro Preview bundle */}
+                {introSession && (
+                  <label
+                    className={`block p-4 border-2 rounded-xl transition-all ${
+                      introIsPast
+                        ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                        : bundleIntroSelected
+                          ? 'border-indigo-500 bg-indigo-50 cursor-pointer'
+                          : 'border-gray-200 hover:border-gray-300 cursor-pointer'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={bundleIntroSelected}
+                      disabled={introIsPast}
+                      onChange={toggleIntro}
+                      className="sr-only"
+                    />
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                          introIsPast
+                            ? 'bg-gray-200 border-gray-300'
+                            : bundleIntroSelected
+                              ? 'bg-indigo-600 border-indigo-600'
+                              : 'border-gray-300 bg-white'
+                        }`}>
+                          {bundleIntroSelected && !introIsPast && (
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900">
+                            Preview Intro Session
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {introSession.dateLabel} · half-price preview
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right text-sm">
+                        <div>
+                          <span className="line-through text-gray-400 mr-1">
+                            {formatWorkshopPrice(originalPricePerSession)}
+                          </span>
+                          <span className="font-semibold text-indigo-700">
+                            {formatWorkshopPrice(intro.introPrice!)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500">per child</div>
+                      </div>
+                    </div>
+                    <p className="mt-2 ml-8 text-sm text-gray-600 leading-relaxed">
+                      A sample workshop session so kids and families can experience the format and decide whether to commit to the 4-session chapter book series.
+                    </p>
+                  </label>
+                )}
+
+                {/* Series Package bundle */}
+                {seriesSessions.length > 0 && (
+                  <label
+                    className={`block p-4 border-2 rounded-xl transition-all ${
+                      seriesIsAllPast
+                        ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                        : bundleSeriesSelected
+                          ? 'border-indigo-500 bg-indigo-50 cursor-pointer'
+                          : 'border-gray-200 hover:border-gray-300 cursor-pointer'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={bundleSeriesSelected}
+                      disabled={seriesIsAllPast}
+                      onChange={toggleSeriesPackage}
+                      className="sr-only"
+                    />
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                          seriesIsAllPast
+                            ? 'bg-gray-200 border-gray-300'
+                            : bundleSeriesSelected
+                              ? 'bg-indigo-600 border-indigo-600'
+                              : 'border-gray-300 bg-white'
+                        }`}>
+                          {bundleSeriesSelected && !seriesIsAllPast && (
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900">
+                            Full 4-Session Commitment Package
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {seriesDateRange} · {seriesSessions.length} sessions · printed chapter book
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right text-sm">
+                        <div>
+                          <span className="line-through text-gray-400 mr-1">
+                            {formatWorkshopPrice(originalPricePerSession * seriesSessions.length)}
+                          </span>
+                          <span className="font-semibold text-indigo-700">
+                            {formatWorkshopPrice(intro.seriesPackagePrice!)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500">per child · package</div>
+                      </div>
+                    </div>
+                    <ul className="mt-3 ml-8 space-y-1 text-sm text-gray-600">
+                      {seriesSessions.map((session) => (
+                        <li key={session.id} className="flex items-center gap-2">
+                          <span className="text-indigo-500">•</span>
+                          <span className="font-medium text-gray-700">{session.dateLabel}</span>
+                          <span className="text-gray-500">— {session.afternoon?.title || session.theme}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </label>
+                )}
+              </div>
+
+              {errors.selectedWorkshopIds && (
+                <p className={errorClassName} role="alert">
+                  {errors.selectedWorkshopIds.message}
+                </p>
+              )}
+
+              {totalPrice > 0 && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">
+                        {numberOfChildren > 1
+                          ? `Subtotal · ${numberOfChildren} children`
+                          : 'Subtotal'}
+                      </span>
+                      <span className="text-sm text-gray-700">
+                        {formatWorkshopPrice(totalPrice)}
+                      </span>
+                    </div>
+                    {taxRate > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-500">
+                          Sales tax ({(taxRate * 100).toFixed(1)}%)
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          {formatWorkshopPrice(taxAmount)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center pt-1.5 border-t border-gray-200">
+                      <span className="text-sm font-semibold text-gray-800">Total</span>
+                      <span className="text-lg font-bold text-gray-900">
+                        {formatWorkshopPrice(totalWithTax)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}

@@ -194,7 +194,32 @@ export async function POST(request: NextRequest) {
       isSingleMode ? 'single' : validated.selectedSessionType,
     );
     const unitAmount = sessionPricing.promoPrice ?? sessionPricing.originalPrice;
-    const totalAmount = validated.selectedWorkshopIds.length * unitAmount * numberOfChildren;
+
+    // Detect bundle-pricing program (intro + series-package split — summer
+    // SteamOji afternoon). When active, totals come from bundle prices, not
+    // per-session × count.
+    const programForBundle = !isSingleMode
+      ? validated.selectedSessionType === 'afternoon'
+        ? partner.afternoonProgram
+        : partner.morningProgram
+      : null;
+    const isBundlePricing =
+      !!programForBundle?.introPrice && !!programForBundle?.seriesPackagePrice;
+    const enrollableForBundle = partner.sessions.filter((s) => s.enrollable !== false);
+    const bundleIntroId = isBundlePricing ? enrollableForBundle[0]?.id : undefined;
+    const bundleSeriesIds = isBundlePricing
+      ? enrollableForBundle.slice(1).map((s) => s.id)
+      : [];
+    const introInRequest = !!(bundleIntroId && validated.selectedWorkshopIds.includes(bundleIntroId));
+    const seriesInRequest =
+      bundleSeriesIds.length > 0 &&
+      bundleSeriesIds.every((id) => validated.selectedWorkshopIds.includes(id));
+
+    const totalAmount = isBundlePricing
+      ? ((introInRequest ? programForBundle!.introPrice! : 0) +
+          (seriesInRequest ? programForBundle!.seriesPackagePrice! : 0)) *
+        numberOfChildren
+      : validated.selectedWorkshopIds.length * unitAmount * numberOfChildren;
 
     // Calculate sales tax (WA state ESSB 5814 — enrichment workshops)
     let taxRate = 0;
@@ -284,8 +309,11 @@ export async function POST(request: NextRequest) {
 
     // Bundle into a single Stripe line item when the registration is for a
     // series or topic-pair (both represent multi-session purchases). Individual
-    // mode creates one line item per selected session.
-    const isBundle = currentEnrollmentMode === 'series' || currentEnrollmentMode === 'topic-pair';
+    // mode creates one line item per selected session. Bundle-pricing programs
+    // (intro + series-package) are handled separately below.
+    const isBundle =
+      !isBundlePricing &&
+      (currentEnrollmentMode === 'series' || currentEnrollmentMode === 'topic-pair');
     const bundleLabel = (() => {
       if (currentEnrollmentMode === 'series') {
         // Use program name when available; falls back to "Series 1" for Avocado
@@ -305,40 +333,80 @@ export async function POST(request: NextRequest) {
         ? `Topic Pair${topicLabels.length > 1 ? 's' : ''}: ${topicLabels.join(', ')}`
         : 'Workshop Pair';
     })();
-    const lineItems: Array<{
+    type StripeLineItem = {
       price_data: {
         currency: string;
         product_data: { name: string; description?: string };
         unit_amount: number;
       };
       quantity: number;
-    }> = isBundle
-      ? [{
+    };
+
+    let lineItems: StripeLineItem[];
+    if (isBundlePricing && programForBundle) {
+      // Bundle pricing: emit one line item per selected bundle (intro and/or series).
+      lineItems = [];
+      if (introInRequest && bundleIntroId) {
+        const introSession = partner.sessions.find((s) => s.id === bundleIntroId);
+        lineItems.push({
           price_data: {
             currency: partner.pricing.currency,
             product_data: {
-              name: `${partner.name} — ${bundleLabel}`,
-              description: `${sessionDescription} · ${validated.selectedWorkshopIds.length} sessions`,
+              name: `${partner.name} — Preview Intro Session`,
+              description: `${sessionDescription} · ${introSession?.dateLabel || ''} · half-price preview`,
             },
-            unit_amount: unitAmount * validated.selectedWorkshopIds.length,
+            unit_amount: programForBundle.introPrice!,
           },
           quantity: numberOfChildren,
-        }]
-      : validated.selectedWorkshopIds.map((workshopId) => {
-          const session = partner.sessions.find((s) => s.id === workshopId);
-          const dateLabel = session?.dateLabel || workshopId;
-          return {
-            price_data: {
-              currency: partner.pricing.currency,
-              product_data: {
-                name: `${partner.name} — Workshop`,
-                description: `${sessionDescription} · ${dateLabel}`,
-              },
-              unit_amount: unitAmount,
-            },
-            quantity: numberOfChildren,
-          };
         });
+      }
+      if (seriesInRequest) {
+        const firstSeries = partner.sessions.find((s) => s.id === bundleSeriesIds[0]);
+        const lastSeries = partner.sessions.find((s) => s.id === bundleSeriesIds[bundleSeriesIds.length - 1]);
+        const rangeLabel = firstSeries && lastSeries
+          ? `${firstSeries.dateLabel} → ${lastSeries.dateLabel}`
+          : `${bundleSeriesIds.length} sessions`;
+        lineItems.push({
+          price_data: {
+            currency: partner.pricing.currency,
+            product_data: {
+              name: `${partner.name} — 4-Session Commitment Package`,
+              description: `${sessionDescription} · ${rangeLabel}`,
+            },
+            unit_amount: programForBundle.seriesPackagePrice!,
+          },
+          quantity: numberOfChildren,
+        });
+      }
+    } else if (isBundle) {
+      lineItems = [{
+        price_data: {
+          currency: partner.pricing.currency,
+          product_data: {
+            name: `${partner.name} — ${bundleLabel}`,
+            description: `${sessionDescription} · ${validated.selectedWorkshopIds.length} sessions`,
+          },
+          unit_amount: unitAmount * validated.selectedWorkshopIds.length,
+        },
+        quantity: numberOfChildren,
+      }];
+    } else {
+      lineItems = validated.selectedWorkshopIds.map((workshopId) => {
+        const session = partner.sessions.find((s) => s.id === workshopId);
+        const dateLabel = session?.dateLabel || workshopId;
+        return {
+          price_data: {
+            currency: partner.pricing.currency,
+            product_data: {
+              name: `${partner.name} — Workshop`,
+              description: `${sessionDescription} · ${dateLabel}`,
+            },
+            unit_amount: unitAmount,
+          },
+          quantity: numberOfChildren,
+        };
+      });
+    }
 
     // Add WA state sales tax as a separate line item (ESSB 5814)
     if (taxAmount > 0) {

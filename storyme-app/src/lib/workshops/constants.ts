@@ -35,6 +35,13 @@ export interface DualModeProgram {
   timeLabel: string; // e.g. '10:00 – 11:00 AM · 1 hour' or '9:45–10:45 AM or 11:00 AM–12:00 PM'
   shortDescription: string; // shown on the session-picker card
   enrollmentMode?: 'individual' | 'series' | 'topic-pair'; // overrides partner-level mode
+  // Optional "intro + series-package" split for series-mode programs.
+  // When both prices are set, the registration UI renders TWO selectable
+  // bundles instead of one Series Overview: the first enrollable session is
+  // the intro (priced at introPrice), the remainder form a discounted package
+  // (priced at seriesPackagePrice for the whole bundle).
+  introPrice?: number; // cents — special price for the first enrollable session
+  seriesPackagePrice?: number; // cents — bundle price for the rest of the series
 }
 
 export interface WorkshopSessionPricing {
@@ -127,8 +134,10 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       ageLabel: 'Ages 7–12',
       timeLabel: '1:00 – 3:00 PM · 2 hours',
       shortDescription:
-        'Chapter Book Project — a 4-session journey through story structure, creative writing, and real-world connections',
+        'Chapter Book Project — try a half-price preview on May 31, then commit to the 4-session journey',
       enrollmentMode: 'series',
+      introPrice: 3500, // $35 — May 31 preview session
+      seriesPackagePrice: 25000, // $250 — Jun 7–28 four-session commitment
     },
     partnerUrl: 'https://www.steamoji.com/',
     sessions: [
@@ -159,13 +168,13 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
         afternoon: {
           time: '1:00 – 3:00 PM',
           ageRange: 'Ages 7–12',
-          title: 'Story Structure & Character Development',
+          title: 'Chapter Book Preview — Meet the Journey',
           description:
-            'Children learn the bones of a chapter book — characters, setting, conflict — and start mapping their own multi-chapter story.',
+            'A half-price preview for families to experience the workshop format, sample a chapter-book activity, and ask questions before committing to the 4-session series.',
           highlights: [
-            'Chapter book structure & outlining',
-            'Character development workshop',
-            'Worldbuilding & setting design',
+            'Workshop format overview & sample activity',
+            'Hands-on writing & illustration warm-up',
+            'Q&A so families can commit (or not) with confidence',
           ],
         },
       },
@@ -190,13 +199,13 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
         afternoon: {
           time: '1:00 – 3:00 PM',
           ageRange: 'Ages 7–12',
-          title: 'Creative Writing & Visual Storytelling',
+          title: 'Story Structure & Character Development',
           description:
-            'Children draft chapters, find their narrative voice, and explore how illustrations and prose strengthen each other.',
+            'Children learn the bones of a chapter book — characters, setting, conflict — and start mapping their own multi-chapter story.',
           highlights: [
-            'Chapter drafting & narrative voice',
-            'Visual storytelling techniques',
-            'Sensory description & detail craft',
+            'Chapter book structure & outlining',
+            'Character development workshop',
+            'Worldbuilding & setting design',
           ],
         },
       },
@@ -219,6 +228,33 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
             'Story spark + character craft',
             'Beginning of a structured story plot',
           ],
+        },
+        afternoon: {
+          time: '1:00 – 3:00 PM',
+          ageRange: 'Ages 7–12',
+          title: 'Creative Writing & Visual Storytelling',
+          description:
+            'Children draft chapters, find their narrative voice, and explore how illustrations and prose strengthen each other.',
+          highlights: [
+            'Chapter drafting & narrative voice',
+            'Visual storytelling techniques',
+            'Sensory description & detail craft',
+          ],
+        },
+      },
+      {
+        // Father's Day weekend — afternoon Creative Writer continues; morning is dark.
+        // The morning slot uses an empty placeholder since topic-pair grouping is
+        // by topicId, so this session is naturally excluded from morning enrollment.
+        id: 'steamoji-summer-wk-jun21',
+        dateLabel: 'Sun, Jun 21, 2026',
+        theme: 'Creative Writer · Chapter 3',
+        morning: {
+          time: '',
+          ageRange: '',
+          title: '',
+          description: '',
+          highlights: [],
         },
         afternoon: {
           time: '1:00 – 3:00 PM',
@@ -276,9 +312,14 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       name: 'SteamOji Bellevue Store',
       address: '14315 NE 20th Street, Suite C-E, Bellevue, WA 98007',
       mapUrl: 'https://maps.google.com/?q=14315+NE+20th+Street+Suite+C-E+Bellevue+WA+98007',
+      taxRate: 0.103, // WA state sales tax (ESSB 5814 — enrichment workshops), Bellevue
       dayOfWeek: 'sunday',
       startDate: '2026-05-31',
-      skipDates: ['2026-06-21'], // Father's Day weekend
+      // Calendar runs straight through 5 Sundays (May 31 → Jun 28). Father's
+      // Day Jun 21 is included for afternoon Creative Writer; morning is dark
+      // that day (the Jun 21 session entry has no topicId so morning's
+      // topic-pair UI naturally excludes it).
+      skipDates: [],
       timeSlots: [
         { slug: 'slot-1', label: '9:45 – 10:45 AM', startTime: '09:45', endTime: '10:45' },
         { slug: 'slot-2', label: '11:00 AM – 12:00 PM', startTime: '11:00', endTime: '12:00' },
