@@ -508,6 +508,7 @@ async function handleWorkshopCheckoutCompleted(session: Stripe.Checkout.Session)
     selectedWorkshopIds: first.selected_workshop_ids,
     amountPaid: session.amount_total || 0,
     location: first.location || null,
+    timeSlot: first.time_slot || null,
   });
 }
 
