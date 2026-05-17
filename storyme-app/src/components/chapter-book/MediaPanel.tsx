@@ -15,6 +15,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { thumbnailUrl } from '@/lib/utils/image-transform';
 import {
   IMAGE_PROVIDER_OPTIONS,
   DEFAULT_IMAGE_PROVIDER,
@@ -44,6 +45,17 @@ interface CharacterRow {
 
 export function MediaPanel({ onPick }: MediaPanelProps) {
   const [tab, setTab] = useState<Tab>('characters');
+  // Resolved once at panel mount so child tabs + picker don't each pay
+  // the auth round-trip. The Supabase client caches sessions in memory,
+  // but lifting the await up here also lets the picker fire its parallel
+  // queries immediately on open instead of sequentially after getUser().
+  const [userId, setUserId] = useState<string | null>(null);
+  useEffect(() => {
+    const supabase = createClient();
+    void supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id ?? null);
+    });
+  }, []);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -77,8 +89,8 @@ export function MediaPanel({ onPick }: MediaPanelProps) {
       </div>
 
       <div className="p-3 max-h-[calc(100vh-220px)] overflow-y-auto">
-        {tab === 'characters' && <CharactersTab onPick={onPick} />}
-        {tab === 'generate' && <GenerateTab onPick={onPick} />}
+        {tab === 'characters' && <CharactersTab onPick={onPick} userId={userId} />}
+        {tab === 'generate' && <GenerateTab onPick={onPick} userId={userId} />}
         {tab === 'upload' && <UploadTab onPick={onPick} />}
       </div>
     </div>
@@ -87,30 +99,23 @@ export function MediaPanel({ onPick }: MediaPanelProps) {
 
 // ── Characters ─────────────────────────────────────────────────────────
 
-function CharactersTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
+function CharactersTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; userId: string | null }) {
   const [recent, setRecent] = useState<CharacterRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
+    // Wait until the panel has resolved the current user — RLS also
+    // allows reading is_public rows from other users, so the recent
+    // strip must filter explicitly or community characters leak in.
+    if (!userId) return;
     const load = async () => {
       try {
         const supabase = createClient();
-        // Scope to the signed-in user. RLS also allows reading public
-        // characters from other users, which would otherwise leak into
-        // this "my recent" strip — the Community tab in the picker is the
-        // dedicated surface for those.
-        const { data: userData, error: userErr } = await supabase.auth.getUser();
-        if (userErr) throw userErr;
-        const uid = userData.user?.id;
-        if (!uid) {
-          setRecent([]);
-          return;
-        }
         const { data, error } = await supabase
           .from('character_library')
           .select('id, name, animated_preview_url, reference_image_url')
-          .eq('user_id', uid)
+          .eq('user_id', userId)
           .order('updated_at', { ascending: false })
           .limit(8);
         if (error) throw error;
@@ -120,7 +125,7 @@ function CharactersTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
       }
     };
     load();
-  }, []);
+  }, [userId]);
 
   if (error) return <PanelError>{error}</PanelError>;
   if (!recent) return <PanelLoading label="Loading your characters" />;
@@ -151,7 +156,13 @@ function CharactersTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
                   aria-label={`Insert ${c.name}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt={c.name} className="w-full h-full object-cover" />
+                  <img
+                    src={thumbnailUrl(url, 240) ?? url}
+                    alt={c.name}
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full h-full object-cover"
+                  />
                   <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[10px] font-medium py-1 px-1 truncate">
                     {c.name}
                   </span>
@@ -175,6 +186,7 @@ function CharactersTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
         title="Pick a character"
         mode="single"
         itemCtaLabel={() => 'Insert'}
+        userId={userId}
         onPick={(c) => {
           if (c.imageUrl) onPick(c.imageUrl, { alt: c.name });
           setPickerOpen(false);
@@ -200,7 +212,7 @@ interface GenerationResult {
   artStyle: string;
 }
 
-function GenerateTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
+function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; userId: string | null }) {
   const [prompt, setPrompt] = useState('');
   const [selectedChars, setSelectedChars] = useState<Map<string, PickerCharacter>>(new Map());
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
@@ -213,6 +225,14 @@ function GenerateTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [result, setResult] = useState<GenerationResult | null>(null);
+  // Stack of one — the previous result, so kids can undo a regrettable
+  // edit. Larger history is overkill; "undo last edit" is enough.
+  const [previousResult, setPreviousResult] = useState<GenerationResult | null>(null);
+  // Inline edit prompt for tweaking the current result ("make the wolf
+  // smaller", "add a moon"). Distinct from `prompt`, which is the
+  // starting-from-scratch prompt at the top.
+  const [editPrompt, setEditPrompt] = useState('');
+  const [editing, setEditing] = useState(false);
   const [saveAsName, setSaveAsName] = useState('');
   const [savingChar, setSavingChar] = useState(false);
   // The "Save as a character" form is collapsed by default — kids who
@@ -243,6 +263,8 @@ function GenerateTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
     setGenerating(true);
     setError(null);
     setResult(null);
+    setPreviousResult(null);
+    setEditPrompt('');
     try {
       const res = await fetch('/api/v1/editor/generate-image', {
         method: 'POST',
@@ -275,10 +297,62 @@ function GenerateTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
     }
   }, [prompt, selectedChars, referenceImageUrl, artStyle, imageProvider, generating]);
 
+  /**
+   * Edit the current result with a follow-up instruction. The previous
+   * image URL is passed as previousImageUrl so the server can route to
+   * an edit-capable model (OpenAI gpt-image-2 or Gemini — both accept
+   * image+text input). Flux falls back to OpenAI server-side.
+   *
+   * Keeps the prior result in `previousResult` so the kid can undo if
+   * the edit drifted further from what they wanted.
+   */
+  const editImage = useCallback(async () => {
+    if (!result || !editPrompt.trim() || editing) return;
+    setEditing(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/v1/editor/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: editPrompt.trim(),
+          characterIds: result.characterIds,
+          referenceImageUrl: referenceImageUrl ?? undefined,
+          previousImageUrl: result.url,
+          artStyle: artStyle || undefined,
+          imageProvider,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Edit failed');
+      setPreviousResult(result);
+      setResult({
+        url: data.image.url,
+        prompt: editPrompt.trim(),
+        characterIds: result.characterIds,
+        artStyle: result.artStyle,
+      });
+      setEditPrompt('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Edit failed');
+    } finally {
+      setEditing(false);
+    }
+  }, [result, editPrompt, editing, referenceImageUrl, artStyle, imageProvider]);
+
+  const undoEdit = () => {
+    if (!previousResult) return;
+    setResult(previousResult);
+    setPreviousResult(null);
+    setEditPrompt('');
+  };
+
   const useResult = () => {
     if (!result) return;
     onPick(result.url, { alt: result.prompt.slice(0, 80) });
     setResult(null);
+    setPreviousResult(null);
+    setEditPrompt('');
   };
 
   const saveAndUse = useCallback(async () => {
@@ -338,7 +412,13 @@ function GenerateTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
             >
               {c.imageUrl && (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={c.imageUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
+                <img
+                  src={thumbnailUrl(c.imageUrl, 64) ?? c.imageUrl}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="w-4 h-4 rounded-full object-cover"
+                />
               )}
               {c.name}
               <button
@@ -529,7 +609,7 @@ function GenerateTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
             <button
               type="button"
               onClick={() => generate()}
-              disabled={generating}
+              disabled={generating || editing}
               className="flex-1 py-1.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-white disabled:opacity-50"
             >
               Try again
@@ -538,6 +618,8 @@ function GenerateTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
               type="button"
               onClick={() => {
                 setResult(null);
+                setPreviousResult(null);
+                setEditPrompt('');
                 setShowSaveForm(false);
                 setSaveAsName('');
               }}
@@ -545,6 +627,45 @@ function GenerateTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
             >
               Throw it away
             </button>
+          </div>
+
+          {/* Inline edit — ChatGPT-style follow-up tweaks. Sends the
+              current result as previousImageUrl so the server can route
+              to an edit-capable model (OpenAI gpt-image-2 or Gemini). */}
+          <div className="pt-2 border-t border-gray-200 mt-2 space-y-1.5">
+            <p className="text-[11px] font-semibold text-gray-600">
+              Or make a small change to this picture
+            </p>
+            <textarea
+              value={editPrompt}
+              onChange={(e) => setEditPrompt(e.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder="e.g. make the wolf smaller, add a moon"
+              disabled={editing}
+              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y disabled:bg-gray-100"
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={editImage}
+                disabled={editing || generating || !editPrompt.trim()}
+                className="flex-1 min-h-[32px] bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {editing ? 'Editing…' : 'Make this change'}
+              </button>
+              {previousResult && (
+                <button
+                  type="button"
+                  onClick={undoEdit}
+                  disabled={editing || generating}
+                  className="px-2.5 min-h-[32px] text-[11px] text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg disabled:opacity-50"
+                  title="Restore the previous picture"
+                >
+                  Undo
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -557,6 +678,7 @@ function GenerateTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
         onClose={() => setPickerOpen(false)}
         title="Choose characters as references"
         mode="multi"
+        userId={userId}
         selectedIds={new Set(selectedChars.keys())}
         maxSelections={5}
         onToggle={(character, on) => {

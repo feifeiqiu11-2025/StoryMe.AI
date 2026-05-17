@@ -67,6 +67,12 @@ const GenerateImageSchema = z.object({
   prompt: z.string().min(3).max(500),
   characterIds: z.array(z.string().uuid()).max(5).optional(),
   referenceImageUrl: z.string().url().optional(),
+  /** Set when the kid is editing an earlier generation ("make the wolf
+   *  smaller"). The server treats this image as the base to modify and
+   *  routes to an edit-capable model (OpenAI gpt-image-2 or Gemini —
+   *  both accept image+text input). Flux falls back to OpenAI when an
+   *  edit is requested. */
+  previousImageUrl: z.string().url().optional(),
   artStyle: z
     .enum(Object.keys(ART_STYLES) as [ArtStyleKey, ...ArtStyleKey[]])
     .optional(),
@@ -108,11 +114,26 @@ export async function POST(request: NextRequest) {
       prompt,
       characterIds = [],
       referenceImageUrl,
+      previousImageUrl,
       artStyle,
       imageProvider: requestedProvider,
     } = validation.data;
 
-    const provider: ImageProvider = normalizeImageProvider(requestedProvider);
+    const requestedProviderNormalized: ImageProvider = normalizeImageProvider(requestedProvider);
+    // Edits require an image-conditioned model. OpenAI gpt-image-2 has
+    // true edit semantics; Gemini accepts the prior image as a strong
+    // reference. Flux has no clean edit path, so when the kid asks for
+    // an edit we silently re-route Flux requests to OpenAI (or Gemini
+    // if OpenAI isn't configured). For first-time generations we honor
+    // whatever the kid picked.
+    let provider = requestedProviderNormalized;
+    if (previousImageUrl && !isOpenAIProvider(provider) && !isGeminiProvider(provider)) {
+      provider = process.env.OPENAI_API_KEY
+        ? ('openai-gpt-image-2' as ImageProvider)
+        : isGeminiAvailable()
+          ? ('gemini-3.1' as ImageProvider)
+          : provider; // give up — caller will see the upstream error
+    }
     const useOpenAI = isOpenAIProvider(provider);
     const useGemini = isGeminiProvider(provider) && isGeminiAvailable();
     const styledArtStyle = artStyle ? ART_STYLES[artStyle] : undefined;
@@ -146,6 +167,7 @@ export async function POST(request: NextRequest) {
         prompt,
         characters,
         referenceImageUrl,
+        previousImageUrl,
         styledArtStyle,
       });
       actualProvider = provider;
@@ -154,6 +176,7 @@ export async function POST(request: NextRequest) {
         prompt,
         characters,
         referenceImageUrl,
+        previousImageUrl,
         styledArtStyle,
         provider,
       });
@@ -214,6 +237,11 @@ interface RunArgs {
   prompt: string;
   characters: CharacterRow[];
   referenceImageUrl?: string;
+  /** Edit-mode: the prior generated image the kid wants to tweak. When
+   *  set, the prompt is treated as an edit instruction ("add a moon")
+   *  rather than a fresh scene description, and this image is the most
+   *  important reference. */
+  previousImageUrl?: string;
   styledArtStyle?: string;
   provider?: ImageProvider;
 }
@@ -229,12 +257,20 @@ async function runOpenAI({
   prompt,
   characters,
   referenceImageUrl,
+  previousImageUrl,
   styledArtStyle,
 }: RunArgs): Promise<Buffer> {
-  // Collect reference images: library characters first (named), then the
-  // kid's uploaded reference last. Cap at 5 total — OpenAI's edit endpoint
-  // is happiest with a small number, and 5 is what our schema allows.
+  // Collect reference images. Edit-mode: the previous generation goes
+  // FIRST so gpt-image-2 treats it as the base to modify. Otherwise the
+  // library characters lead, then the kid's uploaded reference. Cap at
+  // 5 — OpenAI's edit endpoint is happiest with a small number.
   const refs: Array<{ url: string; label: string }> = [];
+  if (previousImageUrl) {
+    refs.push({
+      url: previousImageUrl,
+      label: "the previous image — keep its overall composition, characters, and style, but apply the changes described in the prompt",
+    });
+  }
   for (const c of characters) {
     const url = c.animated_preview_url || c.reference_image_url;
     if (url) {
@@ -275,6 +311,7 @@ async function runOpenAI({
     sceneDescription: prompt,
     references: buffers.length > 0 ? refs.slice(0, buffers.length) : [],
     styledArtStyle,
+    isEdit: Boolean(previousImageUrl),
   });
 
   const { b64 } = await callOpenAIImage({
@@ -293,21 +330,38 @@ async function runGemini({
   prompt,
   characters,
   referenceImageUrl,
+  previousImageUrl,
   styledArtStyle,
   provider,
 }: RunArgs): Promise<Buffer> {
-  const geminiChars: GeminiCharacterInfo[] = characters.map((c) => ({
-    name: c.name,
-    referenceImageUrl: c.animated_preview_url || c.reference_image_url || '',
-    description: {
-      ai_description: c.ai_description ?? '',
-      skinTone: c.skin_tone ?? undefined,
-      hairColor: c.hair_color ?? undefined,
-      age: c.age ?? undefined,
-      clothing: c.clothing ?? undefined,
-      otherFeatures: c.other_features ?? undefined,
-    } as unknown as GeminiCharacterInfo['description'],
-  }));
+  const geminiChars: GeminiCharacterInfo[] = [];
+  // Edit-mode: previous generation goes first as the strongest reference
+  // so Gemini anchors on its composition + style and applies the prompt
+  // as a delta.
+  if (previousImageUrl) {
+    geminiChars.push({
+      name: 'Previous Image',
+      referenceImageUrl: previousImageUrl,
+      description: {
+        ai_description:
+          'The previous version of this picture. Keep its overall composition, characters, and style, and apply the changes described in the prompt.',
+      } as unknown as GeminiCharacterInfo['description'],
+    });
+  }
+  for (const c of characters) {
+    geminiChars.push({
+      name: c.name,
+      referenceImageUrl: c.animated_preview_url || c.reference_image_url || '',
+      description: {
+        ai_description: c.ai_description ?? '',
+        skinTone: c.skin_tone ?? undefined,
+        hairColor: c.hair_color ?? undefined,
+        age: c.age ?? undefined,
+        clothing: c.clothing ?? undefined,
+        otherFeatures: c.other_features ?? undefined,
+      } as unknown as GeminiCharacterInfo['description'],
+    });
+  }
   if (referenceImageUrl) {
     geminiChars.push({
       name: 'Reference Image',
@@ -318,9 +372,15 @@ async function runGemini({
     });
   }
 
+  // For edits, frame the prompt as a delta on the prior image so Gemini
+  // anchors on it instead of re-imagining the scene from text alone.
+  const sceneDescription = previousImageUrl
+    ? `Edit the "Previous Image" with this change: ${prompt}. Keep everything else about the image the same.`
+    : prompt;
+
   const out = await generateImageWithGemini({
     characters: geminiChars,
-    sceneDescription: prompt,
+    sceneDescription,
     artStyle: styledArtStyle,
     modelId: resolveGeminiImageModel(provider),
   });
@@ -393,16 +453,24 @@ function buildChapterBookPrompt({
   sceneDescription,
   references,
   styledArtStyle,
+  isEdit = false,
 }: {
   sceneDescription: string;
   references: Array<{ label: string }>;
   styledArtStyle?: string;
+  isEdit?: boolean;
 }): string {
-  const lines: string[] = [
-    "Children's chapter book illustration for ages 7–12.",
-    '',
-    `Scene: ${sceneDescription}`,
-  ];
+  const lines: string[] = isEdit
+    ? [
+        "Children's chapter book illustration for ages 7–12.",
+        '',
+        `Edit the first attached image: ${sceneDescription}. Keep everything else about the image the same.`,
+      ]
+    : [
+        "Children's chapter book illustration for ages 7–12.",
+        '',
+        `Scene: ${sceneDescription}`,
+      ];
 
   if (references.length > 0) {
     lines.push(

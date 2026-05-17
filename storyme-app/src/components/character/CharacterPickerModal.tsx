@@ -24,13 +24,15 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { thumbnailUrl } from '@/lib/utils/image-transform';
 import { X, Search } from 'lucide-react';
 
-/** How many "My Characters" rows we load per request. Past ~50 cards
- *  the React mount cost is the bottleneck on slower devices (a user
- *  with 400+ characters reported the picker hanging on open). The
- *  community tab stays capped at 60 since it's already short. */
-const MINE_PAGE_SIZE = 60;
+/** How many "My Characters" rows we load per request. Smaller is faster
+ *  — at md width the grid is 4-wide, so 24 rows fills ~6 rows of cards,
+ *  enough to be useful without paying the mount cost for hundreds of
+ *  full-size images. The infinite scroll sentinel fills in more as the
+ *  kid scrolls. */
+const MINE_PAGE_SIZE = 24;
 
 /** Debounce the search box so we don't fire a query on every keystroke
  *  — kid typing "dragon" should produce one request, not seven. */
@@ -57,6 +59,10 @@ interface BaseProps {
   alreadyAddedIds?: string[];
   /** Custom CTA label per card. Receives whether the row is already added. */
   itemCtaLabel?: (alreadyAdded: boolean) => string;
+  /** Caller-provided current user id. If absent, the modal resolves it
+   *  via auth.getUser() on first open — but that adds a round-trip and
+   *  delays the queries. Pass it in when the parent already has it. */
+  userId?: string | null;
 }
 
 interface SingleModeProps extends BaseProps {
@@ -93,7 +99,7 @@ function toPicker(r: DbRow, source: 'mine' | 'community'): PickerCharacter {
 }
 
 export function CharacterPickerModal(props: Props) {
-  const { open, onClose, title } = props;
+  const { open, onClose, title, userId: userIdProp } = props;
   const [tab, setTab] = useState<Tab>('mine');
   const [search, setSearch] = useState('');
   // "My Characters" browse-mode state. Paginated via the sentinel below.
@@ -109,10 +115,11 @@ export function CharacterPickerModal(props: Props) {
   // Community list is small (≤60) and already capped — single fetch,
   // client-side search filter is plenty.
   const [commRows, setCommRows] = useState<PickerCharacter[] | null>(null);
-  // Resolved on open. RLS lets us SELECT public rows from other users, so
-  // the "Mine" queries must filter user_id = uid explicitly — otherwise
-  // public characters from other users leak in here.
-  const [userId, setUserId] = useState<string | null>(null);
+  // Prefer the caller-provided userId; otherwise resolve once via auth.
+  // RLS allows SELECTing public rows from other users, so the "Mine"
+  // queries must filter user_id = uid explicitly.
+  const [userIdInternal, setUserIdInternal] = useState<string | null>(userIdProp ?? null);
+  const userId = userIdProp ?? userIdInternal;
   const [error, setError] = useState<string | null>(null);
   // Bumped each time the modal opens; effects compare against the
   // captured value before committing state to avoid stale-response races
@@ -120,24 +127,26 @@ export function CharacterPickerModal(props: Props) {
   const requestKey = useRef(0);
   const isSearching = search.trim().length > 0;
 
-  // Initial fetch on open: first page of My Characters + the small
-  // Community list. No more "pull everything in one shot."
+  // Initial fetch on open. Stale-while-revalidate: don't blank out
+  // previously-loaded rows — we re-query in the background and replace
+  // when the new data arrives, so reopens feel instant.
   useEffect(() => {
     if (!open) return;
     requestKey.current += 1;
     const myKey = requestKey.current;
     const supabase = createClient();
-    setMineRows(null);
-    setHasMoreMine(true);
     setSearchRows(null);
 
     const fetchInitial = async () => {
       try {
-        const { data: userData, error: userErr } = await supabase.auth.getUser();
-        if (myKey !== requestKey.current) return;
-        if (userErr) throw userErr;
-        const uid = userData.user?.id ?? null;
-        setUserId(uid);
+        let uid = userIdProp ?? userIdInternal;
+        if (!uid) {
+          const { data: userData, error: userErr } = await supabase.auth.getUser();
+          if (myKey !== requestKey.current) return;
+          if (userErr) throw userErr;
+          uid = userData.user?.id ?? null;
+          setUserIdInternal(uid);
+        }
 
         const minePromise = uid
           ? supabase
@@ -174,7 +183,7 @@ export function CharacterPickerModal(props: Props) {
       }
     };
     void fetchInitial();
-  }, [open]);
+  }, [open, userIdProp, userIdInternal]);
 
   // Reset search when re-opened so each session feels fresh.
   useEffect(() => {
@@ -462,7 +471,7 @@ function PickerCard({
         {character.imageUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
-            src={character.imageUrl}
+            src={thumbnailUrl(character.imageUrl, 300) ?? character.imageUrl}
             alt={character.name}
             // Browser-native lazy load — only fetches when the card is
             // near the viewport. Critical for users with 100+ characters
