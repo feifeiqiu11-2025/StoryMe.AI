@@ -38,6 +38,10 @@ import {
   renderSparkLetter1,
   SPARK_LETTER_1_CAMPAIGN_ID,
 } from '@/lib/email/spark-letter-1';
+import {
+  renderSummerWorkshopPromo,
+  SUMMER_WORKSHOP_PROMO_CAMPAIGN_ID,
+} from '@/lib/email/summer-workshop-promo';
 
 export const maxDuration = 60;
 
@@ -55,6 +59,16 @@ type CampaignRenderer = (email: string) => {
 // Allowlist. Adding a new campaign requires a code change — that's the point.
 const CAMPAIGN_RENDERERS: Record<string, CampaignRenderer> = {
   [SPARK_LETTER_1_CAMPAIGN_ID]: renderSparkLetter1,
+  [SUMMER_WORKSHOP_PROMO_CAMPAIGN_ID]: renderSummerWorkshopPromo,
+};
+
+// Per-campaign audience selector:
+//   'all'           — union of users.email + workshop_registrations.parent_email
+//   'workshop_only' — confirmed workshop registrations only (any partner)
+type CampaignAudience = 'all' | 'workshop_only';
+const CAMPAIGN_AUDIENCES: Record<string, CampaignAudience> = {
+  [SPARK_LETTER_1_CAMPAIGN_ID]: 'all',
+  [SUMMER_WORKSHOP_PROMO_CAMPAIGN_ID]: 'workshop_only',
 };
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -117,9 +131,37 @@ export async function POST(req: NextRequest) {
   const effectiveCampaignId = mode === 'test' ? `${campaign_id}-test` : campaign_id;
 
   // Step 1: build recipient list
+  const audience: CampaignAudience = CAMPAIGN_AUDIENCES[campaign_id] || 'all';
   let recipients: string[];
   if (mode === 'test') {
     recipients = TEST_RECIPIENTS.map((e) => e.toLowerCase().trim());
+  } else if (audience === 'workshop_only') {
+    // Past workshop participants only — any partner, confirmed status.
+    const workshopsResp = await supabase
+      .from('workshop_registrations')
+      .select('parent_email')
+      .eq('status', 'confirmed')
+      .not('parent_email', 'is', null);
+
+    if (workshopsResp.error) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'DB_QUERY_FAILED',
+            message: 'Failed to load workshop recipients',
+            details: workshopsResp.error.message,
+          },
+        },
+        { status: 500 },
+      );
+    }
+    const all = new Set<string>();
+    for (const row of workshopsResp.data || []) {
+      const e = (row as { parent_email: string }).parent_email?.toLowerCase().trim();
+      if (e && e.includes('@')) all.add(e);
+    }
+    recipients = Array.from(all);
   } else {
     const [usersResp, workshopsResp] = await Promise.all([
       supabase.from('users').select('email').not('email', 'is', null),
@@ -157,6 +199,16 @@ export async function POST(req: NextRequest) {
 
   // Step 2: filter opted-out
   const optedOut = await getOptedOutEmails(recipients, supabase);
+
+  // For test mode, clear previous test-send records so the same recipients
+  // can re-receive the email after copy/template changes. Live mode keeps
+  // strict idempotency.
+  if (mode === 'test') {
+    await supabase
+      .from('marketing_email_sends')
+      .delete()
+      .eq('campaign_id', effectiveCampaignId);
+  }
 
   // Step 3: filter already-sent for this campaign
   const { data: sentRows, error: sentErr } = await supabase

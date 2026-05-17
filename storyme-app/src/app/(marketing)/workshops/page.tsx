@@ -135,6 +135,10 @@ export default function WorkshopsPage() {
 
         {WORKSHOP_PARTNERS.filter((p) => p.status !== 'completed').map((partner) => (
           <div key={partner.id} id={partner.slug} className="scroll-mt-24 border-t border-gray-200 pt-12 first:border-t-0 first:pt-0">
+            {/* Marketing email anchor — `?#steamoji` jumps to the active SteamOji program. */}
+            {partner.partnerName === 'SteamOji' && partner.status === 'active' && (
+              <span id="steamoji" className="block -mt-24 pt-24" aria-hidden="true" />
+            )}
             {partner.status === 'coming_soon' ? (
               /* ═══════════════════════════════════════════ */
               /* Coming Soon Partner — Teaser Layout        */
