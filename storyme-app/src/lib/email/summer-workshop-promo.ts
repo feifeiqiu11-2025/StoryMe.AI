@@ -83,45 +83,46 @@ function buildHtml(unsubscribeUrl: string): string {
 
           <!-- Warm intro (no name greeting — matches Spark letter style) -->
           <tr>
-            <td style="font-family:${BODY}; color:#3a2e1f; font-size:16px; line-height:1.7; padding:8px 32px 14px;">
+            <td style="font-family:${BODY}; font-weight:500; color:#2a1d10; font-size:16px; line-height:1.7; padding:8px 32px 14px;">
               Thank you for being part of our <strong>KindleWood families</strong> &mdash; it means a lot to us.
             </td>
           </tr>
           <tr>
-            <td style="font-family:${BODY}; color:#3a2e1f; font-size:16px; line-height:1.7; padding:0 32px 24px;">
-              We're excited to share that our <strong>Creative Storyteller Summer Series</strong>, co-hosted by <strong style="color:#A0552B;">KindleWood &times; Steamoji</strong>, is back &mdash; <strong>five Sundays starting Sunday, May 31</strong> at the Steamoji Bellevue lab.
+            <td style="font-family:${BODY}; font-weight:500; color:#2a1d10; font-size:16px; line-height:1.7; padding:0 32px 24px;">
+              We're excited to share that our <strong>Creative Storyteller Summer Series</strong>, co-hosted by <strong style="color:#8B4513;">KindleWood &times; Steamoji</strong>, is back &mdash; <strong>five Sundays starting Sunday, May 31</strong> at the Steamoji Bellevue lab.
             </td>
           </tr>
 
           <!-- Handwritten transition line -->
           <tr>
-            <td align="center" style="font-family:${CURSIVE}; font-size:26px; color:#5a4a3a; padding:4px 24px 20px;">
+            <td align="center" style="font-family:${CURSIVE}; font-weight:700; font-size:26px; color:#3a2e1f; padding:4px 24px 20px;">
               Here's the full lineup:
             </td>
           </tr>
 
-          <!-- Flyer image (hosted, lazy-loaded by Gmail) -->
+          <!-- Flyer image (hosted, lazy-loaded by Gmail). Intentionally NOT
+               wrapped in an anchor — readers may want to tap and zoom in to
+               inspect the flyer without being yanked off to another page.
+               The dedicated CTA button below handles the registration intent. -->
           <tr>
             <td align="center" style="padding:0 16px 24px;">
-              <a href="${WORKSHOPS_URL}" style="text-decoration:none; display:block;">
-                <img src="${FLYER_URL}" width="608" alt="KindleWood × Steamoji Creative Storyteller Summer Series. Morning Program for ages 4–6 (Time Masters and Little Entrepreneurs) and Afternoon Program for ages 7–12 (Creative Writer Workshop, original chapter book project). Small class size 4:1. Five Sundays at Steamoji Bellevue starting May 31." style="display:block; width:100%; max-width:608px; height:auto; border-radius:10px; border:0;" />
-              </a>
+              <img src="${FLYER_URL}" width="608" alt="KindleWood × Steamoji Creative Storyteller Summer Series. Morning Program for ages 4–6 (Time Masters and Little Entrepreneurs) and Afternoon Program for ages 7–12 (Creative Writer Workshop, original chapter book project). Small class size 4:1. Five Sundays at Steamoji Bellevue starting May 31." style="display:block; width:100%; max-width:608px; height:auto; border-radius:10px; border:0;" />
             </td>
           </tr>
 
           <!-- Summary line with program breakdown -->
           <tr>
-            <td style="font-family:${BODY}; color:#3a2e1f; font-size:15px; line-height:1.7; padding:0 32px 6px;">
+            <td style="font-family:${BODY}; font-weight:500; color:#2a1d10; font-size:15px; line-height:1.7; padding:0 32px 6px;">
               <strong>Mornings</strong> (Ages 4&ndash;6) &middot; 4 sessions across 2 topic pairs
             </td>
           </tr>
           <tr>
-            <td style="font-family:${BODY}; color:#3a2e1f; font-size:15px; line-height:1.7; padding:0 32px 6px;">
+            <td style="font-family:${BODY}; font-weight:500; color:#2a1d10; font-size:15px; line-height:1.7; padding:0 32px 6px;">
               <strong>Afternoons</strong> (Ages 7&ndash;12) &middot; 5 sessions &mdash; half-price intro preview + 4-session chapter book project
             </td>
           </tr>
           <tr>
-            <td style="font-family:${BODY}; color:#5a4a3a; font-size:14px; line-height:1.7; padding:0 32px 22px;">
+            <td style="font-family:${BODY}; font-weight:500; color:#3a2e1f; font-size:14px; line-height:1.7; padding:0 32px 22px;">
               May 31 &rarr; Jun 28 &middot; Steamoji Bellevue &middot; Limited 4:1 small-class spots
             </td>
           </tr>
@@ -143,21 +144,21 @@ function buildHtml(unsubscribeUrl: string): string {
           <!-- Footer (matches Spark letter pattern) -->
           <tr>
             <td align="center" style="padding:8px 24px 36px; border-top:1px solid #E5D8BD;">
-              <div style="font-family:${CURSIVE}; font-weight:700; color:#3a2e1f; font-size:22px; padding:24px 0 6px;">
+              <div style="font-family:${CURSIVE}; font-weight:700; color:#2a1d10; font-size:22px; padding:24px 0 6px;">
                 Happy storytelling!
               </div>
-              <div style="font-family:${BODY}; color:#7a6852; font-size:14px; padding-bottom:18px;">
+              <div style="font-family:${BODY}; font-weight:500; color:#5a4a3a; font-size:14px; padding-bottom:18px;">
                 &mdash; The KindleWood Team
               </div>
-              <div style="font-family:${BODY}; font-size:14px; color:#5a4a3a; padding-bottom:14px;">
-                <a href="${SITE_URL}" style="color:#A0552B; text-decoration:underline;">kindlewoodstudio.ai</a>
+              <div style="font-family:${BODY}; font-weight:500; font-size:14px; color:#3a2e1f; padding-bottom:14px;">
+                <a href="${SITE_URL}" style="color:#8B4513; text-decoration:underline;">kindlewoodstudio.ai</a>
                 &nbsp;&middot;&nbsp;
-                <a href="${YT_URL}" style="color:#A0552B; text-decoration:underline;">YouTube</a>
+                <a href="${YT_URL}" style="color:#8B4513; text-decoration:underline;">YouTube</a>
               </div>
-              <div style="font-family:${BODY}; font-size:12px; color:#9a8a72;">
+              <div style="font-family:${BODY}; font-size:12px; color:#6a5a47;">
                 Questions? Simply reply to this email.
                 &nbsp;&middot;&nbsp;
-                <a href="${unsubscribeUrl}" style="color:#9a8a72; text-decoration:underline;">Unsubscribe</a>
+                <a href="${unsubscribeUrl}" style="color:#6a5a47; text-decoration:underline;">Unsubscribe</a>
               </div>
             </td>
           </tr>

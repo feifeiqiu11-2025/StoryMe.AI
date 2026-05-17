@@ -44,6 +44,12 @@ const CAMPAIGNS: Campaign[] = [
     label: "Spark's first letter",
     description: 'KindleWood is on Android — multilingual update with the dragon-mascot origin.',
   },
+  {
+    id: 'summer-workshop-2026',
+    label: 'Summer 2026 — Creative Storyteller Series',
+    description:
+      'KindleWood × Steamoji co-hosted workshop announcement. Sends to past workshop attendees only (confirmed registrations, any partner).',
+  },
 ];
 
 interface DryRunResponse {
