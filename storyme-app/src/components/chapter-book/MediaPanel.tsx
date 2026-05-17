@@ -96,10 +96,21 @@ function CharactersTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
     const load = async () => {
       try {
         const supabase = createClient();
-        // Recent ~8 — the picker handles the long tail.
+        // Scope to the signed-in user. RLS also allows reading public
+        // characters from other users, which would otherwise leak into
+        // this "my recent" strip — the Community tab in the picker is the
+        // dedicated surface for those.
+        const { data: userData, error: userErr } = await supabase.auth.getUser();
+        if (userErr) throw userErr;
+        const uid = userData.user?.id;
+        if (!uid) {
+          setRecent([]);
+          return;
+        }
         const { data, error } = await supabase
           .from('character_library')
           .select('id, name, animated_preview_url, reference_image_url')
+          .eq('user_id', uid)
           .order('updated_at', { ascending: false })
           .limit(8);
         if (error) throw error;

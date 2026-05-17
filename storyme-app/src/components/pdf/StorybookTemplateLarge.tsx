@@ -307,6 +307,7 @@ export const StorybookTemplateLarge: React.FC<StorybookTemplateLargeProps> = ({
             )}
             <View style={styles.coverDecoration} />
             {author && <Text style={styles.coverAuthorFallback}>By {author}</Text>}
+            <Text style={styles.coverCopyright}>© 2026 KindleWood Studio</Text>
           </View>
         </Page>
       )}

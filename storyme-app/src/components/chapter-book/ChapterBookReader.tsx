@@ -124,7 +124,10 @@ export function ChapterBookReader({ title, authorName, doc, onExit }: ChapterBoo
               {title || 'Chapter Book'}
             </h1>
             {authorName && (
-              <span className="text-xs text-gray-500 italic flex-shrink-0">by {authorName}</span>
+              <span className="text-xs text-gray-500 italic flex-shrink-0 flex flex-col items-start leading-tight">
+                <span>by {authorName}</span>
+                <span className="not-italic text-[10px] text-gray-400">© 2026 KindleWood Studio</span>
+              </span>
             )}
           </div>
         </div>

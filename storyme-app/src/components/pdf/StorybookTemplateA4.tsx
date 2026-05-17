@@ -306,6 +306,7 @@ export const StorybookTemplateA4: React.FC<StorybookTemplateA4Props> = ({
             )}
             <View style={styles.coverDecoration} />
             {author && <Text style={styles.coverAuthorFallback}>By {author}</Text>}
+            <Text style={styles.coverCopyright}>© 2026 KindleWood Studio</Text>
           </View>
         </Page>
       )}

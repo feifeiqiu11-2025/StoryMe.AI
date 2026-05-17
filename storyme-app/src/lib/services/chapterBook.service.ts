@@ -26,16 +26,30 @@ export const CHAPTER_BOOK_STARTER_DOC = {
   type: 'doc',
   content: [
     {
+      type: 'paragraph',
+      attrs: { textAlign: 'center' },
+      content: [{ type: 'text', text: '<Insert cover page image>' }],
+    },
+    {
       type: 'heading',
-      attrs: { level: 1 },
-      content: [{ type: 'text', text: 'My Book Title' }],
+      attrs: { level: 1, textAlign: 'center' },
+      content: [{ type: 'text', text: '<My Book Title>' }],
     },
     {
       type: 'paragraph',
-      content: [{ type: 'text', text: 'by Your Name' }],
+      attrs: { textAlign: 'center' },
+      content: [{ type: 'text', text: 'by <Your Name>' }],
+    },
+    {
+      type: 'paragraph',
+      attrs: { textAlign: 'center' },
+      content: [{ type: 'text', text: '© 2026 KindleWood Studio' }],
     },
     { type: 'pageBreak' },
-    { type: 'paragraph' },
+    {
+      type: 'paragraph',
+      content: [{ type: 'text', text: '<Start writing from here>' }],
+    },
   ],
 } as const;
 

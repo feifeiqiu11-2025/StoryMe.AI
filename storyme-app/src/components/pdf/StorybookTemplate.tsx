@@ -405,6 +405,7 @@ export const StorybookTemplate: React.FC<StorybookTemplateProps> = ({
             <Text style={styles.coverTagline}>A StoryMe Adventure</Text>
             <View style={styles.coverDecorationBottom} />
             {author && <Text style={styles.coverAuthor}>By {author}</Text>}
+            <Text style={styles.coverDate}>© 2026 KindleWood Studio</Text>
             {createdDate && (
               <Text style={styles.coverDate}>{createdDate}</Text>
             )}

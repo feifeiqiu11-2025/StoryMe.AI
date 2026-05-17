@@ -109,6 +109,10 @@ export function CharacterPickerModal(props: Props) {
   // Community list is small (≤60) and already capped — single fetch,
   // client-side search filter is plenty.
   const [commRows, setCommRows] = useState<PickerCharacter[] | null>(null);
+  // Resolved on open. RLS lets us SELECT public rows from other users, so
+  // the "Mine" queries must filter user_id = uid explicitly — otherwise
+  // public characters from other users leak in here.
+  const [userId, setUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Bumped each time the modal opens; effects compare against the
   // captured value before committing state to avoid stale-response races
@@ -129,13 +133,24 @@ export function CharacterPickerModal(props: Props) {
 
     const fetchInitial = async () => {
       try {
+        const { data: userData, error: userErr } = await supabase.auth.getUser();
+        if (myKey !== requestKey.current) return;
+        if (userErr) throw userErr;
+        const uid = userData.user?.id ?? null;
+        setUserId(uid);
+
+        const minePromise = uid
+          ? supabase
+              .from('character_library')
+              .select('id, name, animated_preview_url, reference_image_url, is_favorite, updated_at')
+              .eq('user_id', uid)
+              .order('is_favorite', { ascending: false })
+              .order('updated_at', { ascending: false })
+              .range(0, MINE_PAGE_SIZE - 1)
+          : Promise.resolve({ data: [], error: null } as const);
+
         const [{ data: mineData, error: mineErr }, { data: commData, error: commErr }] = await Promise.all([
-          supabase
-            .from('character_library')
-            .select('id, name, animated_preview_url, reference_image_url, is_favorite, updated_at')
-            .order('is_favorite', { ascending: false })
-            .order('updated_at', { ascending: false })
-            .range(0, MINE_PAGE_SIZE - 1),
+          minePromise,
           supabase
             .from('character_library')
             .select('id, name, animated_preview_url, reference_image_url')
@@ -172,7 +187,7 @@ export function CharacterPickerModal(props: Props) {
    * Guards against concurrent calls + stale modal sessions.
    */
   const loadMoreMine = useCallback(async () => {
-    if (!open || isSearching || loadingMoreMine || !hasMoreMine || !mineRows) return;
+    if (!open || isSearching || loadingMoreMine || !hasMoreMine || !mineRows || !userId) return;
     setLoadingMoreMine(true);
     const myKey = requestKey.current;
     const start = mineRows.length;
@@ -181,6 +196,7 @@ export function CharacterPickerModal(props: Props) {
       const { data, error } = await supabase
         .from('character_library')
         .select('id, name, animated_preview_url, reference_image_url, is_favorite, updated_at')
+        .eq('user_id', userId)
         .order('is_favorite', { ascending: false })
         .order('updated_at', { ascending: false })
         .range(start, start + MINE_PAGE_SIZE - 1);
@@ -196,7 +212,7 @@ export function CharacterPickerModal(props: Props) {
     } finally {
       if (myKey === requestKey.current) setLoadingMoreMine(false);
     }
-  }, [open, isSearching, loadingMoreMine, hasMoreMine, mineRows]);
+  }, [open, isSearching, loadingMoreMine, hasMoreMine, mineRows, userId]);
 
   /**
    * Server-side search. Client-side filter on a paginated list misses
@@ -214,11 +230,17 @@ export function CharacterPickerModal(props: Props) {
     const myKey = requestKey.current;
     setSearching(true);
     const timer = setTimeout(async () => {
+      if (!userId) {
+        setSearchRows([]);
+        setSearching(false);
+        return;
+      }
       const supabase = createClient();
       try {
         const { data, error } = await supabase
           .from('character_library')
           .select('id, name, animated_preview_url, reference_image_url, is_favorite, updated_at')
+          .eq('user_id', userId)
           .ilike('name', `%${q}%`)
           .order('is_favorite', { ascending: false })
           .order('updated_at', { ascending: false })
@@ -235,7 +257,7 @@ export function CharacterPickerModal(props: Props) {
       }
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [open, isSearching, search]);
+  }, [open, isSearching, search, userId]);
 
   const filtered = useMemo(() => {
     if (tab === 'community') {

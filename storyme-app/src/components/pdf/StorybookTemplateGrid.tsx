@@ -137,6 +137,7 @@ export const StorybookTemplateGrid: React.FC<StorybookTemplateGridProps> = ({
             <Text style={{ fontSize: 16, fontFamily: 'Noto Sans SC', color: '#C7D2FE', textAlign: 'center', fontStyle: 'italic', marginBottom: 30 }}>A StoryMe Adventure</Text>
             <View style={{ width: '60%', height: 3, backgroundColor: '#FFD700', marginTop: 40 }} />
             {author && <Text style={{ fontSize: 24, fontFamily: 'Noto Sans SC', color: '#ffffff', textAlign: 'center', marginTop: 20, fontWeight: 'bold' }}>By {author}</Text>}
+            <Text style={{ fontSize: 10, fontFamily: 'Noto Sans SC', color: '#C7D2FE', textAlign: 'center', marginTop: 12 }}>© 2026 KindleWood Studio</Text>
             {createdDate && <Text style={{ fontSize: 12, fontFamily: 'Noto Sans SC', color: '#C7D2FE', textAlign: 'center', marginTop: 40 }}>{createdDate}</Text>}
           </View>
         </Page>
