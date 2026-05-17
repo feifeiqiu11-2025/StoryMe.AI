@@ -212,6 +212,33 @@ interface GenerationResult {
   artStyle: string;
 }
 
+/**
+ * Parse a generate-image response, even when the server doesn't return
+ * JSON. Vercel's plain-text "An error occurred" page (returned on
+ * timeout or function crash) used to surface as a cryptic
+ * "Unexpected token 'A'..." JSON parse error. This helper extracts a
+ * useful message instead.
+ */
+async function parseGenerateResponse(res: Response): Promise<{ image: { url: string } }> {
+  if (!res.ok) {
+    const body = await res.text();
+    let message = `Generation failed (${res.status})`;
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed?.error) message = parsed.error;
+    } catch {
+      // Body is not JSON. The Vercel timeout/crash page starts with
+      // "An error occurred…" — translate to something a kid can act on.
+      if (res.status === 504 || /timed?\s*out|an error occurred/i.test(body)) {
+        message =
+          'The picture took too long to make. Try a shorter prompt, fewer reference characters, or a different model.';
+      }
+    }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
 function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; userId: string | null }) {
   const [prompt, setPrompt] = useState('');
   const [selectedChars, setSelectedChars] = useState<Map<string, PickerCharacter>>(new Map());
@@ -277,8 +304,7 @@ function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; us
           imageProvider,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Generation failed');
+      const data = await parseGenerateResponse(res);
       setResult({
         url: data.image.url,
         prompt: prompt.trim(),
@@ -323,8 +349,7 @@ function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; us
           imageProvider,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Edit failed');
+      const data = await parseGenerateResponse(res);
       setPreviousResult(result);
       setResult({
         url: data.image.url,

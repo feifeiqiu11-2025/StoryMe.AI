@@ -94,6 +94,30 @@ interface CharacterRow {
 
 export const maxDuration = 60;
 
+/** Internal soft-timeout — we want to fail fast with a clean JSON error
+ *  before Vercel kills the function and returns its plain-text error
+ *  page (which clients can't parse as JSON). 5s margin under maxDuration
+ *  is enough for our catch block to run and respond. */
+const PROVIDER_TIMEOUT_MS = 55_000;
+
+async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  return Promise.race([
+    p.finally(() => clearTimeout(timer)),
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error(
+              `${label} timed out after ${Math.round(ms / 1000)}s. Try a shorter prompt, fewer reference characters, or switch image models.`
+            )
+          ),
+        ms
+      );
+    }),
+  ]);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClientFromRequest(request);
@@ -163,31 +187,43 @@ export async function POST(request: NextRequest) {
     let actualProvider: string = provider;
 
     if (useOpenAI) {
-      imageBuffer = await runOpenAI({
-        prompt,
-        characters,
-        referenceImageUrl,
-        previousImageUrl,
-        styledArtStyle,
-      });
+      imageBuffer = await withTimeout(
+        runOpenAI({
+          prompt,
+          characters,
+          referenceImageUrl,
+          previousImageUrl,
+          styledArtStyle,
+        }),
+        PROVIDER_TIMEOUT_MS,
+        'OpenAI image generation'
+      );
       actualProvider = provider;
     } else if (useGemini) {
-      imageBuffer = await runGemini({
-        prompt,
-        characters,
-        referenceImageUrl,
-        previousImageUrl,
-        styledArtStyle,
-        provider,
-      });
+      imageBuffer = await withTimeout(
+        runGemini({
+          prompt,
+          characters,
+          referenceImageUrl,
+          previousImageUrl,
+          styledArtStyle,
+          provider,
+        }),
+        PROVIDER_TIMEOUT_MS,
+        'Gemini image generation'
+      );
       actualProvider = provider;
     } else {
-      imageBuffer = await runFal({
-        prompt,
-        characters,
-        referenceImageUrl,
-        styledArtStyle,
-      });
+      imageBuffer = await withTimeout(
+        runFal({
+          prompt,
+          characters,
+          referenceImageUrl,
+          styledArtStyle,
+        }),
+        PROVIDER_TIMEOUT_MS,
+        'Flux image generation'
+      );
       actualProvider = 'flux';
     }
 
