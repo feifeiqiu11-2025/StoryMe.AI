@@ -45,6 +45,11 @@ const partners: Partner[] = [
     logo: '/images/dreamtree-logo.png',
     logoClassName: 'h-22',
   },
+  {
+    name: 'Washington Education Institute',
+    logo: '/images/wei-logo.png',
+    logoClassName: 'h-24',
+  },
 ];
 
 function PartnerItem({ partner }: { partner: Partner }) {

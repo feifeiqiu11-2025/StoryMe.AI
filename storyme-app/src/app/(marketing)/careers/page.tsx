@@ -199,7 +199,7 @@ function HeroSection() {
   return (
     <div
       ref={ref}
-      className={`text-center mb-16 transition-all duration-700 ${
+      className={`text-center mb-12 transition-all duration-700 ${
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
       }`}
     >
@@ -208,7 +208,6 @@ function HeroSection() {
         <span className="text-amber-700 underline decoration-amber-700 decoration-2 underline-offset-4">
           creative learning
         </span>
-        .
       </h1>
       <p className="text-lg text-gray-700 leading-relaxed max-w-3xl mx-auto mb-6">
         KindleWood is a creativity-driven learning studio that blends storytelling, hands-on
@@ -227,20 +226,36 @@ function HeroSection() {
 interface Value {
   title: string;
   body: string;
+  image: string;
+  imageAlt: string;
+  cardClass: string;
+  rotationClass: string;
 }
 
 const values: Value[] = [
   {
-    title: 'A forward-thinking learning studio',
-    body: 'Built for the world children are actually growing up in. AI is a tool we use thoughtfully — to support a child’s creative process, never to replace it. The program keeps evolving as the world does, and we look for teammates energized by what comes next.',
+    title: 'AI as a tool, not a replacement',
+    body: 'Every program is designed and led by educators. We use AI thoughtfully — to draft assets, speed up the busywork, give you back time — but the creative and pedagogical decisions stay with you. The technology earns its place by amplifying what only a human teacher can do.',
+    image: '/images/careers/ai.jpg',
+    imageAlt: 'A KindleWood facilitator and a young learner exploring a tablet together in the studio.',
+    cardClass: 'bg-amber-50/80 border-amber-200/70',
+    rotationClass: '-rotate-1',
   },
   {
-    title: 'We grow alongside the kids we serve',
-    body: 'Our programs support a child’s continuous creative journey — first stories, bigger projects, confident self-expression. The team works the same way: open-minded, curious, with room to stretch as the studio grows. The people we hire today will help shape what KindleWood becomes.',
+    title: 'Teach a craft, not a script',
+    body: 'Most learning centers hire teachers to deliver a curriculum. KindleWood hires teachers as creative practitioners. You bring your own taste, your own instincts for helping a child find their voice and we hire people who already love that craft and want a place to keep growing in it.',
+    image: '/images/careers/craft.jpg',
+    imageAlt: 'A KindleWood facilitator guiding two children through a hands-on creative project.',
+    cardClass: 'bg-rose-50/80 border-rose-200/70',
+    rotationClass: 'rotate-0',
   },
   {
-    title: 'Preparing future-ready kids',
-    body: 'The children we serve will inherit a world we cannot fully predict. Our work is to give them the creative, expressive, and adaptive muscles to meet it — and we hire teammates with the same growth mindset we want to cultivate in our learners.',
+    title: 'Teaching that matters in this moment',
+    body: 'The children we serve are the first generation growing up alongside AI. What they need from a teacher right now is exactly what’s hardest to automate: taste, imagination, a sense of voice. Here, you’ll see your impact in something a child can hold: a book they wrote, a character they invented, a project they pitched.',
+    image: '/images/careers/moment.jpg',
+    imageAlt: 'A KindleWood facilitator sitting beside a child at a laptop, in front of a STEAM-themed studio wall.',
+    cardClass: 'bg-emerald-50/80 border-emerald-200/70',
+    rotationClass: 'rotate-1',
   },
 ];
 
@@ -250,7 +265,7 @@ function ValuesSection() {
     <section
       ref={ref}
       aria-labelledby="why-heading"
-      className={`mb-24 transition-all duration-700 ${
+      className={`mb-16 transition-all duration-700 ${
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
       }`}
     >
@@ -260,11 +275,24 @@ function ValuesSection() {
       >
         Why work at KindleWood
       </h2>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-10 pt-4">
         {values.map((value) => (
-          <div key={value.title} className="bg-white/70 backdrop-blur-sm rounded-2xl p-7 border border-gray-200/80">
-            <h3 className="text-xl font-semibold text-gray-900 mb-3">{value.title}</h3>
-            <p className="text-gray-700 leading-relaxed">{value.body}</p>
+          <div
+            key={value.title}
+            className={`relative rounded-2xl border shadow-sm overflow-hidden transition-all duration-300 hover:rotate-0 hover:-translate-y-1 hover:shadow-lg ${value.cardClass} ${value.rotationClass}`}
+          >
+            <div className="relative aspect-[4/3] overflow-hidden">
+              <img
+                src={value.image}
+                alt={value.imageAlt}
+                loading="lazy"
+                className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+              />
+            </div>
+            <div className="p-7">
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">{value.title}</h3>
+              <p className="text-gray-700 leading-relaxed">{value.body}</p>
+            </div>
           </div>
         ))}
       </div>
@@ -377,7 +405,7 @@ function RolesSection() {
     <section
       ref={ref}
       aria-labelledby="roles-heading"
-      className={`mb-24 transition-all duration-700 ${
+      className={`mb-16 transition-all duration-700 ${
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
       }`}
     >
@@ -407,7 +435,7 @@ function GeneralInquirySection() {
     <section
       ref={ref}
       aria-labelledby="general-inquiry-heading"
-      className={`mb-20 transition-all duration-700 ${
+      className={`mb-12 transition-all duration-700 ${
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
       }`}
     >
