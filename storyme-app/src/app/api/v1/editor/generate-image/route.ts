@@ -92,13 +92,16 @@ interface CharacterRow {
   other_features: string | null;
 }
 
-export const maxDuration = 60;
+// 300s is the Vercel Pro ceiling for serverless functions; gpt-image-2
+// with multi-image edits routinely needs 60–120s and occasionally more.
+// On Hobby this caps at 60s — no harm, just less headroom.
+export const maxDuration = 300;
 
 /** Internal soft-timeout — we want to fail fast with a clean JSON error
  *  before Vercel kills the function and returns its plain-text error
- *  page (which clients can't parse as JSON). 5s margin under maxDuration
- *  is enough for our catch block to run and respond. */
-const PROVIDER_TIMEOUT_MS = 55_000;
+ *  page (which clients can't parse as JSON). 10s margin under
+ *  maxDuration is enough for our catch block to run and respond. */
+const PROVIDER_TIMEOUT_MS = 290_000;
 
 async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;

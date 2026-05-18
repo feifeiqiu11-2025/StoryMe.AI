@@ -251,15 +251,26 @@ function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; us
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [result, setResult] = useState<GenerationResult | null>(null);
-  // Stack of one — the previous result, so kids can undo a regrettable
-  // edit. Larger history is overkill; "undo last edit" is enough.
-  const [previousResult, setPreviousResult] = useState<GenerationResult | null>(null);
-  // Inline edit prompt for tweaking the current result ("make the wolf
-  // smaller", "add a moon"). Distinct from `prompt`, which is the
-  // starting-from-scratch prompt at the top.
+  // Two-slot comparison: slotA is the kid's anchor (first generation or
+  // a kept edit), slotB is the candidate (latest edit attempt). When
+  // slotB is null we render the single-image view; when both are set we
+  // render side-by-side. Non-destructive — both stay until the kid
+  // explicitly picks one with "Use" or "Throw it away".
+  const [slotA, setSlotA] = useState<GenerationResult | null>(null);
+  const [slotB, setSlotB] = useState<GenerationResult | null>(null);
+  // Edit panel is collapsed by default so the kid sees a single primary
+  // action ("Insert into book") rather than an inviting textbox that
+  // encourages endless tweaking. Expand on click, auto-collapse after
+  // a successful edit.
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingFrom, setEditingFrom] = useState<'A' | 'B'>('A');
   const [editPrompt, setEditPrompt] = useState('');
   const [editing, setEditing] = useState(false);
+  // Per-edit reference image — separate from the top-level
+  // referenceImageUrl. Cleared after each successful edit so a stale
+  // reference from a prior edit doesn't bleed into the next one.
+  const [editReferenceImageUrl, setEditReferenceImageUrl] = useState<string | null>(null);
+  const [editReferenceUploading, setEditReferenceUploading] = useState(false);
   const [saveAsName, setSaveAsName] = useState('');
   const [savingChar, setSavingChar] = useState(false);
   // The "Save as a character" form is collapsed by default — kids who
@@ -285,13 +296,36 @@ function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; us
     }
   }, [referenceUploading]);
 
+  // Separate uploader for the per-edit reference (paperclip in the edit
+  // panel) so a stale reference from an earlier edit doesn't bleed into
+  // the next one.
+  const uploadEditReference = useCallback(async (file: File) => {
+    if (editReferenceUploading) return;
+    setEditReferenceUploading(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/api/v1/editor/upload-image', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Upload failed');
+      setEditReferenceImageUrl(data.image.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setEditReferenceUploading(false);
+    }
+  }, [editReferenceUploading]);
+
   const generate = useCallback(async () => {
     if (!prompt.trim() || generating) return;
     setGenerating(true);
     setError(null);
-    setResult(null);
-    setPreviousResult(null);
+    setSlotA(null);
+    setSlotB(null);
+    setEditOpen(false);
     setEditPrompt('');
+    setEditReferenceImageUrl(null);
     try {
       const res = await fetch('/api/v1/editor/generate-image', {
         method: 'POST',
@@ -305,7 +339,7 @@ function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; us
         }),
       });
       const data = await parseGenerateResponse(res);
-      setResult({
+      setSlotA({
         url: data.image.url,
         prompt: prompt.trim(),
         characterIds: Array.from(selectedChars.keys()),
@@ -324,16 +358,14 @@ function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; us
   }, [prompt, selectedChars, referenceImageUrl, artStyle, imageProvider, generating]);
 
   /**
-   * Edit the current result with a follow-up instruction. The previous
-   * image URL is passed as previousImageUrl so the server can route to
-   * an edit-capable model (OpenAI gpt-image-2 or Gemini — both accept
-   * image+text input). Flux falls back to OpenAI server-side.
-   *
-   * Keeps the prior result in `previousResult` so the kid can undo if
-   * the edit drifted further from what they wanted.
+   * Run an edit based on whichever slot the kid clicked "Edit" on. The
+   * source image is sent as previousImageUrl, and the result lands in
+   * the OTHER slot — so both versions stay visible side-by-side for
+   * comparison instead of replacing one another.
    */
-  const editImage = useCallback(async () => {
-    if (!result || !editPrompt.trim() || editing) return;
+  const submitEdit = useCallback(async () => {
+    const source = editingFrom === 'A' ? slotA : slotB;
+    if (!source || !editPrompt.trim() || editing) return;
     setEditing(true);
     setError(null);
     try {
@@ -342,46 +374,70 @@ function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; us
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: editPrompt.trim(),
-          characterIds: result.characterIds,
-          referenceImageUrl: referenceImageUrl ?? undefined,
-          previousImageUrl: result.url,
+          characterIds: source.characterIds,
+          referenceImageUrl: editReferenceImageUrl ?? referenceImageUrl ?? undefined,
+          previousImageUrl: source.url,
           artStyle: artStyle || undefined,
           imageProvider,
         }),
       });
       const data = await parseGenerateResponse(res);
-      setPreviousResult(result);
-      setResult({
+      const newResult: GenerationResult = {
         url: data.image.url,
         prompt: editPrompt.trim(),
-        characterIds: result.characterIds,
-        artStyle: result.artStyle,
-      });
+        characterIds: source.characterIds,
+        artStyle: source.artStyle,
+      };
+      // Land in the other slot so both versions stay visible.
+      if (editingFrom === 'A') setSlotB(newResult);
+      else setSlotA(newResult);
+      // Close the edit panel after a successful edit — keeps the kid
+      // from staring at an open textbox and feeling like they have to
+      // keep editing.
+      setEditOpen(false);
       setEditPrompt('');
+      setEditReferenceImageUrl(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Edit failed');
     } finally {
       setEditing(false);
     }
-  }, [result, editPrompt, editing, referenceImageUrl, artStyle, imageProvider]);
+  }, [editingFrom, slotA, slotB, editPrompt, editing, referenceImageUrl, editReferenceImageUrl, artStyle, imageProvider]);
 
-  const undoEdit = () => {
-    if (!previousResult) return;
-    setResult(previousResult);
-    setPreviousResult(null);
+  const openEditFor = (slot: 'A' | 'B') => {
+    setEditingFrom(slot);
+    setEditOpen(true);
     setEditPrompt('');
+    setEditReferenceImageUrl(null);
   };
 
-  const useResult = () => {
-    if (!result) return;
-    onPick(result.url, { alt: result.prompt.slice(0, 80) });
-    setResult(null);
-    setPreviousResult(null);
+  const useSlot = (slot: 'A' | 'B') => {
+    const target = slot === 'A' ? slotA : slotB;
+    if (!target) return;
+    onPick(target.url, { alt: target.prompt.slice(0, 80) });
+    setSlotA(null);
+    setSlotB(null);
+    setEditOpen(false);
     setEditPrompt('');
+    setEditReferenceImageUrl(null);
+    setShowSaveForm(false);
+    setSaveAsName('');
   };
 
+  const throwAway = () => {
+    setSlotA(null);
+    setSlotB(null);
+    setEditOpen(false);
+    setEditPrompt('');
+    setEditReferenceImageUrl(null);
+    setShowSaveForm(false);
+    setSaveAsName('');
+  };
+
+  // Save-as-character only appears in single-image view (slotA only,
+  // no candidate), so it always saves slotA.
   const saveAndUse = useCallback(async () => {
-    if (!result || savingChar) return;
+    if (!slotA || savingChar) return;
     if (!saveAsName.trim()) return;
     setSavingChar(true);
     setError(null);
@@ -390,21 +446,22 @@ function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; us
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          imageUrl: result.url,
+          imageUrl: slotA.url,
           name: saveAsName.trim(),
-          prompt: result.prompt,
+          prompt: slotA.prompt,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Save failed');
-      onPick(result.url, { alt: saveAsName.trim() });
-      setResult(null);
+      onPick(slotA.url, { alt: saveAsName.trim() });
+      setSlotA(null);
+      setSlotB(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSavingChar(false);
     }
-  }, [result, saveAsName, savingChar, onPick]);
+  }, [slotA, saveAsName, savingChar, onPick]);
 
   return (
     <div className="space-y-3">
@@ -423,90 +480,104 @@ function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; us
         />
       </div>
 
-      {/* Selected character chips + Choose button. Picker handles the
-          long list; this row only ever shows what's currently selected. */}
+      {/* Selected character chips + Pick button. Label is inline with
+          the icon-only Pick button; selected character chips wrap below. */}
       <div>
-        <label className="block text-xs font-semibold text-gray-700 mb-1">
-          Add characters from your library
-        </label>
-        <div className="flex flex-wrap gap-1.5">
-          {Array.from(selectedChars.values()).map((c) => (
-            <span
-              key={c.id}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-blue-50 border border-blue-300 text-blue-700"
-            >
-              {c.imageUrl && (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={thumbnailUrl(c.imageUrl, 64) ?? c.imageUrl}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  className="w-4 h-4 rounded-full object-cover"
-                />
-              )}
-              {c.name}
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedChars((prev) => {
-                    const next = new Map(prev);
-                    next.delete(c.id);
-                    return next;
-                  });
-                }}
-                aria-label={`Remove ${c.name}`}
-                className="ml-0.5 text-blue-500 hover:text-blue-800"
-              >
-                ×
-              </button>
-            </span>
-          ))}
+        <div className="flex items-center gap-2 mb-1">
+          <label className="text-xs font-semibold text-gray-700">
+            Add characters from your library
+          </label>
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
-            className="px-2.5 py-1 rounded-full text-xs font-semibold border border-dashed border-gray-400 text-gray-700 hover:border-blue-400 hover:text-blue-700"
+            aria-label="Pick characters"
+            title="Pick characters from your library"
+            className="inline-flex items-center justify-center w-6 h-6 text-purple-700 hover:text-purple-900"
           >
-            Pick characters
+            <PlusIcon />
           </button>
         </div>
+        {selectedChars.size > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {Array.from(selectedChars.values()).map((c) => (
+              <span
+                key={c.id}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-blue-50 border border-blue-300 text-blue-700"
+              >
+                {c.imageUrl && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={thumbnailUrl(c.imageUrl, 64) ?? c.imageUrl}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="w-4 h-4 rounded-full object-cover"
+                  />
+                )}
+                {c.name}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedChars((prev) => {
+                      const next = new Map(prev);
+                      next.delete(c.id);
+                      return next;
+                    });
+                  }}
+                  aria-label={`Remove ${c.name}`}
+                  className="ml-0.5 text-blue-500 hover:text-blue-800"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Reference image upload */}
+      {/* Reference image — label and paperclip inline. Thumbnail chip
+          appears below when attached. */}
       <div>
-        <label className="block text-xs font-semibold text-gray-700 mb-1">
-          Add reference image
-        </label>
-        {referenceImageUrl ? (
-          <div className="flex items-center gap-2 p-2 border border-gray-200 rounded-lg">
+        <div className="flex items-center gap-2 mb-1">
+          <label className="text-xs font-semibold text-gray-700">
+            Add reference image
+          </label>
+          {!referenceImageUrl && (
+            <label
+              className={`inline-flex items-center justify-center w-6 h-6 text-purple-700 cursor-pointer hover:text-purple-900 ${
+                referenceUploading ? 'opacity-50' : ''
+              }`}
+              title="Attach a reference sketch or photo (optional)"
+              aria-label="Attach a reference sketch or photo (optional)"
+            >
+              <PaperclipIcon />
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                disabled={referenceUploading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void uploadReference(file);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          )}
+        </div>
+        {referenceImageUrl && (
+          <div className="flex items-center gap-2 px-2 py-1 border border-gray-200 rounded-lg bg-white">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={referenceImageUrl} alt="reference" className="w-12 h-12 rounded object-cover" />
-            <span className="text-xs text-gray-600 flex-1 truncate">Reference attached</span>
+            <img src={referenceImageUrl} alt="reference" className="w-6 h-6 rounded object-cover flex-shrink-0" />
+            <span className="text-[11px] text-gray-600 truncate flex-1">Reference attached</span>
             <button
               type="button"
               onClick={() => setReferenceImageUrl(null)}
-              className="text-xs text-gray-500 hover:text-red-600"
+              className="text-[11px] text-gray-500 hover:text-red-600 flex-shrink-0"
             >
               Remove
             </button>
           </div>
-        ) : (
-          <label className={`flex items-center justify-center min-h-[40px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer text-xs text-gray-600 transition-colors ${
-            referenceUploading ? 'bg-gray-50' : 'hover:border-blue-400 hover:bg-blue-50/30'
-          }`}>
-            {referenceUploading ? 'Uploading…' : 'Tap to attach a sketch or photo'}
-            <input
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void uploadReference(file);
-                e.target.value = '';
-              }}
-              disabled={referenceUploading}
-            />
-          </label>
         )}
       </div>
 
@@ -560,26 +631,28 @@ function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; us
         Generating a picture takes about 20–40 seconds.
       </p>
 
-      {/* Preview pane after generation. Layout priorities:
-            1. Big primary action ("Insert into book") — clear verb,
-               separate from the kid's prompt text
-            2. Save-as-character is opt-in via a small collapsed link, so
-               most kids who just want the image aren't distracted by a
-               name field that previously got pre-filled with their prompt
-            3. Try again / Throw it away always last (less prominent) */}
-      {result && (
+      {/* Preview pane. Two layouts:
+            - Single-image view (only slotA): anchor image with full
+              action set (Insert, Save, Try again, Throw away, plus a
+              collapsed "Make a small change" trigger).
+            - Two-image view (slotA + slotB): side-by-side comparison,
+              each image has its own Use / Edit affordance. Both stay
+              visible until the kid picks one — non-destructive iteration.
+          The edit panel is hidden behind an icon-trigger so kids see a
+          clear primary action instead of a tempting open textbox. */}
+      {slotA && !slotB && (
         <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
           <p className="text-xs font-semibold text-gray-700">How does it look?</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={result.url}
-            alt={result.prompt}
+            src={slotA.url}
+            alt={slotA.prompt}
             className="w-full max-h-48 object-contain rounded bg-white"
           />
 
           <button
             type="button"
-            onClick={useResult}
+            onClick={() => useSlot('A')}
             className="w-full min-h-[40px] bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700"
           >
             Insert into book
@@ -630,68 +703,89 @@ function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; us
             </button>
           )}
 
-          <div className="flex items-center gap-2 text-xs pt-1 border-t border-gray-200 mt-2">
+          {/* Collapsed edit trigger — pencil icon + label, left-aligned.
+              Click to expand the edit panel below the result. Kids can
+              regenerate by editing the prompt at the top and clicking
+              Generate Picture (which clears slots automatically), so
+              dedicated Try-again / Throw-away buttons aren't needed
+              in the single-image view. */}
+          {!editOpen && (
             <button
               type="button"
-              onClick={() => generate()}
-              disabled={generating || editing}
-              className="flex-1 py-1.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-white disabled:opacity-50"
+              onClick={() => openEditFor('A')}
+              disabled={editing || generating}
+              className="w-full flex items-center gap-1.5 pt-2 mt-2 border-t border-gray-200 text-xs text-purple-700 hover:text-purple-900 font-medium disabled:opacity-50"
             >
-              Try again
+              <PencilIcon /> Make a small change to this picture
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setResult(null);
-                setPreviousResult(null);
+          )}
+          {editOpen && (
+            <EditPanel
+              prompt={editPrompt}
+              onPromptChange={setEditPrompt}
+              referenceImageUrl={editReferenceImageUrl}
+              onReferenceFile={(f) => void uploadEditReference(f)}
+              onClearReference={() => setEditReferenceImageUrl(null)}
+              referenceUploading={editReferenceUploading}
+              submitting={editing}
+              onSubmit={submitEdit}
+              onCancel={() => {
+                setEditOpen(false);
                 setEditPrompt('');
-                setShowSaveForm(false);
-                setSaveAsName('');
+                setEditReferenceImageUrl(null);
               }}
-              className="flex-1 py-1.5 border border-gray-300 rounded-lg text-gray-500 hover:bg-white"
-            >
-              Throw it away
-            </button>
-          </div>
-
-          {/* Inline edit — ChatGPT-style follow-up tweaks. Sends the
-              current result as previousImageUrl so the server can route
-              to an edit-capable model (OpenAI gpt-image-2 or Gemini). */}
-          <div className="pt-2 border-t border-gray-200 mt-2 space-y-1.5">
-            <p className="text-[11px] font-semibold text-gray-600">
-              Or make a small change to this picture
-            </p>
-            <textarea
-              value={editPrompt}
-              onChange={(e) => setEditPrompt(e.target.value)}
-              rows={2}
-              maxLength={500}
-              placeholder="e.g. make the wolf smaller, add a moon"
-              disabled={editing}
-              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y disabled:bg-gray-100"
+              sourceLabel="Editing this picture"
             />
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={editImage}
-                disabled={editing || generating || !editPrompt.trim()}
-                className="flex-1 min-h-[32px] bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {editing ? 'Editing…' : 'Make this change'}
-              </button>
-              {previousResult && (
-                <button
-                  type="button"
-                  onClick={undoEdit}
-                  disabled={editing || generating}
-                  className="px-2.5 min-h-[32px] text-[11px] text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg disabled:opacity-50"
-                  title="Restore the previous picture"
-                >
-                  Undo
-                </button>
-              )}
-            </div>
+          )}
+        </div>
+      )}
+
+      {slotA && slotB && (
+        <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
+          <p className="text-xs font-semibold text-gray-700">Pick one or keep editing</p>
+          <div className="grid grid-cols-2 gap-2">
+            <SlotCard
+              slot="A"
+              label="Original"
+              result={slotA}
+              onUse={() => useSlot('A')}
+              onEdit={() => openEditFor('A')}
+              disabled={editing || generating}
+            />
+            <SlotCard
+              slot="B"
+              label="New edit"
+              result={slotB}
+              onUse={() => useSlot('B')}
+              onEdit={() => openEditFor('B')}
+              disabled={editing || generating}
+            />
           </div>
+          <button
+            type="button"
+            onClick={throwAway}
+            className="w-full py-1.5 text-xs border border-gray-300 rounded-lg text-gray-500 hover:bg-white"
+          >
+            Throw both away
+          </button>
+          {editOpen && (
+            <EditPanel
+              prompt={editPrompt}
+              onPromptChange={setEditPrompt}
+              referenceImageUrl={editReferenceImageUrl}
+              onReferenceFile={(f) => void uploadEditReference(f)}
+              onClearReference={() => setEditReferenceImageUrl(null)}
+              referenceUploading={editReferenceUploading}
+              submitting={editing}
+              onSubmit={submitEdit}
+              onCancel={() => {
+                setEditOpen(false);
+                setEditPrompt('');
+                setEditReferenceImageUrl(null);
+              }}
+              sourceLabel={`Editing from ${editingFrom === 'A' ? 'Original' : 'New edit'} — the new picture will replace the ${editingFrom === 'A' ? 'New edit' : 'Original'} slot`}
+            />
+          )}
         </div>
       )}
 
@@ -719,6 +813,215 @@ function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; us
         }}
         onConfirm={() => setPickerOpen(false)}
       />
+    </div>
+  );
+}
+
+// ── Generate-tab subcomponents ────────────────────────────────────────
+
+function PencilIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+function PaperclipIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+    </svg>
+  );
+}
+
+function SlotCard({
+  slot,
+  label,
+  result,
+  onUse,
+  onEdit,
+  disabled,
+}: {
+  slot: 'A' | 'B';
+  label: string;
+  result: GenerationResult;
+  onUse: () => void;
+  onEdit: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-1.5 flex flex-col gap-1.5">
+      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider text-center">
+        {label}
+      </p>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={result.url}
+        alt={`${label} (slot ${slot})`}
+        className="w-full aspect-square object-contain rounded bg-gray-50"
+      />
+      <button
+        type="button"
+        onClick={onUse}
+        disabled={disabled}
+        className="w-full min-h-[28px] bg-blue-600 text-white text-[11px] font-semibold rounded hover:bg-blue-700 disabled:opacity-50"
+      >
+        Use this
+      </button>
+      <button
+        type="button"
+        onClick={onEdit}
+        disabled={disabled}
+        className="w-full min-h-[28px] flex items-center justify-center gap-1 text-[11px] text-purple-700 hover:text-purple-900 border border-purple-200 rounded hover:bg-purple-50 disabled:opacity-50"
+      >
+        <PencilIcon /> Edit
+      </button>
+    </div>
+  );
+}
+
+interface EditPanelProps {
+  prompt: string;
+  onPromptChange: (s: string) => void;
+  referenceImageUrl: string | null;
+  onReferenceFile: (f: File) => void;
+  onClearReference: () => void;
+  referenceUploading: boolean;
+  submitting: boolean;
+  onSubmit: () => void;
+  onCancel: () => void;
+  sourceLabel: string;
+}
+
+function EditPanel({
+  prompt,
+  onPromptChange,
+  referenceImageUrl,
+  onReferenceFile,
+  onClearReference,
+  referenceUploading,
+  submitting,
+  onSubmit,
+  onCancel,
+  sourceLabel,
+}: EditPanelProps) {
+  return (
+    <div className="pt-2 mt-2 border-t border-gray-200 space-y-1.5">
+      <p className="text-[11px] text-gray-600">{sourceLabel}</p>
+      <textarea
+        value={prompt}
+        onChange={(e) => onPromptChange(e.target.value)}
+        rows={2}
+        maxLength={500}
+        placeholder="e.g. make the wolf smaller, add a moon"
+        disabled={submitting}
+        autoFocus
+        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y disabled:bg-gray-100"
+      />
+
+      {referenceImageUrl ? (
+        <div className="flex items-center gap-2 p-1.5 border border-gray-200 rounded-lg bg-white">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={referenceImageUrl}
+            alt="reference"
+            className="w-8 h-8 rounded object-cover"
+          />
+          <span className="text-[11px] text-gray-600 flex-1 truncate">
+            Reference for this edit
+          </span>
+          <button
+            type="button"
+            onClick={onClearReference}
+            className="text-[11px] text-gray-500 hover:text-red-600"
+          >
+            Remove
+          </button>
+        </div>
+      ) : null}
+
+      <div className="flex items-center gap-2">
+        <label
+          className={`px-2 min-h-[32px] flex items-center justify-center text-purple-700 border border-purple-200 rounded-lg cursor-pointer hover:bg-purple-50 ${
+            referenceUploading ? 'opacity-50' : ''
+          }`}
+          title="Attach a reference image for this edit"
+          aria-label="Attach a reference image for this edit"
+        >
+          <PaperclipIcon />
+          <input
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            disabled={referenceUploading || submitting}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onReferenceFile(file);
+              e.target.value = '';
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={submitting || !prompt.trim() || referenceUploading}
+          className="flex-1 min-h-[32px] bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {submitting ? 'Editing…' : 'Make this change'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={submitting}
+          className="px-2 min-h-[32px] text-[11px] text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }
