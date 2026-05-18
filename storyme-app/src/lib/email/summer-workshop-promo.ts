@@ -22,7 +22,7 @@ export const SUMMER_WORKSHOP_PROMO_PREHEADER =
 const SITE_URL = 'https://www.kindlewoodstudio.ai';
 const YT_URL = 'https://www.youtube.com/@KindleWoodStudio';
 const WORKSHOPS_URL = `${SITE_URL}/workshops#steamoji`;
-const FLYER_URL = `${SITE_URL}/images/summer-2026-flyer.jpg`;
+const FLYER_URL = `${SITE_URL}/images/summer-2026-flyer-v2.jpg`;
 const LOGO_URL = `${SITE_URL}/Logo_New.png`;
 
 // Match the Spark letter type system exactly so the family of emails feels coherent.
