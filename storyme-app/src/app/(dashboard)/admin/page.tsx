@@ -17,6 +17,7 @@ import {
   BookOpen,
   Building2,
   Mail,
+  Inbox,
   ArrowUpRight,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -49,6 +50,12 @@ const groups: AdminGroup[] = [
         description: 'Demo requests and support inquiries.',
         href: '/admin/support',
         icon: <LifeBuoy className="w-[18px] h-[18px]" />,
+      },
+      {
+        title: 'Leads',
+        description: 'Inbound contact submissions from /contact.',
+        href: '/admin/leads',
+        icon: <Inbox className="w-[18px] h-[18px]" />,
       },
     ],
   },
