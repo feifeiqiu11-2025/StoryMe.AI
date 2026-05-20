@@ -51,7 +51,18 @@ const paymentStatusColors: Record<string, string> = {
 
 const partnerColors: Record<string, string> = {
   steamoji: 'bg-emerald-100 text-emerald-800',
+  'steamoji-summer-2026': 'bg-teal-100 text-teal-800',
   avocado: 'bg-amber-100 text-amber-800',
+};
+
+const STEAMOJI_PARTNER_IDS = ['steamoji', 'steamoji-summer-2026'];
+const isSteamojiPartnerId = (id: string) => STEAMOJI_PARTNER_IDS.includes(id);
+
+const partnerPillLabel = (id: string, fallback: string) => {
+  if (id === 'steamoji') return 'SteamOji';
+  if (id === 'steamoji-summer-2026') return 'SteamOji Summer';
+  if (id === 'avocado') return 'Avocado';
+  return fallback;
 };
 
 export default function AdminWorkshopsPage() {
@@ -159,10 +170,15 @@ export default function AdminWorkshopsPage() {
     if (paymentFilter === 'paid' && r.payment_status !== 'paid') return false;
     if (paymentFilter === 'pending' && r.payment_status !== 'pending') return false;
 
-    // SteamOji-specific
-    if (partnerFilter === 'steamoji' || (partnerFilter === 'all' && r.partner_id === 'steamoji')) {
-      if (sessionFilter !== 'all' && r.partner_id === 'steamoji' && r.selected_session_type !== sessionFilter) return false;
-      if (weekFilter !== 'all' && r.partner_id === 'steamoji' && !r.selected_workshop_ids.includes(weekFilter)) return false;
+    // SteamOji-family (both classic and summer)
+    if (isSteamojiPartnerId(partnerFilter) || (partnerFilter === 'all' && isSteamojiPartnerId(r.partner_id))) {
+      if (sessionFilter !== 'all' && isSteamojiPartnerId(r.partner_id) && r.selected_session_type !== sessionFilter) return false;
+      if (weekFilter !== 'all' && isSteamojiPartnerId(r.partner_id) && !r.selected_workshop_ids.includes(weekFilter)) return false;
+    }
+
+    // SteamOji Summer morning slot filter (slot-1 / slot-2)
+    if (partnerFilter === 'steamoji-summer-2026' && slotFilter !== 'all') {
+      if (r.partner_id === 'steamoji-summer-2026' && r.time_slot !== slotFilter) return false;
     }
 
     // Avocado-specific
@@ -191,7 +207,7 @@ export default function AdminWorkshopsPage() {
   const totalRevenue = paidRegs.reduce((sum, r) => sum + (r.amount_paid || 0), 0);
 
   // 5th card: partner-specific breakdown
-  const isSteamojiView = partnerFilter === 'steamoji';
+  const isSteamojiView = isSteamojiPartnerId(partnerFilter);
   const isAvocadoView = partnerFilter === 'avocado';
   const morningCount = paidRegs.filter((r) => r.selected_session_type === 'morning').length;
   const afternoonCount = paidRegs.filter((r) => r.selected_session_type === 'afternoon').length;
@@ -224,6 +240,11 @@ export default function AdminWorkshopsPage() {
         return locName;
       }
       return 'Single';
+    }
+    if (r.partner_id === 'steamoji-summer-2026' && r.selected_session_type === 'morning' && r.time_slot) {
+      const summerPartner = WORKSHOP_PARTNERS.find((p) => p.id === 'steamoji-summer-2026');
+      const ts = summerPartner?.location?.timeSlots?.find((t) => t.slug === r.time_slot);
+      if (ts) return `AM · ${ts.label}`;
     }
     return r.selected_session_type === 'morning' ? 'AM (4-6)' : 'PM (7-9)';
   };
@@ -309,7 +330,7 @@ export default function AdminWorkshopsPage() {
               onClick={() => handlePartnerChange(p.id)}
               className={pillClass(partnerFilter === p.id)}
             >
-              {p.id === 'steamoji' ? 'SteamOji' : p.id === 'avocado' ? 'Avocado' : p.partnerName}
+              {partnerPillLabel(p.id, p.partnerName)}
             </button>
           ))}
         </div>
@@ -331,8 +352,8 @@ export default function AdminWorkshopsPage() {
           ))}
         </div>
 
-        {/* SteamOji: Session type filter */}
-        {(partnerFilter === 'steamoji') && (
+        {/* SteamOji-family: Session type filter (both classic and summer) */}
+        {isSteamojiPartnerId(partnerFilter) && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Session</span>
             {(['all', 'morning', 'afternoon'] as const).map((f) => (
@@ -347,8 +368,8 @@ export default function AdminWorkshopsPage() {
           </div>
         )}
 
-        {/* SteamOji: Week filter */}
-        {partnerFilter === 'steamoji' && selectedPartner && (
+        {/* SteamOji-family: Week filter (both classic and summer) */}
+        {isSteamojiPartnerId(partnerFilter) && selectedPartner && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Week</span>
             <button
@@ -368,6 +389,29 @@ export default function AdminWorkshopsPage() {
             ))}
           </div>
         )}
+
+        {/* SteamOji Summer: morning Slot filter (9:45 vs 11:00) */}
+        {partnerFilter === 'steamoji-summer-2026' &&
+          (selectedPartner?.location?.timeSlots?.length ?? 0) > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Slot</span>
+              <button
+                onClick={() => setSlotFilter('all')}
+                className={pillClass(slotFilter === 'all')}
+              >
+                All
+              </button>
+              {selectedPartner!.location!.timeSlots!.map((ts) => (
+                <button
+                  key={ts.slug}
+                  onClick={() => setSlotFilter(ts.slug)}
+                  className={pillClass(slotFilter === ts.slug)}
+                >
+                  {ts.label}
+                </button>
+              ))}
+            </div>
+          )}
 
         {/* Avocado: Location filter */}
         {partnerFilter === 'avocado' && selectedPartner?.locations && (
@@ -480,7 +524,7 @@ export default function AdminWorkshopsPage() {
                             partnerColors[r.partner_id] || 'bg-gray-100 text-gray-800'
                           }`}
                         >
-                          {r.partner_id === 'steamoji' ? 'SteamOji' : r.partner_id === 'avocado' ? 'Avocado' : r.partner_id}
+                          {partnerPillLabel(r.partner_id, r.partner_id)}
                         </span>
                       </td>
                     )}
