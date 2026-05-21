@@ -42,6 +42,10 @@ import {
   renderSummerWorkshopPromo,
   SUMMER_WORKSHOP_PROMO_CAMPAIGN_ID,
 } from '@/lib/email/summer-workshop-promo';
+import {
+  renderCareerFairFollowup,
+  CAREER_FAIR_FOLLOWUP_CAMPAIGN_ID,
+} from '@/lib/email/career-fair-followup';
 
 export const maxDuration = 60;
 
@@ -60,15 +64,18 @@ type CampaignRenderer = (email: string) => {
 const CAMPAIGN_RENDERERS: Record<string, CampaignRenderer> = {
   [SPARK_LETTER_1_CAMPAIGN_ID]: renderSparkLetter1,
   [SUMMER_WORKSHOP_PROMO_CAMPAIGN_ID]: renderSummerWorkshopPromo,
+  [CAREER_FAIR_FOLLOWUP_CAMPAIGN_ID]: renderCareerFairFollowup,
 };
 
 // Per-campaign audience selector:
-//   'all'           — union of users.email + workshop_registrations.parent_email
-//   'workshop_only' — confirmed workshop registrations only (any partner)
-type CampaignAudience = 'all' | 'workshop_only';
+//   'all'                  — union of users.email + workshop_registrations.parent_email
+//   'workshop_only'        — confirmed workshop registrations only (any partner)
+//   'career_fair_leads'    — leads from career-fair-2026-05 source with consent
+type CampaignAudience = 'all' | 'workshop_only' | 'career_fair_leads';
 const CAMPAIGN_AUDIENCES: Record<string, CampaignAudience> = {
   [SPARK_LETTER_1_CAMPAIGN_ID]: 'all',
   [SUMMER_WORKSHOP_PROMO_CAMPAIGN_ID]: 'workshop_only',
+  [CAREER_FAIR_FOLLOWUP_CAMPAIGN_ID]: 'career_fair_leads',
 };
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -159,6 +166,35 @@ export async function POST(req: NextRequest) {
     const all = new Set<string>();
     for (const row of workshopsResp.data || []) {
       const e = (row as { parent_email: string }).parent_email?.toLowerCase().trim();
+      if (e && e.includes('@')) all.add(e);
+    }
+    recipients = Array.from(all);
+  } else if (audience === 'career_fair_leads') {
+    // Career fair attendees only — leads tagged with the specific event source
+    // and who explicitly consented to marketing email.
+    const leadsResp = await supabase
+      .from('leads')
+      .select('email')
+      .eq('source', 'career-fair-2026-05')
+      .eq('consent_marketing', true)
+      .not('email', 'is', null);
+
+    if (leadsResp.error) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'DB_QUERY_FAILED',
+            message: 'Failed to load career-fair leads',
+            details: leadsResp.error.message,
+          },
+        },
+        { status: 500 },
+      );
+    }
+    const all = new Set<string>();
+    for (const row of leadsResp.data || []) {
+      const e = (row as { email: string }).email?.toLowerCase().trim();
       if (e && e.includes('@')) all.add(e);
     }
     recipients = Array.from(all);

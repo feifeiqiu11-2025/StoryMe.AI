@@ -50,6 +50,12 @@ const CAMPAIGNS: Campaign[] = [
     description:
       'KindleWood × Steamoji co-hosted workshop announcement. Sends to past workshop attendees only (confirmed registrations, any partner).',
   },
+  {
+    id: 'career-fair-followup-2026-05',
+    label: 'Career fair follow-up (May 2026)',
+    description:
+      'Thanks-for-stopping-by note with careers-page CTA. Sends only to leads from source=career-fair-2026-05 with marketing consent.',
+  },
 ];
 
 interface DryRunResponse {
