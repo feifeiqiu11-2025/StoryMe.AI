@@ -40,6 +40,8 @@ interface BookForReader {
   editorDoc: JSONContent | null;
 }
 
+type AudioByPage = Record<number, { audioUrl?: string | null; audioUrlSecondary?: string | null }>;
+
 export default function ChapterBookReadPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
@@ -52,6 +54,7 @@ export default function ChapterBookReadPage() {
   const isPreview = searchParams.get('preview') === '1';
 
   const [book, setBook] = useState<BookForReader | null>(null);
+  const [audioByPage, setAudioByPage] = useState<AudioByPage | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -89,6 +92,29 @@ export default function ChapterBookReadPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'view' }),
           }).catch(() => {});
+        }
+        // Audio is owner-only for v1. /api/v1/chapter-books/[id]/audio-pages
+        // requires auth + ownership; public chapter-book audio shipping is a
+        // follow-up (likely via a public audio endpoint or by inlining audio
+        // URLs into the public read response). Spotify publish path is the
+        // main public audio surface in the meantime.
+        if (isPreview) {
+          void fetch(`/api/v1/chapter-books/${id}/audio-pages`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => {
+              if (!d?.pages) return;
+              const map: AudioByPage = {};
+              for (const p of d.pages) {
+                if (p.audioUrl || p.audioUrlSecondary) {
+                  map[p.pageNumber] = {
+                    audioUrl: p.audioUrl,
+                    audioUrlSecondary: p.audioUrlSecondary,
+                  };
+                }
+              }
+              setAudioByPage(map);
+            })
+            .catch(() => { /* silent — reader still works without audio */ });
         }
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load.'));
@@ -141,6 +167,7 @@ export default function ChapterBookReadPage() {
       title={book.title}
       authorName={book.authorName}
       doc={book.editorDoc}
+      audioByPage={audioByPage}
       onExit={onExit}
     />
   );

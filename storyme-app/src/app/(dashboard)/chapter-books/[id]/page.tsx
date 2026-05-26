@@ -32,6 +32,10 @@ import TagSelector from '@/components/story/TagSelector';
 import { downloadChapterBookPDF, type ChapterBookPdfFormat } from '@/lib/pdf/chapterBookRenderer';
 import { docToPages } from '@/lib/chapter-book/docToPages';
 import type { StoryTag } from '@/lib/types/story';
+import {
+  ChapterBookAudioControls,
+  ChapterBookSpotifyButton,
+} from '@/components/chapter-book/ChapterBookAudioActions';
 
 type Visibility = 'private' | 'unlisted' | 'public';
 
@@ -411,17 +415,17 @@ function Body() {
                 <span aria-hidden>📖</span>
                 <span>Read Mode</span>
               </Link>
-              <DisabledAction
-                tone="green"
-                icon="🎵"
-                label="Audio"
-                tooltip="Coming soon — auto-narrate your book page by page."
-              />
-              <DisabledAction
-                tone="pink"
-                icon="🎤"
-                label="Record Audio"
-                tooltip="Coming soon — record your own narration."
+              <ChapterBookAudioControls
+                projectId={book.id}
+                carouselPageNumber={
+                  currentSlide && currentSlide.kind === 'page' ? currentSlide.pageNumber : undefined
+                }
+                onActivePageChange={(pageNumber) => {
+                  const slideIdx = slides.findIndex(
+                    (s) => s.kind === 'page' && s.pageNumber === pageNumber,
+                  );
+                  if (slideIdx >= 0) setCurrentPageIndex(slideIdx);
+                }}
               />
               <button
                 type="button"
@@ -463,12 +467,7 @@ function Body() {
                 <span aria-hidden>🔗</span>
                 <span>{isUnlisted ? 'Link Active' : 'Share Link'}</span>
               </button>
-              <DisabledAction
-                tone="dark"
-                icon="🎧"
-                label="Spotify"
-                tooltip="Coming soon — needs narration first."
-              />
+              <ChapterBookSpotifyButton projectId={book.id} />
               <DisabledAction
                 tone="blue"
                 icon="📱"

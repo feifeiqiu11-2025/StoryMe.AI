@@ -8,8 +8,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientFromRequest } from '@/lib/supabase/server';
-import { getAzureTTSClient, isAzureTTSAvailable } from '@/lib/azure-tts-client';
+import { isAzureTTSAvailable } from '@/lib/azure-tts-client';
 import { isSupportedSecondaryLanguage, getLanguageLabel } from '@/lib/config/languages';
+import { synthesizeAndStore } from '@/lib/audio/tts.service';
 
 // Maximum duration for this API route (5 minutes)
 export const maxDuration = 300;
@@ -194,8 +195,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Initialize Azure TTS client (used for both English and Chinese)
-    const azureTTS = getAzureTTSClient();
     console.log(`🎤 Using Azure TTS for ${language.toUpperCase()} with kid-friendly voice (tone: ${tone})`);
 
     // For English: Delete existing audio pages and recreate
@@ -297,38 +296,30 @@ export async function POST(request: NextRequest) {
         }
 
         // Generate audio using Azure TTS (for both English and secondary languages)
-        const azureResult = await azureTTS.synthesize(page.textContent, tone, language);
-        const buffer = azureResult.audioBuffer;
-        console.log(`[Azure TTS] Generated ${buffer.length} bytes for page ${page.pageNumber}`);
-
-        // Upload to Supabase storage with language suffix
-        const filename = `${projectId}/page-${page.pageNumber}-${language}-${Date.now()}.mp3`;
-        const { error: uploadError } = await supabase.storage
-          .from('story-audio-files')
-          .upload(filename, buffer, {
-            contentType: 'audio/mpeg',
-            upsert: true,
+        let synthResult;
+        try {
+          synthResult = await synthesizeAndStore({
+            supabase,
+            projectId,
+            pageNumber: page.pageNumber,
+            text: page.textContent,
+            language,
+            tone,
           });
-
-        if (uploadError) {
-          console.error(`Upload error for page ${page.pageNumber}:`, uploadError);
-
-          // Update status to failed
+        } catch (synthError: any) {
+          console.error(`TTS/upload error for page ${page.pageNumber}:`, synthError);
           await supabase
             .from('story_audio_pages')
             .update({
               generation_status: 'failed',
-              error_message: uploadError.message,
+              error_message: synthError.message || 'TTS/upload failed',
             })
             .eq('id', audioPageId);
-
           continue;
         }
-
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('story-audio-files')
-          .getPublicUrl(filename);
+        const publicUrl = synthResult.audioUrl;
+        const filename = synthResult.storagePath;
+        console.log(`[Azure TTS] Generated ${synthResult.fileSizeBytes} bytes for page ${page.pageNumber}`);
 
         // Update audio page with URL based on language
         const updateData = language === 'en'

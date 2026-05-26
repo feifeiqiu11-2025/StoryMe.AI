@@ -145,3 +145,50 @@ select:disabled {
   -webkit-text-fill-color: #6b7280 !important;
   opacity: 0.6;
 }
+
+/* Volume slider used in the audio recorder. Native range inputs render
+   their thumb outside the track on most browsers because the default
+   thumb height exceeds the track height. These overrides give us a clean
+   pill track with a centered purple dot in both WebKit and Firefox. */
+input[type='range'].vol-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 14px;
+  padding: 0;
+}
+input[type='range'].vol-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 9999px;
+}
+input[type='range'].vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #9333ea;
+  border-radius: 9999px;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #9333ea;
+  margin-top: -4px;
+}
+input[type='range'].vol-slider::-moz-range-track {
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 9999px;
+  border: none;
+}
+input[type='range'].vol-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #9333ea;
+  border-radius: 9999px;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #9333ea;
+}
+input[type='range'].vol-slider:focus { outline: none; }
+input[type='range'].vol-slider:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 1px #9333ea, 0 0 0 4px rgba(147, 51, 234, 0.2);
+}

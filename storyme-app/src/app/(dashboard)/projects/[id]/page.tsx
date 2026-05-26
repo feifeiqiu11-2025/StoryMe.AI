@@ -16,8 +16,8 @@ import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeVi
 import Tooltip from '@/components/ui/Tooltip';
 import TagSelector from '@/components/story/TagSelector';
 import { getLanguageLabel, getLanguageConfig } from '@/lib/config/languages';
-import { SkipForward, SkipBack } from 'lucide-react';
 import { isAdminEmail } from '@/lib/auth/isAdmin';
+import Recorder, { RecordingPage, SaveRecordingArgs } from '@/components/audio/Recorder';
 
 export default function StoryViewerPage() {
   const router = useRouter();
@@ -53,31 +53,14 @@ export default function StoryViewerPage() {
   const [generatingQuiz, setGeneratingQuiz] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
 
-  // Recording mode state
+  // Recording mode is entered/exited; all in-progress recording state lives
+  // inside <Recorder> (components/audio/Recorder.tsx).
   const [recordingMode, setRecordingMode] = useState(false);
-  const [uploadingAudio, setUploadingAudio] = useState(false);
-  const [pageRecordings, setPageRecordings] = useState<Map<number, { blob: Blob; url: string; duration: number }>>(new Map());
-  const [savedPages, setSavedPages] = useState<Set<number>>(new Set()); // Track which pages are uploaded to server
-  const [isRecording, setIsRecording] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
-  const [recordingChunks, setRecordingChunks] = useState<Blob[]>([]);
-  // Recording language: 'en' or the project's secondary language code (e.g. 'zh', 'ko')
-  const [recordingLanguage, setRecordingLanguage] = useState<string>('en');
+  // Server-saved audio per page (keyed by 1-based pageNumber). Fetched on
+  // entry to recording mode so the recorder can offer "Edit saved audio".
+  const [existingPageAudio, setExistingPageAudio] = useState<Record<number, { audioUrl: string }>>({});
   const [showAudioDropdown, setShowAudioDropdown] = useState(false);
   const audioDropdownRef = useRef<HTMLDivElement>(null);
-  const audioPreviewRef = useRef<HTMLAudioElement>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const startTimeRef = useRef<number>(0);
-
-  // Draggable panel state
-  const [panelPosition, setPanelPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const panelRef = useRef<HTMLDivElement>(null);
 
   // PDF dropdown ref
   const pdfDropdownRef = useRef<HTMLDivElement>(null);
@@ -329,530 +312,129 @@ export default function StoryViewerPage() {
       return;
     }
 
+    // Fetch existing server-saved audio per page so the recorder can offer
+    // "Edit saved audio" on pages with prior recordings. Best-effort — if
+    // this fails, recorder still opens (just without the Edit affordance).
+    try {
+      const res = await fetch(`/api/projects/${projectId}/audio-pages`);
+      if (res.ok) {
+        const data = await res.json();
+        const map: Record<number, { audioUrl: string }> = {};
+        for (const p of data.pages ?? []) {
+          if (p.audio_url && (p.audio_source === 'user_recorded' || p.audio_source === 'ai_voice_clone')) {
+            map[p.page_number] = { audioUrl: p.audio_url };
+          }
+        }
+        setExistingPageAudio(map);
+      }
+    } catch (err) {
+      console.warn('Could not load existing audio for editing:', err);
+    }
+
     console.log('🎙️ Entering recording mode...');
     setRecordingMode(true);
   };
 
-  const handleExitRecordingMode = () => {
-    console.log('🎙️ Exiting recording mode...');
-
-    // Stop recording if active
-    if (isRecording && mediaRecorder) {
-      mediaRecorder.stop();
-    }
-
-    // Stop preview if playing
-    if (audioPreviewRef.current) {
-      audioPreviewRef.current.pause();
-    }
-
-    // Clear timer
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-
-    // Stop audio stream
-    if (audioStream) {
-      audioStream.getTracks().forEach(track => track.stop());
-    }
-
+  const handleCloseRecorder = () => {
     setRecordingMode(false);
-    setIsRecording(false);
-    setIsPaused(false);
-    setRecordingTime(0);
-    setIsPlaying(false);
   };
 
-  // Request microphone access
-  const requestMicrophoneAccess = async () => {
-    try {
-      if (!window.isSecureContext) {
-        alert('❌ Audio recording requires HTTPS or localhost.\n\nPlease access via:\n• https://story-me-ai.vercel.app (production)\n• http://localhost:3001 (dev)');
-        return null;
-      }
-
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert('❌ Audio recording is not supported in your browser.\n\nPlease update to the latest version of Chrome, Firefox, Safari, or Edge.');
-        return null;
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setAudioStream(stream);
-      return stream;
-    } catch (error: any) {
-      console.error('Microphone access error:', error);
-      if (error.name === 'NotAllowedError') {
-        alert('❌ Microphone access denied.\n\nPlease allow microphone access in your browser settings.');
-      } else if (error.name === 'NotFoundError') {
-        alert('❌ No microphone found.\n\nPlease connect a microphone and try again.');
-      } else {
-        alert(`❌ Failed to access microphone: ${error.message}`);
-      }
-      return null;
-    }
-  };
-
-  // Start recording for current page
-  const startRecording = async () => {
-    let stream = audioStream;
-    if (!stream) {
-      stream = await requestMicrophoneAccess();
-      if (!stream) return;
-    }
-
-    try {
-      // Try multiple codec options in order of preference
-      let recorder: MediaRecorder | null = null;
-      const codecOptions = [
-        { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 128000 },
-        { mimeType: 'audio/webm', audioBitsPerSecond: 128000 },
-        { mimeType: 'audio/mp4', audioBitsPerSecond: 128000 },
-        { mimeType: 'audio/ogg;codecs=opus', audioBitsPerSecond: 128000 },
-        {}, // Fallback: Let browser choose default
-      ];
-
-      for (const options of codecOptions) {
-        try {
-          // Check if mime type is supported (if specified)
-          if (options.mimeType && !MediaRecorder.isTypeSupported(options.mimeType)) {
-            console.log(`❌ Codec not supported: ${options.mimeType}`);
-            continue;
-          }
-
-          // Try to create MediaRecorder with these options
-          recorder = new MediaRecorder(stream, options as MediaRecorderOptions);
-          console.log(`✅ Using codec: ${options.mimeType || 'browser default'}`);
-          break; // Success!
-        } catch (err) {
-          console.warn(`Failed to create MediaRecorder with ${options.mimeType || 'default'}:`, err);
-          continue; // Try next option
-        }
-      }
-
-      if (!recorder) {
-        throw new Error('No supported audio codec found');
-      }
-
-      const chunks: Blob[] = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          console.log(`📦 Audio chunk received: ${e.data.size} bytes, type: ${e.data.type}`);
-          chunks.push(e.data);
-        }
-      };
-
-      recorder.onstop = () => {
-        console.log(`🛑 Recording stopped. Total chunks: ${chunks.length}, Recorder mimeType: ${recorder!.mimeType}`);
-
-        if (chunks.length === 0) {
-          console.error('❌ No audio chunks recorded!');
-          alert('Recording failed - no audio data captured. Please try again.');
-          return;
-        }
-
-        const blob = new Blob(chunks, { type: recorder!.mimeType });
-        console.log(`📝 Created blob: ${blob.size} bytes, type: ${blob.type}`);
-
-        if (blob.size === 0) {
-          console.error('❌ Empty audio blob!');
-          alert('Recording failed - empty audio. Please try again.');
-          return;
-        }
-
-        const url = URL.createObjectURL(blob);
-        const duration = recordingTime;
-
-        // Save recording for current page
-        const newRecordings = new Map(pageRecordings);
-        newRecordings.set(currentSceneIndex, { blob, url, duration });
-        setPageRecordings(newRecordings);
-
-        console.log(`✅ Recorded page ${currentSceneIndex + 1} - ${duration}s, URL: ${url}`);
-      };
-
-      recorder.start();
-      setMediaRecorder(recorder);
-      setRecordingChunks(chunks);
-      setIsRecording(true);
-      setIsPaused(false);
-      setRecordingTime(0);
-      startTimeRef.current = Date.now();
-
-      // Start timer
-      timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => {
-          const newTime = prev + 1;
-          // Auto-stop at 60 seconds
-          if (newTime >= 60) {
-            stopRecording();
-          }
-          return newTime;
-        });
-      }, 1000);
-    } catch (error) {
-      console.error('Recording start error:', error);
-      alert('Failed to start recording. Please try again.');
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
-    }
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-    setIsRecording(false);
-    setIsPaused(false);
-  };
-
-  const pauseRecording = () => {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      mediaRecorder.pause();
-      setIsPaused(true);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    }
-  };
-
-  const resumeRecording = () => {
-    if (mediaRecorder && mediaRecorder.state === 'paused') {
-      mediaRecorder.resume();
-      setIsPaused(false);
-
-      // Resume timer
-      timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => {
-          const newTime = prev + 1;
-          if (newTime >= 60) {
-            stopRecording();
-          }
-          return newTime;
-        });
-      }, 1000);
-    }
-  };
-
-  const deleteRecording = () => {
-    const newRecordings = new Map(pageRecordings);
-    const recording = newRecordings.get(currentSceneIndex);
-    if (recording) {
-      URL.revokeObjectURL(recording.url);
-      newRecordings.delete(currentSceneIndex);
-      setPageRecordings(newRecordings);
-    }
-  };
-
-  const playRecording = () => {
-    const recording = pageRecordings.get(currentSceneIndex);
-    console.log(`🎵 Play requested for page ${currentSceneIndex}`, recording);
-
-    if (!recording) {
-      console.error('❌ No recording found for this page');
-      return;
-    }
-
-    if (!audioPreviewRef.current) {
-      console.error('❌ Audio element ref is null');
-      return;
-    }
-
-    console.log(`▶️ Playing audio: ${recording.url}, blob size: ${recording.blob.size}, duration: ${recording.duration}s`);
-
-    try {
-      audioPreviewRef.current.src = recording.url;
-      audioPreviewRef.current.play().then(() => {
-        console.log('✅ Playback started successfully');
-        setIsPlaying(true);
-      }).catch((err) => {
-        console.error('❌ Playback failed:', err);
-        alert(`Failed to play recording: ${err.message}`);
+  // Build pages array for <Recorder>: cover + scenes + (quiz if present).
+  // Mirrors the picture-book viewer's allPages order so page numbers align
+  // with the story_audio_pages rows the upload endpoint writes.
+  const buildRecordingPages = (): RecordingPage[] => {
+    if (!project) return [];
+    const sortedScenes = (project.scenes || [])
+      .slice()
+      .sort((a: any, b: any) => a.sceneNumber - b.sceneNumber);
+    const pages: RecordingPage[] = [
+      {
+        pageNumber: 1,
+        pageType: 'cover',
+        text: project.title || '',
+        imageUrl: project.coverImageUrl,
+      },
+    ];
+    sortedScenes.forEach((scene: any) => {
+      pages.push({
+        pageNumber: pages.length + 1,
+        pageType: 'scene',
+        text: scene.caption || scene.description || '',
+        textSecondary: scene.captionSecondary || scene.captionChinese,
+        imageUrl: scene.images?.[0]?.imageUrl,
+        refId: scene.id,
       });
-    } catch (err: any) {
-      console.error('❌ Error setting up playback:', err);
-      alert(`Error playing recording: ${err.message}`);
-    }
-  };
-
-  const stopPreview = () => {
-    if (audioPreviewRef.current) {
-      audioPreviewRef.current.pause();
-      audioPreviewRef.current.currentTime = 0;
-    }
-    setIsPlaying(false);
-  };
-
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Drag handlers for movable panel
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!panelRef.current) return;
-
-    const rect = panelRef.current.getBoundingClientRect();
-    setDragOffset({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
     });
-    setIsDragging(true);
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging || !panelRef.current) return;
-
-    const maxX = window.innerWidth - panelRef.current.offsetWidth;
-    const maxY = window.innerHeight - panelRef.current.offsetHeight;
-
-    const newX = Math.max(0, Math.min(e.clientX - dragOffset.x, maxX));
-    const newY = Math.max(0, Math.min(e.clientY - dragOffset.y, maxY));
-
-    setPanelPosition({ x: newX, y: newY });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  // Add/remove mouse event listeners for dragging
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isDragging, dragOffset]);
-
-  // Save current page only and auto-advance to next
-  const handleSaveCurrentPage = async () => {
-    const recording = pageRecordings.get(currentSceneIndex);
-
-    if (!recording) {
-      alert('No recording for this page. Please record first.');
-      return;
-    }
-
-    setUploadingAudio(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('projectId', projectId);
-      formData.append('language', recordingLanguage);
-      formData.append('voiceProfileName', `${user?.name || 'User'}'s Voice`);
-
-      const page = allPages[currentSceneIndex];
-      const metadata = [{
-        pageNumber: currentSceneIndex + 1,
-        pageType: page.type,
-        sceneId: page.type === 'scene' ? page.scene?.id : undefined,
-        quizQuestionId: page.type === 'quiz_question' ? page.question?.id : undefined,
-        textContent: page.type === 'cover' ? `${page.title}` :
-                    page.type === 'scene' ? page.scene?.description :
-                    page.type === 'quiz_question' ? page.question?.question : '',
-        duration: recording.duration,
-      }];
-
-      formData.append(`audio_${currentSceneIndex + 1}`, recording.blob, `page-${currentSceneIndex + 1}.webm`);
-      formData.append('audioMetadata', JSON.stringify(metadata));
-
-      const response = await fetch('/api/upload-user-audio', {
-        method: 'POST',
-        body: formData,
+    if (quizQuestions.length > 0) {
+      pages.push({
+        pageNumber: pages.length + 1,
+        pageType: 'quiz_transition',
+        text: "Let's see if our little readers and listeners are paying attention!",
+        imageUrl: project.coverImageUrl,
       });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        console.log(`✅ Page ${currentSceneIndex + 1} saved successfully`);
-
-        // Mark this page as saved
-        const newSavedPages = new Set(savedPages);
-        newSavedPages.add(currentSceneIndex);
-        setSavedPages(newSavedPages);
-
-        // Remove from unsaved recordings (keep blob for preview until exit)
-        // URL.revokeObjectURL(recording.url);
-        // const newRecordings = new Map(pageRecordings);
-        // newRecordings.delete(currentSceneIndex);
-        // setPageRecordings(newRecordings);
-
-        setHasAudio(true);
-
-        // Auto-advance to next page or exit if last page
-        if (currentSceneIndex < allPages.length - 1) {
-          // Go to next page
-          setCurrentSceneIndex(currentSceneIndex + 1);
-
-          // Stop any playing preview
-          if (isPlaying) {
-            stopPreview();
-          }
-        } else {
-          // Last page - show success and exit
-          alert(`✅ All pages recorded and saved!\n\nYour audio narration is ready.`);
-          await checkAudioExists();
-          handleExitRecordingMode();
-        }
-      } else {
-        console.error('Audio upload failed:', data);
-        alert(`❌ Failed to save page ${currentSceneIndex + 1}: ${data.error || 'Unknown error'}\n\nPlease try again.`);
-      }
-    } catch (error: any) {
-      console.error('Audio upload error:', error);
-      alert(`❌ Error saving audio: ${error.message || 'Unknown error'}\n\nPlease try again.`);
-    } finally {
-      setUploadingAudio(false);
-    }
-  };
-
-  // Skip current page in Recording Mode: advance without uploading. Pages without
-  // a user recording continue to play their AI-generated narration at runtime.
-  // On the last page, Skip exits recording mode (Skip & Finish).
-  const handleSkipPage = () => {
-    if (isPlaying) stopPreview();
-    if (currentSceneIndex >= allPages.length - 1) {
-      handleExitRecordingMode();
-      return;
-    }
-    setCurrentSceneIndex(currentSceneIndex + 1);
-  };
-
-  // Step back to the previous page in Recording Mode. In-memory recordings on
-  // the current page are preserved so the user can return to them later.
-  const handlePreviousPage = () => {
-    if (isPlaying) stopPreview();
-    if (currentSceneIndex <= 0) return;
-    setCurrentSceneIndex(currentSceneIndex - 1);
-  };
-
-  // Legacy: Save all recordings at once (keep for backward compatibility)
-  const handleSaveAllRecordings = async () => {
-    if (pageRecordings.size === 0) {
-      alert('No recordings to save. Please record at least one page.');
-      return;
-    }
-
-    setUploadingAudio(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('projectId', projectId);
-      formData.append('language', 'en');
-      formData.append('voiceProfileName', `${user?.name || 'User'}'s Voice`);
-
-      const metadata: any[] = [];
-      const recordings = Array.from(pageRecordings.entries());
-
-      recordings.forEach(([pageIndex, recording]) => {
-        const page = allPages[pageIndex];
-
-        metadata.push({
-          pageNumber: pageIndex + 1,
-          pageType: page.type,
-          sceneId: page.type === 'scene' ? page.scene?.id : undefined,
-          quizQuestionId: page.type === 'quiz_question' ? page.question?.id : undefined,
-          textContent: page.type === 'cover' ? `${page.title}` :
-                      page.type === 'scene' ? page.scene?.description :
-                      page.type === 'quiz_question' ? page.question?.question : '',
-          duration: recording.duration,
+      quizQuestions.forEach((q: any) => {
+        pages.push({
+          pageNumber: pages.length + 1,
+          pageType: 'quiz_question',
+          text: q.question || '',
+          imageUrl: project.coverImageUrl,
+          refId: q.id,
         });
-
-        formData.append(`audio_${pageIndex + 1}`, recording.blob, `page-${pageIndex + 1}.webm`);
       });
+    }
+    return pages;
+  };
 
-      formData.append('audioMetadata', JSON.stringify(metadata));
+  const handleSaveRecording = async ({
+    page,
+    pageIndex,
+    blob,
+    duration,
+    language,
+    trim,
+  }: SaveRecordingArgs) => {
+    try {
+      const formData = new FormData();
+      formData.append('projectId', projectId);
+      formData.append('language', language);
+      formData.append('voiceProfileName', `${user?.name || 'User'}'s Voice`);
+      formData.append('audioMetadata', JSON.stringify([{
+        pageNumber: pageIndex + 1,
+        pageType: page.pageType,
+        sceneId: page.pageType === 'scene' ? page.refId : undefined,
+        quizQuestionId: page.pageType === 'quiz_question' ? page.refId : undefined,
+        textContent: page.text,
+        duration,
+        ...(trim ? { trimStartSec: trim.startSec, trimEndSec: trim.endSec } : {}),
+      }]));
+      formData.append(`audio_${pageIndex + 1}`, blob, `page-${pageIndex + 1}.webm`);
 
-      const response = await fetch('/api/upload-user-audio', {
+      const res = await fetch('/api/upload-user-audio', {
         method: 'POST',
         body: formData,
       });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        alert(`✅ Audio uploaded successfully!\n\n${data.successfulPages} of ${recordings.length} pages uploaded.`);
-        setHasAudio(true);
-        await checkAudioExists();
-        handleExitRecordingMode();
-
-        // Clear recordings
-        pageRecordings.forEach(rec => URL.revokeObjectURL(rec.url));
-        setPageRecordings(new Map());
-        setSavedPages(new Set());
-      } else {
-        console.error('Audio upload failed:', data);
-        alert(`❌ Audio upload failed: ${data.error || 'Unknown error'}`);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Upload failed' };
       }
-    } catch (error: any) {
-      console.error('Audio upload error:', error);
-      alert(`❌ Error uploading audio: ${error.message || 'Unknown error'}`);
-    } finally {
-      setUploadingAudio(false);
+      setHasAudio(true);
+      // The route uploads one page at a time from the recorder, so the
+      // returned audioPages array has exactly one entry — its id and
+      // audio_url drive the post-upload PATCH /layers when SFX were placed.
+      const firstPage = (data.audioPages ?? [])[0];
+      return {
+        success: true,
+        audioPageId: firstPage?.id,
+        audioUrl: firstPage?.audio_url,
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error' };
     }
   };
 
-  const handleUploadRecordings = async (recordings: any[]) => {
-    setUploadingAudio(true);
-
-    try {
-      console.log(`🎙️ Uploading ${recordings.length} audio recordings...`);
-
-      // Prepare form data
-      const formData = new FormData();
-      formData.append('projectId', projectId);
-      formData.append('language', 'en'); // TODO: Support multi-language
-      formData.append('voiceProfileName', `${user?.name || 'User'}'s Voice`);
-
-      // Build metadata array
-      const metadata = recordings.map((rec, index) => {
-        const page = recordingPages.find(p => p.pageNumber === rec.pageNumber);
-        return {
-          pageNumber: rec.pageNumber,
-          pageType: page?.pageType || 'scene',
-          sceneId: page?.sceneId,
-          quizQuestionId: page?.quizQuestionId,
-          textContent: page?.textContent || '',
-          duration: rec.duration,
-        };
-      });
-
-      formData.append('audioMetadata', JSON.stringify(metadata));
-
-      // Append audio files
-      recordings.forEach((rec) => {
-        formData.append(`audio_${rec.pageNumber}`, rec.audioBlob, `page-${rec.pageNumber}.webm`);
-      });
-
-      // Upload to API
-      const response = await fetch('/api/upload-user-audio', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        alert(`✅ Audio uploaded successfully!\n\n${data.successfulPages} of ${recordings.length} pages uploaded.`);
-        setHasAudio(true);
-        await checkAudioExists();
-        setShowRecorder(false);
-      } else {
-        console.error('Audio upload failed:', data);
-        alert(`❌ Audio upload failed: ${data.error || 'Unknown error'}`);
-      }
-    } catch (error: any) {
-      console.error('Audio upload error:', error);
-      alert(`❌ Error uploading audio: ${error.message || 'Unknown error'}`);
-    } finally {
-      setUploadingAudio(false);
-    }
+  const handleAllRecordingsSaved = async () => {
+    await checkAudioExists();
+    alert('All pages recorded and saved! Your audio narration is ready.');
   };
 
   const handleEnterReadingMode = async () => {
@@ -1611,20 +1193,10 @@ export default function StoryViewerPage() {
                   <Tooltip text="Record your own voice narration for this story">
                     <button
                       onClick={handleRecordAudio}
-                      disabled={uploadingAudio}
-                      className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg hover:from-red-600 hover:to-pink-600 font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg hover:from-red-600 hover:to-pink-600 font-medium shadow-md transition-all"
                     >
-                      {uploadingAudio ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          <span>Saving...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>🎙️</span>
-                          <span>Record Audio</span>
-                        </>
-                      )}
+                      <span>🎙️</span>
+                      <span>Record Audio</span>
                     </button>
                   </Tooltip>
 
@@ -1930,240 +1502,29 @@ export default function StoryViewerPage() {
         </div>
       )}
 
-      {/* Recording Mode Overlay — active recording UI for the dashboard.
-          NOTE: components/story/AudioRecorder.tsx is a separate full-screen recorder
-          used only by app/stories/[id]/page.tsx. Keep both flows in sync if behavior
-          changes meaningfully. */}
-      {recordingMode && (
-        <>
-          {/* Hidden audio element for preview */}
-          <audio
-            ref={audioPreviewRef}
-            onEnded={() => setIsPlaying(false)}
-            onPause={() => setIsPlaying(false)}
+      {recordingMode && (() => {
+        const recordingPages = buildRecordingPages();
+        const secondaryCode = project?.secondaryLanguage as string | undefined;
+        const recorderSecondary = hasBilingualContent && secondaryCode
+          ? {
+              code: secondaryCode,
+              label: getLanguageConfig(secondaryCode)?.nativeLabel ?? secondaryCode.toUpperCase(),
+            }
+          : undefined;
+        return (
+          <Recorder
+            pages={recordingPages}
+            secondaryLanguage={recorderSecondary}
+            maxSecondsPerPage={60}
+            initialPageIndex={currentSceneIndex}
+            onPageIndexChange={setCurrentSceneIndex}
+            existingPageAudio={existingPageAudio}
+            onSaveRecording={handleSaveRecording}
+            onClose={handleCloseRecorder}
+            onAllSaved={handleAllRecordingsSaved}
           />
-
-          {/* Recording panel - draggable, positioned at bottom-right by default */}
-          <div
-            ref={panelRef}
-            className="fixed z-50 max-w-md"
-            style={{
-              left: panelPosition.x ? `${panelPosition.x}px` : 'auto',
-              top: panelPosition.y ? `${panelPosition.y}px` : 'auto',
-              right: !panelPosition.x ? '1rem' : 'auto',
-              bottom: !panelPosition.y ? '1rem' : 'auto',
-              cursor: isDragging ? 'grabbing' : 'auto',
-            }}
-          >
-            <div className="bg-white rounded-2xl shadow-2xl p-4 border-2 border-purple-200 w-80">
-              {/* Header Row - Title + Close */}
-              <div
-                onMouseDown={handleMouseDown}
-                className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing"
-              >
-                <h3 className="text-sm font-bold text-gray-900">🎙️ Recording Mode</h3>
-                <button
-                  onClick={handleExitRecordingMode}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Status + Language Row */}
-              <div className="flex items-center justify-between mb-3 px-1">
-                <p className="text-xs text-gray-600">
-                  <span className="text-green-600 font-semibold">{savedPages.size}</span>
-                  <span className="text-gray-500"> saved, </span>
-                  <span className="text-gray-500">{allPages.length - savedPages.size} left</span>
-                </p>
-                {/* Language Selector — toggles EN ↔ project's secondary language (zh/ko/etc.) */}
-                {hasBilingualContent && project?.secondaryLanguage && (() => {
-                  const secondaryCode = project.secondaryLanguage as string;
-                  const secondaryLabel = getLanguageConfig(secondaryCode)?.nativeLabel
-                    ?? secondaryCode.toUpperCase();
-                  return (
-                    <div className="flex rounded-md overflow-hidden border border-gray-300">
-                      <button
-                        onClick={() => setRecordingLanguage('en')}
-                        className={`px-2 py-0.5 text-xs font-medium transition-colors ${
-                          recordingLanguage === 'en'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 hover:bg-gray-100'
-                        }`}
-                      >
-                        EN
-                      </button>
-                      <button
-                        onClick={() => setRecordingLanguage(secondaryCode)}
-                        className={`px-2 py-0.5 text-xs font-medium transition-colors ${
-                          recordingLanguage === secondaryCode
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 hover:bg-gray-100'
-                        }`}
-                      >
-                        {secondaryLabel}
-                      </button>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Save Button Row + Prev/Skip icons (navigate without saving = page keeps AI narration) */}
-              <div className="mb-3 flex gap-2">
-                <button
-                  onClick={handlePreviousPage}
-                  disabled={uploadingAudio || currentSceneIndex === 0}
-                  title="Previous page"
-                  aria-label="Previous page"
-                  className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  <SkipBack className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleSaveCurrentPage}
-                  disabled={uploadingAudio || !pageRecordings.has(currentSceneIndex)}
-                  className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  {uploadingAudio ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Saving...
-                    </span>
-                  ) : currentSceneIndex === allPages.length - 1 ? (
-                    'Save & Finish'
-                  ) : (
-                    'Save & Continue'
-                  )}
-                </button>
-                <button
-                  onClick={handleSkipPage}
-                  disabled={uploadingAudio}
-                  title={
-                    currentSceneIndex === allPages.length - 1
-                      ? 'Skip and finish (this page keeps AI narration)'
-                      : 'Skip page (this page keeps AI narration)'
-                  }
-                  aria-label="Skip page"
-                  className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  <SkipForward className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Recording Controls */}
-              <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-4">
-                <div className="mb-3 text-center">
-                  <span className="text-xs font-semibold text-gray-700">Page {currentSceneIndex + 1} of {allPages.length}</span>
-                </div>
-
-                {pageRecordings.has(currentSceneIndex) ? (
-                  // Has recording - show preview controls
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-2 mb-3">
-                      {savedPages.has(currentSceneIndex) ? (
-                        <>
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <span className="text-green-700 font-semibold text-sm">✅ Saved ({formatTime(pageRecordings.get(currentSceneIndex)!.duration)})</span>
-                        </>
-                      ) : (
-                        <>
-                          <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                          <span className="text-yellow-700 font-semibold text-sm">🟡 Recorded ({formatTime(pageRecordings.get(currentSceneIndex)!.duration)}) - Not saved yet</span>
-                        </>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <button
-                        onClick={isPlaying ? stopPreview : playRecording}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-semibold shadow-lg transition-all text-sm"
-                      >
-                        {isPlaying ? '⏹️ Stop' : '▶️ Play'}
-                      </button>
-                      <button
-                        onClick={deleteRecording}
-                        className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 font-semibold shadow-lg transition-all text-sm"
-                      >
-                        🗑️ Delete
-                      </button>
-                    </div>
-                  </div>
-                ) : !isRecording ? (
-                  // No recording - show start button
-                  <div className="text-center">
-                    <button
-                      onClick={startRecording}
-                      className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-full hover:from-red-600 hover:to-pink-600 font-semibold shadow-lg transition-all w-full"
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="w-3 h-3 bg-white rounded-full"></div>
-                        <span>Start Recording</span>
-                      </div>
-                    </button>
-                    <p className="text-xs text-gray-600 mt-2">
-                      Max 60s per page
-                    </p>
-                  </div>
-                ) : (
-                  // Recording in progress
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-2 mb-3">
-                      <div className="flex gap-1">
-                        {[...Array(3)].map((_, i) => (
-                          <div
-                            key={i}
-                            className="w-1.5 h-6 bg-red-500 rounded-full animate-pulse"
-                            style={{ animationDelay: `${i * 0.15}s` }}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-xl font-bold text-gray-900">
-                        {formatTime(recordingTime)}
-                      </span>
-                      <span className="text-xs text-gray-600">/ 60s</span>
-                    </div>
-
-                    <div className="w-full mb-4">
-                      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-red-500 to-pink-500 transition-all"
-                          style={{ width: `${(recordingTime / 60) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      {!isPaused ? (
-                        <button
-                          onClick={pauseRecording}
-                          className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 font-semibold shadow-lg transition-all text-sm"
-                        >
-                          ⏸️ Pause
-                        </button>
-                      ) : (
-                        <button
-                          onClick={resumeRecording}
-                          className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 font-semibold shadow-lg transition-all text-sm"
-                        >
-                          ▶️ Resume
-                        </button>
-                      )}
-                      <button
-                        onClick={stopRecording}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-semibold shadow-lg transition-all text-sm"
-                      >
-                        ⏹️ Stop
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+        );
+      })()}
     </>
   );
 }

@@ -13,7 +13,7 @@
 
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import DOMPurify from 'isomorphic-dompurify';
 import { generateHTML, type JSONContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -30,18 +30,39 @@ import { FontSize } from './extensions/FontSizeMark';
 // only knows about src/alt/title and would silently drop alignment + size.
 import { ResizableImage } from './extensions/ResizableImage';
 
+interface PageAudio {
+  /** Primary-language URL (English by default). */
+  audioUrl?: string | null;
+  /** Secondary-language URL (e.g. zh, ko). */
+  audioUrlSecondary?: string | null;
+}
+
 interface ChapterBookReaderProps {
   title: string | null;
   authorName?: string | null;
   doc: JSONContent | null;
+  /** Per-page audio, keyed by 1-based page number. When provided and any page
+      has audio, the reader shows a play/pause toggle and autoplays on page
+      change. */
+  audioByPage?: Record<number, PageAudio>;
   /** Click handler for the "Exit Reading Mode" button. Caller decides
       where to route (owner → details page, public viewer → community
       feed, etc). When omitted, the button is hidden. */
   onExit?: () => void;
 }
 
-export function ChapterBookReader({ title, authorName, doc, onExit }: ChapterBookReaderProps) {
+export function ChapterBookReader({ title, authorName, doc, audioByPage, onExit }: ChapterBookReaderProps) {
   const [pageIndex, setPageIndex] = useState(0);
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const audioUrlForPage = (pageNumber: number): string | null => {
+    const entry = audioByPage?.[pageNumber];
+    return entry?.audioUrl || entry?.audioUrlSecondary || null;
+  };
+  const hasAnyAudio = !!audioByPage && Object.values(audioByPage).some(
+    (a) => a.audioUrl || a.audioUrlSecondary,
+  );
 
   // Split the doc into pages on every pageBreak block. Empty doc → one
   // page so the reader still renders cleanly.
@@ -87,6 +108,27 @@ export function ChapterBookReader({ title, authorName, doc, onExit }: ChapterBoo
   const goPrev = () => setPageIndex((i) => Math.max(0, i - 1));
   const goNext = () => setPageIndex((i) => Math.min(totalPages - 1, i + 1));
 
+  // Autoplay audio when the page changes (if enabled and audio exists for the
+  // new page). Short delay to let the page render first — same pattern as the
+  // picture book reader. Browser autoplay-policy may block this on first load;
+  // user gesture (toggle/page nav) unblocks subsequent plays.
+  useEffect(() => {
+    if (!audioRef.current) return;
+    const url = audioUrlForPage(pageIndex + 1);
+    if (!audioEnabled || !url) {
+      audioRef.current.pause();
+      return;
+    }
+    audioRef.current.src = url;
+    const timer = setTimeout(() => {
+      audioRef.current?.play().catch((err) => {
+        console.log('Audio autoplay blocked by browser policy — will play on next user gesture', err);
+      });
+    }, 100);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageIndex, audioEnabled, audioByPage]);
+
   // Keyboard nav: arrow keys advance pages.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -129,8 +171,36 @@ export function ChapterBookReader({ title, authorName, doc, onExit }: ChapterBoo
                 <span className="not-italic text-[10px] text-gray-400">© 2026 KindleWood Studio</span>
               </span>
             )}
+            {hasAnyAudio && (
+              <button
+                type="button"
+                onClick={() => setAudioEnabled((v) => !v)}
+                className={`ml-2 inline-flex items-center justify-center p-1.5 rounded-md transition-colors ${
+                  audioEnabled
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+                aria-label={audioEnabled ? 'Disable audio' : 'Enable audio'}
+                aria-pressed={audioEnabled}
+              >
+                {audioEnabled ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                  </svg>
+                )}
+              </button>
+            )}
           </div>
         </div>
+        {/* Single <audio> element drives the per-page playback. Hidden — UI
+            is the toggle button in the header above; nav buttons + autoplay
+            useEffect handle the rest. */}
+        <audio ref={audioRef} preload="auto" className="sr-only" />
+
 
         {/* Page surface — generous floor so the pager mostly sits in
             the same place page-to-page, but the page itself can grow

@@ -6,53 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
-import { writeFile, unlink, readFile } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
-
-// Set FFmpeg path
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
-
-/**
- * Convert WebM audio buffer to MP3
- * Required for iOS compatibility (iOS doesn't support WebM)
- */
-async function convertWebmToMp3(webmBuffer: Buffer): Promise<Buffer> {
-  const tempId = `audio-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-  const inputPath = join(tmpdir(), `${tempId}.webm`);
-  const outputPath = join(tmpdir(), `${tempId}.mp3`);
-
-  try {
-    // Write WebM buffer to temp file
-    await writeFile(inputPath, webmBuffer);
-
-    // Convert to MP3
-    await new Promise<void>((resolve, reject) => {
-      ffmpeg(inputPath)
-        .toFormat('mp3')
-        .audioCodec('libmp3lame')
-        .audioBitrate('128k')
-        .on('end', () => resolve())
-        .on('error', (err) => reject(err))
-        .save(outputPath);
-    });
-
-    // Read MP3 buffer
-    const mp3Buffer = await readFile(outputPath);
-
-    return mp3Buffer;
-  } finally {
-    // Cleanup temp files
-    try {
-      await unlink(inputPath);
-      await unlink(outputPath);
-    } catch {
-      // Ignore cleanup errors
-    }
-  }
-}
+import { processAndUploadRecording } from '@/lib/audio/upload-recording.service';
 
 // Maximum duration for this API route (5 minutes for multiple uploads - Vercel Hobby limit)
 export const maxDuration = 300;
@@ -64,6 +18,9 @@ interface AudioUpload {
   quizQuestionId?: string;
   textContent: string;
   duration: number;
+  /** Optional FFmpeg trim window applied before storage upload. */
+  trimStartSec?: number;
+  trimEndSec?: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -176,55 +133,26 @@ export async function POST(request: NextRequest) {
 
         console.log(`📤 Uploading audio for page ${metadata.pageNumber}: ${audioFile.name} (${audioFile.size} bytes)`);
 
-        // Convert File to Buffer
-        const arrayBuffer = await audioFile.arrayBuffer();
-        let buffer: Buffer = Buffer.from(arrayBuffer);
-        let contentType = audioFile.type;
-        let fileExtension = 'mp3'; // Default to MP3 for iOS compatibility
-
-        // Convert WebM to MP3 for iOS compatibility
-        if (audioFile.type.includes('webm')) {
-          console.log(`🔄 Converting WebM to MP3 for iOS compatibility...`);
-          try {
-            const mp3Buffer = await convertWebmToMp3(buffer);
-            buffer = mp3Buffer;
-            contentType = 'audio/mpeg';
-            fileExtension = 'mp3';
-            console.log(`✅ Conversion complete: ${buffer.length} bytes`);
-          } catch (conversionError: any) {
-            console.error(`❌ WebM to MP3 conversion failed:`, conversionError);
-            // Fall back to original WebM if conversion fails
-            fileExtension = 'webm';
-            contentType = audioFile.type;
-          }
-        } else if (audioFile.type.includes('mp4')) {
-          fileExtension = 'm4a';
-        } else if (audioFile.type.includes('mpeg')) {
-          fileExtension = 'mp3';
-        }
-
-        // Upload to Supabase storage
-        const filename = `${projectId}/user-recorded/page-${metadata.pageNumber}-${Date.now()}.${fileExtension}`;
-        const { error: uploadError } = await supabase.storage
-          .from('story-audio-files')
-          .upload(filename, buffer, {
-            contentType: contentType,
-            upsert: false, // Don't overwrite, create new files
+        let uploadResult;
+        try {
+          uploadResult = await processAndUploadRecording({
+            supabase,
+            projectId,
+            pageNumber: metadata.pageNumber,
+            audioFile,
+            trimStartSec: metadata.trimStartSec,
+            trimEndSec: metadata.trimEndSec,
           });
-
-        if (uploadError) {
-          console.error(`Upload error for page ${metadata.pageNumber}:`, uploadError);
+        } catch (uploadErr: any) {
+          console.error(`Upload error for page ${metadata.pageNumber}:`, uploadErr);
           failedPages.push({
             pageNumber: metadata.pageNumber,
-            error: uploadError.message,
+            error: uploadErr.message || 'Upload failed',
           });
           continue;
         }
-
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('story-audio-files')
-          .getPublicUrl(filename);
+        const publicUrl = uploadResult.audioUrl;
+        const filename = uploadResult.storagePath;
 
         // Check if page already exists
         const { data: existingPage } = await supabase
@@ -255,6 +183,10 @@ export async function POST(request: NextRequest) {
             // Keep original language if both EN and secondary recordings exist
             language: existingPage.audio_url && existingPage.audio_url_secondary ? existingPage.language : language,
             generation_status: 'completed',
+            // Re-recording invalidates any prior layer composition (effect
+            // timings were authored against the old vocal). Recorder's
+            // post-upload PATCH /layers will re-apply current effects if any.
+            audio_layers: null,
             recording_metadata: {
               ...(existingPage.recording_metadata || {}),
               [`${language}_recording`]: {
