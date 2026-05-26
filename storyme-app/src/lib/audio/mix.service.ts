@@ -22,7 +22,7 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { writeFile, unlink, readFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { AudioLayers, DEFAULT_VOLUMES } from './layers.types';
+import { AudioLayers, DEFAULT_VOLUMES, normalizeVocalSegments } from './layers.types';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
@@ -42,16 +42,46 @@ async function downloadToTemp(url: string, suffix: string): Promise<string> {
   return path;
 }
 
-function vocalFilter(label: string, layer: AudioLayers['vocal']): string {
-  const ops: string[] = [];
-  if (typeof layer.trimStartSec === 'number' || typeof layer.trimEndSec === 'number') {
-    const start = layer.trimStartSec ?? 0;
-    const end = layer.trimEndSec ?? layer.durationSec;
-    ops.push(`atrim=start=${start}:end=${end}`, `asetpts=PTS-STARTPTS`);
-  }
+/** Vocal filter chain. With one segment that spans the whole source, this
+ *  collapses to a single volume tweak (no atrim). With one trimmed segment,
+ *  it's atrim+volume. With multiple segments, each gets its own atrim and
+ *  they're concat'd in order so cuts (gaps between segments) drop out of
+ *  playback. Returns an array of `filterChain` strings — multiple are
+ *  needed because each [0:a]atrim creates its own labeled output before
+ *  the final concat. */
+function vocalFilters(outLabel: string, layer: AudioLayers['vocal']): string[] {
+  const segments = normalizeVocalSegments(layer);
   const volDb = layer.volumeDb ?? DEFAULT_VOLUMES.vocal;
-  ops.push(`volume=${volDb}dB`);
-  return `[0:a]${ops.join(',')}[${label}]`;
+  const isWholeFile = segments.length === 1
+    && segments[0].startSec === 0
+    && segments[0].endSec === layer.durationSec;
+
+  // Fast path: no cuts, no trim → just a volume node (or nothing if 0 dB).
+  if (isWholeFile) {
+    return [`[0:a]volume=${volDb}dB[${outLabel}]`];
+  }
+
+  // Single segment with a real trim — one atrim node + volume.
+  if (segments.length === 1) {
+    const s = segments[0];
+    return [`[0:a]atrim=start=${s.startSec}:end=${s.endSec},asetpts=PTS-STARTPTS,volume=${volDb}dB[${outLabel}]`];
+  }
+
+  // Multi-segment: N atrim chains + a concat at the end. We label each
+  // intermediate as v_seg_<idx>, then concat into outLabel with the
+  // volume tweak applied after concat (cheaper than once per segment).
+  const filters: string[] = [];
+  const segLabels: string[] = [];
+  for (let i = 0; i < segments.length; i++) {
+    const s = segments[i];
+    const label = `v_seg_${i}`;
+    segLabels.push(label);
+    filters.push(`[0:a]atrim=start=${s.startSec}:end=${s.endSec},asetpts=PTS-STARTPTS[${label}]`);
+  }
+  const concatInputs = segLabels.map((l) => `[${l}]`).join('');
+  filters.push(`${concatInputs}concat=n=${segments.length}:v=0:a=1[v_concat]`);
+  filters.push(`[v_concat]volume=${volDb}dB[${outLabel}]`);
+  return filters;
 }
 
 function timedLayerFilter(
@@ -108,8 +138,9 @@ export async function mixLayersToMp3(layers: AudioLayers): Promise<Buffer> {
       inputs.push({ path, index: inputs.length });
     }
 
-    // Build filter_complex graph.
-    const filters: string[] = [vocalFilter('vocal_out', layers.vocal)];
+    // Build filter_complex graph. vocalFilters returns 1+ chain strings
+    // because multi-segment vocals need per-segment atrim + concat.
+    const filters: string[] = [...vocalFilters('vocal_out', layers.vocal)];
     const mixInputs: string[] = ['[vocal_out]'];
 
     let musicCursor = 1;
@@ -146,14 +177,19 @@ export async function mixLayersToMp3(layers: AudioLayers): Promise<Buffer> {
     const compensateDb = 20 * Math.log10(mixInputs.length);  // +6dB per doubling
     filters.push(`${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=longest[mixed_raw];[mixed_raw]volume=${compensateDb.toFixed(2)}dB[mixed]`);
 
-    // Fast path: vocal-only with no trim/volume change — just transcode
-    // through. Avoids the amix graph entirely. Treats trim/volume as
-    // "edited" because they require the filter to run.
+    // Fast path: vocal-only AND no edits whatsoever — just stream-copy
+    // the input MP3. Avoids re-encoding entirely. "No edits" means: zero
+    // music, zero effects, no volume tweak, and a single segment that
+    // covers the entire source (i.e., the user neither trimmed nor split).
+    const vocalSegments = normalizeVocalSegments(layers.vocal);
+    const wholeFile =
+      vocalSegments.length === 1
+      && vocalSegments[0].startSec === 0
+      && vocalSegments[0].endSec === layers.vocal.durationSec;
     const vocalIsUntouched =
       layers.music.length === 0
       && layers.effects.length === 0
-      && layers.vocal.trimStartSec === undefined
-      && layers.vocal.trimEndSec === undefined
+      && wholeFile
       && (layers.vocal.volumeDb === undefined || layers.vocal.volumeDb === 0);
 
     await new Promise<void>((resolve, reject) => {

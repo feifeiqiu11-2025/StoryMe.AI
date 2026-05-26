@@ -11,7 +11,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { SkipBack, SkipForward, Maximize2, Minimize2, Plus, Trash2, RotateCcw, ZoomIn, ZoomOut, Play, Pause, Music } from 'lucide-react';
+import { SkipBack, SkipForward, Maximize2, Minimize2, Plus, Trash2, RotateCcw, ZoomIn, ZoomOut, Play, Pause, Music, Scissors } from 'lucide-react';
 import WaveformTrimmer, { TrimRange, WaveformTrimmerHandle } from './WaveformTrimmer';
 import SFXBrowserPanel, { SfxLibraryItem } from './SFXBrowserPanel';
 import SFXTimeline from './SFXTimeline';
@@ -298,6 +298,33 @@ export default function Recorder({
       el?.removeEventListener('wheel', onWheel);
     };
   }, [expanded]);
+
+  // Split shortcut — `S` splits the selected clip at the current playhead
+  // position. Mirrors CapCut / Premiere's split hotkey. Only fires when an
+  // SFX clip is selected and the playhead sits strictly inside it. Voice
+  // split will share this handler once the segments UI lands.
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 's' && e.key !== 'S') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (!selectedEffectId) return;
+      const list = pageEffects.get(currentPageIndex);
+      if (!list) return;
+      const clip = list.find((eff) => eff.id === selectedEffectId);
+      if (!clip) return;
+      const playheadMix = scrubSec ?? mixCurrentSec;
+      if (playheadMix <= clip.startSec + 0.05) return;
+      if (playheadMix >= clip.startSec + clip.durationSec - 0.05) return;
+      e.preventDefault();
+      splitEffectAtMixTime(selectedEffectId, playheadMix);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, selectedEffectId, pageEffects, currentPageIndex, mixCurrentSec, scrubSec]);
 
   // Dispose any active mix player on unmount or when the current page
   // changes (each page has its own composition).
@@ -727,6 +754,46 @@ export default function Recorder({
       next.set(currentPageIndex, list.filter((e) => e.id !== effectId));
       return next;
     });
+  };
+
+  /** Split an effect at a mix-time position. Returns true on success.
+   *  Cleanest mental model: the left half keeps the original id (so the
+   *  user's selection / volume / position references stay valid), the
+   *  right half is a brand-new clip with adjusted source offset. Both
+   *  point at the same library sound. */
+  const splitEffectAtMixTime = (effectId: string, splitMixSec: number): boolean => {
+    let didSplit = false;
+    setPageEffects((prev) => {
+      const list = prev.get(currentPageIndex);
+      if (!list) return prev;
+      const idx = list.findIndex((e) => e.id === effectId);
+      if (idx < 0) return prev;
+      const clip = list[idx];
+      const localSec = splitMixSec - clip.startSec;
+      // Split point must sit strictly inside the clip (not at either edge,
+      // and not extending past the source's available length).
+      if (localSec <= 0.05 || localSec >= clip.durationSec - 0.05) return prev;
+      const remainingSourceLen = clip.sound.duration_sec - (clip.sourceOffsetSec + localSec);
+      if (remainingSourceLen <= 0.05) return prev;
+      const left: PendingEffect = {
+        ...clip,
+        durationSec: localSec,
+      };
+      const right: PendingEffect = {
+        ...clip,
+        id: `eff-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        startSec: clip.startSec + localSec,
+        sourceOffsetSec: clip.sourceOffsetSec + localSec,
+        durationSec: clip.durationSec - localSec,
+      };
+      const nextList = [...list];
+      nextList.splice(idx, 1, left, right);
+      const next = new Map(prev);
+      next.set(currentPageIndex, nextList);
+      didSplit = true;
+      return next;
+    });
+    return didSplit;
   };
 
   const playPreview = () => {
@@ -1189,7 +1256,11 @@ export default function Recorder({
               const playheadMixSec = scrubSec ?? mixCurrentSec;
               const playheadTimelineSec = trimStart + playheadMixSec;
               const playheadLeftPx = TRACK_LABEL_WIDTH + playheadTimelineSec * pixelsPerSec;
-              const showPlayhead = mixPlaying || scrubSec !== null || mixCurrentSec > 0;
+              // Show the playhead as soon as the page has a recording — it
+              // anchors at 0s by default so users can see where the cursor
+              // sits, click anywhere to move it, and use the Split button
+              // without first having to hit Play.
+              const showPlayhead = true;
               // Click/drag on the timeline seeks the mix player. The scrub
               // viewport's getBoundingClientRect gives screen coords; we
               // add scrollLeft to land in CONTENT coords, then subtract
@@ -1220,9 +1291,11 @@ export default function Recorder({
                   className="overflow-x-auto overflow-y-hidden overscroll-x-contain"
                 >
                   <div className="relative" style={{ width: contentWidthPx }}>
-                  {/* Seek strip — sits over the ruler so clicks/drags
-                      anywhere on the time axis scrub the playhead. The
-                      strip lives behind the playhead line via z-index. */}
+                  {/* Seek strip — covers the entire timeline area (ruler +
+                      voice + SFX rows) so clicks anywhere set the playhead.
+                      SFX clips and the playhead drag handle sit above
+                      this via higher z-index and stopPropagation, so they
+                      keep their own click semantics. */}
                   <div
                     onPointerDown={(e) => {
                       (e.target as Element).setPointerCapture(e.pointerId);
@@ -1237,7 +1310,7 @@ export default function Recorder({
                       handleScrubFromClientX(e.clientX, true);
                     }}
                     onPointerCancel={() => setScrubSec(null)}
-                    className="absolute top-0 h-[22px] cursor-pointer z-10"
+                    className="absolute top-0 bottom-0 cursor-pointer z-10"
                     style={{ left: TRACK_LABEL_WIDTH, width: timelineSpan * pixelsPerSec }}
                     aria-label="Scrub playback"
                     role="slider"
@@ -1394,6 +1467,23 @@ export default function Recorder({
               };
               const deleteTitle = sel ? `Remove "${sel.sound.name}"` : 'Delete recording';
               const resetTitle = sel ? 'Reset clip to full source' : 'Reset voice trim';
+              // Split availability: need a selected SFX clip with the
+              // playhead strictly inside its bounds. Voice split will
+                  // join this gate once the segments UI lands.
+              const playheadMix = scrubSec ?? mixCurrentSec;
+              const canSplitSfx = !!sel
+                && playheadMix > sel.startSec + 0.05
+                && playheadMix < sel.startSec + sel.durationSec - 0.05;
+              const canSplit = canSplitSfx;
+              const splitTooltip = canSplit
+                ? 'Split selected clip at playhead (S)'
+                : sel
+                  ? 'Move playhead inside the selected clip first'
+                  : 'Select a clip to split it';
+              const handleSplit = () => {
+                if (!canSplit || !sel) return;
+                splitEffectAtMixTime(sel.id, playheadMix);
+              };
               return (
                 <div className="mt-4 flex items-center gap-3 py-2 border-t border-gray-100 text-xs">
                   <button
@@ -1410,6 +1500,15 @@ export default function Recorder({
                     ) : (
                       <Play className="w-3.5 h-3.5" />
                     )}
+                  </button>
+                  <button
+                    onClick={handleSplit}
+                    disabled={!canSplit}
+                    className="p-1.5 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+                    aria-label="Split clip at playhead"
+                    title={splitTooltip}
+                  >
+                    <Scissors className="w-3.5 h-3.5" />
                   </button>
                   {/* Timeline zoom — keyboard (Cmd/Ctrl + +/-/0) and
                       Cmd/Ctrl + scroll wheel also work, the buttons here

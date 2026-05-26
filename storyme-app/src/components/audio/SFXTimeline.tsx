@@ -195,7 +195,7 @@ export default function SFXTimeline({
                 role="button"
                 aria-label={`${eff.sound.name}, starts at ${eff.startSec.toFixed(1)} seconds, ${eff.durationSec.toFixed(1)} seconds long`}
                 aria-pressed={isSelected}
-                className={`absolute top-1 bottom-1 rounded-md cursor-grab active:cursor-grabbing transition-shadow overflow-hidden ${
+                className={`absolute top-1 bottom-1 rounded-md cursor-grab active:cursor-grabbing transition-shadow overflow-hidden z-[15] ${
                   isSelected
                     ? 'bg-orange-50 ring-1 ring-orange-500 shadow-sm'
                     : 'bg-orange-50 ring-1 ring-orange-300 hover:ring-orange-400'
@@ -219,11 +219,13 @@ export default function SFXTimeline({
                     <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
-                {/* Left-edge resize handle — visible-on-hover thin gripper. */}
+                {/* Edge resize handles — always visible as thin gripper
+                    bars on both sides so users see they can drag either
+                    edge. Selected state darkens the bar; hover brightens. */}
                 <div
                   onPointerDown={(e) => handlePointerDown(e, eff, 'resize-left')}
                   className={`absolute top-0 left-0 bottom-0 cursor-ew-resize ${
-                    isSelected ? 'bg-orange-500/40' : 'bg-orange-400/0 hover:bg-orange-400/40'
+                    isSelected ? 'bg-orange-500/50' : 'bg-orange-400/25 hover:bg-orange-500/50'
                   } transition-colors`}
                   style={{ width: HANDLE_WIDTH }}
                   aria-label="Resize start"
@@ -231,7 +233,7 @@ export default function SFXTimeline({
                 <div
                   onPointerDown={(e) => handlePointerDown(e, eff, 'resize-right')}
                   className={`absolute top-0 right-0 bottom-0 cursor-ew-resize ${
-                    isSelected ? 'bg-orange-500/40' : 'bg-orange-400/0 hover:bg-orange-400/40'
+                    isSelected ? 'bg-orange-500/50' : 'bg-orange-400/25 hover:bg-orange-500/50'
                   } transition-colors`}
                   style={{ width: HANDLE_WIDTH }}
                   aria-label="Resize end"

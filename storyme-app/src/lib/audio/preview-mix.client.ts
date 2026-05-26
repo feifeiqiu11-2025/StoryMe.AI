@@ -36,9 +36,19 @@ export interface PreviewEffect {
   volumeDb: number;
 }
 
+export interface VocalSegmentSpec {
+  startSec: number;
+  endSec: number;
+}
+
 export interface PreviewMixParams {
   vocalBlob: Blob;
-  /** Vocal trim window in seconds. When undefined, the whole vocal plays. */
+  /** Ordered, non-overlapping vocal windows played back-to-back. When
+      undefined or empty, the whole vocal plays as one segment. The
+      `trimRange` field below stays accepted for callers that haven't
+      migrated; pass one OR the other, not both. */
+  segments?: VocalSegmentSpec[];
+  /** Legacy single-window form. Equivalent to segments=[{ start, end }]. */
   trimRange?: { startSec: number; endSec: number };
   /** Vocal level in dB. Default 0. */
   vocalVolumeDb?: number;
@@ -93,9 +103,23 @@ export async function createMixPlayer(params: PreviewMixParams): Promise<MixPlay
     }),
   );
 
-  const trimStart = params.trimRange?.startSec ?? 0;
-  const trimEnd = params.trimRange?.endSec ?? vocalBuffer.duration;
-  const vocalDur = Math.max(0, trimEnd - trimStart);
+  // Resolve segments — explicit list wins, fall back to legacy trimRange,
+  // fall back to "whole buffer". Each segment plays back-to-back; gaps
+  // between adjacent segments in original-time drop out of playback.
+  const segments: VocalSegmentSpec[] = (() => {
+    if (params.segments && params.segments.length > 0) return params.segments;
+    if (params.trimRange) return [params.trimRange];
+    return [{ startSec: 0, endSec: vocalBuffer.duration }];
+  })();
+  // Mix-time offsets — each segment starts at the cumulative duration of
+  // the preceding ones. segmentMixStarts[i] = mix-time of segment i's 0:00.
+  const segmentMixStarts: number[] = [];
+  let mixCursor = 0;
+  for (const s of segments) {
+    segmentMixStarts.push(mixCursor);
+    mixCursor += Math.max(0, s.endSec - s.startSec);
+  }
+  const vocalDur = mixCursor;
 
   const longestEffectEnd = params.effects.reduce(
     (max, e) => Math.max(max, e.startSec + e.durationSec),
@@ -129,16 +153,28 @@ export async function createMixPlayer(params: PreviewMixParams): Promise<MixPlay
     clearSources();
     const startCtxTime = ctx.currentTime + 0.02; // tiny lookahead
 
-    // Vocal.
-    if (vocalDur > 0 && offsetSec < vocalDur) {
+    // Vocal — schedule each segment as its own AudioBufferSourceNode, with
+    // the in-context "when" picked so that segment N starts exactly when
+    // segment N-1 ended (no gap, no overlap). Segments entirely before the
+    // current offset are skipped; the segment that contains the offset
+    // gets partial scheduling.
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      const segDur = Math.max(0, seg.endSec - seg.startSec);
+      if (segDur <= 0) continue;
+      const segMixStart = segmentMixStarts[i];
+      const segMixEnd = segMixStart + segDur;
+      if (offsetSec >= segMixEnd) continue;        // already past this segment
+      const audibleMixStart = Math.max(segMixStart, offsetSec);
+      const intoSegmentSec = audibleMixStart - segMixStart;
+      const playDur = segDur - intoSegmentSec;
+      const whenInCtx = startCtxTime + (audibleMixStart - offsetSec);
       const src = ctx.createBufferSource();
       src.buffer = vocalBuffer;
       const gain = ctx.createGain();
       gain.gain.value = dbToGain(params.vocalVolumeDb ?? 0);
       src.connect(gain).connect(masterGain);
-      // Vocal plays starting at trimStart + offsetSec into the original
-      // buffer, for (vocalDur - offsetSec) seconds.
-      src.start(startCtxTime, trimStart + offsetSec, vocalDur - offsetSec);
+      src.start(whenInCtx, seg.startSec + intoSegmentSec, playDur);
       sources.push(src);
     }
 
