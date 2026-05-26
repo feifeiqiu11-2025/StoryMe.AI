@@ -69,7 +69,19 @@ function timedLayerFilter(
   const sourceSlice = sourceOffsetSec > 0
     ? `atrim=start=${sourceOffsetSec},asetpts=PTS-STARTPTS,`
     : '';
-  return `[${inputIdx}:a]${sourceSlice}adelay=${delayMs}|${delayMs}:all=1,atrim=duration=${startSec + durationSec},volume=${volumeDb}dB[${label}]`;
+  // adelay with per-channel values (no `:all=1` — that keyword needs
+  // FFmpeg 4.4+, but Vercel's @ffmpeg-installer/ffmpeg ships 4.2.x).
+  // Providing the same delay 4 times covers up to quadraphonic; extra
+  // values are silently ignored on stereo/mono inputs.
+  const channelDelays = `${delayMs}|${delayMs}|${delayMs}|${delayMs}`;
+  return `[${inputIdx}:a]${sourceSlice}adelay=${channelDelays},atrim=duration=${startSec + durationSec},volume=${volumeDb}dB[${label}]`;
+}
+
+/** Sanitize a string for use as a `[label]` inside an FFmpeg filter graph.
+ *  Hyphens (in our UUIDs) confuse older FFmpeg parsers; underscore-only
+ *  identifiers are universally safe. */
+function safeLabel(raw: string): string {
+  return raw.replace(/[^a-zA-Z0-9]/g, '_');
 }
 
 export async function mixLayersToMp3(layers: AudioLayers): Promise<Buffer> {
@@ -102,7 +114,7 @@ export async function mixLayersToMp3(layers: AudioLayers): Promise<Buffer> {
 
     let musicCursor = 1;
     for (const m of layers.music) {
-      const label = `music_${m.id}_out`;
+      const label = safeLabel(`music_${m.id}_out`);
       filters.push(
         timedLayerFilter(musicCursor, label, m.startSec, m.durationSec, m.volumeDb ?? DEFAULT_VOLUMES.music),
       );
@@ -111,7 +123,7 @@ export async function mixLayersToMp3(layers: AudioLayers): Promise<Buffer> {
     }
     let effectCursor = musicCursor;
     for (const e of layers.effects) {
-      const label = `effect_${e.id}_out`;
+      const label = safeLabel(`effect_${e.id}_out`);
       filters.push(
         timedLayerFilter(
           effectCursor,
@@ -126,9 +138,13 @@ export async function mixLayersToMp3(layers: AudioLayers): Promise<Buffer> {
       effectCursor++;
     }
 
-    // amix all streams. normalize=0 keeps per-stream volumes as authored
-    // (default 1 would auto-attenuate, making the mix quieter as layers add).
-    filters.push(`${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=longest:normalize=0[mixed]`);
+    // amix all streams. We'd love `normalize=0` (keeps per-stream volumes
+    // as authored), but that option needs FFmpeg 4.4+ and Vercel ships
+    // 4.2.x. Without it, amix auto-attenuates by 1/N so the mix gets a
+    // touch quieter as layers add. We pre-bake compensating gain into
+    // each layer's volume to undo the attenuation.
+    const compensateDb = 20 * Math.log10(mixInputs.length);  // +6dB per doubling
+    filters.push(`${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=longest[mixed_raw];[mixed_raw]volume=${compensateDb.toFixed(2)}dB[mixed]`);
 
     // Fast path: vocal-only with no trim/volume change — just transcode
     // through. Avoids the amix graph entirely. Treats trim/volume as
