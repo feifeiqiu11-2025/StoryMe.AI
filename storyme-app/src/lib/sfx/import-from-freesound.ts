@@ -37,6 +37,10 @@ interface ImportOptions {
   /** Mark this row as a curated starter entry (source='curated' instead of
       'freesound'). Curated rows still have external_id for traceability. */
   asCurated?: boolean;
+  /** Library category — sfx (short, default) or music (longer instrumental).
+      Drives the Sounds vs Music tab in the recorder browser. Also relaxes
+      the duration cap to 180s for music. */
+  kind?: 'sfx' | 'music';
 }
 
 export async function importFreesoundSound(
@@ -91,16 +95,19 @@ export async function importFreesoundSound(
     .getPublicUrl(storagePath);
 
   const mergedTags = Array.from(new Set([...(sound.tags ?? []), ...(opts.extraTags ?? [])]));
+  const kind = opts.kind ?? 'sfx';
+  const maxDuration = kind === 'music' ? 180 : 30;
   const insertPayload = {
     name: opts.overrideName ?? sound.name,
     tags: mergedTags,
     audio_url: publicUrl,
-    duration_sec: Math.min(Math.max(sound.duration, 0.1), 30),
+    duration_sec: Math.min(Math.max(sound.duration, 0.1), maxDuration),
     source: opts.asCurated ? 'curated' : 'freesound',
     external_id: String(sound.id),
     kid_safe: true,           // Caller is responsible for picking kid-safe queries.
     attribution: attributionFor(sound),
     license: 'CC0' as const,
+    kind,
   };
 
   const { data: inserted, error: insertError } = await supabase

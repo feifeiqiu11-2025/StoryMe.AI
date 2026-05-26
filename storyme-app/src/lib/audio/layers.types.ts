@@ -85,9 +85,11 @@ export function normalizeVocalSegments(v: VocalLayer): VocalSegment[] {
   return [{ startSec, endSec }];
 }
 
-/** Default volumes the mix service uses when a layer omits `volumeDb`. */
+/** Default volumes the mix service uses when a layer omits `volumeDb`.
+ *  Music at -12 dB keeps narration intelligible while still feeling
+ *  present; users can dial up or down via the per-clip volume slider. */
 export const DEFAULT_VOLUMES = {
   vocal: 0,
-  music: -18,
+  music: -12,
   effect: -6,
 } as const;

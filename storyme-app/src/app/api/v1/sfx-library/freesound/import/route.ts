@@ -28,6 +28,9 @@ export const maxDuration = 30;
 
 const BodySchema = z.object({
   freesoundId: z.number().int().positive(),
+  /** sfx (default) or music — stored on the new sfx_library row so the
+   *  recorder browser shows the import under the right top tab. */
+  kind: z.enum(['sfx', 'music']).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -67,7 +70,9 @@ export async function POST(request: NextRequest) {
 
     let imported;
     try {
-      imported = await importFreesoundSound(serviceClient, parsed.data.freesoundId);
+      imported = await importFreesoundSound(serviceClient, parsed.data.freesoundId, {
+        kind: parsed.data.kind,
+      });
     } catch (err: any) {
       console.error('Freesound import failed:', err);
       return NextResponse.json(

@@ -36,7 +36,7 @@ interface TrackRowProps {
 
 export function TrackRow({ label, sublabel, tooltip, action, children }: TrackRowProps) {
   return (
-    <div className="flex items-stretch border-b border-gray-100 last:border-b-0 py-3">
+    <div className="flex items-stretch border-b border-gray-100 py-3">
       <div
         className="flex flex-col justify-center pr-3"
         style={{ width: TRACK_LABEL_WIDTH, flexShrink: 0 }}

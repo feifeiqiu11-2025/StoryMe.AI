@@ -11,7 +11,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { SkipBack, SkipForward, Maximize2, Minimize2, Plus, Trash2, RotateCcw, ZoomIn, ZoomOut, Play, Pause, Music, Scissors } from 'lucide-react';
+import { SkipBack, SkipForward, Maximize2, Minimize2, Plus, Trash2, ZoomIn, ZoomOut, Play, Pause, Music, Scissors, Loader2 } from 'lucide-react';
 import WaveformTrimmer, { TrimRange, WaveformTrimmerHandle } from './WaveformTrimmer';
 import SFXBrowserPanel, { SfxLibraryItem } from './SFXBrowserPanel';
 import SFXTimeline from './SFXTimeline';
@@ -178,6 +178,18 @@ export default function Recorder({
   // Per-page SFX placements pending save. Persisted via PATCH /layers after
   // the vocal upload completes (in handleSaveCurrentPage).
   const [pageEffects, setPageEffects] = useState<Map<number, PendingEffect[]>>(new Map());
+  // Per-page MUSIC placements. Same shape as effects — PR 3 reuses the
+  // PendingEffect type since music clips have identical fields (id, sound
+  // ref, startSec, durationSec, sourceOffsetSec, volumeDb). Renders into
+  // its own Music track row + corresponds to AudioLayers.music[].
+  const [pageMusic, setPageMusic] = useState<Map<number, PendingEffect[]>>(new Map());
+  // Per-page vocal volume in dB. Default 0 (no change). Drives the
+  // Voice volume slider in the toolbar and persists into the vocal
+  // layer spec on save.
+  const [pageVocalVolumeDb, setPageVocalVolumeDb] = useState<Map<number, number>>(new Map());
+  // Selected music clip id, mutually exclusive with selectedEffectId /
+  // selectedCutIdx / selectedVoiceSegmentIdx.
+  const [selectedMusicId, setSelectedMusicId] = useState<string | null>(null);
   // ID of the currently open LeftRail tab, or null for icon-strip-only mode.
   // Today only one tab exists ('sfx'); future tabs (music, AI music, voice FX)
   // will register against this same state.
@@ -289,6 +301,8 @@ export default function Recorder({
     ? { startSec: currentSegments[0].startSec, endSec: currentSegments[currentSegments.length - 1].endSec }
     : undefined;
   const currentEffects = pageEffects.get(currentPageIndex) ?? [];
+  const currentMusic = pageMusic.get(currentPageIndex) ?? [];
+  const currentVocalVolumeDb = pageVocalVolumeDb.get(currentPageIndex) ?? 0;
   const isLastPage = currentPageIndex === totalPages - 1;
 
   // Cleanup on unmount: stop recording, stop preview, release mic stream.
@@ -365,12 +379,13 @@ export default function Recorder({
           ? layers.vocal.segments
           : [{ startSec: 0, endSec: duration }];
 
-        // Hydrate SFX effects — need to fetch sfx_library rows by id to
-        // restore PendingEffect.sound. Effects without a library id (legacy
-        // freesound rows pre-import) are skipped.
-        const libIds = layers.effects
-          .map((e) => e.sfxLibraryId)
-          .filter((v): v is string => !!v);
+        // Hydrate SFX + music — both reference rows in sfx_library by id.
+        // Single batched lookup covers both, then we route by kind (the
+        // GET response includes kind on each row).
+        const libIds = [
+          ...layers.effects.map((e) => e.sfxLibraryId),
+          ...layers.music.map((m) => m.sfxLibraryId),
+        ].filter((v): v is string => !!v);
         const soundsById = new Map<string, SfxLibraryItem>();
         if (libIds.length > 0) {
           try {
@@ -400,6 +415,21 @@ export default function Recorder({
           })
           .filter((x): x is PendingEffect => x !== null);
 
+        const hydratedMusic: PendingEffect[] = layers.music
+          .map((m) => {
+            const sound = m.sfxLibraryId ? soundsById.get(m.sfxLibraryId) : undefined;
+            if (!sound) return null;
+            return {
+              id: m.id,
+              sound,
+              startSec: m.startSec,
+              durationSec: m.durationSec,
+              sourceOffsetSec: 0,
+              volumeDb: m.volumeDb ?? -12,
+            } as PendingEffect;
+          })
+          .filter((x): x is PendingEffect => x !== null);
+
         setPageRecordings((prev) => {
           const next = new Map(prev);
           const existing = next.get(currentPageIndex);
@@ -417,11 +447,30 @@ export default function Recorder({
           next.set(currentPageIndex, hydratedEffects);
           return next;
         });
+        setPageMusic((prev) => {
+          const next = new Map(prev);
+          next.set(currentPageIndex, hydratedMusic);
+          return next;
+        });
+        if (typeof layers.vocal.volumeDb === 'number') {
+          setPageVocalVolumeDb((prev) => {
+            const next = new Map(prev);
+            next.set(currentPageIndex, layers.vocal.volumeDb!);
+            return next;
+          });
+        }
         // Mark as already-synced so Save draft starts disabled.
         const syntheticLayers: AudioLayers = {
           version: 1,
           vocal: { url, durationSec: duration, segments },
-          music: [],
+          music: hydratedMusic.map((m) => ({
+            id: m.id,
+            url: m.sound.audio_url,
+            sfxLibraryId: m.sound.id,
+            startSec: m.startSec,
+            durationSec: m.durationSec,
+            volumeDb: m.volumeDb,
+          })),
           effects: hydratedEffects.map((eff) => ({
             id: eff.id,
             url: eff.sound.audio_url,
@@ -572,8 +621,9 @@ export default function Recorder({
   }, [expanded, selectedCutIdx, selectedVoiceSegmentIdx]);
 
   // Split shortcut — `S` splits whatever is selected at the current
-  // playhead. Dispatches: selected SFX clip → split that clip; nothing
-  // SFX selected → split the voice segment under the playhead.
+  // playhead. Dispatches: selected SFX → split SFX; selected music →
+  // split music; nothing selected → split the voice segment under the
+  // playhead.
   useEffect(() => {
     if (!expanded) return;
     const onKey = (e: KeyboardEvent) => {
@@ -592,6 +642,16 @@ export default function Recorder({
         splitEffectAtMixTime(selectedEffectId, playheadMix);
         return;
       }
+      if (selectedMusicId) {
+        const list = pageMusic.get(currentPageIndex);
+        const clip = list?.find((m) => m.id === selectedMusicId);
+        if (!clip) return;
+        if (playheadMix <= clip.startSec + 0.05) return;
+        if (playheadMix >= clip.startSec + clip.durationSec - 0.05) return;
+        e.preventDefault();
+        splitMusicAtMixTime(selectedMusicId, playheadMix);
+        return;
+      }
       // Voice split path.
       if (!currentRecording) return;
       const segs = pageVocalSegments.get(currentPageIndex)
@@ -607,7 +667,7 @@ export default function Recorder({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expanded, selectedEffectId, pageEffects, pageVocalSegments, currentPageIndex, mixCurrentSec, scrubSec, currentRecording]);
+  }, [expanded, selectedEffectId, selectedMusicId, pageEffects, pageMusic, pageVocalSegments, currentPageIndex, mixCurrentSec, scrubSec, currentRecording]);
 
   // Dispose any active mix player on unmount or when the current page
   // changes (each page has its own composition).
@@ -624,7 +684,8 @@ export default function Recorder({
     if (!currentRecording) return 'none';
     const segs = currentSegments.map((s) => `${s.startSec.toFixed(2)}-${s.endSec.toFixed(2)}`).join(',');
     const fx = currentEffects.map((e) => `${e.id}:${e.startSec}:${e.durationSec}:${e.sourceOffsetSec}:${e.volumeDb}`).join('|');
-    return `${currentRecording.url}|${segs}|${fx}`;
+    const mu = currentMusic.map((m) => `${m.id}:${m.startSec}:${m.durationSec}:${m.sourceOffsetSec}:${m.volumeDb}`).join('|');
+    return `${currentRecording.url}|${currentVocalVolumeDb}|${segs}|${fx}|${mu}`;
   })();
   useEffect(() => {
     // Any change to the mix recipe invalidates the cached player.
@@ -666,6 +727,7 @@ export default function Recorder({
         // legacy single-segment fallback (kept for back-compat).
         segments: currentSegments.length > 0 ? currentSegments : undefined,
         trimRange: currentTrim,
+        vocalVolumeDb: currentVocalVolumeDb,
         effects: currentEffects.map((e) => ({
           id: e.id,
           url: e.sound.audio_url,
@@ -673,6 +735,14 @@ export default function Recorder({
           durationSec: e.durationSec,
           sourceOffsetSec: e.sourceOffsetSec,
           volumeDb: e.volumeDb,
+        })),
+        music: currentMusic.map((m) => ({
+          id: m.id,
+          url: m.sound.audio_url,
+          startSec: m.startSec,
+          durationSec: m.durationSec,
+          sourceOffsetSec: m.sourceOffsetSec,
+          volumeDb: m.volumeDb,
         })),
       });
       player.onProgress((sec, total) => {
@@ -1088,6 +1158,88 @@ export default function Recorder({
     });
   };
 
+  // Music handlers — same shape as effects, separate state map. Default
+  // volume −18 dB matches DEFAULT_VOLUMES.music: keeps narration audible.
+  const addMusic = (sound: SfxLibraryItem) => {
+    setPageMusic((prev) => {
+      const next = new Map(prev);
+      const list = next.get(currentPageIndex) ?? [];
+      const newId = `mus-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      next.set(currentPageIndex, [
+        ...list,
+        {
+          id: newId,
+          sound,
+          startSec: 0,
+          durationSec: sound.duration_sec,
+          sourceOffsetSec: 0,
+          volumeDb: -12,
+        },
+      ]);
+      setSelectedMusicId(newId);
+      setSelectedEffectId(null);
+      setSelectedCutIdx(null);
+      setSelectedVoiceSegmentIdx(null);
+      return next;
+    });
+  };
+
+  const updateMusic = (
+    musicId: string,
+    patch: Partial<Pick<PendingEffect, 'startSec' | 'volumeDb' | 'durationSec' | 'sourceOffsetSec'>>,
+  ) => {
+    setPageMusic((prev) => {
+      const list = prev.get(currentPageIndex);
+      if (!list) return prev;
+      const next = new Map(prev);
+      next.set(currentPageIndex, list.map((m) => m.id === musicId ? { ...m, ...patch } : m));
+      return next;
+    });
+  };
+
+  const removeMusic = (musicId: string) => {
+    setPageMusic((prev) => {
+      const list = prev.get(currentPageIndex);
+      if (!list) return prev;
+      const next = new Map(prev);
+      next.set(currentPageIndex, list.filter((m) => m.id !== musicId));
+      return next;
+    });
+  };
+
+  /** Split a music clip at a mix-time position. Mirrors splitEffectAtMixTime
+   *  exactly — music and SFX clips share the same data shape, so the math
+   *  is identical. */
+  const splitMusicAtMixTime = (musicId: string, splitMixSec: number): boolean => {
+    let didSplit = false;
+    setPageMusic((prev) => {
+      const list = prev.get(currentPageIndex);
+      if (!list) return prev;
+      const idx = list.findIndex((m) => m.id === musicId);
+      if (idx < 0) return prev;
+      const clip = list[idx];
+      const localSec = splitMixSec - clip.startSec;
+      if (localSec <= 0.05 || localSec >= clip.durationSec - 0.05) return prev;
+      const remainingSourceLen = clip.sound.duration_sec - (clip.sourceOffsetSec + localSec);
+      if (remainingSourceLen <= 0.05) return prev;
+      const left: PendingEffect = { ...clip, durationSec: localSec };
+      const right: PendingEffect = {
+        ...clip,
+        id: `mus-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        startSec: clip.startSec + localSec,
+        sourceOffsetSec: clip.sourceOffsetSec + localSec,
+        durationSec: clip.durationSec - localSec,
+      };
+      const nextList = [...list];
+      nextList.splice(idx, 1, left, right);
+      const next = new Map(prev);
+      next.set(currentPageIndex, nextList);
+      didSplit = true;
+      return next;
+    });
+    return didSplit;
+  };
+
   /** Split an effect at a mix-time position. Returns true on success.
    *  Cleanest mental model: the left half keeps the original id (so the
    *  user's selection / volume / position references stay valid), the
@@ -1175,14 +1327,24 @@ export default function Recorder({
     const segs = pageVocalSegments.get(pageIndex)
       ?? [{ startSec: 0, endSec: rec.duration }];
     const effects = pageEffects.get(pageIndex) ?? [];
+    const music = pageMusic.get(pageIndex) ?? [];
+    const vocalVol = pageVocalVolumeDb.get(pageIndex) ?? 0;
     return {
       version: 1,
       vocal: {
         url: vocalUrlOverride ?? rec.url,
         durationSec: rec.duration,
         segments: segs,
+        ...(vocalVol !== 0 ? { volumeDb: vocalVol } : {}),
       },
-      music: [],
+      music: music.map((m) => ({
+        id: m.id,
+        url: m.sound.audio_url,
+        sfxLibraryId: m.sound.id,
+        startSec: m.startSec,
+        durationSec: m.durationSec,
+        volumeDb: m.volumeDb,
+      })),
       effects: effects.map((e) => ({
         id: e.id,
         url: e.sound.audio_url,
@@ -1212,6 +1374,12 @@ export default function Recorder({
         durationSec: e.durationSec,
         sourceOffsetSec: e.sourceOffsetSec,
         volumeDb: e.volumeDb,
+      })),
+      music: layers.music.map((m) => ({
+        sfxLibraryId: m.sfxLibraryId,
+        startSec: m.startSec,
+        durationSec: m.durationSec,
+        volumeDb: m.volumeDb,
       })),
     };
     return JSON.stringify(stripped);
@@ -1423,6 +1591,7 @@ export default function Recorder({
     trimmedDurationSec: number,
     segments: VocalSegment[],
     effects: PendingEffect[],
+    music: PendingEffect[] = [],
   ): Promise<{ success: boolean; error?: string }> => {
     try {
       const res = await fetch(`/api/v1/audio-pages/${audioPageId}/layers`, {
@@ -1438,7 +1607,14 @@ export default function Recorder({
             // and shouldn't trigger the multi-segment filter graph.
             ...(segments.length > 1 ? { segments } : {}),
           },
-          music: [],
+          music: music.map((m) => ({
+            id: m.id,
+            url: m.sound.audio_url,
+            sfxLibraryId: m.sound.id,
+            startSec: m.startSec,
+            durationSec: m.durationSec,
+            volumeDb: m.volumeDb,
+          })),
           effects: effects.map((e) => ({
             id: e.id,
             url: e.sound.audio_url,
@@ -1521,6 +1697,16 @@ export default function Recorder({
           next.delete(pageIdx);
           return next;
         });
+        setPageMusic((prev) => {
+          const next = new Map(prev);
+          next.delete(pageIdx);
+          return next;
+        });
+        setPageVocalVolumeDb((prev) => {
+          const next = new Map(prev);
+          next.delete(pageIdx);
+          return next;
+        });
         lastSavedLayersHashRef.current.delete(pageIdx);
         draftBlobUploadedRef.current.delete(pageIdx);
         autoFittedPagesRef.current.delete(pageIdx);
@@ -1550,9 +1736,12 @@ export default function Recorder({
           alert(`Failed to save page ${currentPageIndex + 1}: ${result.error || 'Unknown error'}\n\nPlease try again.`);
           return;
         }
-        // Legacy: if SFX OR cuts present, PATCH /layers via applyAudioLayers
-        // to trigger a mix render. Mirrors pre-PR-2 behavior exactly.
-        const needsMixRender = currentEffects.length > 0 || currentSegments.length > 1;
+        // Legacy: if SFX OR music OR cuts present, PATCH /layers via
+        // applyAudioLayers to trigger a mix render. Mirrors pre-PR-2
+        // behavior exactly with music added to the trigger condition.
+        const needsMixRender = currentEffects.length > 0
+          || currentMusic.length > 0
+          || currentSegments.length > 1;
         if (needsMixRender && result.audioPageId && result.audioUrl) {
           const trimStart = currentTrim?.startSec ?? 0;
           const trimmedDuration = currentTrim
@@ -1570,6 +1759,7 @@ export default function Recorder({
             trimmedDuration,
             rebasedSegments,
             currentEffects,
+            currentMusic,
           );
           if (!mixResult.success) {
             alert(`Vocal saved, but mixing failed: ${mixResult.error}\n\nThe page has audio without cuts/effects. Try editing the page again to retry.`);
@@ -1626,12 +1816,23 @@ export default function Recorder({
       next.delete(idx);
       return next;
     });
+    setPageMusic((prev) => {
+      const next = new Map(prev);
+      next.delete(idx);
+      return next;
+    });
+    setPageVocalVolumeDb((prev) => {
+      const next = new Map(prev);
+      next.delete(idx);
+      return next;
+    });
     lastSavedLayersHashRef.current.delete(idx);
     draftBlobUploadedRef.current.delete(idx);
     autoFittedPagesRef.current.delete(idx);
     setSelectedEffectId(null);
     setSelectedCutIdx(null);
     setSelectedVoiceSegmentIdx(null);
+    setSelectedMusicId(null);
   };
 
   const handleSkipPage = () => {
@@ -1878,7 +2079,16 @@ export default function Recorder({
                   id: 'sfx',
                   icon: <Music className="w-5 h-5" />,
                   label: 'Sounds',
-                  content: <SFXBrowserPanel onPick={addEffect} />,
+                  hideHeader: true,
+                  content: (
+                    <SFXBrowserPanel
+                      onPick={(sound, kind) => {
+                        if (kind === 'music') addMusic(sound);
+                        else addEffect(sound);
+                      }}
+                      onClose={() => setActiveRailTab(null)}
+                    />
+                  ),
                 },
               ]}
               activeTabId={activeRailTab}
@@ -1942,12 +2152,24 @@ export default function Recorder({
               // longestClipEnd is in TIMELINE (original) time so the lane
               // width covers clips that visually extend past the vocal —
               // each clip's right edge sits at trimStart + startSec + duration.
-              const longestClipEnd = currentEffects.reduce(
-                (max, e) => Math.max(max, trimStart + e.startSec + e.durationSec),
+              // Includes BOTH SFX and music so the timeline visible area
+              // stays in sync when either kind extends past the vocal.
+              const longestClipEnd = [...currentEffects, ...currentMusic].reduce(
+                (max, c) => Math.max(max, trimStart + c.startSec + c.durationSec),
                 0,
               );
               const timelineSpan = Math.max(recordingDur, longestClipEnd, 5);
               const pixelsPerSec = BASE_PX_PER_SEC * zoomLevel;
+              // Total mix duration from current state — max of vocal
+              // segments and the latest-ending clip. Used to clamp the
+              // playhead so shortening a clip can't leave a stale
+              // playhead position floating past the visible content.
+              const currentMixDur = Math.max(
+                totalMixDuration(currentSegments),
+                ...currentEffects.map((e) => e.startSec + e.durationSec),
+                ...currentMusic.map((m) => m.startSec + m.durationSec),
+                0,
+              );
               // mixCurrentSec / scrubSec are in MIX time. The visual
               // timeline is in ORIGINAL time. With multi-segment vocals
               // the mapping has discontinuities at cut boundaries — use
@@ -1955,7 +2177,8 @@ export default function Recorder({
               // crosses them, matching what playback actually does.
               // Falls back to a linear (trimStart + mixSec) when nothing
               // is splittable yet (single full segment, no edits).
-              const playheadMixSec = scrubSec ?? mixCurrentSec;
+              const clampedMixCurrentSec = Math.min(mixCurrentSec, currentMixDur);
+              const playheadMixSec = scrubSec ?? clampedMixCurrentSec;
               const playheadMapping = mixTimeToOriginal(playheadMixSec, currentSegments);
               const playheadTimelineSec = playheadMapping?.origSec ?? (trimStart + playheadMixSec);
               const playheadLeftPx = TRACK_LABEL_WIDTH + playheadTimelineSec * pixelsPerSec;
@@ -2113,6 +2336,7 @@ export default function Recorder({
                         // a cut/gap, deselect all voice things.
                         setSelectedEffectId(null);
                         setSelectedCutIdx(null);
+                        setSelectedMusicId(null);
                         const rect = e.currentTarget.getBoundingClientRect();
                         const xPx = e.clientX - rect.left - 4; // -4 for p-1 padding
                         const clickedOriginalSec = xPx / pixelsPerSec;
@@ -2220,6 +2444,7 @@ export default function Recorder({
                                   e.stopPropagation();
                                   setSelectedEffectId(null);
                                   setSelectedVoiceSegmentIdx(null);
+                                  setSelectedMusicId(null);
                                   setSelectedCutIdx(i);
                                 }}
                                 className={`absolute top-1 bottom-1 bg-yellow-200 transition-shadow ${
@@ -2275,11 +2500,30 @@ export default function Recorder({
                       timelineSpan={timelineSpan}
                       trimStartSec={trimStart}
                       selectedEffectId={selectedEffectId}
-                      onSelectEffect={(id) => { setSelectedEffectId(id); setSelectedCutIdx(null); setSelectedVoiceSegmentIdx(null); }}
+                      onSelectEffect={(id) => { setSelectedEffectId(id); setSelectedCutIdx(null); setSelectedVoiceSegmentIdx(null); setSelectedMusicId(null); }}
                       onUpdateEffect={updateEffect}
                       onRemoveEffect={(id) => {
                         if (selectedEffectId === id) setSelectedEffectId(null);
                         removeEffect(id);
+                      }}
+                    />
+                  </TrackRow>
+                  <TrackRow
+                    label="Music"
+                    tooltip="Pick music from the left panel (Music tab)"
+                  >
+                    <SFXTimeline
+                      effects={currentMusic}
+                      variant="music"
+                      pixelsPerSec={pixelsPerSec}
+                      timelineSpan={timelineSpan}
+                      trimStartSec={trimStart}
+                      selectedEffectId={selectedMusicId}
+                      onSelectEffect={(id) => { setSelectedMusicId(id); setSelectedEffectId(null); setSelectedCutIdx(null); setSelectedVoiceSegmentIdx(null); }}
+                      onUpdateEffect={updateMusic}
+                      onRemoveEffect={(id) => {
+                        if (selectedMusicId === id) setSelectedMusicId(null);
+                        removeMusic(id);
                       }}
                     />
                   </TrackRow>
@@ -2301,17 +2545,27 @@ export default function Recorder({
               const sel = selectedEffectId
                 ? currentEffects.find((e) => e.id === selectedEffectId) ?? null
                 : null;
-              const sfxNeedsReset = sel
-                ? (sel.sourceOffsetSec > 0 || sel.durationSec < sel.sound.duration_sec)
+              const selMusic = selectedMusicId
+                ? currentMusic.find((m) => m.id === selectedMusicId) ?? null
+                : null;
+              // Whichever clip is selected (SFX or music) drives the
+              // toolbar's "selected clip" affordances — they're identical
+              // shapes, only the update/remove callbacks differ.
+              const selectedClip = sel ?? selMusic;
+              const selectedClipKind: 'sfx' | 'music' | null = sel ? 'sfx' : selMusic ? 'music' : null;
+              const clipNeedsReset = selectedClip
+                ? (selectedClip.sourceOffsetSec > 0 || selectedClip.durationSec < selectedClip.sound.duration_sec)
                 : false;
-              const canReset = sel ? sfxNeedsReset : !!currentTrim;
+              const canReset = selectedClip ? clipNeedsReset : !!currentTrim;
               const handleReset = () => {
-                if (sel) {
-                  updateEffect(sel.id, {
+                if (selectedClip) {
+                  const patch = {
                     sourceOffsetSec: 0,
-                    durationSec: sel.sound.duration_sec,
-                    startSec: sel.startSec, // keep where the user placed it
-                  });
+                    durationSec: selectedClip.sound.duration_sec,
+                    startSec: selectedClip.startSec,
+                  };
+                  if (selectedClipKind === 'music') updateMusic(selectedClip.id, patch);
+                  else updateEffect(selectedClip.id, patch);
                 } else {
                   resetCurrentTrim();
                 }
@@ -2320,6 +2574,9 @@ export default function Recorder({
                 if (sel) {
                   setSelectedEffectId(null);
                   removeEffect(sel.id);
+                } else if (selMusic) {
+                  setSelectedMusicId(null);
+                  removeMusic(selMusic.id);
                 } else if (selectedCutIdx !== null) {
                   void deleteCutAt(selectedCutIdx);
                 } else if (selectedVoiceSegmentIdx !== null) {
@@ -2328,25 +2585,27 @@ export default function Recorder({
                   deleteRecording();
                 }
               };
-              const deleteTitle = sel
-                ? `Remove "${sel.sound.name}"`
+              const deleteTitle = selectedClip
+                ? `Remove "${selectedClip.sound.name}"`
                 : selectedCutIdx !== null
                   ? 'Delete cut (removes the audio permanently)'
                   : selectedVoiceSegmentIdx !== null
                     ? `Delete voice segment ${selectedVoiceSegmentIdx + 1} (removes the audio permanently)`
                     : 'Delete recording';
-              const resetTitle = sel ? 'Reset clip to full source' : 'Reset voice trim';
-              // Split availability — two paths:
-              //   - SFX path: a clip is selected and the playhead sits
-              //     strictly inside its bounds.
-              //   - Voice path: nothing SFX-y is selected (= voice is
-              //     "active") and the playhead lands strictly inside
-              //     some voice segment.
+              const resetTitle = selectedClip ? 'Reset clip to full source' : 'Reset voice trim';
+              // Split availability — three paths:
+              //   - SFX clip selected: split that clip at the playhead.
+              //   - Music clip selected: split that clip at the playhead.
+              //   - Nothing selected: split the voice segment under the
+              //     playhead.
               const playheadMix = scrubSec ?? mixCurrentSec;
               const canSplitSfx = !!sel
                 && playheadMix > sel.startSec + 0.05
                 && playheadMix < sel.startSec + sel.durationSec - 0.05;
-              const voiceSplitMapping = !sel && currentRecording
+              const canSplitMusic = !!selMusic
+                && playheadMix > selMusic.startSec + 0.05
+                && playheadMix < selMusic.startSec + selMusic.durationSec - 0.05;
+              const voiceSplitMapping = !selectedClip && currentRecording
                 ? mixTimeToOriginal(playheadMix, currentSegments)
                 : null;
               const canSplitVoice = !!voiceSplitMapping && (() => {
@@ -2354,10 +2613,10 @@ export default function Recorder({
                 return voiceSplitMapping.origSec > seg.startSec + 0.05
                   && voiceSplitMapping.origSec < seg.endSec - 0.05;
               })();
-              const canSplit = canSplitSfx || canSplitVoice;
+              const canSplit = canSplitSfx || canSplitMusic || canSplitVoice;
               const splitTooltip = canSplit
                 ? 'Split at playhead (S)'
-                : sel
+                : selectedClip
                   ? 'Move playhead inside the selected clip first'
                   : currentRecording
                     ? 'Move playhead inside the voice to split it'
@@ -2365,6 +2624,8 @@ export default function Recorder({
               const handleSplit = () => {
                 if (canSplitSfx && sel) {
                   splitEffectAtMixTime(sel.id, playheadMix);
+                } else if (canSplitMusic && selMusic) {
+                  splitMusicAtMixTime(selMusic.id, playheadMix);
                 } else if (canSplitVoice) {
                   splitVoiceAtMixTime(playheadMix);
                 }
@@ -2428,40 +2689,72 @@ export default function Recorder({
                       <ZoomIn className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  {sel ? (
+                  {selectedClip ? (() => {
+                    // Dispatch updates to the right per-clip-type handler.
+                    // Same patch shape, different state map.
+                    const patchClip = (
+                      patch: Partial<Pick<PendingEffect, 'startSec' | 'volumeDb' | 'durationSec' | 'sourceOffsetSec'>>,
+                    ) => {
+                      if (selectedClipKind === 'music') updateMusic(selectedClip.id, patch);
+                      else updateEffect(selectedClip.id, patch);
+                    };
+                    return (
+                      <>
+                        <span className="font-medium text-gray-900 truncate max-w-[180px]" title={selectedClip.sound.name}>
+                          {selectedClip.sound.name}
+                        </span>
+                        <label className="flex items-center gap-1.5 text-gray-600">
+                          <span className="text-[10px] uppercase tracking-wider text-gray-500">Start</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.1}
+                            value={selectedClip.startSec}
+                            onChange={(e) => patchClip({ startSec: Math.max(0, Number(e.target.value) || 0) })}
+                            className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-gray-900 tabular-nums"
+                            aria-label="Start time in seconds"
+                          />
+                          <span className="text-gray-500">s</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 text-gray-600">
+                          <span className="text-[10px] uppercase tracking-wider text-gray-500">Length</span>
+                          <input
+                            type="number"
+                            min={0.1}
+                            max={selectedClip.sound.duration_sec}
+                            step={0.1}
+                            value={selectedClip.durationSec}
+                            onChange={(e) => patchClip({
+                              durationSec: Math.max(0.1, Math.min(selectedClip.sound.duration_sec, Number(e.target.value) || 0.1)),
+                            })}
+                            className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-gray-900 tabular-nums"
+                            aria-label="Length in seconds"
+                          />
+                          <span className="text-gray-500">s</span>
+                        </label>
+                        <label className="flex items-center gap-2 text-gray-600">
+                          <span className="text-[10px] uppercase tracking-wider text-gray-500">Vol</span>
+                          <input
+                            type="range"
+                            min={-30}
+                            max={6}
+                            step={1}
+                            value={selectedClip.volumeDb}
+                            onChange={(e) => patchClip({ volumeDb: Number(e.target.value) })}
+                            className="vol-slider w-28"
+                            aria-label="Volume in dB"
+                          />
+                          <span className="w-10 text-right text-gray-700 tabular-nums">{selectedClip.volumeDb}dB</span>
+                        </label>
+                      </>
+                    );
+                  })() : (
+                    // No clip selected → voice is the "active track."
+                    // Show just a volume slider (no Start/Length — voice
+                    // length is managed via the WaveSurfer region +
+                    // segments, not numeric inputs).
                     <>
-                      <span className="font-medium text-gray-900 truncate max-w-[180px]" title={sel.sound.name}>
-                        {sel.sound.name}
-                      </span>
-                      <label className="flex items-center gap-1.5 text-gray-600">
-                        <span className="text-[10px] uppercase tracking-wider text-gray-500">Start</span>
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.1}
-                          value={sel.startSec}
-                          onChange={(e) => updateEffect(sel.id, { startSec: Math.max(0, Number(e.target.value) || 0) })}
-                          className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-gray-900 tabular-nums"
-                          aria-label="Start time in seconds"
-                        />
-                        <span className="text-gray-500">s</span>
-                      </label>
-                      <label className="flex items-center gap-1.5 text-gray-600">
-                        <span className="text-[10px] uppercase tracking-wider text-gray-500">Length</span>
-                        <input
-                          type="number"
-                          min={0.1}
-                          max={sel.sound.duration_sec}
-                          step={0.1}
-                          value={sel.durationSec}
-                          onChange={(e) => updateEffect(sel.id, {
-                            durationSec: Math.max(0.1, Math.min(sel.sound.duration_sec, Number(e.target.value) || 0.1)),
-                          })}
-                          className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-gray-900 tabular-nums"
-                          aria-label="Length in seconds"
-                        />
-                        <span className="text-gray-500">s</span>
-                      </label>
+                      <span className="font-medium text-gray-900">Voice</span>
                       <label className="flex items-center gap-2 text-gray-600">
                         <span className="text-[10px] uppercase tracking-wider text-gray-500">Vol</span>
                         <input
@@ -2469,15 +2762,22 @@ export default function Recorder({
                           min={-30}
                           max={6}
                           step={1}
-                          value={sel.volumeDb}
-                          onChange={(e) => updateEffect(sel.id, { volumeDb: Number(e.target.value) })}
+                          value={currentVocalVolumeDb}
+                          onChange={(e) => {
+                            const next = Number(e.target.value);
+                            setPageVocalVolumeDb((prev) => {
+                              const map = new Map(prev);
+                              map.set(currentPageIndex, next);
+                              return map;
+                            });
+                          }}
                           className="vol-slider w-28"
-                          aria-label="Volume in dB"
+                          aria-label="Voice volume in dB"
                         />
-                        <span className="w-10 text-right text-gray-700 tabular-nums">{sel.volumeDb}dB</span>
+                        <span className="w-10 text-right text-gray-700 tabular-nums">{currentVocalVolumeDb}dB</span>
                       </label>
                     </>
-                  ) : null}
+                  )}
                   <span className="flex-1" />
                   {canReset && (
                     <button
@@ -2485,19 +2785,23 @@ export default function Recorder({
                       disabled={uploading}
                       title={resetTitle}
                       aria-label={resetTitle}
-                      className="p-1.5 rounded-md text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                      className="px-2 py-1 rounded-md text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-50"
                     >
-                      <RotateCcw className="w-3.5 h-3.5" />
+                      Reset
                     </button>
                   )}
                   <button
                     onClick={handleUnifiedDelete}
-                    disabled={uploading}
-                    title={deleteTitle}
-                    aria-label={deleteTitle}
+                    disabled={uploading || deletingCut}
+                    title={deletingCut ? 'Deleting…' : deleteTitle}
+                    aria-label={deletingCut ? 'Deleting' : deleteTitle}
                     className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    {deletingCut ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5" />
+                    )}
                   </button>
                 </div>
               );

@@ -53,6 +53,10 @@ export interface PreviewMixParams {
   /** Vocal level in dB. Default 0. */
   vocalVolumeDb?: number;
   effects: PreviewEffect[];
+  /** Music clips. Same scheduling as effects — placed at startSec for
+      durationSec at volumeDb. Default volume -18 dB when unset on the
+      caller side. */
+  music?: PreviewEffect[];
 }
 
 export interface MixPlayer {
@@ -85,11 +89,16 @@ export async function createMixPlayer(params: PreviewMixParams): Promise<MixPlay
   const vocalArrayBuffer = await params.vocalBlob.arrayBuffer();
   const vocalBuffer = await ctx.decodeAudioData(vocalArrayBuffer.slice(0));
 
-  // Decode every effect URL in parallel. Failures don't kill the whole
-  // player — we skip that effect and log; the user still hears vocal +
-  // the rest of the SFX.
+  // Decode every effect + music URL in parallel. Music and effects share
+  // the same scheduling shape — only the source of the IDs differs. We
+  // combine into one decoded list and tag each with `lane` so failures
+  // log a clearer message. Failures don't kill the whole player.
+  const allTimedSources = [
+    ...params.effects.map((eff) => ({ eff, lane: 'sfx' as const })),
+    ...((params.music ?? []).map((eff) => ({ eff, lane: 'music' as const }))),
+  ];
   const effectDecodes = await Promise.all(
-    params.effects.map(async (eff) => {
+    allTimedSources.map(async ({ eff, lane }) => {
       try {
         const res = await fetch(eff.url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -97,7 +106,7 @@ export async function createMixPlayer(params: PreviewMixParams): Promise<MixPlay
         const decoded = await ctx.decodeAudioData(buf.slice(0));
         return { eff, buffer: decoded as AudioBuffer | null };
       } catch (err) {
-        console.warn(`Preview: failed to load effect ${eff.id} (${eff.url}):`, err);
+        console.warn(`Preview: failed to load ${lane} ${eff.id} (${eff.url}):`, err);
         return { eff, buffer: null };
       }
     }),
@@ -121,11 +130,11 @@ export async function createMixPlayer(params: PreviewMixParams): Promise<MixPlay
   }
   const vocalDur = mixCursor;
 
-  const longestEffectEnd = params.effects.reduce(
+  const longestTimedEnd = [...params.effects, ...(params.music ?? [])].reduce(
     (max, e) => Math.max(max, e.startSec + e.durationSec),
     0,
   );
-  const durationSec = Math.max(vocalDur, longestEffectEnd);
+  const durationSec = Math.max(vocalDur, longestTimedEnd);
 
   // Internal state.
   let sources: AudioBufferSourceNode[] = [];

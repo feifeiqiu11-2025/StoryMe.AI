@@ -1,0 +1,20 @@
+[
+  { "name": "Peaceful piano",       "tags": ["peaceful", "piano", "calm"],         "query": "peaceful piano",         "sort": "rating_desc" },
+  { "name": "Gentle acoustic",      "tags": ["peaceful", "acoustic", "calm"],      "query": "gentle acoustic guitar", "sort": "rating_desc" },
+  { "name": "Calm meditation",      "tags": ["peaceful", "meditation", "ambient"], "query": "calm meditation music",  "sort": "rating_desc" },
+  { "name": "Lullaby music box",    "tags": ["lullaby", "music box", "sleepy"],    "query": "music box lullaby",      "sort": "rating_desc" },
+  { "name": "Soft bedtime",         "tags": ["lullaby", "soft", "sleepy"],         "query": "soft bedtime music",     "sort": "rating_desc" },
+  { "name": "Adventure march",      "tags": ["adventurous", "march", "epic"],      "query": "adventure march",        "sort": "rating_desc" },
+  { "name": "Heroic theme",         "tags": ["adventurous", "heroic", "epic"],     "query": "heroic theme orchestral","sort": "rating_desc" },
+  { "name": "Epic exploration",     "tags": ["adventurous", "exploration", "epic"],"query": "epic exploration",       "sort": "rating_desc" },
+  { "name": "Mysterious ambient",   "tags": ["mysterious", "ambient", "dark"],     "query": "mysterious ambient",     "sort": "rating_desc" },
+  { "name": "Spooky theme",         "tags": ["mysterious", "spooky", "creepy"],    "query": "spooky theme",           "sort": "rating_desc" },
+  { "name": "Happy upbeat",         "tags": ["joyful", "upbeat", "cheerful"],      "query": "happy upbeat music",     "sort": "rating_desc" },
+  { "name": "Playful melody",       "tags": ["joyful", "playful", "cute"],         "query": "playful melody",         "sort": "rating_desc" },
+  { "name": "Cheerful tune",        "tags": ["joyful", "cheerful", "bright"],      "query": "cheerful tune",          "sort": "rating_desc" },
+  { "name": "Magical chimes",       "tags": ["magical", "chimes", "fairy"],        "query": "magical chime music",    "sort": "rating_desc" },
+  { "name": "Whimsical fairy",      "tags": ["magical", "fairy", "whimsical"],     "query": "whimsical fairy music",  "sort": "rating_desc" },
+  { "name": "Dreamy soundscape",    "tags": ["magical", "dreamy", "soft"],         "query": "dreamy soundscape",      "sort": "rating_desc" },
+  { "name": "Dramatic build",       "tags": ["dramatic", "tense", "build"],        "query": "dramatic build music",   "sort": "rating_desc" },
+  { "name": "Suspenseful theme",    "tags": ["dramatic", "suspense"],              "query": "suspenseful music",      "sort": "rating_desc" }
+]

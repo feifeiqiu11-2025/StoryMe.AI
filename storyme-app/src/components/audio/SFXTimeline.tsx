@@ -28,6 +28,9 @@ import type { PendingEffect } from './Recorder';
 
 interface SFXTimelineProps {
   effects: PendingEffect[];
+  /** 'sfx' = orange (default), 'music' = blue. Same component, different
+   *  visual variant — clip shape + interactions are identical. */
+  variant?: 'sfx' | 'music';
   /** Pixel-per-second scale shared across tracks. Computed by the host
       (Recorder) from the available timeline column width + the longest
       track's duration, then passed down so every track aligns. */
@@ -52,8 +55,10 @@ interface SFXTimelineProps {
   onDragEnd?: () => void;
 }
 
-// Layout constants — kept here so the math reads cleanly.
-const LANE_HEIGHT = 56;
+// Layout constants — kept here so the math reads cleanly. LANE_HEIGHT
+// is sized to roughly match the voice waveform row above so the three
+// tracks (Voice, Sound effects, Music) form a balanced vertical rhythm.
+const LANE_HEIGHT = 64;
 const HANDLE_WIDTH = 8;
 
 type DragMode = null | 'move' | 'resize-left' | 'resize-right';
@@ -72,6 +77,7 @@ interface DragState {
 
 export default function SFXTimeline({
   effects,
+  variant = 'sfx',
   pixelsPerSec,
   timelineSpan,
   trimStartSec,
@@ -83,6 +89,31 @@ export default function SFXTimeline({
   onDragEnd,
 }: SFXTimelineProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
+  // Color palette per variant — kept here so the rest of the file stays
+  // type-agnostic. Music is blue; SFX is orange (the existing palette).
+  const palette = variant === 'music'
+    ? {
+        clipBg: 'bg-sky-50',
+        clipRingActive: 'ring-sky-500',
+        clipRingIdle: 'ring-sky-300 hover:ring-sky-400',
+        accentActive: 'bg-sky-500',
+        accentIdle: 'bg-sky-400',
+        textColor: 'text-sky-900',
+        iconColor: 'text-sky-700 hover:text-sky-900 hover:bg-sky-100',
+        handleActive: 'bg-sky-500/50',
+        handleIdle: 'bg-sky-400/25 hover:bg-sky-500/50',
+      }
+    : {
+        clipBg: 'bg-orange-50',
+        clipRingActive: 'ring-orange-500',
+        clipRingIdle: 'ring-orange-300 hover:ring-orange-400',
+        accentActive: 'bg-orange-500',
+        accentIdle: 'bg-orange-400',
+        textColor: 'text-orange-900',
+        iconColor: 'text-orange-700 hover:text-orange-900 hover:bg-orange-100',
+        handleActive: 'bg-orange-500/50',
+        handleIdle: 'bg-orange-400/25 hover:bg-orange-500/50',
+      };
 
   const secToPx = (sec: number) => sec * pixelsPerSec;
   const pxToSec = (px: number) => px / pixelsPerSec;
@@ -176,7 +207,11 @@ export default function SFXTimeline({
       >
         {effects.length === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-xs text-gray-400">Drop a sound from the picker — drag the clip to position it</span>
+            <span className="text-xs text-gray-400">
+              {variant === 'music'
+                ? 'Pick music from the left panel — clips appear here'
+                : 'Pick a sound from the left panel — clips appear here'}
+            </span>
           </div>
         ) : (
           effects.map((eff) => {
@@ -195,18 +230,16 @@ export default function SFXTimeline({
                 role="button"
                 aria-label={`${eff.sound.name}, starts at ${eff.startSec.toFixed(1)} seconds, ${eff.durationSec.toFixed(1)} seconds long`}
                 aria-pressed={isSelected}
-                className={`absolute top-1 bottom-1 rounded-md cursor-grab active:cursor-grabbing transition-shadow overflow-hidden z-[15] ${
-                  isSelected
-                    ? 'bg-orange-50 ring-1 ring-orange-500 shadow-sm'
-                    : 'bg-orange-50 ring-1 ring-orange-300 hover:ring-orange-400'
+                className={`absolute top-1 bottom-1 rounded-md cursor-grab active:cursor-grabbing transition-shadow overflow-hidden z-[15] ring-1 ${palette.clipBg} ${
+                  isSelected ? `${palette.clipRingActive} shadow-sm` : palette.clipRingIdle
                 }`}
                 style={{ left: `${leftPx}px`, width: `${widthPx}px` }}
               >
                 {/* Darker top accent gives the clip a DAW-style header
                     without the loud solid-fill look. Stripe gets stronger
                     on selection. */}
-                <div className={`h-1 ${isSelected ? 'bg-orange-500' : 'bg-orange-400'}`} />
-                <div className="flex items-center justify-between gap-1 h-[calc(100%-4px)] text-orange-900" style={{ paddingLeft: HANDLE_WIDTH + 4, paddingRight: HANDLE_WIDTH + 4 }}>
+                <div className={`h-1 ${isSelected ? palette.accentActive : palette.accentIdle}`} />
+                <div className={`flex items-center justify-between gap-1 h-[calc(100%-4px)] ${palette.textColor}`} style={{ paddingLeft: HANDLE_WIDTH + 4, paddingRight: HANDLE_WIDTH + 4 }}>
                   <span className="text-[11px] font-medium truncate flex-1" title={eff.sound.name}>
                     {eff.sound.name}
                   </span>
@@ -214,7 +247,7 @@ export default function SFXTimeline({
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); onRemoveEffect(eff.id); }}
                     aria-label={`Remove ${eff.sound.name}`}
-                    className="flex-shrink-0 p-0.5 rounded text-orange-700 hover:text-orange-900 hover:bg-orange-100 transition-colors"
+                    className={`flex-shrink-0 p-0.5 rounded transition-colors ${palette.iconColor}`}
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -224,17 +257,17 @@ export default function SFXTimeline({
                     edge. Selected state darkens the bar; hover brightens. */}
                 <div
                   onPointerDown={(e) => handlePointerDown(e, eff, 'resize-left')}
-                  className={`absolute top-0 left-0 bottom-0 cursor-ew-resize ${
-                    isSelected ? 'bg-orange-500/50' : 'bg-orange-400/25 hover:bg-orange-500/50'
-                  } transition-colors`}
+                  className={`absolute top-0 left-0 bottom-0 cursor-ew-resize transition-colors ${
+                    isSelected ? palette.handleActive : palette.handleIdle
+                  }`}
                   style={{ width: HANDLE_WIDTH }}
                   aria-label="Resize start"
                 />
                 <div
                   onPointerDown={(e) => handlePointerDown(e, eff, 'resize-right')}
-                  className={`absolute top-0 right-0 bottom-0 cursor-ew-resize ${
-                    isSelected ? 'bg-orange-500/50' : 'bg-orange-400/25 hover:bg-orange-500/50'
-                  } transition-colors`}
+                  className={`absolute top-0 right-0 bottom-0 cursor-ew-resize transition-colors ${
+                    isSelected ? palette.handleActive : palette.handleIdle
+                  }`}
                   style={{ width: HANDLE_WIDTH }}
                   aria-label="Resize end"
                 />

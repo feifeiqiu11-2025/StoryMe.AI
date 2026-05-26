@@ -25,6 +25,12 @@ export interface RailTab {
   /** Used for the icon tooltip and the panel header. */
   label: string;
   content: ReactNode;
+  /** When true, the rail skips the panel's outer header (label + ×
+   *  button) and lets the content take the full panel height. The
+   *  content is responsible for rendering its own dismiss affordance.
+   *  Use when the content already has top tabs of its own and the
+   *  outer header would just duplicate them. */
+  hideHeader?: boolean;
 }
 
 interface LeftRailProps {
@@ -81,18 +87,20 @@ export default function LeftRail({ tabs, activeTabId, onTabChange }: LeftRailPro
       {/* Expanded panel — slides in to the right of the icon strip. */}
       {active && (
         <div className="w-[360px] flex-shrink-0 border-l border-gray-200 bg-white flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
-            <h3 className="text-sm font-semibold text-gray-900">{active.label}</h3>
-            <button
-              onClick={() => onTabChange(null)}
-              aria-label={`Close ${active.label}`}
-              className="p-1 rounded text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+          {!active.hideHeader && (
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
+              <h3 className="text-sm font-semibold text-gray-900">{active.label}</h3>
+              <button
+                onClick={() => onTabChange(null)}
+                aria-label={`Close ${active.label}`}
+                className="p-1 rounded text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
           <div className="flex-1 min-h-0 overflow-y-auto">{active.content}</div>
         </div>
       )}

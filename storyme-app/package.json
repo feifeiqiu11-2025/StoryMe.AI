@@ -12,7 +12,8 @@
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --maxWorkers=2",
     "migrate-audio": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/migrate-webm-to-mp3.ts",
-    "seed-sfx": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/seed-sfx-library.ts"
+    "seed-sfx": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/seed-sfx-library.ts",
+    "seed-music": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/seed-music-library.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.67.0",

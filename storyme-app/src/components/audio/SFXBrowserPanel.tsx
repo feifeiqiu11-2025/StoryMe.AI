@@ -1,22 +1,25 @@
 /**
- * SFXBrowserPanel — panel-shaped sound browser. Renders inside a LeftRail
- * tab (no modal chrome of its own; the rail provides the header + close).
+ * Browser panel for the LeftRail. Two top-level tabs: Sounds | Music.
+ * Inside each tab, library and Freesound results are merged into a single
+ * scrollable list:
+ *   - Library rows first (curated, CC0)
+ *   - "More from Freesound" subhead, then Freesound rows (only when the
+ *     user has typed a query — we don't burn Freesound API quota on idle
+ *     tab opens)
+ *   - Infinite scroll appends more results as the sentinel scrolls into view
  *
- * Tabs:
- *   - Library     — sounds already in our sfx_library table
- *   - Freesound   — live CC0 search via /api/v1/sfx-library/freesound; picking
- *                   triggers an import (copy to our bucket + insert row)
- *                   before handing the SfxLibraryItem to the caller.
+ * Picking a Freesound row triggers a one-time import: the file is copied
+ * to our bucket and a sfx_library row is inserted under the current
+ * top-tab's kind. Library rows are added immediately.
  *
- * Picking a sound does NOT auto-close the panel — that's the whole point of
- * a side rail vs a modal: browse, audition multiple sounds, layer several
- * in one session. The host (Recorder) controls open/close via the LeftRail.
+ * The host (Recorder) receives onPick(sound, kind) so it can route the
+ * placement to either the SFX or music track without inspecting the row.
  */
 
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause, Plus } from 'lucide-react';
+import { Play, Pause, Plus, Loader2 } from 'lucide-react';
 
 export interface SfxLibraryItem {
   id: string;
@@ -30,77 +33,178 @@ export interface SfxLibraryItem {
   license: 'CC0' | 'CC-BY' | 'proprietary';
   /** Set on Freesound search results before import. */
   external_id?: string;
+  /** Library category, attached by the new GET endpoint. */
+  kind?: 'sfx' | 'music';
 }
 
-type Tab = 'library' | 'freesound';
+type TopTab = 'sfx' | 'music';
 
 interface SFXBrowserPanelProps {
-  onPick: (sound: SfxLibraryItem) => void;
+  onPick: (sound: SfxLibraryItem, kind: TopTab) => void;
+  /** Optional close handler. When provided, renders an × on the right
+   *  side of the top-tab row so the panel doesn't need an outer header. */
+  onClose?: () => void;
 }
 
-export default function SFXBrowserPanel({ onPick }: SFXBrowserPanelProps) {
-  const [tab, setTab] = useState<Tab>('library');
-  const [sounds, setSounds] = useState<SfxLibraryItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const LIBRARY_PAGE_SIZE = 30;
+const FREESOUND_PAGE_SIZE = 24;
+
+export default function SFXBrowserPanel({ onPick, onClose }: SFXBrowserPanelProps) {
+  const [topTab, setTopTab] = useState<TopTab>('sfx');
   const [query, setQuery] = useState('');
+
+  const [libraryItems, setLibraryItems] = useState<SfxLibraryItem[]>([]);
+  const [libraryOffset, setLibraryOffset] = useState(0);
+  const [libraryHasMore, setLibraryHasMore] = useState(false);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+
+  const [freesoundItems, setFreesoundItems] = useState<SfxLibraryItem[]>([]);
+  const [freesoundPage, setFreesoundPage] = useState(1);
+  const [freesoundExhausted, setFreesoundExhausted] = useState(false);
+  const [freesoundLoading, setFreesoundLoading] = useState(false);
+
+  const [error, setError] = useState<string | null>(null);
   const [previewingId, setPreviewingId] = useState<string | null>(null);
   const [importingExternalId, setImportingExternalId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const fetchSounds = useCallback(
-    async (currentTab: Tab, q: string) => {
-      setLoading(true);
-      setError(null);
-      // Don't clear `sounds` on a new fetch — stale-while-revalidate keeps
-      // the previous results visible while loading; flashing an empty grid
-      // on every keystroke felt terrible.
+  const fetchLibraryPage = useCallback(
+    async (offset: number, tab: TopTab, q: string, replace: boolean) => {
+      setLibraryLoading(true);
       try {
-        if (currentTab === 'freesound') {
-          if (q.trim().length < 2) {
-            setSounds([]);
-            setLoading(false);
-            return;
-          }
-          const url = new URL('/api/v1/sfx-library/freesound', window.location.origin);
-          url.searchParams.set('q', q.trim());
-          url.searchParams.set('pageSize', '24');
-          const res = await fetch(url.toString());
-          if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            throw new Error(data.error || `HTTP ${res.status}`);
-          }
-          const data = await res.json();
-          setSounds(data.sounds ?? []);
-        } else {
-          const url = new URL('/api/v1/sfx-library', window.location.origin);
-          if (q.trim()) url.searchParams.set('q', q.trim());
-          url.searchParams.set('limit', '60');
-          const res = await fetch(url.toString());
-          if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            throw new Error(data.error || `HTTP ${res.status}`);
-          }
-          const data = await res.json();
-          setSounds(data.sounds ?? []);
+        const url = new URL('/api/v1/sfx-library', window.location.origin);
+        url.searchParams.set('kind', tab);
+        url.searchParams.set('limit', String(LIBRARY_PAGE_SIZE));
+        url.searchParams.set('offset', String(offset));
+        if (q.trim()) url.searchParams.set('q', q.trim());
+        const res = await fetch(url.toString());
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `HTTP ${res.status}`);
         }
+        const data = await res.json();
+        const incoming: SfxLibraryItem[] = data.sounds ?? [];
+        setLibraryItems((prev) => (replace ? incoming : [...prev, ...incoming]));
+        setLibraryHasMore(!!data.hasMore);
+        setLibraryOffset(offset + incoming.length);
       } catch (err: any) {
-        setError(err.message || 'Failed to load sounds');
-        setSounds([]);
+        setError(err.message || 'Library query failed');
       } finally {
-        setLoading(false);
+        setLibraryLoading(false);
       }
     },
     [],
   );
 
-  useEffect(() => {
-    const t = setTimeout(() => { fetchSounds(tab, query); }, query ? 350 : 0);
-    return () => clearTimeout(t);
-  }, [tab, query, fetchSounds]);
+  const fetchFreesoundPage = useCallback(
+    async (page: number, tab: TopTab, q: string, replace: boolean) => {
+      if (q.trim().length < 2) {
+        setFreesoundItems([]);
+        setFreesoundExhausted(true);
+        return;
+      }
+      setFreesoundLoading(true);
+      try {
+        const url = new URL('/api/v1/sfx-library/freesound', window.location.origin);
+        url.searchParams.set('q', q.trim());
+        url.searchParams.set('pageSize', String(FREESOUND_PAGE_SIZE));
+        url.searchParams.set('page', String(page));
+        url.searchParams.set('kind', tab);
+        const res = await fetch(url.toString());
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        const incoming: SfxLibraryItem[] = data.sounds ?? [];
+        setFreesoundItems((prev) => (replace ? incoming : [...prev, ...incoming]));
+        // Heuristic: fewer than requested = no more pages.
+        setFreesoundExhausted(incoming.length < FREESOUND_PAGE_SIZE);
+      } catch (err: any) {
+        setError(err.message || 'Freesound search failed');
+        setFreesoundExhausted(true);
+      } finally {
+        setFreesoundLoading(false);
+      }
+    },
+    [],
+  );
 
-  // Stop any preview audio on unmount so it doesn't keep playing if the
-  // panel collapses while a sound is auditioning.
+  // Single effect for both tab and query changes — collapsing them
+  // prevents the double-fetch flicker that happened when both effects
+  // fired on initial mount. Debounced 350ms on keystroke; immediate
+  // when query is empty (tab open or query cleared).
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setError(null);
+      setLibraryItems([]);
+      setLibraryOffset(0);
+      setLibraryHasMore(false);
+      setFreesoundItems([]);
+      setFreesoundPage(1);
+
+      void fetchLibraryPage(0, topTab, query, true);
+
+      if (query.trim().length >= 2) {
+        setFreesoundExhausted(false);
+        void fetchFreesoundPage(1, topTab, query, true);
+      } else if (topTab === 'music') {
+        // Music tab with no query → show popular CC0 instrumental music
+        // by default. The library is mostly empty until the user curates,
+        // so this gives them something to scrub through immediately.
+        setFreesoundExhausted(false);
+        void fetchFreesoundPage(1, topTab, 'instrumental', true);
+      } else {
+        // Sounds tab with no query → library only (Freesound stays
+        // un-queried to save API quota when the user is just browsing).
+        setFreesoundExhausted(true);
+      }
+    }, query ? 350 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topTab, query]);
+
+  // Reset the query when the user switches tabs — different vocabulary
+  // for sounds vs music. Pure setter; the combined effect above picks up
+  // the topTab + query change in a single batched render.
+  const switchTab = (next: TopTab) => {
+    setTopTab(next);
+    setQuery('');
+  };
+
+  // Infinite scroll — observe a sentinel near the list bottom. When it
+  // enters the viewport, fetch the next chunk from whichever source still
+  // has results: library first, then Freesound.
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0].isIntersecting) return;
+        if (libraryLoading || freesoundLoading) return;
+        if (libraryHasMore) {
+          void fetchLibraryPage(libraryOffset, topTab, query, false);
+        } else if (!freesoundExhausted) {
+          // Use the same effective query as the first-page fetch — for
+          // the music default-state (no user query), keep paginating
+          // the 'instrumental' results we showed initially.
+          const effectiveQuery = query.trim().length >= 2
+            ? query
+            : (topTab === 'music' ? 'instrumental' : '');
+          if (!effectiveQuery) return;
+          const nextPage = freesoundPage + 1;
+          setFreesoundPage(nextPage);
+          void fetchFreesoundPage(nextPage, topTab, effectiveQuery, false);
+        }
+      },
+      { rootMargin: '120px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [libraryLoading, freesoundLoading, libraryHasMore, libraryOffset, freesoundExhausted, freesoundPage, topTab, query, fetchLibraryPage, fetchFreesoundPage]);
+
+  // Stop preview audio on unmount.
   useEffect(() => {
     return () => {
       if (audioRef.current) audioRef.current.pause();
@@ -121,60 +225,119 @@ export default function SFXBrowserPanel({ onPick }: SFXBrowserPanelProps) {
   };
 
   const handlePick = async (sound: SfxLibraryItem) => {
-    // Freesound results need to be imported (copied to our bucket + inserted)
-    // before they can be referenced from a story's audio_layers. The library
-    // tab returns rows that already live in our DB.
     if (sound.source === 'freesound' && sound.external_id) {
       setImportingExternalId(sound.external_id);
       try {
         const res = await fetch('/api/v1/sfx-library/freesound/import', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ freesoundId: Number(sound.external_id) }),
+          body: JSON.stringify({
+            freesoundId: Number(sound.external_id),
+            kind: topTab,
+          }),
         });
         const data = await res.json();
         if (!res.ok) {
           alert(`Import failed: ${data.error || res.status}`);
           return;
         }
-        onPick(data.sound);
+        onPick({ ...data.sound, kind: topTab }, topTab);
       } catch (err: any) {
         alert(`Import failed: ${err.message || 'Network error'}`);
       } finally {
         setImportingExternalId(null);
       }
     } else {
-      onPick(sound);
+      onPick({ ...sound, kind: topTab }, topTab);
     }
   };
+
+  const renderRow = (s: SfxLibraryItem) => {
+    const isImporting = importingExternalId === s.external_id;
+    const isPreviewing = previewingId === s.id;
+    const addLabel = s.source === 'freesound'
+      ? `Import and add ${s.name}`
+      : `Add ${s.name}`;
+    return (
+      <li
+        key={s.id}
+        className="flex items-center gap-1 px-1.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors"
+      >
+        <span
+          className="flex-1 min-w-0 text-xs font-medium text-gray-900 truncate"
+          title={s.name}
+        >
+          {s.name}
+        </span>
+        <span className="text-[10px] text-gray-500 flex-shrink-0 tabular-nums">
+          {s.duration_sec.toFixed(1)}s
+        </span>
+        <button
+          onClick={() => playPreview(s)}
+          aria-label={isPreviewing ? `Stop ${s.name}` : `Preview ${s.name}`}
+          className="p-1 rounded text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors flex-shrink-0"
+        >
+          {isPreviewing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+        </button>
+        <button
+          onClick={() => handlePick(s)}
+          disabled={isImporting}
+          aria-label={isImporting ? 'Importing' : addLabel}
+          className="p-1 rounded text-purple-600 hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+        >
+          {isImporting ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Plus className="w-3.5 h-3.5" />
+          )}
+        </button>
+      </li>
+    );
+  };
+
+  const hasAnyResult = libraryItems.length + freesoundItems.length > 0;
+  const showFreesoundSubhead = freesoundItems.length > 0;
 
   return (
     <div className="flex flex-col h-full">
       <audio ref={audioRef} onEnded={() => setPreviewingId(null)} />
-      {/* Tabs */}
-      <div className="px-3 pt-2 border-b border-gray-100 flex-shrink-0">
+      {/* Top tabs — the panel's only header. The × on the right closes
+          the whole rail (the LeftRail's outer header is hidden when an
+          onClose is wired here, saving ~40px of vertical real estate). */}
+      <div className="px-3 pt-2 border-b border-gray-100 flex-shrink-0 flex items-center justify-between">
         <div className="flex gap-1">
           <button
-            onClick={() => { setTab('library'); setQuery(''); }}
+            onClick={() => switchTab('sfx')}
             className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
-              tab === 'library'
+              topTab === 'sfx'
                 ? 'border-purple-600 text-purple-700'
                 : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
-            Library
+            Sounds
           </button>
           <button
-            onClick={() => { setTab('freesound'); setQuery(''); }}
+            onClick={() => switchTab('music')}
             className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
-              tab === 'freesound'
+              topTab === 'music'
                 ? 'border-purple-600 text-purple-700'
                 : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
-            Freesound
+            Music
           </button>
         </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            aria-label="Close panel"
+            className="p-1 mr-1 rounded text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -183,91 +346,57 @@ export default function SFXBrowserPanel({ onPick }: SFXBrowserPanelProps) {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={tab === 'freesound'
-            ? 'Search Freesound…'
-            : 'Filter library…'}
+          placeholder={topTab === 'music' ? 'Search music…' : 'Search sounds…'}
           className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          aria-label="Search sounds"
+          aria-label="Search"
         />
       </div>
 
       {/* Body — scrollable list. scrollbar-thin-always keeps the track
-          visible on macOS where the OS otherwise auto-hides it, so users
-          can see at a glance that the list extends below the fold. */}
+          visible on macOS where the OS otherwise auto-hides it. */}
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin-always px-3 py-2 relative">
         {error && (
           <div role="alert" className="p-2 bg-red-50 text-red-700 text-xs rounded-md mb-2">
             {error}
           </div>
         )}
-        {!error && sounds.length === 0 && !loading && (
+        {!hasAnyResult && !libraryLoading && !freesoundLoading && (
           <div className="text-center py-10 px-2">
             <p className="text-gray-700 text-sm font-medium mb-1">
-              {tab === 'freesound' && query.trim().length < 2
-                ? 'Type at least 2 letters to search'
-                : 'No sounds found'}
+              {topTab === 'music' ? 'No music yet' : 'No sounds yet'}
             </p>
             <p className="text-xs text-gray-500">
-              {tab === 'library'
-                ? (query ? 'Try a different term, or switch to the Freesound tab.' : 'Switch to Freesound to import sounds.')
-                : 'Freesound returns CC0 sounds only.'}
+              {query.trim().length >= 2
+                ? 'Try a different search — Freesound looks for CC0 matches.'
+                : query.trim().length > 0
+                  ? 'Type at least 2 letters to search Freesound.'
+                  : (topTab === 'music'
+                      ? 'Search to find background music from Freesound.'
+                      : 'Search to discover sounds.')}
             </p>
           </div>
         )}
-        {!error && sounds.length === 0 && loading && (
-          <div className="text-center py-10 text-gray-500 text-xs">Loading…</div>
-        )}
-        {loading && sounds.length > 0 && (
-          <div className="absolute top-2 right-3 text-[10px] text-gray-400 bg-white/80 px-2 py-0.5 rounded-full">
-            Searching…
-          </div>
-        )}
-        {sounds.length > 0 && (
+        {hasAnyResult && (
           <ul className="flex flex-col">
-            {sounds.map((s) => {
-              const isImporting = importingExternalId === s.external_id;
-              const isPreviewing = previewingId === s.id;
-              const addLabel = s.source === 'freesound'
-                ? `Import and add ${s.name}`
-                : `Add ${s.name}`;
-              return (
-                <li
-                  key={s.id}
-                  className="flex items-center gap-1 px-1.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors"
-                >
-                  <span
-                    className="flex-1 min-w-0 text-xs font-medium text-gray-900 truncate"
-                    title={s.name}
-                  >
-                    {s.name}
-                  </span>
-                  <span className="text-[10px] text-gray-500 flex-shrink-0 tabular-nums">
-                    {s.duration_sec.toFixed(1)}s
-                  </span>
-                  <button
-                    onClick={() => playPreview(s)}
-                    aria-label={isPreviewing ? `Stop ${s.name}` : `Preview ${s.name}`}
-                    className="p-1 rounded text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors flex-shrink-0"
-                  >
-                    {isPreviewing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                  </button>
-                  <button
-                    onClick={() => handlePick(s)}
-                    disabled={isImporting}
-                    aria-label={isImporting ? 'Importing' : addLabel}
-                    className="p-1 rounded text-purple-600 hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                  >
-                    {isImporting ? (
-                      <span className="w-3.5 h-3.5 inline-flex items-center justify-center text-[10px] leading-none">…</span>
-                    ) : (
-                      <Plus className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                </li>
-              );
-            })}
+            {libraryItems.map(renderRow)}
+            {showFreesoundSubhead && (
+              <li
+                className="px-1.5 pt-3 pb-1 text-[10px] uppercase tracking-wider text-gray-500 font-semibold"
+                aria-hidden
+              >
+                More from Freesound
+              </li>
+            )}
+            {freesoundItems.map(renderRow)}
           </ul>
         )}
+        {(libraryLoading || freesoundLoading) && (
+          <div className="absolute top-2 right-3 text-[10px] text-gray-400 bg-white/80 px-2 py-0.5 rounded-full">
+            {freesoundLoading ? 'Searching Freesound…' : 'Loading…'}
+          </div>
+        )}
+        {/* Infinite-scroll sentinel — observed by IntersectionObserver. */}
+        <div ref={sentinelRef} aria-hidden className="h-2" />
       </div>
     </div>
   );

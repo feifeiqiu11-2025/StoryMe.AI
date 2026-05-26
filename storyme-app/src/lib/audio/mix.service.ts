@@ -174,7 +174,14 @@ export async function mixLayersToMp3(layers: AudioLayers): Promise<Buffer> {
     // 4.2.x. Without it, amix auto-attenuates by 1/N so the mix gets a
     // touch quieter as layers add. We pre-bake compensating gain into
     // each layer's volume to undo the attenuation.
-    const compensateDb = 20 * Math.log10(mixInputs.length);  // +6dB per doubling
+    // Cap the compensation at +12 dB. amix's 1/N attenuation scales
+    // logarithmically (+6 dB per doubling of layer count), so by ~8 layers
+    // the math says we'd boost +18 dB to compensate — enough to clip
+    // confidently if individual layer levels are already calibrated for
+    // a single-layer mix. +12 dB is the headroom budget that keeps a
+    // realistic page (vocal + 3 SFX + 3 music) audible without clipping.
+    const rawCompensateDb = 20 * Math.log10(mixInputs.length);
+    const compensateDb = Math.min(rawCompensateDb, 12);
     filters.push(`${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=longest[mixed_raw];[mixed_raw]volume=${compensateDb.toFixed(2)}dB[mixed]`);
 
     // Fast path: vocal-only AND no edits whatsoever — just stream-copy

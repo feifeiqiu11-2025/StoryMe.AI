@@ -52,14 +52,30 @@ function getApiKey(): string {
 export async function searchCC0(opts: {
   query: string;
   pageSize?: number;
+  /** 1-based page number for pagination. Default 1. */
+  page?: number;
   /** Sort: 'score' (relevance, default), 'duration_asc', 'rating_desc', etc. */
   sort?: 'score' | 'duration_asc' | 'rating_desc' | 'downloads_desc';
+  /** Min duration in seconds — useful for filtering music vs SFX. */
+  minDurationSec?: number;
+  /** Max duration in seconds — caps results for both lanes. */
+  maxDurationSec?: number;
 }): Promise<FreesoundSearchResult[]> {
+  // Freesound supports range queries via the filter field. Combine the
+  // license filter with optional duration bounds. Bounds are exclusive
+  // brackets but Freesound treats both ends inclusively in practice.
+  const filterParts = ['license:"Creative Commons 0"'];
+  if (typeof opts.minDurationSec === 'number' || typeof opts.maxDurationSec === 'number') {
+    const lo = typeof opts.minDurationSec === 'number' ? opts.minDurationSec : '*';
+    const hi = typeof opts.maxDurationSec === 'number' ? opts.maxDurationSec : '*';
+    filterParts.push(`duration:[${lo} TO ${hi}]`);
+  }
   const params = new URLSearchParams({
     query: opts.query,
-    filter: 'license:"Creative Commons 0"',
+    filter: filterParts.join(' '),
     fields: 'id,name,tags,duration,license,username,previews',
     page_size: String(opts.pageSize ?? 10),
+    page: String(opts.page ?? 1),
     sort: opts.sort ?? 'score',
     token: getApiKey(),
   });
