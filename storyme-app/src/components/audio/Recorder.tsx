@@ -18,6 +18,9 @@ import SFXTimeline from './SFXTimeline';
 import LeftRail from './LeftRail';
 import { TrackRow, TimelineRuler, TRACK_LABEL_WIDTH } from './TimelineLayout';
 import { createMixPlayer, MixPlayer } from '@/lib/audio/preview-mix.client';
+import type { VocalSegment } from '@/lib/audio/layers.types';
+import { mixTimeToOriginal, originalToMixTime, totalMixDuration, splitSegmentsAtMixTime } from '@/lib/audio/segment-time';
+import { renderSegmentsToWav } from '@/lib/audio/offline-render.client';
 
 export interface RecordingPage {
   pageNumber: number;
@@ -150,9 +153,17 @@ export default function Recorder({
   // Expanded mode = centered modal overlay with waveform trimmer; minimized
   // mode = the original draggable mini panel. Same state, different layout.
   const [expanded, setExpanded] = useState(false);
-  // Per-page in-memory trim range. Keyed by page index, same as pageRecordings.
-  // Cleared when the user re-records the page (trim is bound to a specific take).
-  const [pageTrims, setPageTrims] = useState<Map<number, TrimRange>>(new Map());
+  // Per-page in-memory vocal segments. Each segment is a (start,end) window
+  // in original-recording time; the mix plays them back-to-back, so a gap
+  // between adjacent segments = a "cut" the user wants removed. A single
+  // segment spanning [0,duration] = pristine recording. Replaces the older
+  // single-trim model; the legacy outer-trim is derived as the first
+  // segment's start and the last segment's end.
+  const [pageVocalSegments, setPageVocalSegments] = useState<Map<number, VocalSegment[]>>(new Map());
+  // Index of the currently selected voice segment within the current
+  // page's segments[], or null when no voice segment is selected (e.g.,
+  // when an SFX clip is selected instead).
+  const [selectedVoiceSegmentIdx, setSelectedVoiceSegmentIdx] = useState<number | null>(null);
   // Per-page SFX placements pending save. Persisted via PATCH /layers after
   // the vocal upload completes (in handleSaveCurrentPage).
   const [pageEffects, setPageEffects] = useState<Map<number, PendingEffect[]>>(new Map());
@@ -199,11 +210,53 @@ export default function Recorder({
   // until the user releases the pointer, at which point we commit the
   // seek to the player.
   const [scrubSec, setScrubSec] = useState<number | null>(null);
+  // Index of a selected "cut" (gap between adjacent voice segments).
+  // Mutually exclusive with selectedEffectId — selecting one clears the
+  // other. Hitting Delete with a cut selected triggers the destructive
+  // commit (offline render shrinks the source blob).
+  const [selectedCutIdx, setSelectedCutIdx] = useState<number | null>(null);
+  const [deletingCut, setDeletingCut] = useState(false);
+  // Active drag of an inner boundary between two voice segments. `side`
+  // says which edge the user grabbed: 'left' = segments[boundaryIdx].endSec,
+  // 'right' = segments[boundaryIdx + 1].startSec. Captured at drag start
+  // and constant for the gesture so a mid-drag rescale can't reset it.
+  const [voiceBoundaryDrag, setVoiceBoundaryDrag] = useState<{
+    boundaryIdx: number;
+    side: 'left' | 'right';
+    initialOriginalSec: number;
+    pointerStartX: number;
+    frozenPixelsPerSec: number;
+  } | null>(null);
 
   const totalPages = pages.length;
   const currentPage = pages[currentPageIndex];
   const currentRecording = pageRecordings.get(currentPageIndex);
-  const currentTrim = pageTrims.get(currentPageIndex);
+  // Derive current segments — explicit list wins, otherwise default to a
+  // single segment spanning the whole recording (pristine, untouched).
+  // Always non-null whenever there's a recording.
+  const currentSegments: VocalSegment[] = (() => {
+    const explicit = pageVocalSegments.get(currentPageIndex);
+    if (explicit && explicit.length > 0) return explicit;
+    if (currentRecording) return [{ startSec: 0, endSec: currentRecording.duration }];
+    return [];
+  })();
+  // "Has the user actually trimmed or split this take?" — used for the
+  // unsaved badge, the Reset button, and the legacy onSaveRecording trim
+  // payload. Pristine = exactly one segment spanning [0, duration].
+  const isVocalEdited = currentRecording && (
+    currentSegments.length > 1
+    || (currentSegments.length === 1 && (
+      currentSegments[0].startSec !== 0
+      || currentSegments[0].endSec !== currentRecording.duration
+    ))
+  );
+  // Legacy outer-trim shape — first segment's start, last segment's end.
+  // Callers that still need a single-range view (sublabel, upload trim
+  // param, mix preview legacy path) read this; multi-segment information
+  // is only visible to callers that consume currentSegments directly.
+  const currentTrim: TrimRange | undefined = isVocalEdited && currentSegments.length > 0
+    ? { startSec: currentSegments[0].startSec, endSec: currentSegments[currentSegments.length - 1].endSec }
+    : undefined;
   const currentEffects = pageEffects.get(currentPageIndex) ?? [];
   const isLastPage = currentPageIndex === totalPages - 1;
 
@@ -299,10 +352,54 @@ export default function Recorder({
     };
   }, [expanded]);
 
-  // Split shortcut — `S` splits the selected clip at the current playhead
-  // position. Mirrors CapCut / Premiere's split hotkey. Only fires when an
-  // SFX clip is selected and the playhead sits strictly inside it. Voice
-  // split will share this handler once the segments UI lands.
+  // Global pointer handlers for the voice-boundary drag. Listening on
+  // window keeps the drag alive even if the cursor temporarily leaves the
+  // handle (e.g., moves over the waveform's WaveSurfer canvas).
+  useEffect(() => {
+    if (!voiceBoundaryDrag) return;
+    const onMove = (e: PointerEvent) => {
+      const deltaPx = e.clientX - voiceBoundaryDrag.pointerStartX;
+      const deltaSec = deltaPx / voiceBoundaryDrag.frozenPixelsPerSec;
+      const newSec = voiceBoundaryDrag.initialOriginalSec + deltaSec;
+      updateVoiceBoundary(voiceBoundaryDrag.boundaryIdx, voiceBoundaryDrag.side, newSec);
+    };
+    const onUp = () => setVoiceBoundaryDrag(null);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceBoundaryDrag]);
+
+  // Delete shortcut — Delete/Backspace removes whichever voice thing is
+  // selected (cut OR segment). Both are destructive (offline render).
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (selectedCutIdx !== null) {
+        e.preventDefault();
+        void deleteCutAt(selectedCutIdx);
+      } else if (selectedVoiceSegmentIdx !== null) {
+        e.preventDefault();
+        void deleteSegmentAt(selectedVoiceSegmentIdx);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, selectedCutIdx, selectedVoiceSegmentIdx]);
+
+  // Split shortcut — `S` splits whatever is selected at the current
+  // playhead. Dispatches: selected SFX clip → split that clip; nothing
+  // SFX selected → split the voice segment under the playhead.
   useEffect(() => {
     if (!expanded) return;
     const onKey = (e: KeyboardEvent) => {
@@ -310,21 +407,33 @@ export default function Recorder({
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-      if (!selectedEffectId) return;
-      const list = pageEffects.get(currentPageIndex);
-      if (!list) return;
-      const clip = list.find((eff) => eff.id === selectedEffectId);
-      if (!clip) return;
       const playheadMix = scrubSec ?? mixCurrentSec;
-      if (playheadMix <= clip.startSec + 0.05) return;
-      if (playheadMix >= clip.startSec + clip.durationSec - 0.05) return;
+      if (selectedEffectId) {
+        const list = pageEffects.get(currentPageIndex);
+        const clip = list?.find((eff) => eff.id === selectedEffectId);
+        if (!clip) return;
+        if (playheadMix <= clip.startSec + 0.05) return;
+        if (playheadMix >= clip.startSec + clip.durationSec - 0.05) return;
+        e.preventDefault();
+        splitEffectAtMixTime(selectedEffectId, playheadMix);
+        return;
+      }
+      // Voice split path.
+      if (!currentRecording) return;
+      const segs = pageVocalSegments.get(currentPageIndex)
+        ?? [{ startSec: 0, endSec: currentRecording.duration }];
+      const mapping = mixTimeToOriginal(playheadMix, segs);
+      if (!mapping) return;
+      const seg = segs[mapping.segIdx];
+      if (mapping.origSec <= seg.startSec + 0.05) return;
+      if (mapping.origSec >= seg.endSec - 0.05) return;
       e.preventDefault();
-      splitEffectAtMixTime(selectedEffectId, playheadMix);
+      splitVoiceAtMixTime(playheadMix);
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expanded, selectedEffectId, pageEffects, currentPageIndex, mixCurrentSec, scrubSec]);
+  }, [expanded, selectedEffectId, pageEffects, pageVocalSegments, currentPageIndex, mixCurrentSec, scrubSec, currentRecording]);
 
   // Dispose any active mix player on unmount or when the current page
   // changes (each page has its own composition).
@@ -339,9 +448,9 @@ export default function Recorder({
   // click rebuilds with the new vocal trim or effect set.
   const mixVersion = (() => {
     if (!currentRecording) return 'none';
-    const trim = currentTrim ? `${currentTrim.startSec.toFixed(2)}-${currentTrim.endSec.toFixed(2)}` : 'full';
+    const segs = currentSegments.map((s) => `${s.startSec.toFixed(2)}-${s.endSec.toFixed(2)}`).join(',');
     const fx = currentEffects.map((e) => `${e.id}:${e.startSec}:${e.durationSec}:${e.sourceOffsetSec}:${e.volumeDb}`).join('|');
-    return `${currentRecording.url}|${trim}|${fx}`;
+    return `${currentRecording.url}|${segs}|${fx}`;
   })();
   useEffect(() => {
     // Any change to the mix recipe invalidates the cached player.
@@ -378,6 +487,10 @@ export default function Recorder({
     try {
       const player = await createMixPlayer({
         vocalBlob: currentRecording.blob,
+        // segments[] is the source of truth — multi-segment vocals play
+        // back-to-back, skipping gaps. trimRange is only sent for the
+        // legacy single-segment fallback (kept for back-compat).
+        segments: currentSegments.length > 0 ? currentSegments : undefined,
         trimRange: currentTrim,
         effects: currentEffects.map((e) => ({
           id: e.id,
@@ -535,7 +648,7 @@ export default function Recorder({
           next.delete(capturedPageIndex);
           return next;
         });
-        setPageTrims((prev) => {
+        setPageVocalSegments((prev) => {
           if (!prev.has(capturedPageIndex)) return prev;
           const next = new Map(prev);
           next.delete(capturedPageIndex);
@@ -626,20 +739,64 @@ export default function Recorder({
       next.delete(currentPageIndex);
       return next;
     });
-    setPageTrims((prev) => {
+    setPageVocalSegments((prev) => {
       if (!prev.has(currentPageIndex)) return prev;
       const next = new Map(prev);
       next.delete(currentPageIndex);
       return next;
     });
+    setSelectedVoiceSegmentIdx(null);
   };
 
+  /** WaveSurfer's single region maps to the OUTER trim — first segment's
+   *  startSec and last segment's endSec. Any middle segments (from splits)
+   *  are preserved as long as they still sit inside the new outer range;
+   *  middle segments that would fall outside get clamped to the edge. */
   const updateCurrentTrim = (range: TrimRange) => {
-    setPageTrims((prev) => {
+    // Preserve the playhead's ORIGINAL-time position across the trim
+    // change. Visually keeps the playhead pinned where it was.
+    const prevFirstStart = currentSegments[0]?.startSec ?? 0;
+    const playheadOriginalSec = prevFirstStart + mixCurrentSec;
+    setPageVocalSegments((prev) => {
       const next = new Map(prev);
-      next.set(currentPageIndex, range);
+      const old = prev.get(currentPageIndex);
+      const base = old && old.length > 0
+        ? old
+        : (currentRecording ? [{ startSec: 0, endSec: currentRecording.duration }] : []);
+      if (base.length === 0) return prev;
+      const updated: VocalSegment[] = base.map((seg, idx) => {
+        if (idx === 0 && base.length === 1) {
+          return { startSec: range.startSec, endSec: range.endSec };
+        }
+        if (idx === 0) return { ...seg, startSec: range.startSec };
+        if (idx === base.length - 1) return { ...seg, endSec: range.endSec };
+        return seg;
+      })
+      // Drop any middle segment that now sits entirely outside the new
+      // outer bounds (or is degenerate after the clamp).
+      .filter((s) => s.endSec > s.startSec && s.endSec > range.startSec && s.startSec < range.endSec)
+      // And clamp any remaining segment to the new outer bounds.
+      .map((s) => ({
+        startSec: Math.max(s.startSec, range.startSec),
+        endSec: Math.min(s.endSec, range.endSec),
+      }))
+      .filter((s) => s.endSec - s.startSec > 0.01);
+      next.set(currentPageIndex, updated);
       return next;
     });
+    // Update playhead mix-time to match the preserved original-time
+    // position. Recompute against the FUTURE segments (we know the new
+    // outer bounds; middle segments shouldn't change the mapping math
+    // significantly for a single-region drag).
+    let nextMixSec: number;
+    if (playheadOriginalSec <= range.startSec) {
+      nextMixSec = 0;
+    } else if (playheadOriginalSec >= range.endSec) {
+      nextMixSec = Math.max(0, range.endSec - range.startSec);
+    } else {
+      nextMixSec = playheadOriginalSec - range.startSec;
+    }
+    setMixCurrentSec(nextMixSec);
   };
 
   const [loadingSavedAudio, setLoadingSavedAudio] = useState<number | null>(null);
@@ -682,7 +839,7 @@ export default function Recorder({
         next.delete(pageIndex);
         return next;
       });
-      setPageTrims((prev) => {
+      setPageVocalSegments((prev) => {
         if (!prev.has(pageIndex)) return prev;
         const next = new Map(prev);
         next.delete(pageIndex);
@@ -702,12 +859,13 @@ export default function Recorder({
   };
 
   const resetCurrentTrim = () => {
-    setPageTrims((prev) => {
+    setPageVocalSegments((prev) => {
       if (!prev.has(currentPageIndex)) return prev;
       const next = new Map(prev);
       next.delete(currentPageIndex);
       return next;
     });
+    setSelectedVoiceSegmentIdx(null);
   };
 
   const addEffect = (sound: SfxLibraryItem) => {
@@ -796,6 +954,174 @@ export default function Recorder({
     return didSplit;
   };
 
+  /** Adjust one side of an inner boundary between voice segments. Used
+   *  by the cut-band drag handles to widen or close a gap. Preserves the
+   *  playhead's original-time position by recomputing mixCurrentSec when
+   *  the segments around it change. Clamps so segments never overlap and
+   *  never shrink below a minimum playable length. */
+  const updateVoiceBoundary = (boundaryIdx: number, side: 'left' | 'right', newOriginalSec: number) => {
+    setPageVocalSegments((prev) => {
+      const cur = prev.get(currentPageIndex);
+      const base = cur && cur.length > 0
+        ? cur
+        : (currentRecording ? [{ startSec: 0, endSec: currentRecording.duration }] : []);
+      if (boundaryIdx < 0 || boundaryIdx >= base.length - 1) return prev;
+      const segLeft = base[boundaryIdx];
+      const segRight = base[boundaryIdx + 1];
+      const MIN_SEG = 0.05;
+      let updated: VocalSegment[];
+      if (side === 'left') {
+        const clamped = Math.max(segLeft.startSec + MIN_SEG, Math.min(segRight.startSec, newOriginalSec));
+        updated = base.map((s, i) => i === boundaryIdx ? { ...s, endSec: clamped } : s);
+      } else {
+        const clamped = Math.max(segLeft.endSec, Math.min(segRight.endSec - MIN_SEG, newOriginalSec));
+        updated = base.map((s, i) => i === boundaryIdx + 1 ? { ...s, startSec: clamped } : s);
+      }
+      const next = new Map(prev);
+      next.set(currentPageIndex, updated);
+      return next;
+    });
+  };
+
+  /** Destructively remove a whole voice SEGMENT. Renders the remaining
+   *  segments back-to-back into a new shorter blob, swaps it into the
+   *  page's recording, and collapses the survivors into a single segment
+   *  spanning the new shorter source. */
+  const deleteSegmentAt = async (segIdx: number) => {
+    if (deletingCut) return;
+    if (!currentRecording) return;
+    const segs = currentSegments;
+    if (segIdx < 0 || segIdx >= segs.length) return;
+    const remaining = segs.filter((_, i) => i !== segIdx);
+    if (remaining.length === 0) {
+      // Last segment → same effect as deleting the whole recording.
+      deleteRecording();
+      setSelectedVoiceSegmentIdx(null);
+      return;
+    }
+    setDeletingCut(true);
+    try {
+      const { blob: newBlob, durationSec: newDur } = await renderSegmentsToWav(
+        currentRecording.blob,
+        remaining,
+      );
+      const newUrl = URL.createObjectURL(newBlob);
+      const pageIdx = currentPageIndex;
+      setPageRecordings((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(pageIdx);
+        if (existing) URL.revokeObjectURL(existing.url);
+        next.set(pageIdx, { blob: newBlob, url: newUrl, duration: newDur });
+        return next;
+      });
+      // After destructive delete, the survivors are touching back-to-back
+      // in the new source — collapse to one segment so the UI doesn't
+      // show a meaningless divider where the cut used to be.
+      setPageVocalSegments((prev) => {
+        const next = new Map(prev);
+        next.set(pageIdx, [{ startSec: 0, endSec: newDur }]);
+        return next;
+      });
+      autoFittedPagesRef.current.delete(pageIdx);
+      setSelectedVoiceSegmentIdx(null);
+      setSavedPages((prev) => {
+        if (!prev.has(pageIdx)) return prev;
+        const next = new Set(prev);
+        next.delete(pageIdx);
+        return next;
+      });
+    } catch (err: any) {
+      console.error('Delete segment failed:', err);
+      alert(`Could not delete this segment: ${err.message || 'render failed'}`);
+    } finally {
+      setDeletingCut(false);
+    }
+  };
+
+  /** Destructively remove a cut from the source. Offline-renders the
+   *  active segments into a new shorter blob, swaps it into the page's
+   *  recording, and merges the two segments around the cut into one.
+   *  After this commits, the audio that lived inside the gap is gone —
+   *  the user can no longer drag the trim back into it. */
+  const deleteCutAt = async (cutIdx: number) => {
+    if (deletingCut) return;
+    if (!currentRecording) return;
+    const segs = currentSegments;
+    if (cutIdx < 0 || cutIdx >= segs.length - 1) return;
+    const left = segs[cutIdx];
+    const right = segs[cutIdx + 1];
+    const gapDur = right.startSec - left.endSec;
+    if (gapDur <= 0.01) return; // No real gap to delete.
+
+    setDeletingCut(true);
+    try {
+      const { blob: newBlob, durationSec: newDur } = await renderSegmentsToWav(
+        currentRecording.blob,
+        segs,
+      );
+      const newUrl = URL.createObjectURL(newBlob);
+      // Rebuild segments to match the new shorter source. Segments before
+      // the cut are unchanged; the two around the cut merge; segments
+      // after shift left by the deleted gap duration.
+      const newSegments: VocalSegment[] = [];
+      for (let i = 0; i < cutIdx; i++) newSegments.push(segs[i]);
+      newSegments.push({
+        startSec: left.startSec,
+        endSec: right.endSec - gapDur,
+      });
+      for (let i = cutIdx + 2; i < segs.length; i++) {
+        newSegments.push({
+          startSec: segs[i].startSec - gapDur,
+          endSec: segs[i].endSec - gapDur,
+        });
+      }
+      const pageIdx = currentPageIndex;
+      setPageRecordings((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(pageIdx);
+        if (existing) URL.revokeObjectURL(existing.url);
+        next.set(pageIdx, { blob: newBlob, url: newUrl, duration: newDur });
+        return next;
+      });
+      setPageVocalSegments((prev) => {
+        const next = new Map(prev);
+        next.set(pageIdx, newSegments);
+        return next;
+      });
+      // Re-fit zoom against the now-shorter source on the next render.
+      autoFittedPagesRef.current.delete(pageIdx);
+      setSelectedCutIdx(null);
+      // Saved indicator is invalid until the next Save.
+      setSavedPages((prev) => {
+        if (!prev.has(pageIdx)) return prev;
+        const next = new Set(prev);
+        next.delete(pageIdx);
+        return next;
+      });
+    } catch (err: any) {
+      console.error('Delete cut failed:', err);
+      alert(`Could not delete this cut: ${err.message || 'render failed'}`);
+    } finally {
+      setDeletingCut(false);
+    }
+  };
+
+  /** Split the voice at a mix-time playhead position. Inserts a new
+   *  segment break exactly at the playhead — both halves stay adjacent
+   *  initially (no gap). User can then drag the inner edges apart with
+   *  the cut-band handles to create a "skip this part" cut. Returns
+   *  true on success. */
+  const splitVoiceAtMixTime = (splitMixSec: number): boolean => {
+    const newSegments = splitSegmentsAtMixTime(splitMixSec, currentSegments);
+    if (!newSegments) return false;
+    setPageVocalSegments((prev) => {
+      const next = new Map(prev);
+      next.set(currentPageIndex, newSegments);
+      return next;
+    });
+    return true;
+  };
+
   const playPreview = () => {
     if (!currentRecording || !audioPreviewRef.current) return;
     try {
@@ -820,15 +1146,16 @@ export default function Recorder({
     setIsPlaying(false);
   };
 
-  /** PATCH /api/v1/audio-pages/{id}/layers with the current page's effects
-      to produce a mixed MP3 server-side. Skipped if there are no effects.
-      Trim is intentionally NOT sent here because the vocal upload already
-      applied it destructively — the vocal file at `vocalUrl` is the trimmed
-      version. */
-  const applyEffectsLayer = async (
+  /** PATCH /api/v1/audio-pages/{id}/layers with the current page's audio
+      composition. The mix service re-renders the MP3 server-side using
+      whatever combination of vocal segments + effects is present.
+      Segments are sent in upload-trimmed-audio time (already rebased by
+      the caller), so the server treats them as offsets into vocalUrl. */
+  const applyAudioLayers = async (
     audioPageId: string,
     vocalUrl: string,
     trimmedDurationSec: number,
+    segments: VocalSegment[],
     effects: PendingEffect[],
   ): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -840,6 +1167,10 @@ export default function Recorder({
           vocal: {
             url: vocalUrl,
             durationSec: trimmedDurationSec,
+            // Only send segments when there's actually more than one —
+            // single-segment (full upload-trimmed file) is the default
+            // and shouldn't trigger the multi-segment filter graph.
+            ...(segments.length > 1 ? { segments } : {}),
           },
           music: [],
           effects: effects.map((e) => ({
@@ -897,27 +1228,42 @@ export default function Recorder({
         return;
       }
 
-      // If the user added SFX placements, apply them as a layer-mix step
-      // after the vocal upload. Requires the host's save callback to return
-      // both audioPageId and audioUrl — silently skipped if either missing.
-      if (currentEffects.length > 0 && result.audioPageId && result.audioUrl) {
+      // Trigger a server-side mix render whenever the final audio differs
+      // from a straight passthrough of the upload-trimmed vocal — i.e.,
+      // when SFX layers exist OR the user split the vocal into multiple
+      // segments (cuts). Skipped if both are empty since the upload-
+      // trimmed MP3 is already the right output.
+      const needsMixRender = currentEffects.length > 0 || currentSegments.length > 1;
+      if (needsMixRender && result.audioPageId && result.audioUrl) {
+        const trimStart = currentTrim?.startSec ?? 0;
         const trimmedDuration = currentTrim
           ? currentTrim.endSec - currentTrim.startSec
           : currentRecording.duration;
-        const mixResult = await applyEffectsLayer(
+        // Rebase segments from original-recording time into upload-trimmed
+        // audio time (which is what the server-side mix sees). Single-
+        // segment case sends nothing — the upload-trimmed file IS the
+        // intended vocal.
+        const rebasedSegments: VocalSegment[] = currentSegments.length > 1
+          ? currentSegments.map((s) => ({
+              startSec: Math.max(0, s.startSec - trimStart),
+              endSec: Math.max(0, s.endSec - trimStart),
+            }))
+          : [];
+        const mixResult = await applyAudioLayers(
           result.audioPageId,
           result.audioUrl,
           trimmedDuration,
+          rebasedSegments,
           currentEffects,
         );
         if (!mixResult.success) {
-          alert(`Vocal saved, but mixing sound effects failed: ${mixResult.error}\n\nThe page has audio without effects. Try editing the page again to retry.`);
+          alert(`Vocal saved, but mixing failed: ${mixResult.error}\n\nThe page has audio without cuts/effects. Try editing the page again to retry.`);
           // Continue — vocal IS saved. Don't block the workflow.
         }
-        // Note: we intentionally KEEP pageEffects in memory after a
-        // successful save. Clearing them made the SFX lane look empty
-        // after Save & Continue, which read as "the save lost my SFX."
-        // The next save will re-PATCH the same layer spec; harmless.
+        // Note: we intentionally KEEP pageEffects + pageVocalSegments in
+        // memory after a successful save. Clearing them made the lanes
+        // look empty after Save & Continue, which read as "the save lost
+        // my edits." The next save will re-PATCH the same spec; harmless.
       }
 
       setSavedPages((prev) => new Set(prev).add(currentPageIndex));
@@ -1248,13 +1594,16 @@ export default function Recorder({
               );
               const timelineSpan = Math.max(recordingDur, longestClipEnd, 5);
               const pixelsPerSec = BASE_PX_PER_SEC * zoomLevel;
-              // mixCurrentSec / scrubSec are in MIX time (0 = trim start).
-              // The visual timeline is in ORIGINAL time (0 = vocal 0:00).
-              // Adding trimStart bridges the two so the playhead visually
-              // tracks the trim region — at mixSec=0 we draw at the trim
-              // region's left edge, not at the timeline's 0s mark.
+              // mixCurrentSec / scrubSec are in MIX time. The visual
+              // timeline is in ORIGINAL time. With multi-segment vocals
+              // the mapping has discontinuities at cut boundaries — use
+              // mixTimeToOriginal so the playhead jumps over gaps as it
+              // crosses them, matching what playback actually does.
+              // Falls back to a linear (trimStart + mixSec) when nothing
+              // is splittable yet (single full segment, no edits).
               const playheadMixSec = scrubSec ?? mixCurrentSec;
-              const playheadTimelineSec = trimStart + playheadMixSec;
+              const playheadMapping = mixTimeToOriginal(playheadMixSec, currentSegments);
+              const playheadTimelineSec = playheadMapping?.origSec ?? (trimStart + playheadMixSec);
               const playheadLeftPx = TRACK_LABEL_WIDTH + playheadTimelineSec * pixelsPerSec;
               // Show the playhead as soon as the page has a recording — it
               // anchors at 0s by default so users can see where the cursor
@@ -1270,8 +1619,29 @@ export default function Recorder({
                 if (!stackEl) return;
                 const rect = stackEl.getBoundingClientRect();
                 const offsetPx = clientX - rect.left + stackEl.scrollLeft - TRACK_LABEL_WIDTH;
-                const timelineSec = offsetPx / pixelsPerSec;
-                const mixSec = Math.max(0, Math.min(mixTotalSec || timelineSpan, timelineSec - trimStart));
+                const timelineSec = Math.max(0, offsetPx / pixelsPerSec);
+                // Map original-time click into mix-time. If the click lands
+                // inside a segment, originalToMixTime returns the right
+                // mix-second. If it lands in a gap (or outside all segments),
+                // snap to whichever segment edge is closest in original-time.
+                let mixSec = originalToMixTime(timelineSec, currentSegments);
+                if (mixSec === null) {
+                  // Find the closest segment edge in original time.
+                  let bestOrig = currentSegments[0]?.startSec ?? 0;
+                  let bestDelta = Infinity;
+                  for (const seg of currentSegments) {
+                    for (const candidate of [seg.startSec, seg.endSec]) {
+                      const d = Math.abs(candidate - timelineSec);
+                      if (d < bestDelta) {
+                        bestDelta = d;
+                        bestOrig = candidate;
+                      }
+                    }
+                  }
+                  mixSec = originalToMixTime(bestOrig, currentSegments) ?? 0;
+                }
+                const totalDur = mixTotalSec || totalMixDuration(currentSegments) || timelineSpan;
+                mixSec = Math.max(0, Math.min(totalDur, mixSec));
                 if (commit) {
                   mixPlayerRef.current?.seek(mixSec);
                   setMixCurrentSec(mixSec);
@@ -1376,10 +1746,29 @@ export default function Recorder({
                       )
                     }
                   >
+                    {/* relative z-[15] lifts the waveform above the seek
+                        strip (z-10) so WaveSurfer's trim region handles
+                        receive pointer events instead of the strip
+                        kicking the playhead on every drag attempt. Match
+                        is intentional with the SFX clips' z-[15]. */}
                     <div
-                      onClick={() => setSelectedEffectId(null)}
-                      className={`inline-block rounded-md transition ${
-                        !selectedEffectId ? 'ring-2 ring-purple-400 ring-offset-2 ring-offset-white' : 'ring-1 ring-transparent hover:ring-gray-200'
+                      onClick={(e) => {
+                        // Map the click x position to a segment so a click
+                        // on the waveform selects that segment (CapCut-style
+                        // "click a clip to pick it"). If the click lands in
+                        // a cut/gap, deselect all voice things.
+                        setSelectedEffectId(null);
+                        setSelectedCutIdx(null);
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const xPx = e.clientX - rect.left - 4; // -4 for p-1 padding
+                        const clickedOriginalSec = xPx / pixelsPerSec;
+                        const segIdx = currentSegments.findIndex(
+                          (s) => clickedOriginalSec >= s.startSec && clickedOriginalSec <= s.endSec,
+                        );
+                        setSelectedVoiceSegmentIdx(segIdx >= 0 ? segIdx : null);
+                      }}
+                      className={`relative z-[15] inline-block rounded-md transition ${
+                        !selectedEffectId && selectedCutIdx === null && selectedVoiceSegmentIdx === null ? 'ring-2 ring-purple-400 ring-offset-2 ring-offset-white' : 'ring-1 ring-transparent hover:ring-gray-200'
                       }`}
                       role="button"
                       aria-label="Select voice track"
@@ -1392,6 +1781,134 @@ export default function Recorder({
                         onTrimChange={updateCurrentTrim}
                         widthPx={recordingDur * pixelsPerSec}
                       />
+                      {/* Yellow tint overlays on the trimmed-out portions
+                          of the source — makes "this is cut" obvious at
+                          a glance. pointer-events-none so they don't
+                          steal pointer events from WaveSurfer's region
+                          drag handles underneath. Higher opacity so the
+                          purple WaveSurfer region overlay (rendered
+                          underneath) doesn't bleed through — keeps the
+                          cut color consistent between inner and outer
+                          trim. The +4px offsets account for the
+                          trimmer's p-1 padding. */}
+                      {currentTrim && currentTrim.startSec > 0 && (
+                        <div
+                          className="absolute top-1 left-1 bottom-1 bg-yellow-200 pointer-events-none rounded-l-sm"
+                          style={{ width: currentTrim.startSec * pixelsPerSec }}
+                          aria-hidden
+                        />
+                      )}
+                      {currentTrim && currentTrim.endSec < recordingDur && (
+                        <div
+                          className="absolute top-1 bottom-1 bg-yellow-200 pointer-events-none rounded-r-sm"
+                          style={{
+                            left: currentTrim.endSec * pixelsPerSec + 4,
+                            width: (recordingDur - currentTrim.endSec) * pixelsPerSec,
+                          }}
+                          aria-hidden
+                        />
+                      )}
+                      {/* Selected-segment ring — purely visual overlay
+                          showing which segment is the current "click
+                          target" for Delete / future per-segment actions.
+                          pointer-events-none so the underlying wrapper
+                          still gets clicks for changing selection. */}
+                      {selectedVoiceSegmentIdx !== null
+                        && currentSegments[selectedVoiceSegmentIdx]
+                        && (() => {
+                          const s = currentSegments[selectedVoiceSegmentIdx];
+                          return (
+                            <div
+                              className="absolute top-1 bottom-1 ring-2 ring-orange-500 ring-inset rounded-sm pointer-events-none"
+                              style={{
+                                left: s.startSec * pixelsPerSec + 4,
+                                width: (s.endSec - s.startSec) * pixelsPerSec,
+                              }}
+                              aria-hidden
+                            />
+                          );
+                        })()}
+                      {/* Between-segment markers + drag handles. For each
+                          inner boundary we render:
+                            - A divider (touching) or a yellow band (gap)
+                              for visual feedback.
+                            - Two thin drag bars: one at segL.endSec, one
+                              at segR.startSec. They overlap when touching
+                              and separate when there's a gap. Dragging
+                              either grows or closes the gap. */}
+                      {currentSegments.slice(0, -1).map((seg, i) => {
+                        const next = currentSegments[i + 1];
+                        const gapWidth = next.startSec - seg.endSec;
+                        const leftEdgePx = seg.endSec * pixelsPerSec + 4;
+                        const rightEdgePx = next.startSec * pixelsPerSec + 4;
+                        const HANDLE_W = 8;
+                        const startBoundaryDrag = (
+                          e: React.PointerEvent,
+                          side: 'left' | 'right',
+                        ) => {
+                          e.stopPropagation();
+                          (e.target as Element).setPointerCapture(e.pointerId);
+                          setVoiceBoundaryDrag({
+                            boundaryIdx: i,
+                            side,
+                            initialOriginalSec: side === 'left' ? seg.endSec : next.startSec,
+                            pointerStartX: e.clientX,
+                            frozenPixelsPerSec: pixelsPerSec,
+                          });
+                        };
+                        const isCutSelected = selectedCutIdx === i && gapWidth > 0.01;
+                        return (
+                          <div key={`boundary-${i}`}>
+                            {gapWidth > 0.01 ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedEffectId(null);
+                                  setSelectedVoiceSegmentIdx(null);
+                                  setSelectedCutIdx(i);
+                                }}
+                                className={`absolute top-1 bottom-1 bg-yellow-200 transition-shadow ${
+                                  isCutSelected ? 'ring-2 ring-orange-500 ring-inset' : 'hover:ring-1 hover:ring-orange-400 hover:ring-inset'
+                                }`}
+                                style={{ left: leftEdgePx, width: gapWidth * pixelsPerSec }}
+                                aria-label={`Cut ${i + 1} (${gapWidth.toFixed(2)}s)${isCutSelected ? ', selected' : ''}`}
+                                aria-pressed={isCutSelected}
+                              />
+                            ) : (
+                              // 1px solid black at an exact integer pixel
+                              // so the browser doesn't anti-alias it into
+                              // a soft grey band on retina screens.
+                              <div
+                                className="absolute top-1 bottom-1 bg-black pointer-events-none"
+                                style={{ left: Math.round(leftEdgePx), width: 1 }}
+                                aria-hidden
+                              />
+                            )}
+                            {/* Left handle — controls segL.endSec. */}
+                            <div
+                              onPointerDown={(e) => startBoundaryDrag(e, 'left')}
+                              className="absolute top-1 bottom-1 cursor-ew-resize bg-purple-400/25 hover:bg-purple-500/55 transition-colors z-[16]"
+                              style={{ left: leftEdgePx - HANDLE_W / 2, width: HANDLE_W }}
+                              aria-label="Drag to adjust left side of cut"
+                              role="separator"
+                            />
+                            {/* Right handle — controls segR.startSec.
+                                Only render when separated; touching boundaries
+                                share one handle visually to avoid two handles
+                                stacked at the same pixel. */}
+                            {gapWidth > 0.01 && (
+                              <div
+                                onPointerDown={(e) => startBoundaryDrag(e, 'right')}
+                                className="absolute top-1 bottom-1 cursor-ew-resize bg-purple-400/25 hover:bg-purple-500/55 transition-colors z-[16]"
+                                style={{ left: rightEdgePx - HANDLE_W / 2, width: HANDLE_W }}
+                                aria-label="Drag to adjust right side of cut"
+                                role="separator"
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </TrackRow>
                   <TrackRow
@@ -1416,7 +1933,7 @@ export default function Recorder({
                       timelineSpan={timelineSpan}
                       trimStartSec={trimStart}
                       selectedEffectId={selectedEffectId}
-                      onSelectEffect={setSelectedEffectId}
+                      onSelectEffect={(id) => { setSelectedEffectId(id); setSelectedCutIdx(null); setSelectedVoiceSegmentIdx(null); }}
                       onUpdateEffect={updateEffect}
                       onRemoveEffect={(id) => {
                         if (selectedEffectId === id) setSelectedEffectId(null);
@@ -1461,28 +1978,54 @@ export default function Recorder({
                 if (sel) {
                   setSelectedEffectId(null);
                   removeEffect(sel.id);
+                } else if (selectedCutIdx !== null) {
+                  void deleteCutAt(selectedCutIdx);
+                } else if (selectedVoiceSegmentIdx !== null) {
+                  void deleteSegmentAt(selectedVoiceSegmentIdx);
                 } else {
                   deleteRecording();
                 }
               };
-              const deleteTitle = sel ? `Remove "${sel.sound.name}"` : 'Delete recording';
+              const deleteTitle = sel
+                ? `Remove "${sel.sound.name}"`
+                : selectedCutIdx !== null
+                  ? 'Delete cut (removes the audio permanently)'
+                  : selectedVoiceSegmentIdx !== null
+                    ? `Delete voice segment ${selectedVoiceSegmentIdx + 1} (removes the audio permanently)`
+                    : 'Delete recording';
               const resetTitle = sel ? 'Reset clip to full source' : 'Reset voice trim';
-              // Split availability: need a selected SFX clip with the
-              // playhead strictly inside its bounds. Voice split will
-                  // join this gate once the segments UI lands.
+              // Split availability — two paths:
+              //   - SFX path: a clip is selected and the playhead sits
+              //     strictly inside its bounds.
+              //   - Voice path: nothing SFX-y is selected (= voice is
+              //     "active") and the playhead lands strictly inside
+              //     some voice segment.
               const playheadMix = scrubSec ?? mixCurrentSec;
               const canSplitSfx = !!sel
                 && playheadMix > sel.startSec + 0.05
                 && playheadMix < sel.startSec + sel.durationSec - 0.05;
-              const canSplit = canSplitSfx;
+              const voiceSplitMapping = !sel && currentRecording
+                ? mixTimeToOriginal(playheadMix, currentSegments)
+                : null;
+              const canSplitVoice = !!voiceSplitMapping && (() => {
+                const seg = currentSegments[voiceSplitMapping.segIdx];
+                return voiceSplitMapping.origSec > seg.startSec + 0.05
+                  && voiceSplitMapping.origSec < seg.endSec - 0.05;
+              })();
+              const canSplit = canSplitSfx || canSplitVoice;
               const splitTooltip = canSplit
-                ? 'Split selected clip at playhead (S)'
+                ? 'Split at playhead (S)'
                 : sel
                   ? 'Move playhead inside the selected clip first'
-                  : 'Select a clip to split it';
+                  : currentRecording
+                    ? 'Move playhead inside the voice to split it'
+                    : 'Record audio first';
               const handleSplit = () => {
-                if (!canSplit || !sel) return;
-                splitEffectAtMixTime(sel.id, playheadMix);
+                if (canSplitSfx && sel) {
+                  splitEffectAtMixTime(sel.id, playheadMix);
+                } else if (canSplitVoice) {
+                  splitVoiceAtMixTime(playheadMix);
+                }
               };
               return (
                 <div className="mt-4 flex items-center gap-3 py-2 border-t border-gray-100 text-xs">
