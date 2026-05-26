@@ -11,10 +11,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { SkipBack, SkipForward, Maximize2, Minimize2, Plus, Trash2, RotateCcw } from 'lucide-react';
+import { SkipBack, SkipForward, Maximize2, Minimize2, Plus, Trash2, RotateCcw, ZoomIn, ZoomOut, Play, Pause, Music } from 'lucide-react';
 import WaveformTrimmer, { TrimRange, WaveformTrimmerHandle } from './WaveformTrimmer';
-import SFXPicker, { SfxLibraryItem } from './SFXPicker';
+import SFXBrowserPanel, { SfxLibraryItem } from './SFXBrowserPanel';
 import SFXTimeline from './SFXTimeline';
+import LeftRail from './LeftRail';
 import { TrackRow, TimelineRuler, TRACK_LABEL_WIDTH } from './TimelineLayout';
 import { createMixPlayer, MixPlayer } from '@/lib/audio/preview-mix.client';
 
@@ -103,6 +104,14 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+// Pixels per second at zoom=1.0. Fixed (not derived from container width)
+// so opening a side panel, resizing the modal, or adding an SFX past the
+// vocal never reshuffles the clips. Auto-fit happens once per recording
+// via a useEffect that sets the initial zoom; after that the user owns it.
+const BASE_PX_PER_SEC = 60;
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 4;
+
 export default function Recorder({
   pages,
   defaultLanguage = 'en',
@@ -147,8 +156,15 @@ export default function Recorder({
   // Per-page SFX placements pending save. Persisted via PATCH /layers after
   // the vocal upload completes (in handleSaveCurrentPage).
   const [pageEffects, setPageEffects] = useState<Map<number, PendingEffect[]>>(new Map());
-  const [sfxPickerOpen, setSfxPickerOpen] = useState(false);
+  // ID of the currently open LeftRail tab, or null for icon-strip-only mode.
+  // Today only one tab exists ('sfx'); future tabs (music, AI music, voice FX)
+  // will register against this same state.
+  const [activeRailTab, setActiveRailTab] = useState<string | null>(null);
   const [selectedEffectId, setSelectedEffectId] = useState<string | null>(null);
+  // Shows a one-time-per-save dialog warning that vocal + SFX get burned
+  // into a single mix on Save. Only opened when SFX are actually present;
+  // a vocal-only save has nothing to merge so we skip the prompt entirely.
+  const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false);
 
   const audioPreviewRef = useRef<HTMLAudioElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -166,6 +182,14 @@ export default function Recorder({
   const mixPlayerRef = useRef<MixPlayer | null>(null);
   const [mixPlaying, setMixPlaying] = useState(false);
   const [mixLoading, setMixLoading] = useState(false);
+  // Timeline zoom multiplier. `pixelsPerSec = BASE_PX_PER_SEC * zoomLevel`,
+  // so this is the single source of truth for time-axis scale. On first
+  // recording-load per page the auto-fit effect below sets a sensible
+  // initial value; after that the user controls it via the toolbar / Cmd+/-.
+  const [zoomLevel, setZoomLevel] = useState(1);
+  // Tracks which page indices have already had their auto-fit applied so
+  // we don't keep overriding the user's manual zoom on re-renders.
+  const autoFittedPagesRef = useRef<Set<number>>(new Set());
   // Current playhead position emitted by the mix player's onProgress
   // callback. Drives the moving cursor line over the tracks; also gets
   // updated optimistically during a click/drag-to-seek gesture.
@@ -193,8 +217,10 @@ export default function Recorder({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Track-stack width measurement — drives the shared pixelsPerSec across
-  // the voice waveform + SFX timeline so they align at every second mark.
+  // Track-stack width measurement — used ONLY for the one-shot auto-fit
+  // calculation when a new recording first appears. pixelsPerSec itself
+  // is now decoupled from container width (see BASE_PX_PER_SEC), so a
+  // resize after the initial fit does not rescale the clips.
   useEffect(() => {
     const el = trackStackRef.current;
     if (!el || !expanded) return;
@@ -204,6 +230,73 @@ export default function Recorder({
     });
     ro.observe(el);
     return () => ro.disconnect();
+  }, [expanded]);
+
+  // Default the Sounds panel to open whenever the user expands the modal.
+  // Dismissing during an expanded session is respected (effect only fires
+  // on the false → true transition); the panel re-opens next expand.
+  useEffect(() => {
+    if (expanded) setActiveRailTab('sfx');
+  }, [expanded]);
+
+  // One-shot auto-fit per page: when a recording becomes available, pick
+  // a zoom that fits the vocal to ~80% of the available timeline width
+  // so there's headroom to scroll/zoom in either direction. Subsequent
+  // user zoom adjustments are preserved. Re-recording a page clears its
+  // entry below so the next take gets a fresh fit.
+  const currentRecordingForFit = pageRecordings.get(currentPageIndex);
+  useEffect(() => {
+    if (!expanded || !currentRecordingForFit) return;
+    if (autoFittedPagesRef.current.has(currentPageIndex)) return;
+    if (trackStackWidth <= 0) return;
+    const availablePx = trackStackWidth - TRACK_LABEL_WIDTH;
+    if (availablePx <= 0) return;
+    const dur = Math.max(currentRecordingForFit.duration, 1);
+    const targetPxPerSec = (availablePx * 0.8) / dur;
+    const desiredZoom = targetPxPerSec / BASE_PX_PER_SEC;
+    const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, desiredZoom));
+    setZoomLevel(clamped);
+    autoFittedPagesRef.current.add(currentPageIndex);
+  }, [expanded, currentPageIndex, currentRecordingForFit, trackStackWidth]);
+
+  // Zoom shortcuts — Cmd/Ctrl + plus/minus/0 globally while the recorder
+  // is expanded, plus Cmd/Ctrl + scroll wheel anywhere on the track
+  // stack. Wheel needs a native listener with passive: false so we can
+  // preventDefault (React's synthetic onWheel is passive in most setups).
+  useEffect(() => {
+    if (!expanded) return;
+    const clamp = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      // Don't hijack typing in the SFX inputs (start/length/vol).
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault();
+        setZoomLevel((z) => clamp(z * 1.25));
+      } else if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        setZoomLevel((z) => clamp(z / 1.25));
+      } else if (e.key === '0') {
+        e.preventDefault();
+        setZoomLevel(1);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    const el = trackStackRef.current;
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      e.preventDefault();
+      // deltaY < 0 = scrolling up = zoom in. Step proportional to scroll
+      // magnitude so trackpad pinch and mouse-wheel both feel right.
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      setZoomLevel((z) => clamp(z * factor));
+    };
+    el?.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      el?.removeEventListener('wheel', onWheel);
+    };
   }, [expanded]);
 
   // Dispose any active mix player on unmount or when the current page
@@ -406,6 +499,8 @@ export default function Recorder({
           });
         };
         commitRecording(initialDuration);
+        // New take → re-fit the zoom on next render.
+        autoFittedPagesRef.current.delete(capturedPageIndex);
         // Reset trim / saved markers — new take invalidates them.
         setSavedPages((prev) => {
           if (!prev.has(capturedPageIndex)) return prev;
@@ -497,6 +592,7 @@ export default function Recorder({
       }
       return next;
     });
+    autoFittedPagesRef.current.delete(currentPageIndex);
     setSavedPages((prev) => {
       if (!prev.has(currentPageIndex)) return prev;
       const next = new Set(prev);
@@ -551,6 +647,7 @@ export default function Recorder({
         next.set(pageIndex, { blob, url, duration });
         return next;
       });
+      autoFittedPagesRef.current.delete(pageIndex);
       // Editing a saved take = unsaved changes until next Save.
       setSavedPages((prev) => {
         if (!prev.has(pageIndex)) return prev;
@@ -697,6 +794,20 @@ export default function Recorder({
     } catch (err: any) {
       return { success: false, error: err.message || 'Network error' };
     }
+  };
+
+  // Save buttons call this instead of handleSaveCurrentPage directly so the
+  // merge warning gets a chance to fire when SFX are present.
+  const requestSaveCurrentPage = () => {
+    if (!currentRecording) {
+      alert('No recording for this page. Please record first.');
+      return;
+    }
+    if (currentEffects.length > 0) {
+      setMergeConfirmOpen(true);
+      return;
+    }
+    void handleSaveCurrentPage();
   };
 
   const handleSaveCurrentPage = async () => {
@@ -859,7 +970,7 @@ export default function Recorder({
         </button>
       )}
       <button
-        onClick={handleSaveCurrentPage}
+        onClick={requestSaveCurrentPage}
         disabled={uploading || !currentRecording}
         className={`flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
           size === 'md' ? 'px-5 py-2.5 text-base' : 'px-4 py-2 text-sm'
@@ -988,10 +1099,30 @@ export default function Recorder({
     <>
       {audioElement}
       {expanded ? (
-        // Expanded view: centered modal with waveform trimmer + larger controls.
+        // Expanded view: centered modal. The card is a flex row — left rail
+        // (icon strip + optional panel) on the left, scrollable main content
+        // area on the right. Adding more rails / right-side inspector in
+        // future PRs just plugs into this same outer flex.
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3">
-          <div className="bg-white rounded-xl shadow-xl w-[95vw] max-w-[1600px] h-[95vh] overflow-y-auto p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-xl shadow-xl w-[95vw] max-w-[1600px] h-[95vh] flex overflow-hidden">
+            <LeftRail
+              tabs={[
+                {
+                  id: 'sfx',
+                  icon: <Music className="w-5 h-5" />,
+                  label: 'Sounds',
+                  content: <SFXBrowserPanel onPick={addEffect} />,
+                },
+              ]}
+              activeTabId={activeRailTab}
+              onTabChange={setActiveRailTab}
+            />
+            {/* Vertical flex column: header on top, text/image area expands
+                to fill the upper portion, timeline + controls dock at the
+                bottom. Future scene image will slot into the .flex-1
+                content area without touching the lower stack. */}
+            <div className="flex-1 min-w-0 flex flex-col p-6 min-h-0">
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
               <h3 className="text-base font-semibold text-gray-900 tracking-tight">Recording mode</h3>
               <div className="flex items-center gap-3">
                 {languageToggle}
@@ -1014,9 +1145,11 @@ export default function Recorder({
               </div>
             </div>
 
-            {/* Page text — what the user is reading. Scrolls so long chapter
-                book pages don't push the controls off-screen. */}
-            <div className="mb-4 max-h-40 overflow-y-auto">
+            {/* Page text — what the user is reading. Takes the upper area
+                of the modal (flex-1) so chapter book pages have room to
+                breathe; scrolls internally if the text exceeds the space.
+                Will share this region with a scene image when that lands. */}
+            <div className="mb-4 flex-1 min-h-0 overflow-y-auto">
               {currentPage.text ? (
                 <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
                   {currentPage.text}
@@ -1026,9 +1159,16 @@ export default function Recorder({
               )}
             </div>
 
+            {/* Lower stack: tracks + action bar + save bar all dock to the
+                bottom of the content column. flex-shrink-0 keeps them at
+                their natural height as the text region above grows. */}
+            <div className="flex-shrink-0">
             {/* Multi-track editor — voice + sound effects stacked, sharing
-                one time axis. The track-stack ref measures available width;
-                that drives pixelsPerSec so every clip aligns across rows. */}
+                one time axis. pixelsPerSec is FIXED relative to zoom (not
+                derived from container width) so opening side panels,
+                resizing the modal, or adding long SFX never reshuffles the
+                clips. The trackStackRef is the horizontal-scroll viewport;
+                content wider than the viewport scrolls. */}
             {currentRecording ? (() => {
               const recordingDur = currentRecording.duration;
               const trimStart = currentTrim?.startSec ?? 0;
@@ -1040,15 +1180,7 @@ export default function Recorder({
                 0,
               );
               const timelineSpan = Math.max(recordingDur, longestClipEnd, 5);
-              const timelineColWidth = trackStackWidth - TRACK_LABEL_WIDTH;
-              // pixelsPerSec is anchored to the VOCAL length only — clip
-              // resize/move doesn't trigger rescale. Result: clips slide
-              // smoothly under the cursor, lane just grows wider and the
-              // overflow-x-auto wrapper handles scroll if content extends
-              // past the viewport (matches DAW conventions). Re-recording
-              // a different-length take produces a new vocalDur and
-              // recalculates the scale once.
-              const pixelsPerSec = Math.max(40, timelineColWidth / Math.max(recordingDur, 5));
+              const pixelsPerSec = BASE_PX_PER_SEC * zoomLevel;
               // mixCurrentSec / scrubSec are in MIX time (0 = trim start).
               // The visual timeline is in ORIGINAL time (0 = vocal 0:00).
               // Adding trimStart bridges the two so the playhead visually
@@ -1058,14 +1190,15 @@ export default function Recorder({
               const playheadTimelineSec = trimStart + playheadMixSec;
               const playheadLeftPx = TRACK_LABEL_WIDTH + playheadTimelineSec * pixelsPerSec;
               const showPlayhead = mixPlaying || scrubSec !== null || mixCurrentSec > 0;
-              // Click/drag on the timeline seeks the mix player. clientX is
-              // in original-time pixels; convert through trimStart so the
-              // mix player receives mix-time seconds.
+              // Click/drag on the timeline seeks the mix player. The scrub
+              // viewport's getBoundingClientRect gives screen coords; we
+              // add scrollLeft to land in CONTENT coords, then subtract
+              // the label column to land in TIMELINE coords.
               const handleScrubFromClientX = (clientX: number, commit: boolean) => {
                 const stackEl = trackStackRef.current;
                 if (!stackEl) return;
                 const rect = stackEl.getBoundingClientRect();
-                const offsetPx = clientX - rect.left - TRACK_LABEL_WIDTH;
+                const offsetPx = clientX - rect.left + stackEl.scrollLeft - TRACK_LABEL_WIDTH;
                 const timelineSec = offsetPx / pixelsPerSec;
                 const mixSec = Math.max(0, Math.min(mixTotalSec || timelineSpan, timelineSec - trimStart));
                 if (commit) {
@@ -1076,8 +1209,17 @@ export default function Recorder({
                   setScrubSec(mixSec);
                 }
               };
+              // Inner content width = label column + the entire time axis.
+              // The scroll viewport (trackStackRef) clips this to whatever
+              // width is available; users scroll horizontally to reach
+              // content past the right edge.
+              const contentWidthPx = TRACK_LABEL_WIDTH + timelineSpan * pixelsPerSec;
               return (
-                <div ref={trackStackRef} className="relative">
+                <div
+                  ref={trackStackRef}
+                  className="overflow-x-auto overflow-y-hidden overscroll-x-contain"
+                >
+                  <div className="relative" style={{ width: contentWidthPx }}>
                   {/* Seek strip — sits over the ruler so clicks/drags
                       anywhere on the time axis scrub the playhead. The
                       strip lives behind the playhead line via z-index. */}
@@ -1184,10 +1326,14 @@ export default function Recorder({
                     sublabel={currentEffects.length > 0 ? `${currentEffects.length} layered` : undefined}
                     action={
                       <button
-                        onClick={() => setSfxPickerOpen(true)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700"
+                        onClick={() => setActiveRailTab((cur) => cur === 'sfx' ? null : 'sfx')}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+                          activeRailTab === 'sfx'
+                            ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-300'
+                            : 'bg-purple-600 text-white hover:bg-purple-700'
+                        }`}
                       >
-                        <Plus className="w-3 h-3" /> Add
+                        <Plus className="w-3 h-3" /> {activeRailTab === 'sfx' ? 'Browsing' : 'Add'}
                       </button>
                     }
                   >
@@ -1205,6 +1351,7 @@ export default function Recorder({
                       }}
                     />
                   </TrackRow>
+                  </div>
                 </div>
               );
             })() : (
@@ -1252,12 +1399,51 @@ export default function Recorder({
                   <button
                     onClick={toggleMixPlayback}
                     disabled={uploading || mixLoading}
-                    className="w-20 px-3 py-1.5 rounded-md border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 transition-colors disabled:opacity-50 text-sm font-medium text-center"
+                    className="p-1.5 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-50 flex items-center justify-center"
                     aria-label={mixPlaying ? 'Stop preview' : 'Play mix preview'}
                     title={currentEffects.length > 0 ? 'Preview the layered mix' : 'Preview the recording'}
                   >
-                    {mixLoading ? '…' : mixPlaying ? '⏸ Stop' : '▶ Play'}
+                    {mixLoading ? (
+                      <span className="w-3.5 h-3.5 text-[11px] leading-none flex items-center justify-center">…</span>
+                    ) : mixPlaying ? (
+                      <Pause className="w-3.5 h-3.5" />
+                    ) : (
+                      <Play className="w-3.5 h-3.5" />
+                    )}
                   </button>
+                  {/* Timeline zoom — keyboard (Cmd/Ctrl + +/-/0) and
+                      Cmd/Ctrl + scroll wheel also work, the buttons here
+                      are the discoverable surface. ×1.25 per click,
+                      bounded to [25%, 400%]. Click the percentage to
+                      reset to fit-to-viewport. */}
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      onClick={() => setZoomLevel((z) => Math.max(0.25, z / 1.25))}
+                      disabled={zoomLevel <= 0.25}
+                      aria-label="Zoom out timeline"
+                      title="Zoom out (Cmd/Ctrl + −)"
+                      className="p-1.5 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ZoomOut className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setZoomLevel(1)}
+                      aria-label="Reset zoom"
+                      title="Reset zoom (Cmd/Ctrl + 0)"
+                      className="px-2 py-1 rounded-md text-[11px] font-medium text-gray-700 hover:bg-gray-100 tabular-nums w-12 text-center transition-colors"
+                    >
+                      {Math.round(zoomLevel * 100)}%
+                    </button>
+                    <button
+                      onClick={() => setZoomLevel((z) => Math.min(4, z * 1.25))}
+                      disabled={zoomLevel >= 4}
+                      aria-label="Zoom in timeline"
+                      title="Zoom in (Cmd/Ctrl + +)"
+                      className="p-1.5 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ZoomIn className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   {sel ? (
                     <>
                       <span className="font-medium text-gray-900 truncate max-w-[180px]" title={sel.sound.name}>
@@ -1355,7 +1541,7 @@ export default function Recorder({
                 <SkipBack className="w-4 h-4" />
               </button>
               <button
-                onClick={handleSaveCurrentPage}
+                onClick={requestSaveCurrentPage}
                 disabled={uploading || !currentRecording}
                 className="w-56 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-md hover:from-green-600 hover:to-emerald-600 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed py-2.5 text-sm"
               >
@@ -1379,6 +1565,8 @@ export default function Recorder({
               >
                 <SkipForward className="w-4 h-4" />
               </button>
+            </div>
+            </div>
             </div>
           </div>
         </div>
@@ -1482,11 +1670,42 @@ export default function Recorder({
           </div>
         </div>
       )}
-      <SFXPicker
-        open={sfxPickerOpen}
-        onClose={() => setSfxPickerOpen(false)}
-        onPick={addEffect}
-      />
+      {mergeConfirmOpen && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="merge-confirm-title"
+        >
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-5">
+            <h3 id="merge-confirm-title" className="text-base font-semibold text-gray-900 mb-2">
+              Merge voice and sound effects?
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Saving this page will mix your voice and sound effects into a single audio file. After that, you can re-record or replace it, but the voice and sound effects can no longer be edited separately.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setMergeConfirmOpen(false)}
+                disabled={uploading}
+                className="px-4 py-2 rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setMergeConfirmOpen(false);
+                  void handleSaveCurrentPage();
+                }}
+                disabled={uploading}
+                className="px-4 py-2 rounded-md bg-green-600 text-white hover:bg-green-700 text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                Save & merge
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

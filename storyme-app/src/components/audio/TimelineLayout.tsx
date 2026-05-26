@@ -42,7 +42,7 @@ export function TrackRow({ label, sublabel, action, children }: TrackRowProps) {
         {sublabel && <span className="text-xs text-gray-500 mt-0.5">{sublabel}</span>}
         {action && <div className="mt-2">{action}</div>}
       </div>
-      <div className="flex-1 min-w-0 overflow-x-auto">{children}</div>
+      <div className="flex-1 min-w-0">{children}</div>
     </div>
   );
 }
