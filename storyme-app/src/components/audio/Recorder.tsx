@@ -18,9 +18,9 @@ import SFXTimeline from './SFXTimeline';
 import LeftRail from './LeftRail';
 import { TrackRow, TimelineRuler, TRACK_LABEL_WIDTH } from './TimelineLayout';
 import { createMixPlayer, MixPlayer } from '@/lib/audio/preview-mix.client';
-import type { VocalSegment } from '@/lib/audio/layers.types';
+import type { VocalSegment, AudioLayers } from '@/lib/audio/layers.types';
 import { mixTimeToOriginal, originalToMixTime, totalMixDuration, splitSegmentsAtMixTime } from '@/lib/audio/segment-time';
-import { renderSegmentsToWav } from '@/lib/audio/offline-render.client';
+import { saveDraft as apiSaveDraft, renderFinal as apiRenderFinal, shrinkSource as apiShrinkSource } from '@/lib/audio/draft-api.client';
 
 export interface RecordingPage {
   pageNumber: number;
@@ -90,6 +90,16 @@ interface RecorderProps {
       recording — clicking it pulls the saved file back as a blob so the user
       can re-trim and re-save without losing the existing work. */
   existingPageAudio?: Record<number, { audioUrl: string }>;
+  /** PR 2 draft + commit metadata per page, keyed by 1-based pageNumber.
+      audioPageId is the story_audio_pages row's UUID — needed to call
+      /save-draft, /shrink-source, and /render. draftVocalUrl + draftLayers
+      drive hydration when the user re-opens an in-progress edit. */
+  existingPageDrafts?: Record<number, {
+    audioPageId?: string;
+    draftVocalUrl?: string | null;
+    draftLayers?: AudioLayers | null;
+    committedAt?: string | null;
+  }>;
   onSaveRecording: (args: SaveRecordingArgs) => Promise<SaveRecordingResult>;
   onClose: () => void;
   onAllSaved?: () => void;
@@ -123,6 +133,7 @@ export default function Recorder({
   initialPageIndex = 0,
   onPageIndexChange,
   existingPageAudio,
+  existingPageDrafts,
   onSaveRecording,
   onClose,
   onAllSaved,
@@ -216,6 +227,26 @@ export default function Recorder({
   // commit (offline render shrinks the source blob).
   const [selectedCutIdx, setSelectedCutIdx] = useState<number | null>(null);
   const [deletingCut, setDeletingCut] = useState(false);
+  // PR 2 — draft persistence tracking.
+  // Per-page hash of the layer state last successfully saved to the
+  // server. Dirty = current hash differs. Stable JSON.stringify so the
+  // hash matches when nothing's changed.
+  const lastSavedLayersHashRef = useRef<Map<number, string>>(new Map());
+  // Per-page flag indicating whether the current blob has been uploaded
+  // to the server as draft_vocal_url. False = the next /save-draft must
+  // include the blob; true = layer-only update is enough.
+  const draftBlobUploadedRef = useRef<Set<number>>(new Set());
+  // Currently in-flight Save draft action (the pageIndex being saved).
+  const [savingDraftPage, setSavingDraftPage] = useState<number | null>(null);
+  // Per-page millisecond timestamp of the most recent successful save.
+  // Drives the "Saved 5s ago" indicator in the bottom bar.
+  const [draftSavedAt, setDraftSavedAt] = useState<Map<number, number>>(new Map());
+  // Render in flight for Finish & Continue.
+  const [renderingPage, setRenderingPage] = useState<number | null>(null);
+  // Confirmation dialog when leaving a page with unsaved edits. `proceed`
+  // is the navigation action the user originally tried to take; we run it
+  // after Save (or Discard) resolves.
+  const [navConfirm, setNavConfirm] = useState<{ proceed: () => void } | null>(null);
   // Active drag of an inner boundary between two voice segments. `side`
   // says which edge the user grabbed: 'left' = segments[boundaryIdx].endSec,
   // 'right' = segments[boundaryIdx + 1].startSec. Captured at drag start
@@ -291,6 +322,131 @@ export default function Recorder({
   useEffect(() => {
     if (expanded) setActiveRailTab('sfx');
   }, [expanded]);
+
+  // Hydrate the current page from a server-saved draft on mount/page-change.
+  // Fires when: (a) the recorder is expanded, (b) the page has a saved
+  // draft (draft_vocal_url + draft_layers), and (c) we don't already have
+  // an in-memory recording. Fetches the blob, parses the layer spec into
+  // segments + effects, and marks the page as "synced" so the Save draft
+  // button stays disabled until the user makes a real change.
+  const [hydratingPage, setHydratingPage] = useState<number | null>(null);
+  useEffect(() => {
+    if (!expanded) return;
+    const pn = pages[currentPageIndex]?.pageNumber;
+    if (!pn) return;
+    const draft = existingPageDrafts?.[pn];
+    if (!draft?.draftVocalUrl || !draft?.draftLayers) return;
+    if (pageRecordings.has(currentPageIndex)) return;
+    if (hydratingPage === currentPageIndex) return;
+
+    setHydratingPage(currentPageIndex);
+    let cancelled = false;
+    (async () => {
+      try {
+        const blobRes = await fetch(draft.draftVocalUrl!);
+        if (!blobRes.ok) throw new Error(`Fetch draft: HTTP ${blobRes.status}`);
+        const blob = await blobRes.blob();
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+
+        // Decode duration via Web Audio for accuracy across codecs.
+        let duration = draft.draftLayers!.vocal.durationSec ?? 0;
+        try {
+          const tempCtx = new AudioContext();
+          const buf = await blob.arrayBuffer();
+          const decoded = await tempCtx.decodeAudioData(buf.slice(0));
+          duration = decoded.duration;
+          await tempCtx.close().catch(() => undefined);
+        } catch { /* fall back to layer spec duration */ }
+        if (cancelled) return;
+
+        const layers = draft.draftLayers!;
+        const segments = layers.vocal.segments && layers.vocal.segments.length > 0
+          ? layers.vocal.segments
+          : [{ startSec: 0, endSec: duration }];
+
+        // Hydrate SFX effects — need to fetch sfx_library rows by id to
+        // restore PendingEffect.sound. Effects without a library id (legacy
+        // freesound rows pre-import) are skipped.
+        const libIds = layers.effects
+          .map((e) => e.sfxLibraryId)
+          .filter((v): v is string => !!v);
+        const soundsById = new Map<string, SfxLibraryItem>();
+        if (libIds.length > 0) {
+          try {
+            const lookupRes = await fetch(`/api/v1/sfx-library?ids=${encodeURIComponent(libIds.join(','))}`);
+            const lookupData = await lookupRes.json().catch(() => ({}));
+            for (const s of (lookupData.sounds ?? []) as SfxLibraryItem[]) {
+              soundsById.set(s.id, s);
+            }
+          } catch (err) {
+            console.warn('SFX library hydration lookup failed:', err);
+          }
+        }
+        if (cancelled) return;
+
+        const hydratedEffects: PendingEffect[] = layers.effects
+          .map((e) => {
+            const sound = e.sfxLibraryId ? soundsById.get(e.sfxLibraryId) : undefined;
+            if (!sound) return null;
+            return {
+              id: e.id,
+              sound,
+              startSec: e.startSec,
+              durationSec: e.durationSec,
+              sourceOffsetSec: e.sourceOffsetSec ?? 0,
+              volumeDb: e.volumeDb ?? -6,
+            } as PendingEffect;
+          })
+          .filter((x): x is PendingEffect => x !== null);
+
+        setPageRecordings((prev) => {
+          const next = new Map(prev);
+          const existing = next.get(currentPageIndex);
+          if (existing) URL.revokeObjectURL(existing.url);
+          next.set(currentPageIndex, { blob, url, duration });
+          return next;
+        });
+        setPageVocalSegments((prev) => {
+          const next = new Map(prev);
+          next.set(currentPageIndex, segments);
+          return next;
+        });
+        setPageEffects((prev) => {
+          const next = new Map(prev);
+          next.set(currentPageIndex, hydratedEffects);
+          return next;
+        });
+        // Mark as already-synced so Save draft starts disabled.
+        const syntheticLayers: AudioLayers = {
+          version: 1,
+          vocal: { url, durationSec: duration, segments },
+          music: [],
+          effects: hydratedEffects.map((eff) => ({
+            id: eff.id,
+            url: eff.sound.audio_url,
+            sfxLibraryId: eff.sound.id,
+            startSec: eff.startSec,
+            durationSec: eff.durationSec,
+            sourceOffsetSec: eff.sourceOffsetSec || undefined,
+            volumeDb: eff.volumeDb,
+          })),
+        };
+        lastSavedLayersHashRef.current.set(currentPageIndex, hashLayers(syntheticLayers));
+        draftBlobUploadedRef.current.add(currentPageIndex);
+        if (draft.draftLayers!.vocal.url) {
+          // Track that the server already has THIS blob — re-saves shouldn't
+          // re-upload until the user replaces the blob (e.g., destructive delete).
+        }
+      } catch (err: any) {
+        console.error('Hydration failed:', err);
+      } finally {
+        if (!cancelled) setHydratingPage(null);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, currentPageIndex, existingPageDrafts]);
 
   // One-shot auto-fit per page: when a recording becomes available, pick
   // a zoom that fits the vocal to ~80% of the available timeline width
@@ -374,6 +530,24 @@ export default function Recorder({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceBoundaryDrag]);
+
+  // Auto-save safety net — every 2 minutes, if the current page has
+  // pending changes and we're not in the middle of recording / saving /
+  // rendering, quietly fire a Save draft. Belt-and-suspenders for
+  // laptop-lid-closes-mid-session and similar.
+  useEffect(() => {
+    if (!expanded) return;
+    const id = setInterval(() => {
+      if (savingDraftPage !== null) return;
+      if (renderingPage !== null) return;
+      if (isRecording) return;
+      if (!getAudioPageId(currentPageIndex)) return;
+      if (!isPageDirty(currentPageIndex)) return;
+      void handleSaveAsDraft(currentPageIndex);
+    }, 2 * 60 * 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, currentPageIndex, isRecording, savingDraftPage, renderingPage]);
 
   // Delete shortcut — Delete/Backspace removes whichever voice thing is
   // selected (cut OR segment). Both are destructive (offline render).
@@ -983,10 +1157,172 @@ export default function Recorder({
     });
   };
 
-  /** Destructively remove a whole voice SEGMENT. Renders the remaining
-   *  segments back-to-back into a new shorter blob, swaps it into the
-   *  page's recording, and collapses the survivors into a single segment
-   *  spanning the new shorter source. */
+  /** Look up the server-side row id for a page (PR 2). NULL when the page
+   *  hasn't been registered server-side yet — Save draft is disabled in
+   *  that case until the host provides an audioPageId. */
+  const getAudioPageId = (pageIndex: number): string | undefined => {
+    const pn = pages[pageIndex]?.pageNumber;
+    return pn ? existingPageDrafts?.[pn]?.audioPageId : undefined;
+  };
+
+  /** Build the AudioLayers JSON for a page from current in-memory state.
+   *  Vocal points at the in-memory blob's URL (which the server replaces
+   *  with the uploaded draft URL inside /save-draft when the blob is
+   *  included). Used by both Save draft and Finish & Continue. */
+  const buildLayersForPage = (pageIndex: number, vocalUrlOverride?: string): AudioLayers | null => {
+    const rec = pageRecordings.get(pageIndex);
+    if (!rec) return null;
+    const segs = pageVocalSegments.get(pageIndex)
+      ?? [{ startSec: 0, endSec: rec.duration }];
+    const effects = pageEffects.get(pageIndex) ?? [];
+    return {
+      version: 1,
+      vocal: {
+        url: vocalUrlOverride ?? rec.url,
+        durationSec: rec.duration,
+        segments: segs,
+      },
+      music: [],
+      effects: effects.map((e) => ({
+        id: e.id,
+        url: e.sound.audio_url,
+        sfxLibraryId: e.sound.id,
+        startSec: e.startSec,
+        durationSec: e.durationSec,
+        sourceOffsetSec: e.sourceOffsetSec || undefined,
+        volumeDb: e.volumeDb,
+      })),
+    };
+  };
+
+  /** Stable hash of a layer spec used for dirty detection. Sorts keys so
+   *  trivial reorderings don't cause false-positives. Vocal URL is
+   *  intentionally EXCLUDED because the blob's object URL changes on
+   *  re-record and we track blob-dirty separately. */
+  const hashLayers = (layers: AudioLayers): string => {
+    const stripped = {
+      vocal: {
+        durationSec: layers.vocal.durationSec,
+        segments: layers.vocal.segments,
+        volumeDb: layers.vocal.volumeDb,
+      },
+      effects: layers.effects.map((e) => ({
+        sfxLibraryId: e.sfxLibraryId,
+        startSec: e.startSec,
+        durationSec: e.durationSec,
+        sourceOffsetSec: e.sourceOffsetSec,
+        volumeDb: e.volumeDb,
+      })),
+    };
+    return JSON.stringify(stripped);
+  };
+
+  /** Dirty = current layer-hash differs from last server-saved, OR the
+   *  blob hasn't been uploaded yet (e.g., right after recording). */
+  const isPageDirty = (pageIndex: number): boolean => {
+    const layers = buildLayersForPage(pageIndex);
+    if (!layers) return false;
+    const currentHash = hashLayers(layers);
+    const lastHash = lastSavedLayersHashRef.current.get(pageIndex);
+    const blobUploaded = draftBlobUploadedRef.current.has(pageIndex);
+    return !blobUploaded || currentHash !== lastHash;
+  };
+
+  /** PR 2 — persist the current page's edits to the server as a draft.
+   *  Uploads the vocal blob only when it's not already on the server.
+   *  Always sends layers. */
+  const handleSaveAsDraft = async (pageIndex: number): Promise<boolean> => {
+    if (savingDraftPage !== null) return false;
+    const audioPageId = getAudioPageId(pageIndex);
+    if (!audioPageId) {
+      console.warn('Save draft skipped: no audioPageId for page', pageIndex);
+      return false;
+    }
+    const rec = pageRecordings.get(pageIndex);
+    if (!rec) return false;
+    const layers = buildLayersForPage(pageIndex);
+    if (!layers) return false;
+
+    setSavingDraftPage(pageIndex);
+    try {
+      const needsBlob = !draftBlobUploadedRef.current.has(pageIndex);
+      const result = await apiSaveDraft({
+        audioPageId,
+        vocalBlob: needsBlob ? rec.blob : undefined,
+        layers,
+      });
+      if (needsBlob) draftBlobUploadedRef.current.add(pageIndex);
+      lastSavedLayersHashRef.current.set(pageIndex, hashLayers(layers));
+      setDraftSavedAt((prev) => new Map(prev).set(pageIndex, Date.now()));
+      return true;
+    } catch (err: any) {
+      console.error('Save draft failed:', err);
+      alert(`Could not save draft: ${err.message || 'Unknown error'}`);
+      return false;
+    } finally {
+      setSavingDraftPage(null);
+    }
+  };
+
+  /** Server-side destructive helper used by both deleteSegmentAt and
+   *  deleteCutAt. Ensures the draft is uploaded first, then calls
+   *  /shrink-source with the survivors, then swaps the in-memory blob
+   *  with the new shorter one returned by the server. */
+  const commitShrinkSource = async (keepSegments: VocalSegment[]): Promise<boolean> => {
+    if (!currentRecording) return false;
+    const audioPageId = getAudioPageId(currentPageIndex);
+    if (!audioPageId) {
+      alert('Cannot delete: this page is not registered server-side yet. Try Save draft first.');
+      return false;
+    }
+    // Make sure the server has the current blob to shrink. If not, save
+    // a draft first so /shrink-source has something to operate on.
+    if (!draftBlobUploadedRef.current.has(currentPageIndex)) {
+      const saved = await handleSaveAsDraft(currentPageIndex);
+      if (!saved) return false;
+    }
+    const pageIdx = currentPageIndex;
+    const result = await apiShrinkSource(audioPageId, keepSegments);
+    // Fetch the new blob and update in-memory state.
+    const blobRes = await fetch(result.draftVocalUrl);
+    if (!blobRes.ok) throw new Error(`Fetch shrunk blob: HTTP ${blobRes.status}`);
+    const blob = await blobRes.blob();
+    const url = URL.createObjectURL(blob);
+    setPageRecordings((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(pageIdx);
+      if (existing) URL.revokeObjectURL(existing.url);
+      next.set(pageIdx, { blob, url, duration: result.durationSec });
+      return next;
+    });
+    setPageVocalSegments((prev) => {
+      const next = new Map(prev);
+      next.set(pageIdx, result.segments);
+      return next;
+    });
+    autoFittedPagesRef.current.delete(pageIdx);
+    // Server has the new blob — keep the "blob uploaded" flag true.
+    draftBlobUploadedRef.current.add(pageIdx);
+    // Layer state is now in sync with what the server has after the
+    // shrink-source call updated draft_layers. Refresh the dirty-hash so
+    // Save draft stays disabled until the user makes a NEW change.
+    const syntheticLayers = buildLayersForPage(pageIdx, url);
+    if (syntheticLayers) {
+      lastSavedLayersHashRef.current.set(pageIdx, hashLayers(syntheticLayers));
+      setDraftSavedAt((prev) => new Map(prev).set(pageIdx, Date.now()));
+    }
+    setSavedPages((prev) => {
+      if (!prev.has(pageIdx)) return prev;
+      const next = new Set(prev);
+      next.delete(pageIdx);
+      return next;
+    });
+    return true;
+  };
+
+  /** Destructively remove a whole voice SEGMENT. Goes through the server
+   *  so draft_vocal_url stays consistent across sessions — see
+   *  commitShrinkSource. */
   const deleteSegmentAt = async (segIdx: number) => {
     if (deletingCut) return;
     if (!currentRecording) return;
@@ -994,42 +1330,14 @@ export default function Recorder({
     if (segIdx < 0 || segIdx >= segs.length) return;
     const remaining = segs.filter((_, i) => i !== segIdx);
     if (remaining.length === 0) {
-      // Last segment → same effect as deleting the whole recording.
       deleteRecording();
       setSelectedVoiceSegmentIdx(null);
       return;
     }
     setDeletingCut(true);
     try {
-      const { blob: newBlob, durationSec: newDur } = await renderSegmentsToWav(
-        currentRecording.blob,
-        remaining,
-      );
-      const newUrl = URL.createObjectURL(newBlob);
-      const pageIdx = currentPageIndex;
-      setPageRecordings((prev) => {
-        const next = new Map(prev);
-        const existing = next.get(pageIdx);
-        if (existing) URL.revokeObjectURL(existing.url);
-        next.set(pageIdx, { blob: newBlob, url: newUrl, duration: newDur });
-        return next;
-      });
-      // After destructive delete, the survivors are touching back-to-back
-      // in the new source — collapse to one segment so the UI doesn't
-      // show a meaningless divider where the cut used to be.
-      setPageVocalSegments((prev) => {
-        const next = new Map(prev);
-        next.set(pageIdx, [{ startSec: 0, endSec: newDur }]);
-        return next;
-      });
-      autoFittedPagesRef.current.delete(pageIdx);
-      setSelectedVoiceSegmentIdx(null);
-      setSavedPages((prev) => {
-        if (!prev.has(pageIdx)) return prev;
-        const next = new Set(prev);
-        next.delete(pageIdx);
-        return next;
-      });
+      const ok = await commitShrinkSource(remaining);
+      if (ok) setSelectedVoiceSegmentIdx(null);
     } catch (err: any) {
       console.error('Delete segment failed:', err);
       alert(`Could not delete this segment: ${err.message || 'render failed'}`);
@@ -1038,11 +1346,9 @@ export default function Recorder({
     }
   };
 
-  /** Destructively remove a cut from the source. Offline-renders the
-   *  active segments into a new shorter blob, swaps it into the page's
-   *  recording, and merges the two segments around the cut into one.
-   *  After this commits, the audio that lived inside the gap is gone —
-   *  the user can no longer drag the trim back into it. */
+  /** Destructively remove a CUT (gap between two segments). Goes through
+   *  the server so the persisted draft stays consistent — see
+   *  commitShrinkSource. */
   const deleteCutAt = async (cutIdx: number) => {
     if (deletingCut) return;
     if (!currentRecording) return;
@@ -1051,53 +1357,13 @@ export default function Recorder({
     const left = segs[cutIdx];
     const right = segs[cutIdx + 1];
     const gapDur = right.startSec - left.endSec;
-    if (gapDur <= 0.01) return; // No real gap to delete.
-
+    if (gapDur <= 0.01) return;
     setDeletingCut(true);
     try {
-      const { blob: newBlob, durationSec: newDur } = await renderSegmentsToWav(
-        currentRecording.blob,
-        segs,
-      );
-      const newUrl = URL.createObjectURL(newBlob);
-      // Rebuild segments to match the new shorter source. Segments before
-      // the cut are unchanged; the two around the cut merge; segments
-      // after shift left by the deleted gap duration.
-      const newSegments: VocalSegment[] = [];
-      for (let i = 0; i < cutIdx; i++) newSegments.push(segs[i]);
-      newSegments.push({
-        startSec: left.startSec,
-        endSec: right.endSec - gapDur,
-      });
-      for (let i = cutIdx + 2; i < segs.length; i++) {
-        newSegments.push({
-          startSec: segs[i].startSec - gapDur,
-          endSec: segs[i].endSec - gapDur,
-        });
-      }
-      const pageIdx = currentPageIndex;
-      setPageRecordings((prev) => {
-        const next = new Map(prev);
-        const existing = next.get(pageIdx);
-        if (existing) URL.revokeObjectURL(existing.url);
-        next.set(pageIdx, { blob: newBlob, url: newUrl, duration: newDur });
-        return next;
-      });
-      setPageVocalSegments((prev) => {
-        const next = new Map(prev);
-        next.set(pageIdx, newSegments);
-        return next;
-      });
-      // Re-fit zoom against the now-shorter source on the next render.
-      autoFittedPagesRef.current.delete(pageIdx);
-      setSelectedCutIdx(null);
-      // Saved indicator is invalid until the next Save.
-      setSavedPages((prev) => {
-        if (!prev.has(pageIdx)) return prev;
-        const next = new Set(prev);
-        next.delete(pageIdx);
-        return next;
-      });
+      // Keep all segments — the server-side concat removes the gap audio
+      // between them because keepSegments lists only the active windows.
+      const ok = await commitShrinkSource(segs);
+      if (ok) setSelectedCutIdx(null);
     } catch (err: any) {
       console.error('Delete cut failed:', err);
       alert(`Could not delete this cut: ${err.message || 'render failed'}`);
@@ -1215,88 +1481,176 @@ export default function Recorder({
     }
     setUploading(true);
     try {
-      const result = await onSaveRecording({
-        page: currentPage,
-        pageIndex: currentPageIndex,
-        blob: currentRecording.blob,
-        duration: currentRecording.duration,
-        language: recordingLanguage,
-        trim: currentTrim,
-      });
-      if (!result.success) {
-        alert(`Failed to save page ${currentPageIndex + 1}: ${result.error || 'Unknown error'}\n\nPlease try again.`);
-        return;
-      }
+      const audioPageId = getAudioPageId(currentPageIndex);
 
-      // Trigger a server-side mix render whenever the final audio differs
-      // from a straight passthrough of the upload-trimmed vocal — i.e.,
-      // when SFX layers exist OR the user split the vocal into multiple
-      // segments (cuts). Skipped if both are empty since the upload-
-      // trimmed MP3 is already the right output.
-      const needsMixRender = currentEffects.length > 0 || currentSegments.length > 1;
-      if (needsMixRender && result.audioPageId && result.audioUrl) {
-        const trimStart = currentTrim?.startSec ?? 0;
-        const trimmedDuration = currentTrim
-          ? currentTrim.endSec - currentTrim.startSec
-          : currentRecording.duration;
-        // Rebase segments from original-recording time into upload-trimmed
-        // audio time (which is what the server-side mix sees). Single-
-        // segment case sends nothing — the upload-trimmed file IS the
-        // intended vocal.
-        const rebasedSegments: VocalSegment[] = currentSegments.length > 1
-          ? currentSegments.map((s) => ({
-              startSec: Math.max(0, s.startSec - trimStart),
-              endSec: Math.max(0, s.endSec - trimStart),
-            }))
-          : [];
-        const mixResult = await applyAudioLayers(
-          result.audioPageId,
-          result.audioUrl,
-          trimmedDuration,
-          rebasedSegments,
-          currentEffects,
-        );
-        if (!mixResult.success) {
-          alert(`Vocal saved, but mixing failed: ${mixResult.error}\n\nThe page has audio without cuts/effects. Try editing the page again to retry.`);
-          // Continue — vocal IS saved. Don't block the workflow.
+      // PR 2 — chapter book pages have an audioPageId from the server.
+      // The flow is: Save draft (persists in-progress state) → /render
+      // (mixes and writes audio_url, clears the draft). After render the
+      // in-memory state for THIS page is cleared so future visits start
+      // fresh from the new committed audio_url.
+      if (audioPageId) {
+        const savedOk = await handleSaveAsDraft(currentPageIndex);
+        if (!savedOk) return;
+        setRenderingPage(currentPageIndex);
+        try {
+          await apiRenderFinal(audioPageId);
+        } catch (err: any) {
+          alert(`Render failed: ${err.message || 'Unknown error'}\n\nYour draft is saved — you can try again.`);
+          return;
+        } finally {
+          setRenderingPage(null);
         }
-        // Note: we intentionally KEEP pageEffects + pageVocalSegments in
-        // memory after a successful save. Clearing them made the lanes
-        // look empty after Save & Continue, which read as "the save lost
-        // my edits." The next save will re-PATCH the same spec; harmless.
+        setSavedPages((prev) => new Set(prev).add(currentPageIndex));
+        // Drop the in-memory state for this page — it's now committed.
+        // Future Edit-existing or hydration will pull the new audio_url.
+        const pageIdx = currentPageIndex;
+        setPageRecordings((prev) => {
+          const next = new Map(prev);
+          const existing = next.get(pageIdx);
+          if (existing) URL.revokeObjectURL(existing.url);
+          next.delete(pageIdx);
+          return next;
+        });
+        setPageVocalSegments((prev) => {
+          const next = new Map(prev);
+          next.delete(pageIdx);
+          return next;
+        });
+        setPageEffects((prev) => {
+          const next = new Map(prev);
+          next.delete(pageIdx);
+          return next;
+        });
+        lastSavedLayersHashRef.current.delete(pageIdx);
+        draftBlobUploadedRef.current.delete(pageIdx);
+        autoFittedPagesRef.current.delete(pageIdx);
+        setDraftSavedAt((prev) => {
+          if (!prev.has(pageIdx)) return prev;
+          const next = new Map(prev);
+          next.delete(pageIdx);
+          return next;
+        });
+        setSelectedEffectId(null);
+        setSelectedCutIdx(null);
+        setSelectedVoiceSegmentIdx(null);
+      } else {
+        // Picture book (or chapter book row not yet registered server-
+        // side) — fall back to the legacy onSaveRecording host callback.
+        // This calls the chapter-book upload-user-audio endpoint which
+        // trims via FFmpeg + uploads the result to audio_url.
+        const result = await onSaveRecording({
+          page: currentPage,
+          pageIndex: currentPageIndex,
+          blob: currentRecording.blob,
+          duration: currentRecording.duration,
+          language: recordingLanguage,
+          trim: currentTrim,
+        });
+        if (!result.success) {
+          alert(`Failed to save page ${currentPageIndex + 1}: ${result.error || 'Unknown error'}\n\nPlease try again.`);
+          return;
+        }
+        // Legacy: if SFX OR cuts present, PATCH /layers via applyAudioLayers
+        // to trigger a mix render. Mirrors pre-PR-2 behavior exactly.
+        const needsMixRender = currentEffects.length > 0 || currentSegments.length > 1;
+        if (needsMixRender && result.audioPageId && result.audioUrl) {
+          const trimStart = currentTrim?.startSec ?? 0;
+          const trimmedDuration = currentTrim
+            ? currentTrim.endSec - currentTrim.startSec
+            : currentRecording.duration;
+          const rebasedSegments: VocalSegment[] = currentSegments.length > 1
+            ? currentSegments.map((s) => ({
+                startSec: Math.max(0, s.startSec - trimStart),
+                endSec: Math.max(0, s.endSec - trimStart),
+              }))
+            : [];
+          const mixResult = await applyAudioLayers(
+            result.audioPageId,
+            result.audioUrl,
+            trimmedDuration,
+            rebasedSegments,
+            currentEffects,
+          );
+          if (!mixResult.success) {
+            alert(`Vocal saved, but mixing failed: ${mixResult.error}\n\nThe page has audio without cuts/effects. Try editing the page again to retry.`);
+          }
+        }
+        setSavedPages((prev) => new Set(prev).add(currentPageIndex));
       }
-
-      setSavedPages((prev) => new Set(prev).add(currentPageIndex));
 
       if (currentPageIndex < totalPages - 1) {
         setCurrentPageIndex((i) => i + 1);
         if (isPlaying) stopPreview();
       } else {
-        // Last page saved — notify host and exit.
         onAllSaved?.();
         handleClose();
       }
     } catch (err: any) {
-      console.error('Audio upload error:', err);
+      console.error('Finish & Continue error:', err);
       alert(`Error saving audio: ${err.message || 'Unknown error'}\n\nPlease try again.`);
     } finally {
       setUploading(false);
     }
   };
 
-  const handleSkipPage = () => {
-    if (isPlaying) stopPreview();
-    if (isLastPage) {
-      handleClose();
+  /** Wrap a navigation action with the unsaved-changes guard. If the
+   *  current page has pending draft edits, opens the navConfirm modal
+   *  and stages the action; otherwise runs it immediately. */
+  const guardedNavigate = (action: () => void) => {
+    if (!isPageDirty(currentPageIndex) || !getAudioPageId(currentPageIndex)) {
+      action();
       return;
     }
-    setCurrentPageIndex((i) => i + 1);
+    setNavConfirm({ proceed: action });
+  };
+
+  /** Discard in-memory edits for the current page. Next time the page is
+   *  visited, the hydration effect will reload from the server-saved
+   *  draft (or fall back to a fresh empty state). */
+  const discardCurrentPageEdits = () => {
+    const idx = currentPageIndex;
+    setPageRecordings((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(idx);
+      if (existing) URL.revokeObjectURL(existing.url);
+      next.delete(idx);
+      return next;
+    });
+    setPageVocalSegments((prev) => {
+      const next = new Map(prev);
+      next.delete(idx);
+      return next;
+    });
+    setPageEffects((prev) => {
+      const next = new Map(prev);
+      next.delete(idx);
+      return next;
+    });
+    lastSavedLayersHashRef.current.delete(idx);
+    draftBlobUploadedRef.current.delete(idx);
+    autoFittedPagesRef.current.delete(idx);
+    setSelectedEffectId(null);
+    setSelectedCutIdx(null);
+    setSelectedVoiceSegmentIdx(null);
+  };
+
+  const handleSkipPage = () => {
+    guardedNavigate(() => {
+      if (isPlaying) stopPreview();
+      if (isLastPage) {
+        handleClose();
+        return;
+      }
+      setCurrentPageIndex((i) => i + 1);
+    });
   };
 
   const handlePreviousPage = () => {
-    if (isPlaying) stopPreview();
-    if (currentPageIndex <= 0) return;
-    setCurrentPageIndex((i) => i - 1);
+    guardedNavigate(() => {
+      if (isPlaying) stopPreview();
+      if (currentPageIndex <= 0) return;
+      setCurrentPageIndex((i) => i - 1);
+    });
   };
 
   const handleClose = () => {
@@ -1547,7 +1901,7 @@ export default function Recorder({
                   <Minimize2 className="w-5 h-5" />
                 </button>
                 <button
-                  onClick={handleClose}
+                  onClick={() => guardedNavigate(() => handleClose())}
                   aria-label="Close recording mode"
                   className="p-1.5 rounded-md text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
                 >
@@ -1913,19 +2267,7 @@ export default function Recorder({
                   </TrackRow>
                   <TrackRow
                     label="Sound effects"
-                    sublabel={currentEffects.length > 0 ? `${currentEffects.length} layered` : undefined}
-                    action={
-                      <button
-                        onClick={() => setActiveRailTab((cur) => cur === 'sfx' ? null : 'sfx')}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
-                          activeRailTab === 'sfx'
-                            ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-300'
-                            : 'bg-purple-600 text-white hover:bg-purple-700'
-                        }`}
-                      >
-                        <Plus className="w-3 h-3" /> {activeRailTab === 'sfx' ? 'Browsing' : 'Add'}
-                      </button>
-                    }
+                    tooltip="Pick a sound from the left panel"
                   >
                     <SFXTimeline
                       effects={currentEffects}
@@ -2165,49 +2507,94 @@ export default function Recorder({
                 with Save & Continue on the right so the primary CTA + page
                 nav cluster together (matches the visual order of "where am
                 I → what happens next"). */}
-            <div className="mt-3 flex items-center gap-3 pt-3 border-t border-gray-200">
-              <span className="flex-1 text-xs text-gray-600 tabular-nums">
-                Page {currentPageIndex + 1} of {totalPages}
-                <span className="text-gray-400"> · </span>
-                <span className="text-green-700 font-medium">{savedPages.size}</span> saved
-                <span className="text-gray-400"> · </span>
-                {totalPages - savedPages.size} left
-              </span>
-              <button
-                onClick={handlePreviousPage}
-                disabled={uploading || currentPageIndex === 0}
-                title="Previous page"
-                aria-label="Previous page"
-                className="p-2.5 rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-              >
-                <SkipBack className="w-4 h-4" />
-              </button>
-              <button
-                onClick={requestSaveCurrentPage}
-                disabled={uploading || !currentRecording}
-                className="w-56 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-md hover:from-green-600 hover:to-emerald-600 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed py-2.5 text-sm"
-              >
-                {uploading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Saving…
+            {(() => {
+              const dirty = currentRecording ? isPageDirty(currentPageIndex) : false;
+              const saving = savingDraftPage === currentPageIndex;
+              const savedAt = draftSavedAt.get(currentPageIndex);
+              const audioPageId = getAudioPageId(currentPageIndex);
+              const canSaveDraft = !!currentRecording && !!audioPageId && dirty && !saving && !uploading;
+              // Saved-status text for the page status area.
+              let statusText = '';
+              if (saving) {
+                statusText = 'Saving draft…';
+              } else if (dirty) {
+                statusText = 'Unsaved changes';
+              } else if (savedAt) {
+                const ago = Math.max(0, Math.round((Date.now() - savedAt) / 1000));
+                statusText = ago < 5 ? 'Draft saved' : `Draft saved ${ago}s ago`;
+              }
+              return (
+                <div className="mt-3 flex items-center gap-3 pt-3 border-t border-gray-200">
+                  <span className="flex-1 text-xs text-gray-600 tabular-nums">
+                    Page {currentPageIndex + 1} of {totalPages}
+                    <span className="text-gray-400"> · </span>
+                    <span className="text-green-700 font-medium">{savedPages.size}</span> saved
+                    <span className="text-gray-400"> · </span>
+                    {totalPages - savedPages.size} left
+                    {statusText && (
+                      <>
+                        <span className="text-gray-400"> · </span>
+                        <span className={dirty ? 'text-amber-700' : 'text-gray-500'}>{statusText}</span>
+                      </>
+                    )}
                   </span>
-                ) : isLastPage ? (
-                  'Save & Finish'
-                ) : (
-                  'Save & Continue'
-                )}
-              </button>
-              <button
-                onClick={handleSkipPage}
-                disabled={uploading}
-                title={isLastPage ? 'Skip and finish (this page keeps AI narration)' : 'Skip page (this page keeps AI narration)'}
-                aria-label="Skip page"
-                className="p-2.5 rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-              >
-                <SkipForward className="w-4 h-4" />
-              </button>
-            </div>
+                  <button
+                    onClick={handlePreviousPage}
+                    disabled={uploading || currentPageIndex === 0}
+                    title="Previous page"
+                    aria-label="Previous page"
+                    className="p-2.5 rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    <SkipBack className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => void handleSaveAsDraft(currentPageIndex)}
+                    disabled={!canSaveDraft}
+                    title={
+                      !currentRecording ? 'Record first'
+                      : !audioPageId ? 'Page not yet registered server-side'
+                      : !dirty ? 'No unsaved changes'
+                      : 'Save your progress (you can come back to finish later)'
+                    }
+                    className="px-4 py-2.5 rounded-md border border-purple-300 bg-white text-purple-700 hover:bg-purple-50 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    {saving ? (
+                      <span className="inline-flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-purple-700"></div>
+                        Saving…
+                      </span>
+                    ) : (
+                      'Save draft'
+                    )}
+                  </button>
+                  <button
+                    onClick={requestSaveCurrentPage}
+                    disabled={uploading || !currentRecording}
+                    className="w-48 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-md hover:from-green-600 hover:to-emerald-600 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed py-2.5 text-sm"
+                  >
+                    {uploading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Saving…
+                      </span>
+                    ) : isLastPage ? (
+                      'Finish'
+                    ) : (
+                      'Finish & Continue'
+                    )}
+                  </button>
+                  <button
+                    onClick={handleSkipPage}
+                    disabled={uploading}
+                    title={isLastPage ? 'Skip and finish (this page keeps AI narration)' : 'Skip page (this page keeps AI narration)'}
+                    aria-label="Skip page"
+                    className="p-2.5 rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    <SkipForward className="w-4 h-4" />
+                  </button>
+                </div>
+              );
+            })()}
             </div>
             </div>
           </div>
@@ -2344,6 +2731,61 @@ export default function Recorder({
               >
                 Save & merge
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {navConfirm && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="nav-confirm-title"
+        >
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-5">
+            <h3 id="nav-confirm-title" className="text-base font-semibold text-gray-900 mb-2">
+              Save your draft before leaving?
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              You have unsaved edits on this page. Save them so you can come back to finish later, or discard them.
+            </p>
+            <div className="flex justify-between gap-2">
+              <button
+                onClick={() => {
+                  const proceed = navConfirm.proceed;
+                  setNavConfirm(null);
+                  discardCurrentPageEdits();
+                  proceed();
+                }}
+                disabled={savingDraftPage !== null}
+                className="px-4 py-2 rounded-md border border-red-200 bg-white text-red-700 hover:bg-red-50 text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                Discard
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setNavConfirm(null)}
+                  disabled={savingDraftPage !== null}
+                  className="px-4 py-2 rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    const proceed = navConfirm.proceed;
+                    const ok = await handleSaveAsDraft(currentPageIndex);
+                    if (ok) {
+                      setNavConfirm(null);
+                      proceed();
+                    }
+                    // On failure, leave the dialog open so the user can retry.
+                  }}
+                  disabled={savingDraftPage !== null}
+                  className="px-4 py-2 rounded-md bg-purple-600 text-white hover:bg-purple-700 text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {savingDraftPage !== null ? 'Saving…' : 'Save draft'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

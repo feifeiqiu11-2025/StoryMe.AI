@@ -21,6 +21,10 @@ const QuerySchema = z.object({
   q: z.string().max(100).optional(),
   tags: z.string().max(200).optional(),
   source: z.enum(['curated', 'freesound', 'elevenlabs_cache']).optional(),
+  /** Comma-separated UUIDs — when present, the library returns ONLY these
+   *  rows (ignoring q/tags/source/limit/offset). Used by the Recorder to
+   *  hydrate saved SFX placements on re-open. */
+  ids: z.string().max(2000).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(60),
   offset: z.coerce.number().int().min(0).default(0),
 });
@@ -38,6 +42,7 @@ export async function GET(request: NextRequest) {
       q: url.searchParams.get('q') ?? undefined,
       tags: url.searchParams.get('tags') ?? undefined,
       source: url.searchParams.get('source') ?? undefined,
+      ids: url.searchParams.get('ids') ?? undefined,
       limit: url.searchParams.get('limit') ?? undefined,
       offset: url.searchParams.get('offset') ?? undefined,
     });
@@ -47,7 +52,23 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { q, tags, source, limit, offset } = parsed.data;
+    const { q, tags, source, ids, limit, offset } = parsed.data;
+
+    // ids-mode: batch-fetch by UUID list, bypass all other filters. Used
+    // by the recorder to hydrate saved SFX placements on re-open.
+    if (ids) {
+      const idList = ids.split(',').map((s) => s.trim()).filter(Boolean);
+      if (idList.length === 0) return NextResponse.json({ sounds: [] });
+      const { data, error } = await supabase
+        .from('sfx_library')
+        .select('id, name, tags, audio_url, duration_sec, source, kid_safe, attribution, license')
+        .in('id', idList);
+      if (error) {
+        console.error('sfx_library ids query failed:', error);
+        return NextResponse.json({ error: 'Library query failed' }, { status: 500 });
+      }
+      return NextResponse.json({ sounds: data ?? [] });
+    }
 
     let query = supabase
       .from('sfx_library')

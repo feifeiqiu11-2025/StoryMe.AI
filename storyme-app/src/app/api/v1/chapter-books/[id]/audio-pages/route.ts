@@ -51,13 +51,45 @@ export async function GET(
 
     const { data: audioRows } = await supabase
       .from('story_audio_pages')
-      .select('page_number, audio_url, audio_url_secondary, audio_duration_seconds, audio_source, content_hash, language')
+      .select('id, page_number, audio_url, audio_url_secondary, audio_duration_seconds, audio_source, content_hash, language, draft_vocal_url, draft_layers, draft_updated_at, committed_at')
       .eq('project_id', projectId)
       .order('page_number', { ascending: true });
 
     const audioByPage = new Map<number, any>();
     for (const row of audioRows ?? []) {
       audioByPage.set(row.page_number, row);
+    }
+
+    // PR 2 — lazy-initialise story_audio_pages rows for pages the user
+    // can already see in the recorder but that haven't had TTS or recording
+    // yet. Without a row, the page has no audio_page_id and the new draft
+    // endpoints would have nothing to update. Insert minimal placeholder
+    // rows for any missing page, then re-fetch so the IDs propagate.
+    const missingPages = currentPages.filter((p) => !audioByPage.has(p.pageNumber));
+    if (missingPages.length > 0) {
+      const inserts = missingPages.map((p) => ({
+        project_id: projectId,
+        page_number: p.pageNumber,
+        page_type: 'chapter_page' as const,
+        generation_status: 'pending' as const,
+        language: 'en',
+        content_hash: hashPageContent(p.plainText),
+      }));
+      const { error: insertError } = await supabase
+        .from('story_audio_pages')
+        .insert(inserts);
+      if (insertError) {
+        // Non-fatal — log and continue with what we have. Save draft will
+        // be disabled for these pages until the next refresh succeeds.
+        console.warn('Failed to lazy-init audio_pages rows:', insertError);
+      } else {
+        const { data: newRows } = await supabase
+          .from('story_audio_pages')
+          .select('id, page_number, audio_url, audio_url_secondary, audio_duration_seconds, audio_source, content_hash, language, draft_vocal_url, draft_layers, draft_updated_at, committed_at')
+          .eq('project_id', projectId)
+          .in('page_number', missingPages.map((p) => p.pageNumber));
+        for (const row of newRows ?? []) audioByPage.set(row.page_number, row);
+      }
     }
 
     const pages = currentPages.map((page) => {
@@ -75,6 +107,14 @@ export async function GET(
         audioUrlSecondary: row?.audio_url_secondary ?? null,
         audioDurationSec: row?.audio_duration_seconds ?? null,
         audioSource: row?.audio_source ?? null,
+        // PR 2 draft + commit metadata. audioPageId is the
+        // story_audio_pages row's UUID; the recorder needs it to call
+        // /save-draft, /shrink-source, and /render directly.
+        audioPageId: row?.id ?? null,
+        draftVocalUrl: row?.draft_vocal_url ?? null,
+        draftLayers: row?.draft_layers ?? null,
+        draftUpdatedAt: row?.draft_updated_at ?? null,
+        committedAt: row?.committed_at ?? null,
       };
     });
 

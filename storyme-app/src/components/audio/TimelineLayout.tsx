@@ -23,20 +23,24 @@ const RULER_HEIGHT = 22;
 interface TrackRowProps {
   /** Small uppercase eyebrow label rendered in the left column. */
   label: string;
-  /** Optional secondary text below the label (e.g. "0:03" or "2 layered"). */
+  /** Optional secondary text below the label (e.g. "0:03"). */
   sublabel?: string;
+  /** Optional native tooltip surfaced when hovering the label area —
+   *  used for hints that would otherwise crowd the column. */
+  tooltip?: string;
   /** Optional action(s) — typically a single small button like "+ Add". */
   action?: ReactNode;
   /** The timeline content (waveform, SFX lane, etc.) for this track. */
   children: ReactNode;
 }
 
-export function TrackRow({ label, sublabel, action, children }: TrackRowProps) {
+export function TrackRow({ label, sublabel, tooltip, action, children }: TrackRowProps) {
   return (
     <div className="flex items-stretch border-b border-gray-100 last:border-b-0 py-3">
       <div
         className="flex flex-col justify-center pr-3"
         style={{ width: TRACK_LABEL_WIDTH, flexShrink: 0 }}
+        title={tooltip}
       >
         <span className="text-[10px] font-bold tracking-wider text-gray-700 uppercase">{label}</span>
         {sublabel && <span className="text-xs text-gray-500 mt-0.5">{sublabel}</span>}

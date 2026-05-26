@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Recorder, { RecordingPage, SaveRecordingArgs } from '@/components/audio/Recorder';
+import type { AudioLayers } from '@/lib/audio/layers.types';
 
 interface AudioPageEntry {
   pageNumber: number;
@@ -19,6 +20,13 @@ interface AudioPageEntry {
   stale: boolean;
   audioUrl: string | null;
   audioSource: 'ai_tts' | 'user_recorded' | 'ai_voice_clone' | null;
+  // PR 2 draft metadata. audioPageId is the story_audio_pages row's UUID
+  // needed to call /save-draft, /shrink-source, and /render.
+  audioPageId: string | null;
+  draftVocalUrl: string | null;
+  draftLayers: AudioLayers | null;
+  draftUpdatedAt: string | null;
+  committedAt: string | null;
 }
 
 interface FetchHookResult {
@@ -240,9 +248,24 @@ export function ChapterBookAudioControls({
         // Map of pageNumber → { audioUrl } for pages that already have a
         // server-saved recording. Drives the "Edit saved audio" affordance.
         const existingPageAudio: Record<number, { audioUrl: string }> = {};
+        // PR 2 — per-page draft + commit metadata.
+        const existingPageDrafts: Record<number, {
+          audioPageId?: string;
+          draftVocalUrl?: string | null;
+          draftLayers?: AudioLayers | null;
+          committedAt?: string | null;
+        }> = {};
         for (const p of pages ?? []) {
           if (p.hasAudio && p.audioUrl) {
             existingPageAudio[p.pageNumber] = { audioUrl: p.audioUrl };
+          }
+          if (p.audioPageId) {
+            existingPageDrafts[p.pageNumber] = {
+              audioPageId: p.audioPageId,
+              draftVocalUrl: p.draftVocalUrl,
+              draftLayers: p.draftLayers,
+              committedAt: p.committedAt,
+            };
           }
         }
         return (
@@ -252,6 +275,7 @@ export function ChapterBookAudioControls({
             initialPageIndex={initialIdx}
             onPageIndexChange={(_idx, page) => onActivePageChange?.(page.pageNumber)}
             existingPageAudio={existingPageAudio}
+            existingPageDrafts={existingPageDrafts}
             onSaveRecording={handleSaveRecording}
             onClose={() => {
               setRecorderOpen(false);
