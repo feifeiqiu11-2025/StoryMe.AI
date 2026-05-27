@@ -43,6 +43,14 @@ const IMAGE_SAFETY_SETTINGS = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
 ];
 
+// Max number of character reference images inlined into a single image-gen
+// request. Gemini Nano Banana 2 supports up to 20 reference images; GPT
+// Image 1 has no explicit cap (token-window bounded). 8 is a conservative
+// quality/cost/latency balance — covers all realistic kid-book scenes
+// (typically 1–3 characters) while leaving headroom for occasional bigger
+// casts. Bump if you ever see large-cast scenes drop the wrong character.
+const MAX_REFERENCE_IMAGES_PER_SCENE = 8;
+
 export interface GeminiCharacterInfo {
   name: string;
   referenceImageUrl: string;
@@ -657,8 +665,11 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const contentParts: any[] = [{ text: fullPrompt }];
 
-  // Add reference images for each character (up to 5 supported by Gemini)
-  for (const char of characters.slice(0, 5)) {
+  // Add reference images for each character. See MAX_REFERENCE_IMAGES_PER_SCENE.
+  if (characters.length > MAX_REFERENCE_IMAGES_PER_SCENE) {
+    console.warn(`[Gemini] Scene has ${characters.length} characters; inlining first ${MAX_REFERENCE_IMAGES_PER_SCENE} reference images. Remaining ${characters.length - MAX_REFERENCE_IMAGES_PER_SCENE} use text description only.`);
+  }
+  for (const char of characters.slice(0, MAX_REFERENCE_IMAGES_PER_SCENE)) {
     // Only fetch if there's a valid reference image URL
     // Skip: empty URLs, URLs that are just the base localhost, or URLs without actual paths
     const url = char.referenceImageUrl?.trim() || '';
@@ -865,8 +876,11 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const contentParts: any[] = [{ text: fullPrompt }];
 
-  // Add reference images for each character
-  for (const char of characters.slice(0, 5)) {
+  // Add reference images for each character. See MAX_REFERENCE_IMAGES_PER_SCENE.
+  if (characters.length > MAX_REFERENCE_IMAGES_PER_SCENE) {
+    console.warn(`[Gemini Classic] Scene has ${characters.length} characters; inlining first ${MAX_REFERENCE_IMAGES_PER_SCENE} reference images. Remaining ${characters.length - MAX_REFERENCE_IMAGES_PER_SCENE} use text description only.`);
+  }
+  for (const char of characters.slice(0, MAX_REFERENCE_IMAGES_PER_SCENE)) {
     // Only fetch if there's a valid reference image URL
     // Skip: empty URLs, URLs that are just the base localhost, or URLs without actual paths
     const url = char.referenceImageUrl?.trim() || '';
@@ -1072,8 +1086,11 @@ FINAL REMINDER: This is a COLORING BOOK page. Output MUST be BLACK LINES ON WHIT
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const contentParts: any[] = [{ text: fullPrompt }];
 
-  // Add reference images for each character
-  for (const char of characters.slice(0, 5)) {
+  // Add reference images for each character. See MAX_REFERENCE_IMAGES_PER_SCENE.
+  if (characters.length > MAX_REFERENCE_IMAGES_PER_SCENE) {
+    console.warn(`[Gemini Coloring] Scene has ${characters.length} characters; inlining first ${MAX_REFERENCE_IMAGES_PER_SCENE} reference images. Remaining ${characters.length - MAX_REFERENCE_IMAGES_PER_SCENE} use text description only.`);
+  }
+  for (const char of characters.slice(0, MAX_REFERENCE_IMAGES_PER_SCENE)) {
     // Only fetch if there's a valid reference image URL
     // Skip: empty URLs, URLs that are just the base localhost, or URLs without actual paths
     const url = char.referenceImageUrl?.trim() || '';
