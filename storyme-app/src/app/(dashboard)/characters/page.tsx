@@ -993,9 +993,21 @@ export default function CharactersPage() {
       // Determine subject type for storage
       // - For "From Image" mode: use detected subjectType (default to 'human' if not detected)
       // - For "From Description" mode: infer from character type
-      const subjectType: SubjectType = characterMode === 'photo'
+      let subjectType: SubjectType = characterMode === 'photo'
         ? (detectedSubjectType || 'human')
         : (formData.characterType && isAnimalType(formData.characterType) ? 'creature' : 'human');
+
+      // Sync rule: the user's "Use as" toggle (role) is authoritative on the
+      // scenery axis. Keep subject_type's granularity within each role.
+      // - role='scene_element'           → force 'scenery'
+      // - role='character' + 'scenery'   → snap to 'creature' (safe default)
+      // Prevents the "Spark mis-classified as scenery → ends up as a scene
+      // location" class of bugs (see scene-enhancer.ts sceneTypeCharacters).
+      if (formData.role === 'scene_element') {
+        subjectType = 'scenery';
+      } else if (formData.role === 'character' && subjectType === 'scenery') {
+        subjectType = 'creature';
+      }
 
       // For non-human subjects, don't save human-specific fields
       const isHuman = subjectType === 'human';

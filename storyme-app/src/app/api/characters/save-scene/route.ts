@@ -71,6 +71,10 @@ export async function POST(request: NextRequest) {
       name,
       ai_description: description,
       subject_type: 'scene',
+      // Keep role in sync with subject_type — this row IS a location backer,
+      // so it must be a scene_element. Without this, sceneTypeCharacters in
+      // scene-enhancer would skip it once that filter starts trusting `role`.
+      role: 'scene_element',
       reference_image_url: referenceImageUrl,
       is_favorite: false,
       usage_count: 0,

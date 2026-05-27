@@ -639,6 +639,10 @@ export default function CharacterFormModal({
         isAnimal: isAnimal, // Flag for image generation
         subjectType: subjectType, // NEW: Store detected/inferred subject type
       },
+      // "+ Add Character" button on the create flow always produces a character,
+      // not a scene element. Pin the role explicitly so the story-bible builder
+      // never treats this as location-eligible even if subjectType drifts.
+      role: 'character',
       isPrimary: false,
       order: 0,
       // Mark as created via modal (will show compact after save)

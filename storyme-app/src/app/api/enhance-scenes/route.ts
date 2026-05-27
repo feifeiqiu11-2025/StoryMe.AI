@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
 
     try {
       if (useStoryBible) {
-        const bible = parseStoryBibleResponse(responseText, scenes);
+        const bible = parseStoryBibleResponse(responseText, scenes, characters as Character[]);
         storyBible = bible;
         // The bible scenes are EnhancedSceneResult + bible-only fields; downstream
         // consumers that read enhancedScenes keep working unchanged.

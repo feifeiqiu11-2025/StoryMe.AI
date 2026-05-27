@@ -24,6 +24,7 @@ import { parseScriptIntoScenes } from '@/lib/scene-parser';
 import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import { getGuestStory, clearGuestStory } from '@/lib/utils/guest-story-storage';
+import { thumbnailUrl } from '@/lib/utils/image-transform';
 import EditImageControl from '@/components/story/EditImageControl';
 import { WritingCoachContent } from '@/components/story/WritingCoachModal';
 import { buildCoverPrompt } from '@/lib/ai/cover-prompt-builder';
@@ -110,6 +111,16 @@ function CreateStoryPageInner() {
   const [definingNewCharacterName, setDefiningNewCharacterName] = useState<string | null>(null);
   const [libraryCharacters, setLibraryCharacters] = useState<Character[]>([]);
   const [communityCharacters, setCommunityCharacters] = useState<Character[]>([]);
+  // Pagination + lazy-load flags for the Import-from-Library modal.
+  // `loaded` lets us cache results across modal close→reopen; `hasMore` drives
+  // the Load-more button. Tabs are fetched on demand: Mine when the modal
+  // opens, Community only when the user clicks that tab.
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryLoaded, setLibraryLoaded] = useState(false);
+  const [libraryHasMore, setLibraryHasMore] = useState(false);
+  const [communityLoading, setCommunityLoading] = useState(false);
+  const [communityLoaded, setCommunityLoaded] = useState(false);
+  const [communityHasMore, setCommunityHasMore] = useState(false);
   const [importTab, setImportTab] = useState<'mine' | 'community'>('mine');
   // Search filter for the import-from-library modal. Reused by both the
   // top-level "Import from Library" button and the per-scene "+ Add to
@@ -252,6 +263,23 @@ function CreateStoryPageInner() {
     }
   }, [user]);
 
+  // Lazy-fetch character lists for the Import-from-Library modal.
+  // - Mine: fetched the first time the modal opens (Mine is the default tab).
+  // - Community: fetched the first time the user clicks the Community tab.
+  // Cached across modal close→reopen via the `loaded` flags; refreshed
+  // explicitly by handleSaveToLibrary after a new char is added.
+  useEffect(() => {
+    if (!showImportModal || !user?.id) return;
+    if (importTab === 'mine' && !libraryLoaded && !libraryLoading) {
+      loadLibraryCharacters(user.id, 0);
+    } else if (importTab === 'community' && !communityLoaded && !communityLoading) {
+      loadCommunityCharacters(0);
+    }
+    // loadLibraryCharacters/loadCommunityCharacters are stable references in
+    // this component; intentionally omitted from deps to avoid re-running.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showImportModal, importTab, user?.id, libraryLoaded, communityLoaded]);
+
   // Resume from draft via ?projectId= URL parameter
   useEffect(() => {
     const resumeProjectId = searchParams.get('projectId');
@@ -371,85 +399,90 @@ function CreateStoryPageInner() {
     setCharacters(newCharacters);
   };
 
-  const loadLibraryCharacters = async (userId: string) => {
+  // Page size for the Import-from-Library modal. Matches the chunk size used
+  // by CharacterPickerModal so behavior is consistent across pickers.
+  const IMPORT_PAGE_SIZE = 24;
+
+  // Columns the modal actually needs. Avoids the previous `select('*')` which
+  // pulled `character_embedding`, `reference_images[]` (with per-pose embeddings),
+  // `ai_description`, etc. — heavy payloads that the picker grid doesn't use.
+  const IMPORT_SELECT_COLUMNS =
+    'id, name, reference_image_url, reference_image_filename, animated_preview_url, hair_color, skin_tone, clothing, age, other_features, subject_type, role';
+
+  const mapLibraryRow = (char: any, isPublic = false): Character => ({
+    id: char.id,
+    name: char.name,
+    referenceImage: {
+      url: char.reference_image_url || '',
+      fileName: char.reference_image_filename || '',
+    },
+    animatedPreviewUrl: char.animated_preview_url || undefined,
+    description: {
+      hairColor: char.hair_color,
+      skinTone: char.skin_tone,
+      clothing: char.clothing,
+      age: char.age,
+      otherFeatures: char.other_features,
+      // subject_type plumbing: 'scenery'/'scene' marks a location-capable character.
+      // Without this the bible can't link Rainbow House (a scene-type char) as a location backer.
+      subjectType: char.subject_type || undefined,
+    },
+    // User-set "Use as" toggle. Authoritative over subjectType for scene-eligibility
+    // in the story-bible builder — see scene-enhancer.ts sceneTypeCharacters filter.
+    role: (char.role as 'character' | 'scene_element' | undefined) ?? undefined,
+    isPrimary: false,
+    order: 0,
+    isFromLibrary: true,
+    ...(isPublic ? { isPublic: true } : {}),
+  });
+
+  const loadLibraryCharacters = async (userId: string, offset = 0) => {
+    setLibraryLoading(true);
     try {
       const supabase = createClient();
       const { data, error } = await supabase
         .from('character_library')
-        .select('*')
+        .select(IMPORT_SELECT_COLUMNS)
         .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(offset, offset + IMPORT_PAGE_SIZE - 1);
 
       if (error) throw error;
 
-      // Transform database records to Character type
-      const transformedCharacters: Character[] = (data || []).map((char: any) => ({
-        id: char.id,
-        name: char.name,
-        referenceImage: {
-          url: char.reference_image_url || '',
-          fileName: char.reference_image_filename || '',
-        },
-        animatedPreviewUrl: char.animated_preview_url || undefined,
-        description: {
-          hairColor: char.hair_color,
-          skinTone: char.skin_tone,
-          clothing: char.clothing,
-          age: char.age,
-          otherFeatures: char.other_features,
-          // subject_type plumbing: 'scenery'/'scene' marks a location-capable character.
-          // Without this the bible can't link Rainbow House (a scene-type char) as a location backer.
-          subjectType: char.subject_type || undefined,
-        },
-        isPrimary: false,
-        order: 0,
-        isFromLibrary: true,
-      }));
-
-      setLibraryCharacters(transformedCharacters);
+      const page = (data || []).map((char: any) => mapLibraryRow(char));
+      setLibraryCharacters(prev => (offset === 0 ? page : [...prev, ...page]));
+      setLibraryHasMore(page.length === IMPORT_PAGE_SIZE);
+      setLibraryLoaded(true);
     } catch (error) {
       console.error('Error loading library characters:', error);
-      setLibraryCharacters([]);
+      if (offset === 0) setLibraryCharacters([]);
+    } finally {
+      setLibraryLoading(false);
     }
   };
 
-  const loadCommunityCharacters = async (userId: string) => {
+  const loadCommunityCharacters = async (offset = 0) => {
+    setCommunityLoading(true);
     try {
       const supabase = createClient();
       const { data, error } = await supabase
         .from('character_library')
-        .select('*')
+        .select(IMPORT_SELECT_COLUMNS)
         .eq('is_public', true)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(offset, offset + IMPORT_PAGE_SIZE - 1);
 
       if (error) throw error;
 
-      const transformedCharacters: Character[] = (data || []).map((char: any) => ({
-        id: char.id,
-        name: char.name,
-        referenceImage: {
-          url: char.reference_image_url || '',
-          fileName: char.reference_image_filename || '',
-        },
-        animatedPreviewUrl: char.animated_preview_url || undefined,
-        description: {
-          hairColor: char.hair_color,
-          skinTone: char.skin_tone,
-          clothing: char.clothing,
-          age: char.age,
-          otherFeatures: char.other_features,
-          subjectType: char.subject_type || undefined,
-        },
-        isPrimary: false,
-        order: 0,
-        isFromLibrary: true,
-        isPublic: true,
-      }));
-
-      setCommunityCharacters(transformedCharacters);
+      const page = (data || []).map((char: any) => mapLibraryRow(char, true));
+      setCommunityCharacters(prev => (offset === 0 ? page : [...prev, ...page]));
+      setCommunityHasMore(page.length === IMPORT_PAGE_SIZE);
+      setCommunityLoaded(true);
     } catch (error) {
       console.error('Error loading community characters:', error);
-      setCommunityCharacters([]);
+      if (offset === 0) setCommunityCharacters([]);
+    } finally {
+      setCommunityLoading(false);
     }
   };
 
@@ -543,9 +576,9 @@ function CreateStoryPageInner() {
 
       alert(`${character.name} saved to library!`);
 
-      // Reload library characters if modal is open
+      // Reload library characters if modal is open (fresh page 1).
       if (showImportModal) {
-        await loadLibraryCharacters(user.id);
+        await loadLibraryCharacters(user.id, 0);
       }
     } catch (error) {
       console.error('Error saving character to library:', error);
@@ -617,6 +650,9 @@ function CreateStoryPageInner() {
             ].filter(Boolean).join(', '),
             // Signal scene-type characters so the bible can link locations to them (Dragonfly Land etc.)
             subjectType: c.description.subjectType,
+            // Authoritative "Use as" toggle — overrides subjectType when deciding
+            // whether the bible may use this character as a location.
+            role: c.role,
           }))
         })
       });
@@ -2006,13 +2042,12 @@ function CreateStoryPageInner() {
           <div className="flex justify-end gap-2">
             <div className="flex gap-2">
               <button
-                onClick={async () => {
-                  if (user?.id) {
-                    await loadLibraryCharacters(user.id);
-                    await loadCommunityCharacters(user.id);
-                    setImportTab('mine');
-                    setShowImportModal(true);
-                  }
+                onClick={() => {
+                  // Open the modal instantly; the useEffect above will fetch
+                  // the Mine tab in the background and render skeletons until
+                  // the first page lands.
+                  setImportTab('mine');
+                  setShowImportModal(true);
                 }}
                 className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-medium text-sm shadow transition-all flex items-center gap-2"
               >
@@ -2089,25 +2124,49 @@ function CreateStoryPageInner() {
               </div>
 
               {(() => {
-                const sourceList = importTab === 'mine' ? libraryCharacters : communityCharacters;
+                const isMine = importTab === 'mine';
+                const sourceList = isMine ? libraryCharacters : communityCharacters;
+                const loading = isMine ? libraryLoading : communityLoading;
+                const loaded = isMine ? libraryLoaded : communityLoaded;
+                const hasMore = isMine ? libraryHasMore : communityHasMore;
                 const q = importSearch.trim().toLowerCase();
                 const displayChars = q
                   ? sourceList.filter((c) => c.name.toLowerCase().includes(q))
                   : sourceList;
 
+                // First-page skeleton: tab opened but no data yet.
+                if (!loaded && loading && sourceList.length === 0) {
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="bg-white border-2 border-gray-200 rounded-xl overflow-hidden"
+                        >
+                          <div className="h-40 bg-gray-200 animate-pulse" />
+                          <div className="p-2">
+                            <div className="h-4 bg-gray-200 animate-pulse rounded mb-2" />
+                            <div className="h-7 bg-gray-200 animate-pulse rounded" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
+
                 if (displayChars.length === 0) {
                   const isFilteredEmpty = q.length > 0 && sourceList.length > 0;
                   return (
                     <div className="text-center py-12">
-                      <div className="text-6xl mb-4">{isFilteredEmpty ? '🔍' : (importTab === 'mine' ? '👦👧' : '🌍')}</div>
+                      <div className="text-6xl mb-4">{isFilteredEmpty ? '🔍' : (isMine ? '👦👧' : '🌍')}</div>
                       <p className="text-gray-600 mb-4">
                         {isFilteredEmpty
                           ? `No characters match "${importSearch}".`
-                          : importTab === 'mine'
+                          : isMine
                             ? 'No characters in your library yet!'
                             : 'No community characters available yet.'}
                       </p>
-                      {!isFilteredEmpty && importTab === 'mine' && (
+                      {!isFilteredEmpty && isMine && (
                         <Link
                           href="/characters"
                           className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold shadow-lg transition-all"
@@ -2120,65 +2179,91 @@ function CreateStoryPageInner() {
                 }
 
                 return (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {displayChars.map((character) => (
-                      <div
-                        key={character.id}
-                        className="bg-white border-2 border-gray-200 rounded-xl overflow-hidden hover:border-blue-400 transition-all"
-                      >
-                        {character.animatedPreviewUrl || character.referenceImage.url ? (
-                          <div className="h-40 bg-gradient-to-br from-blue-100 to-purple-100 relative">
-                            <img
-                              src={character.animatedPreviewUrl || character.referenceImage.url}
-                              alt={character.name}
-                              className="w-full h-full object-cover"
-                            />
-                            {importTab === 'community' && (
-                              <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
-                                Community
-                              </div>
-                            )}
-                            {importTab === 'mine' && character.animatedPreviewUrl && (
-                              <div className="absolute top-2 left-2 bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full">
-                                Preview
-                              </div>
-                            )}
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {displayChars.map((character) => {
+                        const rawImg = character.animatedPreviewUrl || character.referenceImage.url;
+                        const thumb = thumbnailUrl(rawImg, 320) || rawImg;
+                        return (
+                        <div
+                          key={character.id}
+                          className="bg-white border-2 border-gray-200 rounded-xl overflow-hidden hover:border-blue-400 transition-all"
+                        >
+                          {rawImg ? (
+                            <div className="h-40 bg-gradient-to-br from-blue-100 to-purple-100 relative">
+                              <img
+                                src={thumb}
+                                alt={character.name}
+                                loading="lazy"
+                                decoding="async"
+                                className="w-full h-full object-cover"
+                              />
+                              {!isMine && (
+                                <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                  Community
+                                </div>
+                              )}
+                              {isMine && character.animatedPreviewUrl && (
+                                <div className="absolute top-2 left-2 bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                  Preview
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="h-40 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center relative">
+                              <div className="text-4xl">👤</div>
+                              {!isMine && (
+                                <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                  Community
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <div className="p-2">
+                            <h3 className="font-bold text-gray-900 text-sm mb-2 truncate">{character.name}</h3>
+                            {(() => {
+                              const alreadyInStory = characters.some(c => c.id === character.id);
+                              // When opened from a scene-chip "+Add", already-in-story characters remain
+                              // clickable (the handler routes them into the target scene). Otherwise keep
+                              // the original disabled-"Added" behavior.
+                              const disabled = alreadyInStory && addCharToSceneNumber === null;
+                              const label = addCharToSceneNumber !== null
+                                ? (alreadyInStory ? 'Add to scene' : 'Import & add to scene')
+                                : (alreadyInStory ? 'Added' : 'Import');
+                              return (
+                                <button
+                                  onClick={() => handleImportCharacter(character)}
+                                  disabled={disabled}
+                                  className="w-full bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium text-xs disabled:bg-gray-300 disabled:cursor-not-allowed transition-all"
+                                >
+                                  {label}
+                                </button>
+                              );
+                            })()}
                           </div>
-                        ) : (
-                          <div className="h-40 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center relative">
-                            <div className="text-4xl">👤</div>
-                            {importTab === 'community' && (
-                              <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
-                                Community
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <div className="p-2">
-                          <h3 className="font-bold text-gray-900 text-sm mb-2 truncate">{character.name}</h3>
-                          {(() => {
-                            const alreadyInStory = characters.some(c => c.id === character.id);
-                            // When opened from a scene-chip "+Add", already-in-story characters remain
-                            // clickable (the handler routes them into the target scene). Otherwise keep
-                            // the original disabled-"Added" behavior.
-                            const disabled = alreadyInStory && addCharToSceneNumber === null;
-                            const label = addCharToSceneNumber !== null
-                              ? (alreadyInStory ? 'Add to scene' : 'Import & add to scene')
-                              : (alreadyInStory ? 'Added' : 'Import');
-                            return (
-                              <button
-                                onClick={() => handleImportCharacter(character)}
-                                disabled={disabled}
-                                className="w-full bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium text-xs disabled:bg-gray-300 disabled:cursor-not-allowed transition-all"
-                              >
-                                {label}
-                              </button>
-                            );
-                          })()}
                         </div>
+                        );
+                      })}
+                    </div>
+                    {hasMore && (
+                      <div className="mt-4 flex justify-center">
+                        <button
+                          onClick={() => {
+                            if (loading) return;
+                            if (isMine) {
+                              if (user?.id) loadLibraryCharacters(user.id, libraryCharacters.length);
+                            } else {
+                              loadCommunityCharacters(communityCharacters.length);
+                            }
+                          }}
+                          disabled={loading}
+                          className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-50 rounded-lg transition-all"
+                        >
+                          {loading ? 'Loading…' : 'Load more'}
+                        </button>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 );
               })()}
             </div>

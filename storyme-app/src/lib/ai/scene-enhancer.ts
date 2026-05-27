@@ -22,6 +22,7 @@ export interface Character {
   // Optional fields used by the story-bible pipeline; ignored by the legacy enhancer.
   id?: string;                 // character_library UUID (needed to resolve names → IDs after bible pass)
   subjectType?: string;        // 'human' | 'animal' | 'animated_object' | 'scene' | 'scenery' — signals location candidates
+  role?: 'character' | 'scene_element'; // User's explicit "Use as" toggle; authoritative over subjectType for scene-eligibility
 }
 
 export interface EnhancedSceneResult {
@@ -547,9 +548,18 @@ export function buildStoryBiblePrompt(
     })
     .join('\n');
 
-  const sceneTypeCharacters = characters.filter(c =>
-    c.subjectType === 'scene' || c.subjectType === 'scenery'
-  );
+  // Scene-eligibility: the explicit "Use as" toggle (`role`) is authoritative.
+  // - role='character'     → never a location, even if subjectType drifted to 'scenery'
+  // - role='scene_element' → always a location
+  // - role unset (legacy)  → fall back to the subjectType heuristic
+  // Fixes a class of bugs where a regular character (e.g. Spark the dragon)
+  // ends up as a scene's location because Gemini mis-classified its image as
+  // scenery during analyze-character.
+  const sceneTypeCharacters = characters.filter(c => {
+    if (c.role === 'character') return false;
+    if (c.role === 'scene_element') return true;
+    return c.subjectType === 'scene' || c.subjectType === 'scenery';
+  });
   const sceneCharNote = sceneTypeCharacters.length > 0
     ? `\nSCENE-TYPE CHARACTERS (eligible to back a location):
 ${sceneTypeCharacters.map(c => `- ${c.name}`).join('\n')}
@@ -757,7 +767,8 @@ export function parseRefreshPromptsResponse(response: string): RefreshedScene[] 
 
 export function parseStoryBibleResponse(
   response: string,
-  originalScenes: SceneToEnhance[]
+  originalScenes: SceneToEnhance[],
+  characters?: Character[]
 ): StoryBibleResult {
   // Extract JSON object (tolerate surrounding prose or markdown fences)
   const objMatch = response.match(/\{[\s\S]*\}/);
@@ -776,8 +787,33 @@ export function parseStoryBibleResponse(
     throw new Error('Story bible response contains no scenes');
   }
 
+  // Defense against model hallucinating a character name as a location.
+  // Names of non-scene-element characters are NEVER valid location names. If
+  // the model returned one (e.g. "Spark" as Scene 2's setting), drop it; the
+  // scene's location_temp_id will fall through to null and the user can pick
+  // a real location in the UI. scene_element rows are allowed through —
+  // those legitimately back locations (Rainbow House, etc.).
+  const nonLocationNames = new Set<string>();
+  for (const c of characters || []) {
+    const isExplicitSceneElement = c.role === 'scene_element';
+    const isLegacySceneType = !c.role && (c.subjectType === 'scene' || c.subjectType === 'scenery');
+    if (!isExplicitSceneElement && !isLegacySceneType) {
+      nonLocationNames.add(c.name.toLowerCase());
+    }
+  }
+
   const locations: BibleLocation[] = rawLocations
     .filter((loc: any) => loc && typeof loc.temp_id === 'string' && typeof loc.name === 'string' && typeof loc.description === 'string')
+    .filter((loc: any) => {
+      if (nonLocationNames.size === 0) return true;
+      const locName = String(loc.name).toLowerCase();
+      const backingName = String(loc.backing_character_name ?? '').toLowerCase();
+      if (nonLocationNames.has(locName) || nonLocationNames.has(backingName)) {
+        console.warn(`[parseStoryBibleResponse] Dropping hallucinated location "${loc.name}" — matches a character name`);
+        return false;
+      }
+      return true;
+    })
     .map((loc: any, idx: number) => ({
       temp_id: String(loc.temp_id),
       name: String(loc.name),
