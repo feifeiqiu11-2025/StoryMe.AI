@@ -253,14 +253,17 @@ export async function POST(request: NextRequest) {
     const characterPrompts: CharacterPromptInfo[] = characters.map((char: Character) => {
       let referenceUrl: string | undefined = undefined;
 
+      // Pass through absolute URLs (http/https) and inline data: URLs unchanged;
+      // only prepend baseUrl to actual relative paths. See generate-images/route.ts.
+      const isAbsolute = (u: string) => u.startsWith('http') || u.startsWith('data:');
       if (char.animatedPreviewUrl && char.animatedPreviewUrl.trim()) {
         // Animated preview exists - use it (best for consistency)
-        referenceUrl = char.animatedPreviewUrl.startsWith('http')
+        referenceUrl = isAbsolute(char.animatedPreviewUrl)
           ? char.animatedPreviewUrl
           : `${baseUrl}${char.animatedPreviewUrl}`;
       } else if (char.referenceImage?.url && char.referenceImage.url.trim()) {
         // Fallback to original reference photo
-        referenceUrl = char.referenceImage.url.startsWith('http')
+        referenceUrl = isAbsolute(char.referenceImage.url)
           ? char.referenceImage.url
           : `${baseUrl}${char.referenceImage.url}`;
       }

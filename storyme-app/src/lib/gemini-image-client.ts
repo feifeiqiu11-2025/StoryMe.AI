@@ -664,8 +664,8 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
     const url = char.referenceImageUrl?.trim() || '';
     const isValidImageUrl = url &&
       !url.match(/^https?:\/\/localhost(:\d+)?\/?$/) && // Skip bare localhost URLs
-      url.includes('/') && // Must have a path
-      url.split('/').pop()?.includes('.'); // Path must have a file extension
+      (url.startsWith('data:image/') ||                  // Accept inline data URLs (Node fetch handles these)
+        (url.includes('/') && url.split('/').pop()?.includes('.'))); // …or a normal path with an extension
 
     if (isValidImageUrl) {
       try {
@@ -872,8 +872,8 @@ ${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? '- Humans a
     const url = char.referenceImageUrl?.trim() || '';
     const isValidImageUrl = url &&
       !url.match(/^https?:\/\/localhost(:\d+)?\/?$/) && // Skip bare localhost URLs
-      url.includes('/') && // Must have a path
-      url.split('/').pop()?.includes('.'); // Path must have a file extension
+      (url.startsWith('data:image/') ||                  // Accept inline data URLs (Node fetch handles these)
+        (url.includes('/') && url.split('/').pop()?.includes('.'))); // …or a normal path with an extension
 
     if (isValidImageUrl) {
       try {
@@ -1079,8 +1079,8 @@ FINAL REMINDER: This is a COLORING BOOK page. Output MUST be BLACK LINES ON WHIT
     const url = char.referenceImageUrl?.trim() || '';
     const isValidImageUrl = url &&
       !url.match(/^https?:\/\/localhost(:\d+)?\/?$/) && // Skip bare localhost URLs
-      url.includes('/') && // Must have a path
-      url.split('/').pop()?.includes('.'); // Path must have a file extension
+      (url.startsWith('data:image/') ||                  // Accept inline data URLs (Node fetch handles these)
+        (url.includes('/') && url.split('/').pop()?.includes('.'))); // …or a normal path with an extension
 
     if (isValidImageUrl) {
       try {

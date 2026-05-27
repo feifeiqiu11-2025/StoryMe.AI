@@ -200,15 +200,20 @@ export async function POST(request: NextRequest) {
       // Animated preview is preferred because it's already in the target illustration style
       let referenceUrl: string | undefined = undefined;
 
+      // Absolute URLs (http/https) and inline data: URLs are passed through as-is.
+      // Anything else is treated as a relative path and prefixed with baseUrl.
+      // Without the data: guard a base64 preview becomes "https://prod/data:image/..."
+      // which the downstream validator rejects → character has no visual anchor.
+      const isAbsolute = (u: string) => u.startsWith('http') || u.startsWith('data:');
       if (char.animatedPreviewUrl && char.animatedPreviewUrl.trim()) {
         // Animated preview exists - use it (best for consistency)
-        referenceUrl = char.animatedPreviewUrl.startsWith('http')
+        referenceUrl = isAbsolute(char.animatedPreviewUrl)
           ? char.animatedPreviewUrl
           : `${baseUrl}${char.animatedPreviewUrl}`;
         console.log(`[Character] ${char.name}: Using animated preview for reference`);
       } else if (char.referenceImage?.url && char.referenceImage.url.trim()) {
         // Fallback to original reference photo
-        referenceUrl = char.referenceImage.url.startsWith('http')
+        referenceUrl = isAbsolute(char.referenceImage.url)
           ? char.referenceImage.url
           : `${baseUrl}${char.referenceImage.url}`;
         console.log(`[Character] ${char.name}: Using reference photo (no animated preview)`);
