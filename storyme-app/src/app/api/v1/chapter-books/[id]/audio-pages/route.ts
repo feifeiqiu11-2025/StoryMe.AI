@@ -71,6 +71,12 @@ export async function GET(
         project_id: projectId,
         page_number: p.pageNumber,
         page_type: 'chapter_page' as const,
+        // text_content is NOT NULL in story_audio_pages — every other
+        // insert path (generate-page-audio, upload-user-audio) passes it.
+        // Omitting it here causes the insert to silently fail and leaves
+        // the row's audio_page_id null, which then breaks Save draft and
+        // any destructive op that needs a server-side row id.
+        text_content: p.plainText,
         generation_status: 'pending' as const,
         language: 'en',
         content_hash: hashPageContent(p.plainText),
@@ -81,7 +87,8 @@ export async function GET(
       if (insertError) {
         // Non-fatal — log and continue with what we have. Save draft will
         // be disabled for these pages until the next refresh succeeds.
-        console.warn('Failed to lazy-init audio_pages rows:', insertError);
+        // Surface the full error so schema mismatches don't fail silently.
+        console.warn('Failed to lazy-init audio_pages rows:', JSON.stringify(insertError));
       } else {
         const { data: newRows } = await supabase
           .from('story_audio_pages')

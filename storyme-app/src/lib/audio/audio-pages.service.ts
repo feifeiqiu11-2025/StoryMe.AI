@@ -117,6 +117,11 @@ export async function loadAudioPagesForProject(
     project_id: projectId,
     page_number: p.pageNumber,
     page_type: p.pageType,
+    // text_content is NOT NULL in story_audio_pages — every other insert
+    // path (generate-page-audio, upload-user-audio) passes it. Omitting
+    // it here causes the insert to silently fail, leaving the row's
+    // audio_page_id null and breaking Save draft / destructive delete.
+    text_content: p.text,
     generation_status: 'pending' as const,
     language: 'en',
     content_hash: p.contentHash,
@@ -128,8 +133,9 @@ export async function loadAudioPagesForProject(
     // Non-fatal: callers get back whatever rows already existed. Save
     // draft and destructive delete remain disabled for the missing
     // pages until the next refresh succeeds, but rendering existing
-    // rows continues to work.
-    console.warn('loadAudioPagesForProject: lazy-init insert failed:', insertError);
+    // rows continues to work. Stringify so the constraint name + detail
+    // are visible in server logs.
+    console.warn('loadAudioPagesForProject: lazy-init insert failed:', JSON.stringify(insertError));
     return { rowsByPage, didInsert };
   }
   didInsert = true;

@@ -24,7 +24,12 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClientFromRequest } from '@/lib/supabase/server';
 import { importFreesoundSound } from '@/lib/sfx/import-from-freesound';
 
-export const maxDuration = 30;
+// 60s ceiling: music tracks up to 180s can be 5-10MB, and Freesound's
+// CDN + Supabase upload can each take 15-20s. 30s was too tight and
+// caused intermittent timeouts on longer music imports (Vercel returns
+// an HTML error page which the client couldn't JSON.parse).
+// Vercel Hobby supports up to 60s; Pro goes higher if we need it.
+export const maxDuration = 60;
 
 const BodySchema = z.object({
   freesoundId: z.number().int().positive(),

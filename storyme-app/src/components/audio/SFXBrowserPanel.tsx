@@ -48,6 +48,11 @@ interface SFXBrowserPanelProps {
 
 const LIBRARY_PAGE_SIZE = 30;
 const FREESOUND_PAGE_SIZE = 24;
+// On empty-query Music tab open: if the library returns fewer than
+// this many tracks, auto-fetch default Freesound music so new users
+// have something to browse. Above this, library is the home view and
+// we skip the Freesound roundtrip (faster, no API quota).
+const LIBRARY_HOME_THRESHOLD = 10;
 
 export default function SFXBrowserPanel({ onPick, onClose }: SFXBrowserPanelProps) {
   const [topTab, setTopTab] = useState<TopTab>('sfx');
@@ -70,7 +75,7 @@ export default function SFXBrowserPanel({ onPick, onClose }: SFXBrowserPanelProp
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const fetchLibraryPage = useCallback(
-    async (offset: number, tab: TopTab, q: string, replace: boolean) => {
+    async (offset: number, tab: TopTab, q: string, replace: boolean): Promise<SfxLibraryItem[]> => {
       setLibraryLoading(true);
       try {
         const url = new URL('/api/v1/sfx-library', window.location.origin);
@@ -88,8 +93,10 @@ export default function SFXBrowserPanel({ onPick, onClose }: SFXBrowserPanelProp
         setLibraryItems((prev) => (replace ? incoming : [...prev, ...incoming]));
         setLibraryHasMore(!!data.hasMore);
         setLibraryOffset(offset + incoming.length);
+        return incoming;
       } catch (err: any) {
         setError(err.message || 'Library query failed');
+        return [];
       } finally {
         setLibraryLoading(false);
       }
@@ -135,8 +142,18 @@ export default function SFXBrowserPanel({ onPick, onClose }: SFXBrowserPanelProp
   // prevents the double-fetch flicker that happened when both effects
   // fired on initial mount. Debounced 350ms on keystroke; immediate
   // when query is empty (tab open or query cleared).
+  //
+  // Freesound fetch policy:
+  //   - Search mode (user typed ≥2 chars): always fetch Freesound for
+  //     discovery, alongside library results.
+  //   - Empty query + library has plenty (≥ LIBRARY_HOME_THRESHOLD):
+  //     skip Freesound — library is the home view.
+  //   - Empty query + sparse library (< threshold): fetch default
+  //     Freesound results so new users see something. This is the
+  //     "first-run discovery" path; once the library grows, it tapers
+  //     off naturally.
   useEffect(() => {
-    const t = setTimeout(() => {
+    const t = setTimeout(async () => {
       setError(null);
       setLibraryItems([]);
       setLibraryOffset(0);
@@ -144,20 +161,22 @@ export default function SFXBrowserPanel({ onPick, onClose }: SFXBrowserPanelProp
       setFreesoundItems([]);
       setFreesoundPage(1);
 
-      void fetchLibraryPage(0, topTab, query, true);
+      // Always fetch library first so we know the count before deciding
+      // whether to auto-fetch Freesound.
+      const libraryResults = await fetchLibraryPage(0, topTab, query, true);
 
       if (query.trim().length >= 2) {
         setFreesoundExhausted(false);
         void fetchFreesoundPage(1, topTab, query, true);
-      } else if (topTab === 'music') {
-        // Music tab with no query → show popular CC0 instrumental music
-        // by default. The library is mostly empty until the user curates,
-        // so this gives them something to scrub through immediately.
+      } else if (topTab === 'music' && libraryResults.length < LIBRARY_HOME_THRESHOLD) {
+        // Sparse music library → auto-fetch default Freesound popular
+        // music so the panel isn't empty for new users.
         setFreesoundExhausted(false);
         void fetchFreesoundPage(1, topTab, 'instrumental', true);
       } else {
-        // Sounds tab with no query → library only (Freesound stays
-        // un-queried to save API quota when the user is just browsing).
+        // Either Sounds tab with no query, or Music tab with a
+        // well-stocked library. Don't auto-fetch Freesound — saves
+        // API quota and lets imports be the home view.
         setFreesoundExhausted(true);
       }
     }, query ? 350 : 0);
@@ -236,9 +255,25 @@ export default function SFXBrowserPanel({ onPick, onClose }: SFXBrowserPanelProp
             kind: topTab,
           }),
         });
-        const data = await res.json();
+        // Handle non-JSON responses gracefully. Vercel returns an HTML
+        // error page (starting with "An error occurred...") on function
+        // timeout or crash; raw `.json()` throws an unhelpful
+        // SyntaxError that surfaces as cryptic alert text.
+        const contentType = res.headers.get('content-type') ?? '';
+        let data: any = {};
+        if (contentType.includes('application/json')) {
+          data = await res.json().catch(() => ({}));
+        }
         if (!res.ok) {
-          alert(`Import failed: ${data.error || res.status}`);
+          const msg = data.error
+            || (res.status === 504 || res.status === 503
+                ? 'Import timed out — Freesound or our storage took too long. Try a shorter track, or try again.'
+                : `Server returned ${res.status}`);
+          alert(`Import failed: ${msg}`);
+          return;
+        }
+        if (!data.sound) {
+          alert('Import succeeded but the server returned no sound data. Try again.');
           return;
         }
         onPick({ ...data.sound, kind: topTab }, topTab);
