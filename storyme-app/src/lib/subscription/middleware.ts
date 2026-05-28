@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { isAdminEmail } from '@/lib/auth/isAdmin';
 
 export interface SubscriptionStatus {
@@ -72,8 +73,11 @@ export async function checkStoryCreationLimit(userId: string): Promise<Subscript
     if (daysSinceBillingStart >= 30 && stories_created_this_month > 0) {
       console.log(`Auto-resetting story count for user ${userId} - billing cycle passed (${daysSinceBillingStart} days)`);
 
-      // Reset the count in database
-      await supabase
+      // stories_created_this_month and billing_cycle_start are blocked by
+      // the RLS guard for the authenticated role. Use service-role for
+      // this auto-reset write.
+      const supabaseAdmin = createServiceRoleClient();
+      await supabaseAdmin
         .from('users')
         .update({
           stories_created_this_month: 0,

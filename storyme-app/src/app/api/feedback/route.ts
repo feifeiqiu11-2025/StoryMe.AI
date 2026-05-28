@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,8 +79,11 @@ export async function POST(request: NextRequest) {
       console.error('Error fetching user data:', userFetchError);
       // Feedback was saved, but bonus failed - not critical
     } else if (!userData.feedback_bonus_awarded) {
-      // Award bonus only once
-      const { error: updateError } = await supabase
+      // images_limit / has_given_feedback / feedback_bonus_awarded are
+      // privileged columns blocked by the RLS guard for the authenticated
+      // role. Use service-role to apply the bonus.
+      const supabaseAdmin = createServiceRoleClient();
+      const { error: updateError } = await supabaseAdmin
         .from('users')
         .update({
           images_limit: (userData.images_limit || 50) + FEEDBACK_BONUS,

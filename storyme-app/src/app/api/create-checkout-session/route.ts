@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { stripe, getPriceId } from '@/lib/stripe/config';
 
 export async function POST(request: NextRequest) {
@@ -70,8 +71,11 @@ export async function POST(request: NextRequest) {
 
       customerId = customer.id;
 
-      // Save customer ID to database
-      await supabase
+      // stripe_customer_id is a privileged column (identity-bridging) and
+      // is blocked by the RLS guard for the authenticated role. Use the
+      // service-role client to persist Stripe's customer id.
+      const supabaseAdmin = createServiceRoleClient();
+      await supabaseAdmin
         .from('users')
         .update({ stripe_customer_id: customerId })
         .eq('id', user.id);
