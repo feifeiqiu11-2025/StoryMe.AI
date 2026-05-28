@@ -35,8 +35,15 @@ interface PreparedInput {
 async function downloadToTemp(url: string, suffix: string): Promise<string> {
   const tempId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const path = join(tmpdir(), `mix-${tempId}-${suffix}.mp3`);
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to fetch ${url}: HTTP ${res.status}`);
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch (err: any) {
+    // undici's bare "fetch failed" loses the URL context — surface it so
+    // the render endpoint's error message points at the culprit layer.
+    throw new Error(`Fetch failed for ${suffix} (${url}): ${err.message || err}`);
+  }
+  if (!res.ok) throw new Error(`Failed to fetch ${suffix} (${url}): HTTP ${res.status}`);
   const buffer = Buffer.from(await res.arrayBuffer());
   await writeFile(path, buffer);
   return path;

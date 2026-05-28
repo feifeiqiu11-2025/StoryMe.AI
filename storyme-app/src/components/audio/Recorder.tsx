@@ -138,16 +138,22 @@ export default function Recorder({
   onClose,
   onAllSaved,
 }: RecorderProps) {
-  const [currentPageIndex, setCurrentPageIndexRaw] = useState(initialPageIndex);
-  const setCurrentPageIndex = (next: number | ((prev: number) => number)) => {
-    setCurrentPageIndexRaw((prev) => {
-      const resolved = typeof next === 'function' ? next(prev) : next;
-      if (resolved !== prev && pages[resolved]) {
-        onPageIndexChange?.(resolved, pages[resolved]);
-      }
-      return resolved;
-    });
-  };
+  const [currentPageIndex, setCurrentPageIndex] = useState(initialPageIndex);
+  // Notify the host when the active page changes. Lives in a useEffect
+  // instead of inside the state updater because some hosts bind the
+  // callback directly to a useState setter (picture book does this with
+  // setCurrentSceneIndex). Calling a parent setter inside another
+  // component's state updater triggers React 18's "Cannot update a
+  // component while rendering" error — useEffect fires after commit, so
+  // the parent update is properly scheduled rather than recursive.
+  const prevPageIndexRef = useRef(initialPageIndex);
+  useEffect(() => {
+    if (prevPageIndexRef.current === currentPageIndex) return;
+    prevPageIndexRef.current = currentPageIndex;
+    const page = pages[currentPageIndex];
+    if (page) onPageIndexChange?.(currentPageIndex, page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPageIndex]);
   const [pageRecordings, setPageRecordings] = useState<Map<number, InMemoryRecording>>(new Map());
   const [savedPages, setSavedPages] = useState<Set<number>>(new Set());
   const [isRecording, setIsRecording] = useState(false);
@@ -249,7 +255,27 @@ export default function Recorder({
   // include the blob; true = layer-only update is enough.
   const draftBlobUploadedRef = useRef<Set<number>>(new Set());
   // Currently in-flight Save draft action (the pageIndex being saved).
+  // Drives UI state ("Saving…" indicator, button disable). For
+  // race-prevention between manual saves + autosave, see
+  // saveDraftQueueRef below — that's what guarantees concurrent calls
+  // don't drop state on the floor.
   const [savingDraftPage, setSavingDraftPage] = useState<number | null>(null);
+  // Per-page promise queue. When a save for a given page is in flight,
+  // its Promise is stored here so subsequent calls (e.g., manual Finish
+  // & Continue arriving while autosave is mid-network) await the
+  // previous save and then run their own with the latest state. Without
+  // this, the old early-return-if-savingDraftPage check would silently
+  // drop the manual save and Finish & Continue would commit nothing.
+  const saveDraftQueueRef = useRef<Map<number, Promise<boolean>>>(new Map());
+  // In-session override for committed audio. The host's
+  // existingPageAudio + existingPageDrafts props are snapshotted when
+  // the recorder opens and never refresh during a session — so after a
+  // Finish & Continue updates audio_url on the server, the props still
+  // point at the OLD URL. We track the freshly-committed audio URL per
+  // page here and prefer it over the props in hasSavedAudioOnServer,
+  // loadSavedAudioForEdit, and the hydration effect. Cleaner than
+  // forcing the host to re-fetch.
+  const [committedAudioOverride, setCommittedAudioOverride] = useState<Map<number, string>>(new Map());
   // Per-page millisecond timestamp of the most recent successful save.
   // Drives the "Saved 5s ago" indicator in the bottom bar.
   const [draftSavedAt, setDraftSavedAt] = useState<Map<number, number>>(new Map());
@@ -348,6 +374,11 @@ export default function Recorder({
     if (!expanded) return;
     const pn = pages[currentPageIndex]?.pageNumber;
     if (!pn) return;
+    // Skip hydration if this page was committed in the current session.
+    // The host's existingPageDrafts is snapshotted at recorder-open and
+    // still has the pre-commit draft fields, but the server cleared the
+    // draft when we rendered — hydrating would pull stale data.
+    if (committedAudioOverride.has(currentPageIndex)) return;
     const draft = existingPageDrafts?.[pn];
     if (!draft?.draftVocalUrl || !draft?.draftLayers) return;
     if (pageRecordings.has(currentPageIndex)) return;
@@ -1049,21 +1080,33 @@ export default function Recorder({
       recording map so the user can re-trim and re-save. The fetched file is
       already a final MP3 — re-trim narrows further (lossless `-c copy`), it
       doesn't restore audio the user previously cut. */
+  /** Audio URL for a page that prefers the in-session committed override
+   *  (set right after a successful Finish & Continue) over the host's
+   *  existingPageAudio prop (snapshotted at recorder-open time). Without
+   *  this, Edit-existing would re-load the pre-commit AI TTS instead of
+   *  the just-rendered mix. */
+  const getEffectiveSavedAudioUrl = (pageIndex: number): string | undefined => {
+    const override = committedAudioOverride.get(pageIndex);
+    if (override) return override;
+    const pn = pages[pageIndex]?.pageNumber;
+    return pn ? existingPageAudio?.[pn]?.audioUrl : undefined;
+  };
+
   const loadSavedAudioForEdit = async (pageIndex: number) => {
-    const entry = existingPageAudio?.[pages[pageIndex]?.pageNumber];
-    if (!entry?.audioUrl) return;
+    const url = getEffectiveSavedAudioUrl(pageIndex);
+    if (!url) return;
     setLoadingSavedAudio(pageIndex);
     try {
-      const res = await fetch(entry.audioUrl);
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const blobUrl = URL.createObjectURL(blob);
       // Try to read duration from an offscreen <audio> element. Falls back
       // to 0 if metadata never loads — UI will still let the user trim.
       const duration = await new Promise<number>((resolve) => {
         const a = document.createElement('audio');
         a.preload = 'metadata';
-        a.src = url;
+        a.src = blobUrl;
         a.onloadedmetadata = () => resolve(Math.round(a.duration || 0));
         a.onerror = () => resolve(0);
         setTimeout(() => resolve(0), 5000);
@@ -1072,11 +1115,10 @@ export default function Recorder({
         const next = new Map(prev);
         const existing = next.get(pageIndex);
         if (existing) URL.revokeObjectURL(existing.url);
-        next.set(pageIndex, { blob, url, duration });
+        next.set(pageIndex, { blob, url: blobUrl, duration });
         return next;
       });
       autoFittedPagesRef.current.delete(pageIndex);
-      // Editing a saved take = unsaved changes until next Save.
       setSavedPages((prev) => {
         if (!prev.has(pageIndex)) return prev;
         const next = new Set(prev);
@@ -1089,6 +1131,17 @@ export default function Recorder({
         next.delete(pageIndex);
         return next;
       });
+      // Stash a baseline hash matching the just-loaded state so
+      // isPageDirty returns false until the user actually changes
+      // something. Without this, simply listening to Edit-existing
+      // and navigating away would trigger the save-draft prompt.
+      const baselineLayers: AudioLayers = {
+        version: 1,
+        vocal: { url: blobUrl, durationSec: duration, segments: [{ startSec: 0, endSec: duration }] },
+        music: [],
+        effects: [],
+      };
+      lastSavedLayersHashRef.current.set(pageIndex, hashLayers(baselineLayers));
     } catch (err: any) {
       console.error('Failed to load saved audio for edit:', err);
       alert(`Could not load the saved audio for editing: ${err.message || 'Unknown error'}`);
@@ -1098,8 +1151,7 @@ export default function Recorder({
   };
 
   const hasSavedAudioOnServer = (pageIndex: number): boolean => {
-    const pn = pages[pageIndex]?.pageNumber;
-    return !!(pn && existingPageAudio?.[pn]?.audioUrl);
+    return !!getEffectiveSavedAudioUrl(pageIndex);
   };
 
   const resetCurrentTrim = () => {
@@ -1385,22 +1437,41 @@ export default function Recorder({
     return JSON.stringify(stripped);
   };
 
-  /** Dirty = current layer-hash differs from last server-saved, OR the
-   *  blob hasn't been uploaded yet (e.g., right after recording). */
+  /** Dirty = current layer-hash differs from the last known "synced"
+   *  hash. The synced hash is set after a successful save-draft, after
+   *  hydration from a server draft, OR after loadSavedAudioForEdit
+   *  stashes the just-loaded baseline. When no synced hash exists yet
+   *  (fresh in-memory recording with nothing on server), the page
+   *  is dirty so the user is prompted to save before navigating.
+   *
+   *  Note: this used to also flag `!blobUploaded` as dirty, but that
+   *  fired spurious prompts for Edit-existing loads where the user
+   *  only listened without changing anything. Whether the blob needs
+   *  uploading is now a separate concern (handleSaveAsDraft's
+   *  needsBlob check), unrelated to dirty detection. */
   const isPageDirty = (pageIndex: number): boolean => {
     const layers = buildLayersForPage(pageIndex);
     if (!layers) return false;
     const currentHash = hashLayers(layers);
     const lastHash = lastSavedLayersHashRef.current.get(pageIndex);
-    const blobUploaded = draftBlobUploadedRef.current.has(pageIndex);
-    return !blobUploaded || currentHash !== lastHash;
+    if (lastHash === undefined) return true;
+    return currentHash !== lastHash;
   };
 
   /** PR 2 — persist the current page's edits to the server as a draft.
    *  Uploads the vocal blob only when it's not already on the server.
    *  Always sends layers. */
   const handleSaveAsDraft = async (pageIndex: number): Promise<boolean> => {
-    if (savingDraftPage !== null) return false;
+    // Wait for any in-flight save for the same page before starting our
+    // own. This is the race-fix: autosave + manual save + Finish &
+    // Continue would otherwise collide, and the old early-return would
+    // silently drop the second caller, leaving the user wondering why
+    // their edits didn't commit.
+    const inFlight = saveDraftQueueRef.current.get(pageIndex);
+    if (inFlight) {
+      try { await inFlight; } catch { /* surface failure on our own attempt */ }
+    }
+
     const audioPageId = getAudioPageId(pageIndex);
     if (!audioPageId) {
       console.warn('Save draft skipped: no audioPageId for page', pageIndex);
@@ -1411,24 +1482,37 @@ export default function Recorder({
     const layers = buildLayersForPage(pageIndex);
     if (!layers) return false;
 
-    setSavingDraftPage(pageIndex);
+    const promise: Promise<boolean> = (async () => {
+      setSavingDraftPage(pageIndex);
+      try {
+        const needsBlob = !draftBlobUploadedRef.current.has(pageIndex);
+        const result = await apiSaveDraft({
+          audioPageId,
+          vocalBlob: needsBlob ? rec.blob : undefined,
+          layers,
+        });
+        if (needsBlob) draftBlobUploadedRef.current.add(pageIndex);
+        lastSavedLayersHashRef.current.set(pageIndex, hashLayers(layers));
+        setDraftSavedAt((prev) => new Map(prev).set(pageIndex, Date.now()));
+        return true;
+      } catch (err: any) {
+        console.error('Save draft failed:', err);
+        alert(`Could not save draft: ${err.message || 'Unknown error'}`);
+        return false;
+      } finally {
+        setSavingDraftPage(null);
+      }
+    })();
+
+    saveDraftQueueRef.current.set(pageIndex, promise);
     try {
-      const needsBlob = !draftBlobUploadedRef.current.has(pageIndex);
-      const result = await apiSaveDraft({
-        audioPageId,
-        vocalBlob: needsBlob ? rec.blob : undefined,
-        layers,
-      });
-      if (needsBlob) draftBlobUploadedRef.current.add(pageIndex);
-      lastSavedLayersHashRef.current.set(pageIndex, hashLayers(layers));
-      setDraftSavedAt((prev) => new Map(prev).set(pageIndex, Date.now()));
-      return true;
-    } catch (err: any) {
-      console.error('Save draft failed:', err);
-      alert(`Could not save draft: ${err.message || 'Unknown error'}`);
-      return false;
+      return await promise;
     } finally {
-      setSavingDraftPage(null);
+      // Only clear if we're still the active in-flight save — a later
+      // call may have queued behind us and become the new "current."
+      if (saveDraftQueueRef.current.get(pageIndex) === promise) {
+        saveDraftQueueRef.current.delete(pageIndex);
+      }
     }
   };
 
@@ -1668,8 +1752,9 @@ export default function Recorder({
         const savedOk = await handleSaveAsDraft(currentPageIndex);
         if (!savedOk) return;
         setRenderingPage(currentPageIndex);
+        let renderResult: { audioUrl: string; committedAt: string } | null = null;
         try {
-          await apiRenderFinal(audioPageId);
+          renderResult = await apiRenderFinal(audioPageId);
         } catch (err: any) {
           alert(`Render failed: ${err.message || 'Unknown error'}\n\nYour draft is saved — you can try again.`);
           return;
@@ -1677,6 +1762,13 @@ export default function Recorder({
           setRenderingPage(null);
         }
         setSavedPages((prev) => new Set(prev).add(currentPageIndex));
+        // Override the host's stale existingPageAudio for this page so
+        // a subsequent Edit-existing pulls the freshly-rendered mix
+        // rather than the pre-commit AI TTS the host had captured.
+        if (renderResult?.audioUrl) {
+          const committedUrl = renderResult.audioUrl;
+          setCommittedAudioOverride((prev) => new Map(prev).set(currentPageIndex, committedUrl));
+        }
         // Drop the in-memory state for this page — it's now committed.
         // Future Edit-existing or hydration will pull the new audio_url.
         const pageIdx = currentPageIndex;

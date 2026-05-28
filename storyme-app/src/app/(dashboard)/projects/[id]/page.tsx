@@ -59,6 +59,15 @@ export default function StoryViewerPage() {
   // Server-saved audio per page (keyed by 1-based pageNumber). Fetched on
   // entry to recording mode so the recorder can offer "Edit saved audio".
   const [existingPageAudio, setExistingPageAudio] = useState<Record<number, { audioUrl: string }>>({});
+  // PR 2 — per-page draft + commit metadata. Passing this in unlocks the
+  // recorder's Save draft button, server-side destructive delete, and
+  // hydration on reopen. Populated alongside existingPageAudio.
+  const [existingPageDrafts, setExistingPageDrafts] = useState<Record<number, {
+    audioPageId?: string;
+    draftVocalUrl?: string | null;
+    draftLayers?: any;
+    committedAt?: string | null;
+  }>>({});
   const [showAudioDropdown, setShowAudioDropdown] = useState(false);
   const audioDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -312,20 +321,42 @@ export default function StoryViewerPage() {
       return;
     }
 
-    // Fetch existing server-saved audio per page so the recorder can offer
-    // "Edit saved audio" on pages with prior recordings. Best-effort — if
-    // this fails, recorder still opens (just without the Edit affordance).
+    // Fetch per-page audio + draft metadata for the recorder. Uses the
+    // authenticated v1 endpoint (different from the public read endpoint
+    // the rest of this page polls). The v1 endpoint lazy-inits
+    // story_audio_pages rows so every narratable scene has an audioPageId,
+    // which unlocks Save draft + server-side destructive delete + hydration.
+    // Best-effort: on failure the recorder still opens with reduced
+    // functionality (legacy host-callback save path remains the fallback).
     try {
-      const res = await fetch(`/api/projects/${projectId}/audio-pages`);
+      const res = await fetch(`/api/v1/projects/${projectId}/audio-pages`);
       if (res.ok) {
         const data = await res.json();
-        const map: Record<number, { audioUrl: string }> = {};
+        const audioMap: Record<number, { audioUrl: string }> = {};
+        const draftMap: Record<number, {
+          audioPageId?: string;
+          draftVocalUrl?: string | null;
+          draftLayers?: any;
+          committedAt?: string | null;
+        }> = {};
         for (const p of data.pages ?? []) {
-          if (p.audio_url && (p.audio_source === 'user_recorded' || p.audio_source === 'ai_voice_clone')) {
-            map[p.page_number] = { audioUrl: p.audio_url };
+          // Include EVERY source with audio (ai_tts, user_recorded,
+          // ai_voice_clone) so users can edit-on-top of AI narration
+          // without re-recording.
+          if (p.hasAudio && p.audioUrl) {
+            audioMap[p.pageNumber] = { audioUrl: p.audioUrl };
+          }
+          if (p.audioPageId) {
+            draftMap[p.pageNumber] = {
+              audioPageId: p.audioPageId,
+              draftVocalUrl: p.draftVocalUrl,
+              draftLayers: p.draftLayers,
+              committedAt: p.committedAt,
+            };
           }
         }
-        setExistingPageAudio(map);
+        setExistingPageAudio(audioMap);
+        setExistingPageDrafts(draftMap);
       }
     } catch (err) {
       console.warn('Could not load existing audio for editing:', err);
@@ -1519,6 +1550,7 @@ export default function StoryViewerPage() {
             initialPageIndex={currentSceneIndex}
             onPageIndexChange={setCurrentSceneIndex}
             existingPageAudio={existingPageAudio}
+            existingPageDrafts={existingPageDrafts}
             onSaveRecording={handleSaveRecording}
             onClose={handleCloseRecorder}
             onAllSaved={handleAllRecordingsSaved}
