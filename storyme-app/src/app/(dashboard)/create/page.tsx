@@ -126,6 +126,17 @@ function CreateStoryPageInner() {
   // top-level "Import from Library" button and the per-scene "+ Add to
   // scene" entrypoint — keeps the picker usable as libraries grow large.
   const [importSearch, setImportSearch] = useState('');
+  // Server-side search results for the import modal. Without these, the
+  // search box would only filter the paginated `libraryCharacters` /
+  // `communityCharacters` cache — meaning a kid with 400 characters who
+  // hasn't clicked "Load more" enough times would get phantom "no results"
+  // for a character that exists. `null` = no active search; `[]` = searched
+  // and empty.
+  const [importSearchResults, setImportSearchResults] = useState<Character[] | null>(null);
+  const [importSearching, setImportSearching] = useState(false);
+  // Race-condition guard: each search bump invalidates earlier in-flight
+  // queries so a slow first result can't overwrite a fast second.
+  const importSearchKeyRef = useRef(0);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveTitle, setSaveTitle] = useState('');
   const [saveDescription, setSaveDescription] = useState('');
@@ -279,6 +290,63 @@ function CreateStoryPageInner() {
     // this component; intentionally omitted from deps to avoid re-running.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showImportModal, importTab, user?.id, libraryLoaded, communityLoaded]);
+
+  // Clear the search box every time the modal reopens so each session
+  // feels fresh. Not all close paths clear it on the way out — e.g.
+  // handleImportCharacter just sets showImportModal(false) — so the open
+  // side is where we guarantee a clean state.
+  useEffect(() => {
+    if (showImportModal) setImportSearch('');
+  }, [showImportModal]);
+
+  // Debounced server-side search for the import modal. Client-side filter
+  // on the paginated cache misses characters that haven't been loaded yet
+  // (matches the fix already in CharacterPickerModal). Debounce so a kid
+  // typing "dragon" produces one query, not seven.
+  useEffect(() => {
+    if (!showImportModal) return;
+    const q = importSearch.trim();
+    if (!q) {
+      setImportSearchResults(null);
+      setImportSearching(false);
+      return;
+    }
+    if (!user?.id) return;
+
+    importSearchKeyRef.current += 1;
+    const myKey = importSearchKeyRef.current;
+    setImportSearching(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const supabase = createClient();
+        const isMine = importTab === 'mine';
+        const base = supabase
+          .from('character_library')
+          .select(IMPORT_SELECT_COLUMNS)
+          .ilike('name', `%${q}%`)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        const { data, error } = isMine
+          ? await base.eq('user_id', user.id)
+          : await base.eq('is_public', true);
+        if (myKey !== importSearchKeyRef.current) return; // stale
+        if (error) throw error;
+        const rows = (data || []).map((char: any) => mapLibraryRow(char, !isMine));
+        setImportSearchResults(rows);
+      } catch (err) {
+        if (myKey !== importSearchKeyRef.current) return;
+        console.error('Character search failed:', err);
+        setImportSearchResults([]);
+      } finally {
+        if (myKey === importSearchKeyRef.current) setImportSearching(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+    // IMPORT_SELECT_COLUMNS and mapLibraryRow are stable in-component constants.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showImportModal, importTab, importSearch, user?.id]);
 
   // Resume from draft via ?projectId= URL parameter
   useEffect(() => {
@@ -2125,14 +2193,24 @@ function CreateStoryPageInner() {
 
               {(() => {
                 const isMine = importTab === 'mine';
-                const sourceList = isMine ? libraryCharacters : communityCharacters;
-                const loading = isMine ? libraryLoading : communityLoading;
-                const loaded = isMine ? libraryLoaded : communityLoaded;
-                const hasMore = isMine ? libraryHasMore : communityHasMore;
-                const q = importSearch.trim().toLowerCase();
-                const displayChars = q
-                  ? sourceList.filter((c) => c.name.toLowerCase().includes(q))
-                  : sourceList;
+                const q = importSearch.trim();
+                const isSearchingMode = q.length > 0;
+                // Server-side search results when there's a query; paginated
+                // browse cache otherwise. No client-side filter — the server
+                // already scoped by name.
+                const sourceList = isSearchingMode
+                  ? (importSearchResults ?? [])
+                  : (isMine ? libraryCharacters : communityCharacters);
+                const loading = isSearchingMode
+                  ? importSearching
+                  : (isMine ? libraryLoading : communityLoading);
+                const loaded = isSearchingMode
+                  ? importSearchResults !== null
+                  : (isMine ? libraryLoaded : communityLoaded);
+                // Hide "Load more" while searching — search results are
+                // server-capped at 100 and pagination doesn't apply.
+                const hasMore = !isSearchingMode && (isMine ? libraryHasMore : communityHasMore);
+                const displayChars = sourceList;
 
                 // First-page skeleton: tab opened but no data yet.
                 if (!loaded && loading && sourceList.length === 0) {
@@ -2155,7 +2233,10 @@ function CreateStoryPageInner() {
                 }
 
                 if (displayChars.length === 0) {
-                  const isFilteredEmpty = q.length > 0 && sourceList.length > 0;
+                  // When searching, empty means server-side search returned
+                  // nothing — so "no matches" is the right copy. When not
+                  // searching, empty means library/community has zero rows.
+                  const isFilteredEmpty = isSearchingMode;
                   return (
                     <div className="text-center py-12">
                       <div className="text-6xl mb-4">{isFilteredEmpty ? '🔍' : (isMine ? '👦👧' : '🌍')}</div>
@@ -2262,6 +2343,18 @@ function CreateStoryPageInner() {
                           {loading ? 'Loading…' : 'Load more'}
                         </button>
                       </div>
+                    )}
+                    {/* Search status: keeps the kid oriented while a query
+                        is in-flight and warns when results hit the 100-row
+                        server cap. */}
+                    {isSearchingMode && (
+                      <p className="text-center text-xs text-gray-500 mt-4">
+                        {importSearching
+                          ? 'Searching…'
+                          : `Showing ${displayChars.length} match${displayChars.length === 1 ? '' : 'es'}${
+                              displayChars.length === 100 ? ' (capped — try a more specific search)' : ''
+                            }`}
+                      </p>
                     )}
                   </>
                 );
