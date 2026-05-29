@@ -120,6 +120,25 @@ function buildHtml(
             </td>
           </tr>
 
+          <!-- Summary line -->
+          <tr>
+            <td style="font-family:${BODY}; color:#2a1d10; font-size:15px; line-height:1.65; font-weight:500; padding:0 32px 6px;">
+              <strong>Afternoons</strong> (Ages 7&ndash;12) &middot; Creative Writer Workshop
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family:${BODY}; color:#2a1d10; font-size:15px; line-height:1.65; font-weight:500; padding:0 32px 18px;">
+              May 31 &rarr; Jun 28 &middot; Steamoji Bellevue &middot; Half-price May 31 intro available
+            </td>
+          </tr>
+
+          <!-- CTA button -->
+          <tr>
+            <td align="center" style="padding:0 24px 28px;">
+              <a href="${workshopsUrl}" style="display:inline-block; padding:14px 28px; background-color:#3F6B3A; color:#FBF6EC; text-decoration:none; border-radius:8px; font-family:${BODY}; font-size:15px; font-weight:600; letter-spacing:0.3px;">Reserve your May 31 spot &rarr;</a>
+            </td>
+          </tr>
+
           <!-- Hero: program flyer -->
           <tr>
             <td align="center" style="padding:0 16px 18px;">
@@ -131,25 +150,6 @@ function buildHtml(
           <tr>
             <td align="center" style="padding:0 16px 24px;">
               <img src="${introUrl}" width="608" alt="Creative Writer Workshop one-page intro — what kids will create, the week-by-week flow, and what to expect from the half-price May 31 intro session." style="display:block; width:100%; max-width:608px; height:auto; border-radius:10px; border:0;" />
-            </td>
-          </tr>
-
-          <!-- Summary line -->
-          <tr>
-            <td style="font-family:${BODY}; color:#2a1d10; font-size:15px; line-height:1.65; font-weight:500; padding:0 32px 6px;">
-              <strong>Afternoons</strong> (Ages 7&ndash;12) &middot; Creative Writer Workshop
-            </td>
-          </tr>
-          <tr>
-            <td style="font-family:${BODY}; color:#2a1d10; font-size:15px; line-height:1.65; font-weight:500; padding:0 32px 22px;">
-              May 31 &rarr; Jun 28 &middot; Steamoji Bellevue &middot; Half-price May 31 intro available
-            </td>
-          </tr>
-
-          <!-- CTA button -->
-          <tr>
-            <td align="center" style="padding:0 24px 36px;">
-              <a href="${workshopsUrl}" style="display:inline-block; padding:14px 28px; background-color:#3F6B3A; color:#FBF6EC; text-decoration:none; border-radius:8px; font-family:${BODY}; font-size:15px; font-weight:600; letter-spacing:0.3px;">Reserve your May 31 spot &rarr;</a>
             </td>
           </tr>
 
