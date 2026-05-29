@@ -223,32 +223,60 @@ export function ChapterBookReader({ title, authorName, doc, audioByPage, onExit 
           />
         </article>
 
-        {/* Pager — sits in the same place every page because the article
-            above is fixed-height. */}
-        <div className="mt-4 flex items-center justify-between">
+        {/* Page indicator only — Prev/Next have moved to the side rails
+            below so kids don't have to scroll a tall page to flip. */}
+        {totalPages > 1 && (
+          <div className="mt-4 flex items-center justify-center">
+            <span className="text-sm text-gray-500">
+              Page {pageIndex + 1} of {totalPages}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Side-rail page flippers — viewport-anchored so the buttons stay
+          in reach no matter how far a long page is scrolled. No pill
+          background: on desktop they live in the gutter beside the 680px
+          prose column, on mobile a thin white text-shadow halo keeps the
+          chevron legible when it lands on top of prose. */}
+      {totalPages > 1 && (
+        <>
           <button
             type="button"
             onClick={goPrev}
             disabled={pageIndex === 0}
-            className="min-h-[44px] min-w-[88px] px-4 rounded-lg text-sm font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="Previous page"
+            className="fixed left-2 md:left-4 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100/70 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent z-30"
           >
-            ← Previous
+            <svg
+              className="w-7 h-7"
+              style={{ filter: 'drop-shadow(0 0 2px white) drop-shadow(0 0 1px white)' }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+            </svg>
           </button>
-          <span className="text-sm text-gray-500">
-            Page {pageIndex + 1} of {totalPages}
-          </span>
           <button
             type="button"
             onClick={goNext}
             disabled={pageIndex === totalPages - 1}
-            className="min-h-[44px] min-w-[88px] px-4 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="Next page"
+            className="fixed right-2 md:right-4 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100/70 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent z-30"
           >
-            Next →
+            <svg
+              className="w-7 h-7"
+              style={{ filter: 'drop-shadow(0 0 2px white) drop-shadow(0 0 1px white)' }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+            </svg>
           </button>
-        </div>
-      </div>
+        </>
+      )}
 
       {/* Reader typography mirrors the editor for WYSIWYG fidelity. */}
       <style jsx global>{`

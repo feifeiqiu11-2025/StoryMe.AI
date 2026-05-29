@@ -152,7 +152,6 @@ export default function ChapterBookEditPage() {
               initialDescription={book.description}
               initialAuthorName={book.authorName}
               initialAuthorAge={book.authorAge}
-              initialLanguage={book.secondaryLanguage}
               alreadySaved={book.status === 'completed'}
             />
           </div>

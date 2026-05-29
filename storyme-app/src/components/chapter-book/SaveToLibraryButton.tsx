@@ -15,7 +15,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { X as XIcon } from 'lucide-react';
 
@@ -26,7 +26,6 @@ interface SaveToLibraryButtonProps {
   initialDescription?: string | null;
   initialAuthorName?: string | null;
   initialAuthorAge?: number | null;
-  initialLanguage?: string | null;
   /** True once the project is status='completed'; switches the CTA. */
   alreadySaved?: boolean;
 }
@@ -37,7 +36,6 @@ export function SaveToLibraryButton({
   initialDescription,
   initialAuthorName,
   initialAuthorAge,
-  initialLanguage,
   alreadySaved,
 }: SaveToLibraryButtonProps) {
   const router = useRouter();
@@ -72,7 +70,6 @@ export function SaveToLibraryButton({
         initialDescription={initialDescription ?? ''}
         initialAuthorName={initialAuthorName ?? ''}
         initialAuthorAge={initialAuthorAge ?? null}
-        initialLanguage={initialLanguage ?? ''}
         onSaved={() => router.push(`/chapter-books/${bookId}`)}
       />
     </>
@@ -87,7 +84,6 @@ interface SaveToLibraryModalProps {
   initialDescription: string;
   initialAuthorName: string;
   initialAuthorAge: number | null;
-  initialLanguage: string;
   onSaved: () => void;
 }
 
@@ -99,7 +95,6 @@ function SaveToLibraryModal({
   initialDescription,
   initialAuthorName,
   initialAuthorAge,
-  initialLanguage,
   onSaved,
 }: SaveToLibraryModalProps) {
   const [title, setTitle] = useState(initialTitle);
@@ -108,9 +103,14 @@ function SaveToLibraryModal({
   const [authorAge, setAuthorAge] = useState<string>(
     initialAuthorAge != null ? String(initialAuthorAge) : ''
   );
-  const [language, setLanguage] = useState(initialLanguage);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Tracks whether the active pointer gesture began on the backdrop.
+  // Without this, dragging to select text inside an input and releasing
+  // outside the field synthesizes a click whose target bubbles up to the
+  // backdrop, dismissing the modal mid-edit.
+  const downOnBackdrop = useRef(false);
 
   // Refresh prefills whenever the modal is re-opened so the latest
   // editor title flows in.
@@ -120,10 +120,9 @@ function SaveToLibraryModal({
       setDescription(initialDescription);
       setAuthorName(initialAuthorName);
       setAuthorAge(initialAuthorAge != null ? String(initialAuthorAge) : '');
-      setLanguage(initialLanguage);
       setError(null);
     }
-  }, [open, initialTitle, initialDescription, initialAuthorName, initialAuthorAge, initialLanguage]);
+  }, [open, initialTitle, initialDescription, initialAuthorName, initialAuthorAge]);
 
   const onSave = async () => {
     if (saving) return;
@@ -145,7 +144,6 @@ function SaveToLibraryModal({
           description: description.trim() || undefined,
           authorName: authorName.trim() || undefined,
           authorAge: authorAge ? Number(authorAge) : undefined,
-          language: language || undefined,
           coverImageUrl: coverUrl ?? undefined,
         }),
       });
@@ -165,8 +163,14 @@ function SaveToLibraryModal({
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !saving) onClose();
+      onMouseDown={(e) => {
+        downOnBackdrop.current = e.target === e.currentTarget;
+      }}
+      onMouseUp={(e) => {
+        if (downOnBackdrop.current && e.target === e.currentTarget && !saving) {
+          onClose();
+        }
+        downOnBackdrop.current = false;
       }}
       role="dialog"
       aria-modal="true"
@@ -253,24 +257,6 @@ function SaveToLibraryModal({
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-          </div>
-
-          <div>
-            <label htmlFor="save-lang" className="block text-xs font-semibold text-gray-700 mb-1">
-              Secondary language (optional)
-            </label>
-            <select
-              id="save-lang"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">English only</option>
-              <option value="zh">Chinese (中文)</option>
-              <option value="ko">Korean (한국어)</option>
-              <option value="es">Spanish (Español)</option>
-              <option value="fr">French (Français)</option>
-            </select>
           </div>
 
           {error && <p className="text-xs text-red-600">{error}</p>}
