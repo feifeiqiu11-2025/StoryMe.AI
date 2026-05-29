@@ -28,6 +28,7 @@ import {
   Inbox,
   ShieldCheck,
   Users,
+  Eye,
 } from 'lucide-react';
 
 const ENDPOINT = '/api/admin/send-marketing-email';
@@ -49,6 +50,12 @@ const CAMPAIGNS: Campaign[] = [
     label: 'Summer 2026 — Creative Storyteller Series',
     description:
       'KindleWood × Steamoji co-hosted workshop announcement. Sends to past workshop attendees only (confirmed registrations, any partner).',
+  },
+  {
+    id: 'summer-workshop-followup-2026',
+    label: 'Summer 2026 — Creative Writer follow-up (May 31 half-price intro)',
+    description:
+      'Follow-up nudge for the afternoon Creative Writer track (ages 7–12). Highlights the May 31 half-price intro session and chapter-book + podcast project. Sends to past workshop attendees only.',
   },
   {
     id: 'career-fair-followup-2026-05',
@@ -353,6 +360,15 @@ export default function AdminMarketingEmailPage() {
       <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
         <h2 className="text-sm font-semibold text-gray-900 mb-4">Actions</h2>
         <div className="flex flex-wrap items-center gap-3">
+          <a
+            href={`/api/admin/preview-marketing-email?campaign_id=${campaignId}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            <Eye className="w-4 h-4" />
+            Preview in browser
+          </a>
           <button
             onClick={fireTest}
             disabled={loading}

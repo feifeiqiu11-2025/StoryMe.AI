@@ -43,6 +43,10 @@ import {
   SUMMER_WORKSHOP_PROMO_CAMPAIGN_ID,
 } from '@/lib/email/summer-workshop-promo';
 import {
+  renderSummerWorkshopFollowup,
+  SUMMER_WORKSHOP_FOLLOWUP_CAMPAIGN_ID,
+} from '@/lib/email/summer-workshop-followup';
+import {
   renderCareerFairFollowup,
   CAREER_FAIR_FOLLOWUP_CAMPAIGN_ID,
 } from '@/lib/email/career-fair-followup';
@@ -64,6 +68,7 @@ type CampaignRenderer = (email: string) => {
 const CAMPAIGN_RENDERERS: Record<string, CampaignRenderer> = {
   [SPARK_LETTER_1_CAMPAIGN_ID]: renderSparkLetter1,
   [SUMMER_WORKSHOP_PROMO_CAMPAIGN_ID]: renderSummerWorkshopPromo,
+  [SUMMER_WORKSHOP_FOLLOWUP_CAMPAIGN_ID]: renderSummerWorkshopFollowup,
   [CAREER_FAIR_FOLLOWUP_CAMPAIGN_ID]: renderCareerFairFollowup,
 };
 
@@ -75,6 +80,7 @@ type CampaignAudience = 'all' | 'workshop_only' | 'career_fair_leads';
 const CAMPAIGN_AUDIENCES: Record<string, CampaignAudience> = {
   [SPARK_LETTER_1_CAMPAIGN_ID]: 'all',
   [SUMMER_WORKSHOP_PROMO_CAMPAIGN_ID]: 'workshop_only',
+  [SUMMER_WORKSHOP_FOLLOWUP_CAMPAIGN_ID]: 'workshop_only',
   [CAREER_FAIR_FOLLOWUP_CAMPAIGN_ID]: 'career_fair_leads',
 };
 
