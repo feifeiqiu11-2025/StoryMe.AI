@@ -306,7 +306,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       afternoon: { originalPrice: 7000, promoPrice: 7000 }, // $70/session
       currency: 'usd',
     },
-    capacity: { morning: 8, afternoon: 8 },
+    capacity: { morning: 8, afternoon: 10 },
     location: {
       slug: 'bellevue',
       name: 'SteamOji Bellevue Store',
