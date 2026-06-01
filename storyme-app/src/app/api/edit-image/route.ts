@@ -45,7 +45,7 @@ interface EditImageRequest {
   instruction: string;
   imageType: 'scene' | 'cover';
   imageId: string;
-  illustrationStyle?: 'pixar' | 'classic' | 'coloring';
+  illustrationStyle?: 'pixar' | 'classic' | 'coloring' | 'ghibli';
   sceneDescription?: string;
   useProvider?: EditProvider;
   imageProvider?: string; // Generation-level provider for Gemini model selection

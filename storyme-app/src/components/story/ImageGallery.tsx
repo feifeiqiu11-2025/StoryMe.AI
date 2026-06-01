@@ -20,7 +20,7 @@ interface ImageGalleryProps {
   onRegenerateScene?: (imageId: string, newImageData: any) => void;
   artStyle?: string;
   imageProvider?: ImageProvider;
-  illustrationStyle?: 'pixar' | 'classic' | 'coloring';
+  illustrationStyle?: 'pixar' | 'classic' | 'coloring' | 'ghibli';
   clothingConsistency?: ClothingConsistency;
   isGuestMode?: boolean; // Hide individual downloads in guest mode
   enhancedScenes?: EnhancedScene[];
@@ -619,7 +619,7 @@ export default function ImageGallery({
                         currentImageUrl={image.imageUrl}
                         imageType="scene"
                         imageId={image.id}
-                        illustrationStyle={artStyle === 'classic' ? 'classic' : artStyle === 'coloring' ? 'coloring' : 'pixar'}
+                        illustrationStyle={artStyle === 'classic' ? 'classic' : artStyle === 'coloring' ? 'coloring' : artStyle === 'ghibli' ? 'ghibli' : 'pixar'}
                         sceneDescription={image.sceneDescription}
                         characters={characters}
                         bibleLocations={storyBible?.locations ?? undefined}

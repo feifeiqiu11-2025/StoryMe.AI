@@ -9,7 +9,7 @@ import { StorageService } from '@/lib/services/storage.service';
 import type { StoryBibleResult, BibleLocation, BibleScene } from '@/lib/ai/scene-enhancer';
 
 // Illustration style type
-type IllustrationStyle = 'pixar' | 'classic' | 'coloring';
+type IllustrationStyle = 'pixar' | 'classic' | 'coloring' | 'ghibli';
 
 export const maxDuration = 300; // 5 minutes timeout for Vercel
 
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     // Determine illustration style (default to 'classic' for 2D storybook)
     const selectedIllustrationStyle: IllustrationStyle = illustrationStyle || 'classic';
-    console.log(`🎨 Illustration style: ${selectedIllustrationStyle === 'pixar' ? '3D Pixar' : 'Classic Storybook 2D'}`);
+    console.log(`🎨 Illustration style: ${selectedIllustrationStyle}`);
 
     // Determine which image provider to use
     // Priority: request param > env var > default
@@ -361,14 +361,17 @@ export async function POST(request: NextRequest) {
               clothingConsistency,
               modelId: geminiModelId,
             });
-          } else if (effectiveStyle === 'classic') {
-            // Classic Storybook - 2D hand-drawn/watercolor style
+          } else if (effectiveStyle === 'classic' || effectiveStyle === 'ghibli') {
+            // Classic Storybook (2D) and Ghibli share the same 2D generator;
+            // styleVariant swaps only the STYLE line in the prompt.
+            console.log(`[Scene ${scene.sceneNumber}] Using ${effectiveStyle === 'ghibli' ? 'Ghibli' : 'Classic 2D'} style`);
             result = await generateImageWithGeminiClassic({
               characters: geminiCharacters,
               sceneDescription: sceneDescriptionForPrompt,
               artStyle: artStyle || "children's book illustration, colorful, whimsical",
               clothingConsistency,
               modelId: geminiModelId,
+              styleVariant: effectiveStyle === 'ghibli' ? 'ghibli' : 'classic',
             });
           } else {
             // 3D Pixar style (default Gemini behavior)

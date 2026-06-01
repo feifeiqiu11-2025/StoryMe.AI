@@ -15,7 +15,6 @@ export async function POST(request: NextRequest) {
     // For coloring book mode, cover should always be colorful (use pixar style)
     const requestedStyle = illustrationStyle || 'classic';
     const selectedStyle = requestedStyle === 'coloring' ? 'pixar' : requestedStyle;
-    const is3DStyle = selectedStyle === 'pixar';
 
     if (requestedStyle === 'coloring') {
       console.log(`🖍️ Coloring book mode - cover will use 3D Pixar style (colorful)`);
@@ -39,7 +38,7 @@ export async function POST(request: NextRequest) {
     console.log(`Author: ${author || 'Unknown'}`);
     console.log(`Age: ${age || 'N/A'}`);
     console.log(`Language: ${language}`);
-    console.log(`Style: ${is3DStyle ? '3D Pixar' : 'Classic Storybook 2D'}`);
+    console.log(`Style: ${selectedStyle}`);
     console.log(`Image Provider: ${useGemini ? 'Gemini' : 'Fal.ai FLUX'}`);
     console.log(`Custom Prompt: ${customPrompt ? 'Yes' : 'No (using default)'}`);
 
@@ -76,16 +75,32 @@ export async function POST(request: NextRequest) {
       : `http://localhost:${process.env.PORT || 3002}`;
 
     // Prepare character info with absolute URLs (if characters provided)
-    // Handle both "From Photo" and "From Description" characters
+    // Handle both "From Photo" and "From Description" characters.
+    // Priority: animated preview (already in illustration style) > reference photo > none.
+    // This mirrors scene generation so the cover renders characters with the SAME
+    // visual anchor as the interior pages — critical for "From Description" characters,
+    // whose only visual identity lives in animatedPreviewUrl (referenceImage.url is empty).
+    //
+    // Absolute URLs (http/https) and inline data: URLs are passed through as-is.
+    // Anything else is treated as a relative path and prefixed with baseUrl.
+    // Without the data: guard a base64 preview becomes "https://prod/data:image/..."
+    // which the downstream validator rejects → character has no visual anchor.
+    const isAbsolute = (u: string) => u.startsWith('http') || u.startsWith('data:');
     const preparedCharacters = characters && characters.length > 0
       ? characters.map((char: Character) => {
-          // Handle reference image URL - may be empty for "From Description" characters
           let referenceImageUrl = '';
-          if (char.referenceImage?.url) {
-            referenceImageUrl = char.referenceImage.url.startsWith('http')
+          if (char.animatedPreviewUrl && char.animatedPreviewUrl.trim()) {
+            // Animated preview exists - use it (best for consistency)
+            referenceImageUrl = isAbsolute(char.animatedPreviewUrl)
+              ? char.animatedPreviewUrl
+              : `${baseUrl}${char.animatedPreviewUrl}`;
+          } else if (char.referenceImage?.url && char.referenceImage.url.trim()) {
+            // Fallback to original reference photo
+            referenceImageUrl = isAbsolute(char.referenceImage.url)
               ? char.referenceImage.url
               : `${baseUrl}${char.referenceImage.url}`;
           }
+          // If neither exists, referenceImageUrl stays '' (text-only generation)
 
           return {
             name: char.name,
@@ -95,34 +110,51 @@ export async function POST(request: NextRequest) {
         })
       : [];
 
-    console.log(`Generating cover with ${useGemini ? 'Gemini' : 'Fal.ai'} (${is3DStyle ? '3D Pixar' : '2D Classic'}), ${preparedCharacters.length} character(s)`);
+    console.log(`Generating cover with ${useGemini ? 'Gemini' : 'Fal.ai'} (${selectedStyle}), ${preparedCharacters.length} character(s)`);
+    preparedCharacters.forEach((c: { name: string; referenceImageUrl: string }) => {
+      const anchor = c.referenceImageUrl
+        ? (c.referenceImageUrl.startsWith('data:') ? 'data: preview' : c.referenceImageUrl.slice(0, 60))
+        : 'NONE (text-only)';
+      console.log(`[Cover] ${c.name}: reference = ${anchor}`);
+    });
 
     // Generate the cover image using selected provider
     let result;
 
     if (useGemini) {
-      // Use Gemini with reference photos
+      // Use Gemini with reference photos.
+      // Pixar uses the 3D generator; classic and ghibli share the 2D generator
+      // (styleVariant swaps only the STYLE line). Coloring was already remapped
+      // to pixar above so the cover stays colorful.
       const geminiCharacters: GeminiCharacterInfo[] = preparedCharacters;
-      result = is3DStyle
-        ? await generateImageWithGemini({
-            characters: geminiCharacters,
-            sceneDescription: coverDescription,
-            modelId: geminiModelId,
-          })
-        : await generateImageWithGeminiClassic({
-            characters: geminiCharacters,
-            sceneDescription: coverDescription,
-            modelId: geminiModelId,
-          });
+      if (selectedStyle === 'pixar') {
+        result = await generateImageWithGemini({
+          characters: geminiCharacters,
+          sceneDescription: coverDescription,
+          modelId: geminiModelId,
+        });
+      } else {
+        result = await generateImageWithGeminiClassic({
+          characters: geminiCharacters,
+          sceneDescription: coverDescription,
+          modelId: geminiModelId,
+          styleVariant: selectedStyle === 'ghibli' ? 'ghibli' : 'classic',
+        });
+      }
     } else {
-      // Use Fal.ai FLUX (text-based prompts)
+      // Use Fal.ai FLUX (text-based prompts). Keep "warm rich colors" rather than
+      // "soft watercolor/pastel" so the printed cover holds contrast.
       const falCharacters: CharacterPromptInfo[] = preparedCharacters;
+      const falArtStyle =
+        selectedStyle === 'pixar'
+          ? "3D animated Pixar/Disney style, soft rounded features, vibrant colors"
+          : selectedStyle === 'ghibli'
+          ? "Studio Ghibli-inspired illustration, warm rich colors"
+          : "2D hand-drawn storybook illustration, warm rich colors";
       result = await generateImageWithMultipleCharacters({
         characters: falCharacters,
         sceneDescription: coverDescription,
-        artStyle: is3DStyle
-          ? "3D animated Pixar/Disney style, soft rounded features, vibrant colors"
-          : "2D hand-drawn storybook illustration, soft watercolor, warm pastel colors",
+        artStyle: falArtStyle,
         emphasizeGenericCharacters: false,
       });
     }

@@ -19,7 +19,9 @@ import { StorageService } from '@/lib/services/storage.service';
 import OpenAI from 'openai';
 
 // Illustration style type
-type IllustrationStyle = 'pixar' | 'classic';
+// NOTE: 'coloring' regeneration is a known pre-existing gap (falls through to pixar);
+// out of scope for the Ghibli change.
+type IllustrationStyle = 'pixar' | 'classic' | 'ghibli';
 
 export const maxDuration = 300; // 5 minutes timeout
 
@@ -293,14 +295,16 @@ export async function POST(request: NextRequest) {
         description: char.description,
       }));
 
-      // Choose generation function based on illustration style
-      if (selectedIllustrationStyle === 'classic') {
+      // Choose generation function based on illustration style.
+      // Classic and Ghibli share the 2D generator (styleVariant swaps the look).
+      if (selectedIllustrationStyle === 'classic' || selectedIllustrationStyle === 'ghibli') {
         result = await generateImageWithGeminiClassic({
           characters: geminiCharacters,
           sceneDescription: refinedPrompt,
           artStyle: artStyle || "children's book illustration, colorful, whimsical",
           clothingConsistency,
           modelId: geminiModelId,
+          styleVariant: selectedIllustrationStyle === 'ghibli' ? 'ghibli' : 'classic',
         });
       } else {
         result = await generateImageWithGemini({

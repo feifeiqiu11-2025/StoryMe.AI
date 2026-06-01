@@ -65,6 +65,15 @@ export interface GeminiGenerateParams {
   clothingConsistency?: ClothingConsistency;
   /** Override Gemini model ID (resolved from ImageProvider on the backend) */
   modelId?: string;
+  /**
+   * Selects the STYLE line within the 2D generator (generateImageWithGeminiClassic).
+   * 'classic' = modern vibrant 2D cartoon (default). 'ghibli' = Studio Ghibli-inspired
+   * look. Ghibli rides on the Classic 2D generator because it shares every functional
+   * rule (reference authority, human/animal separation, proportions); only the STYLE
+   * descriptor differs. Ignored by the Pixar (generateImageWithGemini) and Coloring
+   * generators.
+   */
+  styleVariant?: 'classic' | 'ghibli';
 }
 
 export interface GeminiGenerateResult {
@@ -789,6 +798,7 @@ export async function generateImageWithGeminiClassic({
   artStyle = "children's book illustration, colorful, whimsical",
   clothingConsistency = 'consistent',
   modelId,
+  styleVariant = 'classic',
 }: GeminiGenerateParams): Promise<GeminiGenerateResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -849,10 +859,19 @@ export async function generateImageWithGeminiClassic({
     ? '- IMPORTANT: Keep character clothing EXACTLY the same as specified in their description. Do NOT change clothing based on scene context, activities, or themes.'
     : '- Keep clothing consistent with character description unless scene specifies costume/role/holiday attire';
 
-  // Build Classic Storybook style prompt (2D illustration) - Modern vibrant digital style
+  // Build Classic Storybook style prompt (2D illustration).
+  // The STYLE line is the ONLY thing that varies between the Classic and Ghibli
+  // looks — every functional rule below (reference authority, human/animal
+  // separation, proportions, clothing) is shared. Keep "warm rich colors" rather
+  // than "soft watercolor/pastel" so the printed book holds contrast (washed-out
+  // pale palettes print poorly).
+  const styleLine = styleVariant === 'ghibli'
+    ? 'Studio Ghibli-inspired illustration, warm rich colors. Square 1:1.'
+    : 'Modern 2D digital cartoon, vibrant saturated colors, smooth cel-shading, large glossy expressive eyes, soft warm lighting, clean polished style. Square 1:1.';
+  console.log(`[Gemini Classic] Style variant: ${styleVariant}`);
   const fullPrompt = `Create a 2D children's book illustration: ${sceneDescription}
 
-STYLE: Modern 2D digital cartoon, vibrant saturated colors, smooth cel-shading, large glossy expressive eyes, soft warm lighting, clean polished style. Square 1:1.
+STYLE: ${styleLine}
 
 PROPORTIONS: Normal, healthy body proportions - not overly fat or chubby. If "big" is mentioned, interpret as LARGE/TALL in size, NOT fat. Maintain natural proportions for the species/character type.
 
@@ -2031,9 +2050,9 @@ export async function generateCharacterPreviewClassic({
 - Output should look like a page from a classic children's picture book
 
 === ART STYLE ===
-- 2D digital illustration with soft watercolor/painted feel
+- 2D digital illustration with soft painted feel
 - Warm golden hour lighting with soft bokeh background
-- Pastel, muted color palette with gentle saturation
+- Warm, rich color palette with good contrast (print-friendly, avoid washed-out pastels)
 - Large expressive eyes (anime/chibi inspired)
 - Soft edges and dreamy atmosphere
 - Hand-drawn quality, not computer generated look
@@ -2385,13 +2404,13 @@ ${additionalDetails ? `- Additional details: ${additionalDetails}` : ''}
 === CRITICAL RENDERING STYLE (MANDATORY) ===
 - Transform the reference image into a 2D HAND-DRAWN/DIGITAL ILLUSTRATION
 - Do NOT create 3D rendered or CGI style - this must look hand-drawn/painted
-- Style: Classic children's storybook illustration with soft watercolor/painted feel
+- Style: Classic children's storybook illustration with soft painted feel
 - Do NOT just copy the reference - CREATE an illustrated interpretation
 
 === ART STYLE ===
-- 2D digital illustration with soft watercolor/painted feel
+- 2D digital illustration with soft painted feel
 - Warm golden hour lighting with soft bokeh background
-- Pastel, muted color palette with gentle saturation
+- Warm, rich color palette with good contrast (print-friendly, avoid washed-out pastels)
 - Large expressive features (anime/chibi inspired proportions where appropriate)
 - Soft edges and dreamy atmosphere
 - Hand-drawn quality, not computer generated look
@@ -2715,13 +2734,13 @@ export async function generateDescriptionOnlyPreviewClassic({
 === CRITICAL RENDERING STYLE (MANDATORY) ===
 - Render as a 2D HAND-DRAWN/DIGITAL ILLUSTRATION (NOT 3D CGI)
 - This is a ${characterType} character - create a cute, appealing illustrated version
-- Style: Classic children's storybook illustration with soft watercolor/painted feel
+- Style: Classic children's storybook illustration with soft painted feel
 - Do NOT create 3D rendered or CGI style - this must look hand-drawn/painted
 
 === ART STYLE ===
-- 2D digital illustration with soft watercolor/painted feel
+- 2D digital illustration with soft painted feel
 - Warm golden hour lighting with soft bokeh background
-- Pastel, muted color palette with gentle saturation
+- Warm, rich color palette with good contrast (print-friendly, avoid washed-out pastels)
 - Large expressive eyes (anime/chibi inspired proportions)
 - ${hasChubbyDescription ? 'Soft, rounded body shape' : 'Balanced, well-proportioned body with normal features'}
 - Soft edges and dreamy atmosphere
@@ -2739,7 +2758,7 @@ export async function generateDescriptionOnlyPreviewClassic({
 1. Make the character appealing and kid-friendly
 2. Use the character type description to determine species/form
 3. Add personality through expression and pose
-4. Keep colors warm and gentle (watercolor feel)
+4. Keep colors warm and rich with good contrast (print-friendly)
 5. Expression: Friendly, happy, gentle
 6. MUST BE 2D ILLUSTRATED - not 3D rendered
 7. ${hasChubbyDescription ? 'Character has a chubby/plump body as described' : 'IMPORTANT: Use normal, balanced proportions - avoid making the character overly round or chubby unless specified in description'}
@@ -2825,7 +2844,7 @@ export interface GeminiEditParams {
   /** Original scene description for context */
   sceneDescription?: string;
   /** Illustration style to maintain */
-  illustrationStyle?: 'pixar' | 'classic' | 'coloring';
+  illustrationStyle?: 'pixar' | 'classic' | 'coloring' | 'ghibli';
   /** Override Gemini model ID */
   modelId?: string;
   /** Auto-detected character references (URLs fetched server-side) */
@@ -2893,10 +2912,13 @@ export async function editImageWithGemini({
     ? 'Black and white line art for a coloring book - clean thin outlines on white background, NO colors, NO shading, NO gradients'
     : illustrationStyle === 'pixar'
     ? '3D animated Pixar/Disney style with soft rounded features, vibrant colors, large expressive eyes'
+    : illustrationStyle === 'ghibli'
+    ? 'Studio Ghibli-inspired illustration with warm rich colors and gentle painted detail'
     : 'Modern 2D digital cartoon with vibrant saturated colors, smooth cel-shading, large glossy expressive eyes';
 
   const styleLabel = illustrationStyle === 'coloring' ? 'B&W coloring book line art' :
-                     illustrationStyle === 'pixar' ? '3D Pixar' : '2D cartoon';
+                     illustrationStyle === 'pixar' ? '3D Pixar' :
+                     illustrationStyle === 'ghibli' ? 'Studio Ghibli' : '2D cartoon';
 
   // Build character reference section for the prompt
   const hasCharacterRefs = characterReferences && characterReferences.length > 0;

@@ -12,7 +12,7 @@ import { getLanguageLabel } from '@/lib/config/languages';
 import type { StoryBibleResult } from '@/lib/ai/scene-enhancer';
 
 // Art style type
-type ArtStyleType = 'pixar' | 'classic' | 'coloring';
+type ArtStyleType = 'pixar' | 'classic' | 'coloring' | 'ghibli';
 
 interface ScenePreviewApprovalProps {
   enhancedScenes: EnhancedScene[];
@@ -874,7 +874,7 @@ export default function ScenePreviewApproval({
           {onArtStyleChange && (
             <div className="mb-6">
               <h4 className="text-sm font-semibold text-gray-900 mb-3">Art Style</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* 3D Pixar Option */}
                 <button
                   type="button"
@@ -924,7 +924,7 @@ export default function ScenePreviewApproval({
                     )}
                   </div>
                   <div>
-                    <div className="font-medium text-gray-900 text-sm">Classic Storybook 2D</div>
+                    <div className="font-medium text-gray-900 text-sm">Classic 2D</div>
                     <p className="text-xs text-gray-500">Traditional watercolor illustration</p>
                   </div>
                 </button>
@@ -953,6 +953,33 @@ export default function ScenePreviewApproval({
                   <div>
                     <div className="font-medium text-gray-900 text-sm">Coloring Book</div>
                     <p className="text-xs text-gray-500">B&W line art for coloring</p>
+                  </div>
+                </button>
+
+                {/* Ghibli Option */}
+                <button
+                  type="button"
+                  onClick={() => !isGenerating && onArtStyleChange('ghibli')}
+                  disabled={isGenerating}
+                  className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all text-left ${
+                    artStyle === 'ghibli'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
+                  } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {/* Custom radio circle */}
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    artStyle === 'ghibli'
+                      ? 'border-blue-500 bg-blue-500'
+                      : 'border-gray-300 bg-white'
+                  }`}>
+                    {artStyle === 'ghibli' && (
+                      <div className="w-2 h-2 rounded-full bg-white"></div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-900 text-sm">Ghibli Style</div>
+                    <p className="text-xs text-gray-500">Hand-painted, warm and whimsical</p>
                   </div>
                 </button>
               </div>

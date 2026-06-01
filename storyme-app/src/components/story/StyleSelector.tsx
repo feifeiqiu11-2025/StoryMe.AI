@@ -13,7 +13,7 @@
 
 import { useState } from 'react';
 
-export type ArtStyleType = 'pixar' | 'classic' | 'coloring';
+export type ArtStyleType = 'pixar' | 'classic' | 'coloring' | 'ghibli';
 
 interface StyleSelectorProps {
   selectedStyle: ArtStyleType;
@@ -26,6 +26,7 @@ const STYLE_PREVIEWS = {
   pixar: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIiB2aWV3Qm94PSIwIDAgMTIwIDEyMCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzY2NjZmZiIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzk5MzNmZiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIiBmaWxsPSJ1cmwoI2JnKSIgcng9IjgiLz48Y2lyY2xlIGN4PSI2MCIgY3k9IjQ1IiByPSIyMCIgZmlsbD0iI2ZmZTRjNCIvPjxlbGxpcHNlIGN4PSI2MCIgY3k9Ijg1IiByeD0iMjUiIHJ5PSIyMCIgZmlsbD0iIzMzOTlmZiIvPjxjaXJjbGUgY3g9IjUyIiBjeT0iNDIiIHI9IjQiIGZpbGw9IiMzMzMiLz48Y2lyY2xlIGN4PSI2OCIgY3k9IjQyIiByPSI0IiBmaWxsPSIjMzMzIi8+PHBhdGggZD0iTTU0IDUyIFE2MCA1NiA2NiA1MiIgc3Ryb2tlPSIjZmY2Njk5IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz48dGV4dCB4PSI2MCIgeT0iMTEwIiBmb250LXNpemU9IjEwIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiPjNEIFBpeGFyPC90ZXh0Pjwvc3ZnPg==',
   classic: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIiB2aWV3Qm94PSIwIDAgMTIwIDEyMCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZmZTRiNSIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2ZmY2M4MCIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIiBmaWxsPSJ1cmwoI2JnKSIgcng9IjgiLz48Y2lyY2xlIGN4PSI2MCIgY3k9IjQ1IiByPSIyMiIgZmlsbD0iI2ZmZDRhNCIgc3Ryb2tlPSIjY2M5OTY2IiBzdHJva2Utd2lkdGg9IjEuNSIvPjxlbGxpcHNlIGN4PSI2MCIgY3k9Ijg1IiByeD0iMjgiIHJ5PSIxOCIgZmlsbD0iIzk5Y2NmZiIgc3Ryb2tlPSIjNjY5OWNjIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNDIiIHI9IjUiIGZpbGw9IiM0NDQiLz48Y2lyY2xlIGN4PSI3MCIgY3k9IjQyIiByPSI1IiBmaWxsPSIjNDQ0Ii8+PGNpcmNsZSBjeD0iNTIiIGN5PSI0MCIgcj0iMS41IiBmaWxsPSJ3aGl0ZSIvPjxjaXJjbGUgY3g9IjcyIiBjeT0iNDAiIHI9IjEuNSIgZmlsbD0id2hpdGUiLz48cGF0aCBkPSJNNTIgNTUgUTYwIDYyIDY4IDU1IiBzdHJva2U9IiNmZjg4YWEiIHN0cm9rZS13aWR0aD0iMi41IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48dGV4dCB4PSI2MCIgeT0iMTEwIiBmb250LXNpemU9IjkiIGZpbGw9IiM4ODY2NDQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJzZXJpZiI+Q2xhc3NpYyAyRDwvdGV4dD48L3N2Zz4=',
   coloring: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIiB2aWV3Qm94PSIwIDAgMTIwIDEyMCI+PHJlY3Qgd2lkdGg9IjEyMCIgaGVpZ2h0PSIxMjAiIGZpbGw9IiNmZmZmZmYiIHJ4PSI4IiBzdHJva2U9IiNlMGUwZTAiIHN0cm9rZS13aWR0aD0iMSIvPjxjaXJjbGUgY3g9IjYwIiBjeT0iNDUiIHI9IjIwIiBmaWxsPSJub25lIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIvPjxlbGxpcHNlIGN4PSI2MCIgY3k9Ijg1IiByeD0iMjUiIHJ5PSIxOCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzMzIiBzdHJva2Utd2lkdGg9IjIiLz48Y2lyY2xlIGN4PSI1MiIgY3k9IjQyIiByPSI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMS41Ii8+PGNpcmNsZSBjeD0iNjgiIGN5PSI0MiIgcj0iNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzMzIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxwYXRoIGQ9Ik01NCA1MiBRNjAgNTYgNjYgNTIiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIxLjUiIGZpbGw9Im5vbmUiLz48dGV4dCB4PSI2MCIgeT0iMTEwIiBmb250LXNpemU9IjkiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIj5Db2xvcmluZzwvdGV4dD48L3N2Zz4=',
+  ghibli: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIiB2aWV3Qm94PSIwIDAgMTIwIDEyMCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzhmZDQ5YSIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzRhOWU2ZiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIiBmaWxsPSJ1cmwoI2JnKSIgcng9IjgiLz48Y2lyY2xlIGN4PSI5MiIgY3k9IjI4IiByPSIxMiIgZmlsbD0iI2ZmZjRjMiIvPjxlbGxpcHNlIGN4PSI0MCIgY3k9IjMwIiByeD0iMTgiIHJ5PSI5IiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjg1Ii8+PGVsbGlwc2UgY3g9IjYwIiBjeT0iMzQiIHJ4PSIxNCIgcnk9IjciIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNyIvPjxwYXRoIGQ9Ik0wIDk1IFEzMCA3OCA2MCA5MCBROTAgMTAwIDEyMCA4NCBMMTIwIDEyMCBMMCAxMjAgWiIgZmlsbD0iIzNjOGE1YyIvPjxjaXJjbGUgY3g9IjYwIiBjeT0iNjAiIHI9IjE0IiBmaWxsPSIjZmZlMGIwIiBzdHJva2U9IiNjYzk5NjYiIHN0cm9rZS13aWR0aD0iMSIvPjxjaXJjbGUgY3g9IjU1IiBjeT0iNTgiIHI9IjIiIGZpbGw9IiM0NDQiLz48Y2lyY2xlIGN4PSI2NSIgY3k9IjU4IiByPSIyIiBmaWxsPSIjNDQ0Ii8+PHBhdGggZD0iTTU2IDY0IFE2MCA2NyA2NCA2NCIgc3Ryb2tlPSIjYzY2IiBzdHJva2Utd2lkdGg9IjEuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PHRleHQgeD0iNjAiIHk9IjExMiIgZm9udC1zaXplPSI5IiBmaWxsPSIjZmZmZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0ic2VyaWYiPkdoaWJsaTwvdGV4dD48L3N2Zz4=',
 };
 
 export default function StyleSelector({ selectedStyle, onStyleChange, disabled }: StyleSelectorProps) {
@@ -36,7 +37,7 @@ export default function StyleSelector({ selectedStyle, onStyleChange, disabled }
         <h4 className="text-sm font-semibold text-gray-900">Art Style</h4>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {/* 3D Pixar Option */}
         <button
           type="button"
@@ -120,6 +121,34 @@ export default function StyleSelector({ selectedStyle, onStyleChange, disabled }
             </div>
           </div>
         </button>
+
+        {/* Ghibli Option */}
+        <button
+          type="button"
+          onClick={() => onStyleChange('ghibli')}
+          disabled={disabled}
+          className={`relative rounded-lg overflow-hidden border-2 transition-all ${
+            selectedStyle === 'ghibli'
+              ? 'border-green-500 ring-2 ring-green-200 bg-green-50'
+              : 'border-gray-200 hover:border-green-300 bg-white'
+          } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        >
+          <div className="flex flex-col items-center gap-2 p-3">
+            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-green-300 to-emerald-500 flex-shrink-0">
+              <img
+                src={STYLE_PREVIEWS.ghibli}
+                alt="Ghibli style preview"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="text-center">
+              <span className="font-medium text-xs text-gray-900">Ghibli</span>
+              {selectedStyle === 'ghibli' && (
+                <span className="text-green-600 text-xs ml-1">✓</span>
+              )}
+            </div>
+          </div>
+        </button>
       </div>
 
       <p className="text-xs text-gray-500 mt-2 text-center">
@@ -127,6 +156,8 @@ export default function StyleSelector({ selectedStyle, onStyleChange, disabled }
           ? 'Vibrant 3D animated characters like Disney/Pixar movies'
           : selectedStyle === 'classic'
           ? 'Soft, hand-drawn illustrations with a cozy storybook feel'
+          : selectedStyle === 'ghibli'
+          ? 'Studio Ghibli-inspired hand-painted look, warm and whimsical'
           : 'Black & white line art for kids to color (cover stays colorful)'}
       </p>
     </div>
