@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
-import { WORKSHOP_PARTNERS, getEnrollmentMode } from '@/lib/workshops/constants';
+import { WORKSHOP_PARTNERS } from '@/lib/workshops/constants';
 import type { SessionCounts } from '@/lib/workshops/types';
 
 export async function GET(request: NextRequest) {
@@ -66,12 +66,12 @@ export async function GET(request: NextRequest) {
         }
       }
     } else {
-      // Dual-mode partner — use v3 (slot-aware) when the partner has singular
-      // location.timeSlots AND the queried session type uses topic-pair enrollment
-      // (e.g. summer SteamOji morning). Otherwise fall back to v1.
+      // Dual-mode partner — use v3 (slot-aware) for morning when the partner
+      // has singular location.timeSlots, regardless of morning enrollment mode
+      // (topic-pair OR individual both want per-slot capacity tracking).
+      // Afternoon has no slots in the current partner config; falls back to v1.
       const singularLocationHasSlots = (partner.location?.timeSlots?.length ?? 0) > 0;
-      const morningMode = getEnrollmentMode(partner, 'morning');
-      const morningUsesSlots = singularLocationHasSlots && morningMode === 'topic-pair';
+      const morningUsesSlots = singularLocationHasSlots;
 
       // If the caller passes sessionType=morning AND a time_slot AND morning uses slots,
       // use v3 for morning. We always fall back to v1 for afternoon (no slots in current model).

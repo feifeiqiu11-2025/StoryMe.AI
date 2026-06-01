@@ -126,8 +126,8 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       ageLabel: 'Ages 4–6',
       timeLabel: '9:45–10:45 AM or 11:00 AM–12:00 PM',
       shortDescription:
-        'Drama play, story spark, craft, and a printed storybook every other session',
-      enrollmentMode: 'topic-pair',
+        'Each Sunday is a standalone session — kids craft a story and take home their own printed mini-book',
+      enrollmentMode: 'individual',
     },
     afternoonProgram: {
       name: 'Creative Writer',
@@ -181,19 +181,17 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       {
         id: 'steamoji-summer-wk2',
         dateLabel: 'Sun, Jun 7, 2026',
-        theme: 'Time Master',
-        topicId: 'time-management',
-        topicLabel: 'Time Master',
+        theme: 'Plan My Day',
         morning: {
           time: '9:45–10:45 AM or 11:00 AM–12:00 PM',
           ageRange: 'Ages 4–6',
-          title: 'Time Master — Book Production & Share',
+          title: 'Plan My Day',
           description:
-            'Kids complete their Time Master story, produce a physical storybook, sign it, and present it in a share circle.',
+            'A story-style planning game — set goals, prioritize, and follow through.',
           highlights: [
-            'Story completion + detailed illustration',
-            'Physical storybook production',
-            'Book signing & share circle',
+            'Hands-on planning game',
+            'Story craft about a busy day',
+            'Take home a printed mini-book',
           ],
         },
         afternoon: {
@@ -212,21 +210,17 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       {
         id: 'steamoji-summer-wk3',
         dateLabel: 'Sun, Jun 14, 2026',
-        theme: 'Little Entrepreneur',
-        topicId: 'little-entrepreneur',
-        topicLabel: 'Little Entrepreneur',
-        themeDescription:
-          'Kids discover the basics of entrepreneurship — turning ideas into action, understanding value, planning, and sharing — through hands-on drama play that becomes a printed storybook.',
+        theme: 'Daddy & Me',
         morning: {
           time: '9:45–10:45 AM or 11:00 AM–12:00 PM',
           ageRange: 'Ages 4–6',
-          title: 'Little Entrepreneur — Story Spark & Drama Play',
+          title: 'Daddy & Me — Father\'s Day Book',
           description:
-            'Kids step into a drama-play scenario as a young entrepreneur — generating an idea, understanding what makes it valuable, and planning how to share it. They craft a character and shape the beginning of a guided story.',
+            'Design a personalized Father\'s Day book for Dad — ready for the big day.',
           highlights: [
-            'Drama play around ideas, value & sharing',
-            'Story spark + character craft',
-            'Beginning of a structured story plot',
+            'Personalized Father\'s Day storybook',
+            'Drawings & favorite memories of Dad',
+            'Take it home in time for Father\'s Day',
           ],
         },
         afternoon: {
@@ -243,18 +237,22 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
         },
       },
       {
-        // Father's Day weekend — afternoon Creative Writer continues; morning is dark.
-        // The morning slot uses an empty placeholder since topic-pair grouping is
-        // by topicId, so this session is naturally excluded from morning enrollment.
+        // Father's Day weekend — both morning Space Explorer (new standalone)
+        // and afternoon Creative Writer Chapter 3 run.
         id: 'steamoji-summer-wk-jun21',
         dateLabel: 'Sun, Jun 21, 2026',
-        theme: 'Creative Writer · Chapter 3',
+        theme: 'Space Explorer',
         morning: {
-          time: '',
-          ageRange: '',
-          title: '',
-          description: '',
-          highlights: [],
+          time: '9:45–10:45 AM or 11:00 AM–12:00 PM',
+          ageRange: 'Ages 4–6',
+          title: 'Space Explorer',
+          description:
+            'Explore planets and astronauts, then craft a space adventure story.',
+          highlights: [
+            'Space facts + hands-on activity',
+            'Design a spaceship & alien character',
+            'Take home a space-themed mini-book',
+          ],
         },
         afternoon: {
           time: '1:00 – 3:00 PM',
@@ -272,19 +270,17 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       {
         id: 'steamoji-summer-wk4',
         dateLabel: 'Sun, Jun 28, 2026',
-        theme: 'Little Entrepreneur',
-        topicId: 'little-entrepreneur',
-        topicLabel: 'Little Entrepreneur',
+        theme: 'Little Market',
         morning: {
           time: '9:45–10:45 AM or 11:00 AM–12:00 PM',
           ageRange: 'Ages 4–6',
-          title: 'Little Entrepreneur — Book Production & Share',
+          title: 'Little Market',
           description:
-            'Kids complete their Little Entrepreneur story, produce a physical storybook, sign it, and present it in a share circle.',
+            'Craft your own market goods and trade them with friends.',
           highlights: [
-            'Story completion + detailed illustration',
-            'Physical storybook production',
-            'Book signing & share circle',
+            'Craft your own market goods',
+            'Mini exchange with classmates',
+            'Take home a printed market booklet',
           ],
         },
         afternoon: {

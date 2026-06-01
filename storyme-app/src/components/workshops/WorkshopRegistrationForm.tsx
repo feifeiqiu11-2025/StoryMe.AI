@@ -175,6 +175,25 @@ export default function WorkshopRegistrationForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSeriesMode, selectedLocation, enrollableSessions.length, selectedSessionType]);
 
+  // Auto-select all FUTURE sessions for individual mode (e.g. summer SteamOji
+  // morning, now standalone per-session enrollment). Encourages full-summer
+  // bundle while still letting users deselect any week they can't make.
+  useEffect(() => {
+    if (isSeriesMode || isTopicPairMode || isSingleMode) return;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const futureIds = partner.sessions
+      .filter((s) => s.enrollable !== false)
+      .filter((s) => {
+        const d = new Date(s.dateLabel);
+        if (isNaN(d.getTime())) return true;
+        return d > today;
+      })
+      .map((s) => s.id);
+    setValue('selectedWorkshopIds', futureIds, { shouldValidate: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSeriesMode, isTopicPairMode, isSingleMode, selectedSessionType, partner.id]);
+
   // Auto-set session type for single mode
   useEffect(() => {
     if (isSingleMode) {
@@ -188,13 +207,14 @@ export default function WorkshopRegistrationForm({
     (partner.locations?.some(l => (l.timeSlots?.length ?? 0) > 0) ?? false) ||
     ((partner.location?.timeSlots?.length ?? 0) > 0);
 
-  // For dual-mode partners with singular-location slots, we currently only
-  // surface the slot picker for topic-pair enrollment (i.e. summer SteamOji
-  // morning). Series-mode afternoon does not use a slot picker.
+  // For dual-mode partners with singular-location slots, surface the slot
+  // picker for any morning enrollment (topic-pair OR individual). Slots are
+  // a morning-side artifact in the current partner config; afternoon series
+  // mode never uses them.
   const showSlotPicker = hasTimeSlots && (
     hasLocations // multi-location series (Avocado) always shows the picker
       ? !!selectedLocation
-      : isTopicPairMode // singular-location dual (SteamOji summer) only for topic-pair
+      : sessionTypeForMode === 'morning' // singular-location dual: morning only
   );
 
   // Effective location slug — multi-location partners use selection; singular
@@ -1624,13 +1644,20 @@ export default function WorkshopRegistrationForm({
                       >
                         {session.theme}
                       </span>
+                      <span
+                        className={`text-xs whitespace-nowrap ${
+                          isPast ? 'line-through text-gray-400' : 'text-gray-500'
+                        }`}
+                      >
+                        {session.dateLabel}
+                      </span>
                       {isPast && (
                         <span className="text-xs font-semibold text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
                           Completed
                         </span>
                       )}
                     </div>
-                    <div className="text-sm">
+                    <div className="text-sm text-right whitespace-nowrap">
                       {!isPast && hasDiscount && (
                         <span className="line-through text-gray-400 mr-1">
                           {formatWorkshopPrice(originalPricePerSession)}
@@ -1643,15 +1670,15 @@ export default function WorkshopRegistrationForm({
                       </span>
                     </div>
                   </div>
-                  {/* Row 2: Date + Time + Status */}
-                  <div className="flex items-center justify-between mt-1.5 ml-8">
-                    <span
-                      className={`text-sm ${isPast ? 'line-through text-gray-400' : 'text-gray-500'}`}
-                    >
-                      {session.dateLabel} · {sessionTimeLabel}
-                    </span>
-                    <div className="text-sm">
-                      {isPast ? null : spotsLeft !== null ? (
+                  {/* Row 2: Description + spots-left status (inline right) */}
+                  {(() => {
+                    const slot =
+                      sessionTypeKey === 'afternoon'
+                        ? session.afternoon
+                        : session.morning;
+                    const desc = slot?.description;
+                    const spotsBadge =
+                      isPast ? null : spotsLeft !== null ? (
                         isSoldOut ? (
                           <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
                             Sold out
@@ -1669,9 +1696,25 @@ export default function WorkshopRegistrationForm({
                         <span className="text-xs text-gray-400 animate-pulse">
                           checking...
                         </span>
-                      ) : null}
-                    </div>
-                  </div>
+                      ) : null;
+                    if (!desc && !spotsBadge) return null;
+                    return (
+                      <div className="flex items-start justify-between gap-3 mt-1.5 ml-8">
+                        {desc && (
+                          <p
+                            className={`text-sm flex-1 ${
+                              isPast ? 'line-through text-gray-400' : 'text-gray-600'
+                            }`}
+                          >
+                            {desc}
+                          </p>
+                        )}
+                        {spotsBadge && (
+                          <div className="flex-shrink-0">{spotsBadge}</div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </label>
               );
             })}
