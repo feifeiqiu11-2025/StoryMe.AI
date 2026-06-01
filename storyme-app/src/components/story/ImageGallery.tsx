@@ -619,7 +619,7 @@ export default function ImageGallery({
                         currentImageUrl={image.imageUrl}
                         imageType="scene"
                         imageId={image.id}
-                        illustrationStyle={artStyle === 'classic' ? 'classic' : artStyle === 'coloring' ? 'coloring' : artStyle === 'ghibli' ? 'ghibli' : 'pixar'}
+                        illustrationStyle={illustrationStyle ?? 'pixar'}
                         sceneDescription={image.sceneDescription}
                         characters={characters}
                         bibleLocations={storyBible?.locations ?? undefined}
