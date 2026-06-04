@@ -1266,7 +1266,7 @@ If the image shows only scenery with small figures, classify as "scenery".`;
 
   try {
     const result = await genAI.models.generateContent({
-      model: 'gemini-2.0-flash', // Use fast model for detection (no image generation needed)
+      model: 'gemini-2.5-flash', // Use fast model for detection (no image generation needed). gemini-2.0-flash was retired (404 NOT_FOUND).
       contents: [
         { text: detectionPrompt },
         {
@@ -1705,7 +1705,7 @@ JSON array:`;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       result = await genAI.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash', // gemini-2.0-flash was retired (404 NOT_FOUND)
         contents: [
           { text: prompt },
           {
@@ -3269,7 +3269,7 @@ Return ONLY the caption text, nothing else.`;
   let caption = '';
   try {
     const captionResult = await genAI.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash', // gemini-2.0-flash was retired (404 NOT_FOUND)
       contents: [
         { text: captionPrompt },
         {

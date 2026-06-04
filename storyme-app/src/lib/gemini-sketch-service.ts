@@ -135,7 +135,7 @@ Return ONLY valid JSON in this EXACT format (no markdown, no code blocks):
 
   try {
     const result = await genAI.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash', // gemini-2.0-flash was retired (404 NOT_FOUND)
       contents: [{ text: prompt }],
     });
 

@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       import_metadata: {
         original_filename: originalFilename,
         total_pages: pages.length,
-        gemini_model_used: 'gemini-2.0-flash',
+        gemini_model_used: 'gemini-2.5-flash',
       },
     } as any); // Cast to any since these fields may not be in type yet
 

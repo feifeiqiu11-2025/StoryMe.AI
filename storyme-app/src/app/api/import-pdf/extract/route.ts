@@ -89,7 +89,7 @@ async function extractPageContent(
   captionChinese: string;
 }> {
   const response = await genai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash', // gemini-2.0-flash was retired (404 NOT_FOUND)
     contents: [
       {
         role: 'user',
