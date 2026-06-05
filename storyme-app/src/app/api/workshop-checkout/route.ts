@@ -79,16 +79,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate time slot for partners with time slots.
-    // Slot picker only applies to:
+    // Slot picker applies to:
     //   - single-mode partners with locations[].timeSlots (e.g. Avocado)
-    //   - dual-mode partners with location.timeSlots AND topic-pair enrollment (e.g. summer SteamOji morning)
-    // For dual-mode singular-location series enrollment (e.g. summer SteamOji afternoon),
-    // no slot picker is shown so no validation is required.
+    //   - dual-mode singular-location partners for MORNING enrollment, whether
+    //     individual OR topic-pair (e.g. summer SteamOji morning). Time slots are
+    //     a morning-side artifact in the current partner config; afternoon series
+    //     enrollment has no slots, so no slot validation is required there.
+    //
+    // This MUST mirror the front-end `showSlotPicker` (morning-only for singular
+    // locations) and the availability RPC selection (`morningUsesSlots`). Gating on
+    // `enrollmentMode === 'topic-pair'` was the bug: summer SteamOji morning is
+    // `individual` but still uses slots, so checkout fell back to the slot-blind v1
+    // count and summed BOTH time slots — producing false "fully booked" errors when
+    // one slot was busy (the Week 2 11am case: open 11am slot blocked by a full 9:45am).
     const multiLocationHasSlots = partner.locations?.some(l => (l.timeSlots?.length ?? 0) > 0) ?? false;
     const singularLocationHasSlots = (partner.location?.timeSlots?.length ?? 0) > 0;
     const requiresSlotForThisRequest =
       multiLocationHasSlots ||
-      (singularLocationHasSlots && currentEnrollmentMode === 'topic-pair');
+      (singularLocationHasSlots && sessionTypeForQuery === 'morning');
 
     if (requiresSlotForThisRequest) {
       if (!validated.selectedTimeSlot) {
@@ -124,9 +132,12 @@ export async function POST(request: NextRequest) {
     const supabaseAvailability = createServiceRoleClient();
 
     // Use v3 RPC (location + time slot aware) for any registration that requires
-    // a slot. This includes single-mode partners (Avocado) and dual-mode partners
-    // with singular-location topic-pair enrollment (summer SteamOji morning).
-    // Dual-mode partners without slots fall back to v1 RPC.
+    // a slot. This includes single-mode partners (Avocado) and dual-mode
+    // singular-location MORNING enrollment (summer SteamOji morning — individual
+    // or topic-pair). Afternoon / slotless requests fall back to v1 RPC.
+    // Both RPCs count PAID registrations only (pending checkouts don't hold a
+    // slot — see 20260530 migration); v3 additionally scopes the count to the
+    // selected time slot, so a busy 9:45am slot no longer blocks an open 11am slot.
     const useLocationRpc = requiresSlotForThisRequest;
     const rpcName = useLocationRpc
       ? 'get_workshop_registration_counts_v3'
