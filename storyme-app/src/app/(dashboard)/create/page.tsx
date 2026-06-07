@@ -1115,9 +1115,24 @@ function CreateStoryPageInner() {
         );
       }
       if (!response.ok) {
-        savePreuploadFailed({ sceneNumber: img.sceneNumber, error: `http ${response.status}` });
+        // Surface the server's actual reason (route returns { error, details })
+        // so failures are diagnosable from the console instead of a generic 500.
+        let serverDetail = '';
+        try {
+          const errBody = await response.json();
+          serverDetail = errBody?.details || errBody?.error || '';
+        } catch {
+          /* non-JSON error body */
+        }
+        console.error(
+          `[uploadPendingBase64Images] scene ${img.sceneNumber} upload failed:`,
+          response.status,
+          serverDetail,
+          `(payload ~${Math.round((img.imageUrl?.length || 0) / 1024)}KB)`
+        );
+        savePreuploadFailed({ sceneNumber: img.sceneNumber, error: `http ${response.status}: ${serverDetail}` });
         throw new Error(
-          `Scene ${img.sceneNumber}'s image couldn't be uploaded (status ${response.status}). Try Save again.`
+          `Scene ${img.sceneNumber}'s image couldn't be uploaded (status ${response.status}${serverDetail ? `: ${serverDetail}` : ''}). Try Save again.`
         );
       }
       const data = await response.json();

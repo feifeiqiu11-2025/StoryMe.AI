@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
 import { generateImageWithGemini, generateImageWithGeminiClassic, generateImageWithGeminiColoring, isGeminiAvailable, GeminiCharacterInfo, clearOutfitCache, resolveGeminiImageModel } from '@/lib/gemini-image-client';
+import { openaiGenerateScene } from '@/lib/openai-image-client';
 import { parseScriptIntoScenes, buildConsistentSceneSettings, extractSceneLocation } from '@/lib/scene-parser';
-import { GeneratedImage, Character, CharacterRating, ClothingConsistency, ImageProvider, normalizeImageProvider, isGeminiProvider, isOpenAIProvider, DEFAULT_IMAGE_PROVIDER } from '@/lib/types/story';
+import { GeneratedImage, Character, CharacterRating, ClothingConsistency, ImageProvider, normalizeImageProvider, isGeminiProvider, isOpenAIProvider } from '@/lib/types/story';
 import { createClientFromRequest } from '@/lib/supabase/server';
 import { checkImageGenerationLimit, logApiUsage } from '@/lib/utils/rate-limit';
 import { StorageService } from '@/lib/services/storage.service';
@@ -75,15 +76,14 @@ export async function POST(request: NextRequest) {
     const defaultProvider = normalizeImageProvider(process.env.IMAGE_PROVIDER);
     const requestedProviderResolved: ImageProvider = normalizeImageProvider(requestedProvider) || defaultProvider;
 
-    // OpenAI gpt-image-2 is currently only implemented for character previews, NOT scene
-    // generation. If the user picked it for scenes, fall back to Gemini and surface a clear
-    // message. Without this, the route silently routes to FLUX and the user has no idea why
-    // their selection didn't take effect.
+    // OpenAI gpt-image-2 is now supported for scene generation (open to all users).
+    // It only requires an API key; if the key is missing we fall back to Gemini and
+    // surface a clear, user-friendly notice instead of silently downgrading.
     let imageProvider: ImageProvider = requestedProviderResolved;
     let providerFallback: string | null = null;
-    if (isOpenAIProvider(requestedProviderResolved)) {
+    if (isOpenAIProvider(requestedProviderResolved) && !process.env.OPENAI_API_KEY) {
       const fallbackTarget: ImageProvider = 'gemini-3.1';
-      providerFallback = `OpenAI gpt-image-2 isn't supported for scene generation yet (it's only available for character previews). Using ${fallbackTarget} for scenes.`;
+      providerFallback = `ChatGPT Image 2.0 isn't available right now. Using Nano Banana 2 for your scenes instead.`;
       console.warn(`[generate-images] ${providerFallback}`);
       imageProvider = fallbackTarget;
     }
@@ -93,9 +93,10 @@ export async function POST(request: NextRequest) {
       console.warn(`${imageProvider} requested but Gemini not available, falling back to FLUX`);
     }
 
+    const useOpenAI = isOpenAIProvider(imageProvider);
     const useGemini = isGeminiProvider(imageProvider) && isGeminiAvailable();
     const geminiModelId = useGemini ? resolveGeminiImageModel(imageProvider) : undefined;
-    console.log(`🎨 Using image provider: ${useGemini ? `Gemini (${geminiModelId})` : 'FLUX'}`);
+    console.log(`🎨 Using image provider: ${useOpenAI ? 'OpenAI (gpt-image-2)' : useGemini ? `Gemini (${geminiModelId})` : 'FLUX'}`);
 
 
     // Validate inputs
@@ -387,40 +388,30 @@ export async function POST(request: NextRequest) {
             });
           }
 
-          // IMPORTANT: Upload Gemini base64 images to Supabase Storage
-          // This converts data:image/... URLs to proper CDN URLs for:
-          // 1. Better mobile app compatibility
-          // 2. Reduced database storage (no multi-MB base64 strings)
-          // 3. Faster page loads with CDN caching
-          if (result.imageUrl.startsWith('data:')) {
-            const storageService = new StorageService(supabase);
-            let uploaded = false;
-
-            // Try upload twice with a short delay between attempts
-            for (let attempt = 1; attempt <= 2; attempt++) {
-              try {
-                const uploadResult = await storageService.uploadGeneratedImageFromBase64(
-                  `temp-${requestId}`,
-                  scene.id,
-                  result.imageUrl
-                );
-                console.log(`[Storage] Uploaded Gemini image for scene ${scene.sceneNumber} (attempt ${attempt}): ${uploadResult.url}`);
-                result.imageUrl = uploadResult.url;
-                uploaded = true;
-                break;
-              } catch (uploadError) {
-                console.warn(`[Storage] Upload attempt ${attempt}/2 failed for scene ${scene.sceneNumber}:`, uploadError);
-                if (attempt < 2) {
-                  await new Promise(r => setTimeout(r, 2000));
-                }
-              }
-            }
-
-            if (!uploaded) {
-              console.warn(`[Storage] All upload attempts failed for scene ${scene.sceneNumber}. Base64 will be uploaded client-side before save.`);
-              // Keep base64 — the client's uploadPendingBase64Images() will handle it before save
-            }
-          }
+        } else if (useOpenAI) {
+          // OpenAI gpt-image-2 — multi-reference scene generation.
+          // Cover (scene 0) stays colorful even in coloring-book mode, matching Gemini.
+          const isCoverScene = scene.sceneNumber === 0;
+          const effectiveStyle = (selectedIllustrationStyle === 'coloring' && isCoverScene)
+            ? 'pixar'
+            : selectedIllustrationStyle;
+          console.log(`[Scene ${scene.sceneNumber}] Using OpenAI gpt-image-2 (${effectiveStyle})`);
+          result = await openaiGenerateScene({
+            characters: sceneCharacters.map(char => ({
+              name: char.name,
+              referenceImageUrl: char.referenceImageUrl,
+              descriptionText: char.description?.fullDescription
+                || [
+                  char.description?.age,
+                  char.description?.hairColor && `${char.description.hairColor} hair`,
+                  char.description?.clothing && `wearing ${char.description.clothing}`,
+                ].filter(Boolean).join(', ')
+                || undefined,
+            })),
+            sceneDescription: sceneDescriptionForPrompt,
+            styleVariant: effectiveStyle,
+            artStyle,
+          });
         } else {
           // Use FLUX LoRA (text-based prompts only)
           result = await generateImageWithMultipleCharacters({
@@ -431,6 +422,40 @@ export async function POST(request: NextRequest) {
             emphasizeGenericCharacters: true,
             storySeed: storySeed,
           });
+        }
+
+        // Upload base64 (data:) results to Supabase Storage. Both Gemini and
+        // OpenAI return data URLs; converting to CDN URLs gives better mobile
+        // compatibility, smaller DB rows, and faster loads. FLUX already returns
+        // a hosted URL, so this is skipped for it.
+        if (result.imageUrl.startsWith('data:')) {
+          const storageService = new StorageService(supabase);
+          let uploaded = false;
+
+          // Try upload twice with a short delay between attempts
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+              const uploadResult = await storageService.uploadGeneratedImageFromBase64(
+                `temp-${requestId}`,
+                scene.id,
+                result.imageUrl
+              );
+              console.log(`[Storage] Uploaded image for scene ${scene.sceneNumber} (attempt ${attempt}): ${uploadResult.url}`);
+              result.imageUrl = uploadResult.url;
+              uploaded = true;
+              break;
+            } catch (uploadError) {
+              console.warn(`[Storage] Upload attempt ${attempt}/2 failed for scene ${scene.sceneNumber}:`, uploadError);
+              if (attempt < 2) {
+                await new Promise(r => setTimeout(r, 2000));
+              }
+            }
+          }
+
+          if (!uploaded) {
+            console.warn(`[Storage] All upload attempts failed for scene ${scene.sceneNumber}. Base64 will be uploaded client-side before save.`);
+            // Keep base64 — the client's uploadPendingBase64Images() will handle it before save
+          }
         }
 
         // Create character ratings array for this scene
@@ -529,8 +554,8 @@ export async function POST(request: NextRequest) {
       totalScenes: scenes.length,
       successfulScenes: successfulCount,
       limits: rateLimitCheck.limits,
-      imageProvider: useGemini ? 'gemini' : 'flux', // Report which provider was used
-      providerFallback,  // Non-null when the requested provider isn't supported for scenes (e.g., openai-gpt-image-2 → Gemini)
+      imageProvider: useOpenAI ? 'openai-gpt-image-2' : useGemini ? 'gemini' : 'flux', // Report which provider was used
+      providerFallback,  // Non-null only when OpenAI was requested but unavailable (missing key) → Gemini
     });
   } catch (error) {
     console.error('Generate images error:', error);

@@ -39,7 +39,7 @@ import {
   isGeminiAvailable,
   type GeminiCharacterInfo,
 } from '@/lib/gemini-image-client';
-import { callOpenAIImage } from '@/lib/openai-image-client';
+import { callOpenAIImage, getSceneImageQuality } from '@/lib/openai-image-client';
 import {
   normalizeImageProvider,
   isGeminiProvider,
@@ -356,6 +356,7 @@ async function runOpenAI({
   const { b64 } = await callOpenAIImage({
     prompt: fullPrompt,
     referenceImageBuffer: buffers.length > 0 ? buffers : undefined,
+    quality: getSceneImageQuality(), // same knob as scene generation (default 'medium')
     logTag: 'chapter-book-generate',
   });
   return Buffer.from(b64, 'base64');

@@ -8,6 +8,7 @@
  * function delegates to its OpenAI sibling here.
  */
 
+import sharp from 'sharp';
 import { OPENAI_IMAGE_MODEL, type ImageMedium } from './types/story';
 import {
   buildKidCreationPrompt,
@@ -25,6 +26,30 @@ import type {
 } from './gemini-image-client';
 
 const MAX_RETRIES = 3;
+
+type OpenAIQuality = 'low' | 'medium' | 'high' | 'auto';
+
+function resolveQuality(value: string | undefined, fallback: OpenAIQuality): OpenAIQuality {
+  return value === 'low' || value === 'medium' || value === 'high' || value === 'auto'
+    ? value
+    : fallback;
+}
+
+/**
+ * Quality for story scene generation AND the edit-scene editor route — one knob
+ * keeps them in lockstep. Tunable via OPENAI_SCENE_QUALITY (default 'medium').
+ */
+export function getSceneImageQuality(): OpenAIQuality {
+  return resolveQuality(process.env.OPENAI_SCENE_QUALITY, 'medium');
+}
+
+/**
+ * Quality for character previews. Separate knob so hero-character art can be
+ * tuned independently of scenes. Tunable via OPENAI_PREVIEW_QUALITY (default 'medium').
+ */
+export function getPreviewImageQuality(): OpenAIQuality {
+  return resolveQuality(process.env.OPENAI_PREVIEW_QUALITY, 'medium');
+}
 
 // ============================================================================
 // SHARED OPENAI HELPERS
@@ -49,6 +74,27 @@ async function downloadImageAsBuffer(url: string): Promise<Buffer> {
   return Buffer.from(arrayBuffer);
 }
 
+/**
+ * Re-encode arbitrary image bytes (JPEG/WebP/PNG/GIF/HEIC-decoded) to real PNG.
+ * Reference images reach us in mixed formats — client uploads are JPEG, editor
+ * uploads are WebP, AI-generated images are PNG. We hand OpenAI's images.edit a
+ * file named `reference.png` with `type: 'image/png'`, so bytes that are actually
+ * WebP/JPEG are mislabeled and can be rejected. Normalizing guarantees the bytes
+ * match the label and strips EXIF. On failure we fall back to the original bytes
+ * rather than dropping the reference entirely.
+ */
+async function normalizeToPng(buf: Buffer): Promise<Buffer> {
+  try {
+    return await sharp(buf, { failOn: 'error' }).rotate().png().toBuffer();
+  } catch (err) {
+    console.warn(
+      '[openai-image] PNG normalize failed, using original bytes:',
+      err instanceof Error ? err.message : err
+    );
+    return buf;
+  }
+}
+
 interface CallOpenAIParams {
   prompt: string;
   /**
@@ -63,6 +109,13 @@ interface CallOpenAIParams {
    */
   referenceImageBuffer?: Buffer | Buffer[];
   size?: '1024x1024' | '1024x1536' | '1536x1024';
+  /**
+   * Render quality. Defaults to 'high' as a safe fallback; in practice every
+   * caller passes an explicit value (scenes/editor → getSceneImageQuality,
+   * previews → getPreviewImageQuality, both default 'medium'). Lower values
+   * trade fidelity for much faster gpt-image renders.
+   */
+  quality?: 'low' | 'medium' | 'high' | 'auto';
   logTag: string;
 }
 
@@ -71,17 +124,24 @@ export async function callOpenAIImage({
   prompt,
   referenceImageBuffer,
   size = '1024x1024',
+  quality = 'high',
   logTag,
 }: CallOpenAIParams): Promise<{ b64: string; mimeType: string }> {
   const { client, toFile } = await getOpenAIClient();
 
   // Normalize to an array. [] = text-only generate; [single] = legacy
   // single-edit; [a, b, …] = multi-image edit.
-  const buffers: Buffer[] = referenceImageBuffer
+  const rawBuffers: Buffer[] = referenceImageBuffer
     ? Array.isArray(referenceImageBuffer)
       ? referenceImageBuffer
       : [referenceImageBuffer]
     : [];
+
+  // Re-encode each reference to real PNG bytes so they match the `image/png`
+  // file label we send below (uploads arrive as mixed JPEG/WebP/PNG).
+  const buffers: Buffer[] = rawBuffers.length
+    ? await Promise.all(rawBuffers.map(normalizeToPng))
+    : rawBuffers;
 
   let lastError: Error | null = null;
   // Tracks whether we've already fallen back from array → single image
@@ -102,7 +162,7 @@ export async function callOpenAIImage({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           size: size as any,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          quality: 'high' as any,
+          quality: quality as any,
           n: 1,
         });
       } else if (buffers.length === 1 || multiImageFellBack) {
@@ -118,7 +178,7 @@ export async function callOpenAIImage({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           size: size as any,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          quality: 'high' as any,
+          quality: quality as any,
         });
       } else {
         // Multi-image edit. SDK type accepts an array; gpt-image-2 may
@@ -138,7 +198,7 @@ export async function callOpenAIImage({
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             size: size as any,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            quality: 'high' as any,
+            quality: quality as any,
           });
         } catch (multiErr) {
           const msg = multiErr instanceof Error ? multiErr.message : String(multiErr);
@@ -281,6 +341,7 @@ export async function openaiGenerateCharacterPreview(
     prompt,
     referenceImageBuffer: buffer,
     size: '1024x1024',
+    quality: getPreviewImageQuality(),
     logTag: 'OpenAI Pixar',
   });
 
@@ -321,6 +382,7 @@ export async function openaiGenerateCharacterPreviewClassic(
     prompt,
     referenceImageBuffer: buffer,
     size: '1024x1024',
+    quality: getPreviewImageQuality(),
     logTag: 'OpenAI Classic',
   });
 
@@ -357,6 +419,7 @@ export async function openaiGenerateNonHumanPreview(
     prompt,
     referenceImageBuffer: buffer,
     size: '1024x1024',
+    quality: getPreviewImageQuality(),
     logTag: 'OpenAI NonHuman Pixar',
   });
 
@@ -394,6 +457,7 @@ export async function openaiGenerateNonHumanPreviewClassic(
     prompt,
     referenceImageBuffer: buffer,
     size: '1024x1024',
+    quality: getPreviewImageQuality(),
     logTag: 'OpenAI NonHuman Classic',
   });
 
@@ -427,6 +491,7 @@ export async function openaiGenerateDescriptionOnlyPreview(
   const { b64, mimeType } = await callOpenAIImage({
     prompt,
     size: '1024x1024',
+    quality: getPreviewImageQuality(),
     logTag: 'OpenAI DescOnly Pixar',
   });
 
@@ -459,6 +524,7 @@ export async function openaiGenerateDescriptionOnlyPreviewClassic(
   const { b64, mimeType } = await callOpenAIImage({
     prompt,
     size: '1024x1024',
+    quality: getPreviewImageQuality(),
     logTag: 'OpenAI DescOnly Classic',
   });
 
@@ -466,5 +532,148 @@ export async function openaiGenerateDescriptionOnlyPreviewClassic(
     imageUrl: `data:${mimeType};base64,${b64}`,
     generationTime: (Date.now() - startTime) / 1000,
     prompt,
+  };
+}
+
+// ============================================================================
+// STORY SCENE GENERATION
+// ============================================================================
+
+/** A single character/subject reference for a scene. */
+export interface OpenAISceneRef {
+  name: string;
+  referenceImageUrl: string;
+  /** Short trait/description line used to label the reference in the prompt. */
+  descriptionText?: string;
+}
+
+export interface OpenAISceneParams {
+  characters: OpenAISceneRef[];
+  sceneDescription: string;
+  /** Visual style for the scene. Mirrors the Gemini illustration styles. */
+  styleVariant?: 'pixar' | 'classic' | 'ghibli' | 'coloring';
+  /** Optional free-form art style; only used when no styleVariant matches. */
+  artStyle?: string;
+  /** OpenAI fixed output size. Defaults to landscape for scenes. */
+  size?: '1024x1024' | '1024x1536' | '1536x1024';
+}
+
+export interface OpenAISceneResult {
+  imageUrl: string; // data:image/jpeg;base64,... (PNG fallback if compression fails)
+  prompt: string;
+  generationTime: number;
+}
+
+/** Style line per illustration variant — kept explicit (not the generic
+ *  artStyle string) so each look is reproducible. */
+const SCENE_STYLE_LINES: Record<NonNullable<OpenAISceneParams['styleVariant']>, string> = {
+  pixar:
+    '3D Pixar-style animated illustration — soft cinematic lighting, vibrant saturated colors, rounded friendly shapes, gentle depth of field.',
+  classic:
+    "2D classic children's storybook illustration — soft watercolor textures, warm cozy colors, hand-drawn feel.",
+  ghibli:
+    'Studio Ghibli-inspired 2D illustration — painterly backgrounds, soft natural light, gentle muted colors, hand-painted feel.',
+  coloring:
+    'Black-and-white coloring-book line art — clean bold even outlines, NO shading, NO color, pure white background, simple shapes a child can color in.',
+};
+
+/**
+ * Generate a full story scene with OpenAI gpt-image-2.
+ *
+ * Sibling to the Gemini scene generators (generateImageWithGemini*). Downloads
+ * every character/subject reference, sends them all as edit references (the
+ * client normalizes formats + handles multi-image fallback), and returns a
+ * data URL in the same shape the Gemini generators return so callers can treat
+ * the result identically (upload base64 → storage).
+ */
+export async function openaiGenerateScene({
+  characters,
+  sceneDescription,
+  styleVariant,
+  artStyle,
+  size,
+}: OpenAISceneParams): Promise<OpenAISceneResult> {
+  const startTime = Date.now();
+  const variant = styleVariant || 'classic';
+  const styleLine = SCENE_STYLE_LINES[variant] || artStyle || SCENE_STYLE_LINES.classic;
+
+  // Fetch references as (ref, buffer) pairs so labels stay aligned with the
+  // images we actually downloaded — a failed fetch drops both, not just one.
+  const refs = characters.filter((c) => c.referenceImageUrl && c.referenceImageUrl.trim());
+  const fetched = (
+    await Promise.all(
+      refs.map(async (c) => {
+        try {
+          return { ref: c, buf: await downloadImageAsBuffer(c.referenceImageUrl) };
+        } catch (err) {
+          console.warn(
+            `[openai-scene] reference fetch failed for "${c.name}":`,
+            err instanceof Error ? err.message : err
+          );
+          return null;
+        }
+      })
+    )
+  ).filter((x): x is { ref: OpenAISceneRef; buf: Buffer } => x !== null);
+
+  const buffers = fetched.map((f) => f.buf);
+  const labels = fetched.map((f) =>
+    f.ref.descriptionText ? `${f.ref.name} — ${f.ref.descriptionText}` : f.ref.name
+  );
+
+  // Build the prompt: scene first (most important), then labeled references,
+  // then style, then safety guidance.
+  const lines: string[] = [
+    "Children's picture book illustration for ages 5–8.",
+    '',
+    `Scene: ${sceneDescription}`,
+  ];
+  if (labels.length > 0) {
+    lines.push(
+      '',
+      'Use the attached reference images. Each subject (character, animal, object, or setting) must appear faithfully — keep its appearance, colors, and key features intact:'
+    );
+    labels.forEach((label, i) => lines.push(`  - Image ${i + 1}: ${label}`));
+  }
+  lines.push('', `Style: ${styleLine}`);
+  lines.push(
+    '',
+    'Keep it age-appropriate, warm, and free of scary content. Avoid text in the image unless the scene specifically requires it.'
+  );
+  const prompt = lines.join('\n');
+
+  // Scene quality (shared with the edit-scene editor route) — gpt-image 'high'
+  // is ~10-20x slower than Gemini, so default to 'medium'.
+  const sceneQuality = getSceneImageQuality();
+
+  const { b64 } = await callOpenAIImage({
+    prompt,
+    referenceImageBuffer: buffers.length > 0 ? buffers : undefined,
+    size: size || '1536x1024',
+    quality: sceneQuality,
+    logTag: `OpenAI Scene (${sceneQuality})`,
+  });
+
+  // OpenAI returns large lossless PNG. Re-encode to JPEG (capped at 1536px) so the
+  // image is small enough to upload/round-trip reliably (PNG base64 was failing the
+  // save step) and to cut storage/DB bloat. JPEG (not WebP) because the create-flow
+  // storybook PDF uses @react-pdf, which only decodes PNG/JPEG — WebP renders blank.
+  // Scenes are full-frame illustrations with no transparency, so JPEG is safe.
+  // Falls back to the raw PNG on failure.
+  let imageUrl = `data:image/png;base64,${b64}`;
+  try {
+    const jpeg = await sharp(Buffer.from(b64, 'base64'))
+      .resize(1536, 1536, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85, mozjpeg: true })
+      .toBuffer();
+    imageUrl = `data:image/jpeg;base64,${jpeg.toString('base64')}`;
+  } catch (err) {
+    console.warn('[openai-scene] JPEG compression failed, keeping PNG:', err instanceof Error ? err.message : err);
+  }
+
+  return {
+    imageUrl,
+    prompt,
+    generationTime: (Date.now() - startTime) / 1000,
   };
 }

@@ -12,8 +12,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo, sceneContainsAnimals } from '@/lib/fal-client';
 import { generateImageWithGemini, generateImageWithGeminiClassic, isGeminiAvailable, GeminiCharacterInfo, resolveGeminiImageModel } from '@/lib/gemini-image-client';
+import { openaiGenerateScene } from '@/lib/openai-image-client';
 import { extractSceneLocation } from '@/lib/scene-parser';
-import { Character, ClothingConsistency, ImageProvider, normalizeImageProvider, isGeminiProvider } from '@/lib/types/story';
+import { Character, ClothingConsistency, ImageProvider, normalizeImageProvider, isGeminiProvider, isOpenAIProvider } from '@/lib/types/story';
 import { createClient } from '@/lib/supabase/server';
 import { StorageService } from '@/lib/services/storage.service';
 import OpenAI from 'openai';
@@ -183,11 +184,17 @@ export async function POST(request: NextRequest) {
 
     // Determine which image provider to use
     const defaultProvider = normalizeImageProvider(process.env.IMAGE_PROVIDER);
-    const imageProvider: ImageProvider = normalizeImageProvider(requestedProvider) || defaultProvider;
+    let imageProvider: ImageProvider = normalizeImageProvider(requestedProvider) || defaultProvider;
+    // OpenAI needs only an API key; fall back to Gemini with a clear log if missing.
+    if (isOpenAIProvider(imageProvider) && !process.env.OPENAI_API_KEY) {
+      console.warn('[Regenerate] ChatGPT Image 2.0 unavailable (missing key) — using Gemini.');
+      imageProvider = 'gemini-3.1';
+    }
+    const useOpenAI = isOpenAIProvider(imageProvider);
     const useGemini = isGeminiProvider(imageProvider) && isGeminiAvailable();
     const geminiModelId = useGemini ? resolveGeminiImageModel(imageProvider) : undefined;
 
-    console.log(`[Regenerate] Using provider: ${useGemini ? 'Gemini' : 'FLUX'}, style: ${selectedIllustrationStyle}`);
+    console.log(`[Regenerate] Using provider: ${useOpenAI ? 'OpenAI (gpt-image-2)' : useGemini ? 'Gemini' : 'FLUX'}, style: ${selectedIllustrationStyle}`);
 
     // Validate inputs
     if (!sceneId || !sceneNumber) {
@@ -332,6 +339,41 @@ export async function POST(request: NextRequest) {
           console.warn(`[Regenerate] Failed to upload Gemini image, keeping base64:`, uploadError);
         }
       }
+    } else if (useOpenAI) {
+      // OpenAI gpt-image-2 — multi-reference scene regeneration.
+      result = await openaiGenerateScene({
+        characters: characterPrompts.map(char => ({
+          name: char.name,
+          referenceImageUrl: char.referenceImageUrl,
+          descriptionText: char.description?.fullDescription
+            || [
+              char.description?.age,
+              char.description?.hairColor && `${char.description.hairColor} hair`,
+              char.description?.clothing && `wearing ${char.description.clothing}`,
+            ].filter(Boolean).join(', ')
+            || undefined,
+        })),
+        sceneDescription: refinedPrompt,
+        styleVariant: selectedIllustrationStyle,
+        artStyle,
+      });
+
+      // Upload base64 result to storage (same as the Gemini path).
+      if (result.imageUrl.startsWith('data:')) {
+        try {
+          const supabase = await createClient();
+          const storageService = new StorageService(supabase);
+          const uploaded = await storageService.uploadGeneratedImageFromBase64(
+            `temp-${requestId}`,
+            sceneId,
+            result.imageUrl
+          );
+          console.log(`[Regenerate] Uploaded OpenAI image to: ${uploaded.url}`);
+          result.imageUrl = uploaded.url;
+        } catch (uploadError) {
+          console.warn(`[Regenerate] Failed to upload OpenAI image, keeping base64:`, uploadError);
+        }
+      }
     } else {
       // Use FLUX LoRA (text-based prompts only)
       result = await generateImageWithMultipleCharacters({
@@ -365,7 +407,7 @@ export async function POST(request: NextRequest) {
           characterName: char.name,
         })),
       },
-      imageProvider: useGemini ? 'gemini' : 'flux',
+      imageProvider: useOpenAI ? 'openai-gpt-image-2' : useGemini ? 'gemini' : 'flux',
     });
 
   } catch (error) {

@@ -323,7 +323,7 @@ export const IMAGE_PROVIDER_OPTIONS: Array<{
   {
     value: 'openai-gpt-image-2',
     label: 'ChatGPT Image 2.0',
-    description: 'OpenAI — best for kid drawings (admin only)',
+    description: 'OpenAI — great for kid drawings',
     isNew: true,
   },
   {
