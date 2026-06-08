@@ -554,7 +554,7 @@ export interface OpenAISceneParams {
   styleVariant?: 'pixar' | 'classic' | 'ghibli' | 'coloring';
   /** Optional free-form art style; only used when no styleVariant matches. */
   artStyle?: string;
-  /** OpenAI fixed output size. Defaults to landscape for scenes. */
+  /** OpenAI fixed output size. Defaults to square (1024x1024) for picture-book scenes. */
   size?: '1024x1024' | '1024x1536' | '1536x1024';
 }
 
@@ -649,7 +649,7 @@ export async function openaiGenerateScene({
   const { b64 } = await callOpenAIImage({
     prompt,
     referenceImageBuffer: buffers.length > 0 ? buffers : undefined,
-    size: size || '1536x1024',
+    size: size || '1024x1024',
     quality: sceneQuality,
     logTag: `OpenAI Scene (${sceneQuality})`,
   });
