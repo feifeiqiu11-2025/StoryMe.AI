@@ -3,7 +3,7 @@ import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/
 import { generateImageWithGemini, generateImageWithGeminiClassic, generateImageWithGeminiColoring, isGeminiAvailable, GeminiCharacterInfo, clearOutfitCache, resolveGeminiImageModel } from '@/lib/gemini-image-client';
 import { openaiGenerateScene } from '@/lib/openai-image-client';
 import { parseScriptIntoScenes, buildConsistentSceneSettings, extractSceneLocation } from '@/lib/scene-parser';
-import { GeneratedImage, Character, CharacterRating, ClothingConsistency, ImageProvider, normalizeImageProvider, isGeminiProvider, isOpenAIProvider } from '@/lib/types/story';
+import { GeneratedImage, Character, CharacterRating, ClothingConsistency, ImageProvider, normalizeImageProvider, isGeminiProvider, isOpenAIProvider, DEFAULT_SCENE_IMAGE_PROVIDER } from '@/lib/types/story';
 import { createClientFromRequest } from '@/lib/supabase/server';
 import { checkImageGenerationLimit, logApiUsage } from '@/lib/utils/rate-limit';
 import { StorageService } from '@/lib/services/storage.service';
@@ -71,10 +71,13 @@ export async function POST(request: NextRequest) {
     const selectedIllustrationStyle: IllustrationStyle = illustrationStyle || 'classic';
     console.log(`🎨 Illustration style: ${selectedIllustrationStyle}`);
 
-    // Determine which image provider to use
-    // Priority: request param > env var > default
-    const defaultProvider = normalizeImageProvider(process.env.IMAGE_PROVIDER);
-    const requestedProviderResolved: ImageProvider = normalizeImageProvider(requestedProvider) || defaultProvider;
+    // Determine which image provider to use.
+    // Priority: request param > IMAGE_PROVIDER env var > scene default (gpt-image-2).
+    const requestedProviderResolved: ImageProvider = requestedProvider
+      ? normalizeImageProvider(requestedProvider)
+      : process.env.IMAGE_PROVIDER
+        ? normalizeImageProvider(process.env.IMAGE_PROVIDER)
+        : DEFAULT_SCENE_IMAGE_PROVIDER;
 
     // OpenAI gpt-image-2 is now supported for scene generation (open to all users).
     // It only requires an API key; if the key is missing we fall back to Gemini and

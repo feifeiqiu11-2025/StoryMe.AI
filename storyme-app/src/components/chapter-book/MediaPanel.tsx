@@ -17,8 +17,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { thumbnailUrl } from '@/lib/utils/image-transform';
 import {
-  IMAGE_PROVIDER_OPTIONS,
-  DEFAULT_IMAGE_PROVIDER,
+  VISIBLE_IMAGE_PROVIDER_OPTIONS,
+  DEFAULT_SCENE_IMAGE_PROVIDER,
   type ImageProvider,
 } from '@/lib/types/story';
 import {
@@ -247,7 +247,7 @@ function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; us
   // Default to 3D Pixar — matches the picture-book default (also 'pixar')
   // so kids get a consistent first impression across the two flows.
   const [artStyle, setArtStyle] = useState<'pixar' | 'classic' | 'coloring' | ''>('pixar');
-  const [imageProvider, setImageProvider] = useState<ImageProvider>(DEFAULT_IMAGE_PROVIDER);
+  const [imageProvider, setImageProvider] = useState<ImageProvider>(DEFAULT_SCENE_IMAGE_PROVIDER);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -608,7 +608,7 @@ function GenerateTab({ onPick, userId }: { onPick: MediaPanelProps['onPick']; us
             onChange={(e) => setImageProvider(e.target.value as ImageProvider)}
             className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            {IMAGE_PROVIDER_OPTIONS.map((opt) => (
+            {VISIBLE_IMAGE_PROVIDER_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>

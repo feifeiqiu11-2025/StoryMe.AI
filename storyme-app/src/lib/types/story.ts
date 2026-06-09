@@ -290,8 +290,16 @@ export interface ProjectScene {
 /** Image generation provider — selects both the service and model version */
 export type ImageProvider = 'flux' | 'gemini-2.5' | 'gemini-3.1' | 'openai-gpt-image-2';
 
-/** Default image provider for new stories */
+/** Default image provider for new stories (character previews, covers, etc.) */
 export const DEFAULT_IMAGE_PROVIDER: ImageProvider = 'gemini-3.1';
+
+/**
+ * Default image provider for picture-book and chapter-book SCENE generation.
+ * Scenes default to OpenAI gpt-image-2; character previews still use
+ * DEFAULT_IMAGE_PROVIDER (Gemini) since they generate many previews per
+ * character and benefit from the faster/cheaper model.
+ */
+export const DEFAULT_SCENE_IMAGE_PROVIDER: ImageProvider = 'openai-gpt-image-2';
 
 /** Mapping from Gemini provider values to actual Google model IDs */
 export const GEMINI_IMAGE_MODELS: Record<'gemini-2.5' | 'gemini-3.1', string> = {
@@ -308,6 +316,8 @@ export const IMAGE_PROVIDER_OPTIONS: Array<{
   label: string;
   description: string;
   isNew?: boolean;
+  /** Hidden from the picker UI (kept in the type so older saved drafts still resolve). */
+  hidden?: boolean;
 }> = [
   {
     value: 'gemini-3.1',
@@ -319,6 +329,7 @@ export const IMAGE_PROVIDER_OPTIONS: Array<{
     value: 'gemini-2.5',
     label: 'Nano Banana',
     description: 'Proven quality, stable',
+    hidden: true,
   },
   {
     value: 'openai-gpt-image-2',
@@ -330,8 +341,12 @@ export const IMAGE_PROVIDER_OPTIONS: Array<{
     value: 'flux',
     label: 'Fal.ai FLUX',
     description: 'Fast, text-based descriptions',
+    hidden: true,
   },
 ];
+
+/** Picker-visible subset of IMAGE_PROVIDER_OPTIONS (excludes hidden/legacy models). */
+export const VISIBLE_IMAGE_PROVIDER_OPTIONS = IMAGE_PROVIDER_OPTIONS.filter((o) => !o.hidden);
 
 /** Normalize legacy 'gemini' value and validate provider strings */
 export function normalizeImageProvider(provider?: string): ImageProvider {

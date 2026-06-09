@@ -17,7 +17,7 @@ import { ArtStyleType } from '@/components/story/StyleSelector';
 import GenerationProgress from '@/components/story/GenerationProgress';
 import ImageGallery from '@/components/story/ImageGallery';
 import FeedbackModal from '@/components/feedback/FeedbackModal';
-import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScene, ExpansionLevel, ClothingConsistency, ImageProvider, DEFAULT_IMAGE_PROVIDER } from '@/lib/types/story';
+import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScene, ExpansionLevel, ClothingConsistency, ImageProvider, DEFAULT_SCENE_IMAGE_PROVIDER, VISIBLE_IMAGE_PROVIDER_OPTIONS } from '@/lib/types/story';
 import type { StoryBibleResult } from '@/lib/ai/scene-enhancer';
 import { StoryTemplateId, STORY_TEMPLATES } from '@/lib/ai/story-templates';
 import { parseScriptIntoScenes } from '@/lib/scene-parser';
@@ -99,7 +99,7 @@ function CreateStoryPageInner() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [imageGenerationStatus, setImageGenerationStatus] = useState<GeneratedImage[]>([]);
-  const [imageProvider, setImageProvider] = useState<ImageProvider>(DEFAULT_IMAGE_PROVIDER);
+  const [imageProvider, setImageProvider] = useState<ImageProvider>(DEFAULT_SCENE_IMAGE_PROVIDER);
 
   // Art style selection (3D Pixar default for better quality)
   const [artStyle, setArtStyle] = useState<ArtStyleType>('pixar');
@@ -393,7 +393,12 @@ function CreateStoryPageInner() {
         if (meta.clothingConsistency) setClothingConsistency(meta.clothingConsistency as ClothingConsistency);
         if (meta.expansionLevel) setExpansionLevel(meta.expansionLevel as ExpansionLevel);
         if (meta.artStyle) setArtStyle(meta.artStyle as ArtStyleType);
-        if (meta.imageProvider) setImageProvider(meta.imageProvider as ImageProvider);
+        if (meta.imageProvider) {
+          // Coerce drafts saved with a now-hidden/legacy model to the current default.
+          const savedProvider = meta.imageProvider as ImageProvider;
+          const stillVisible = VISIBLE_IMAGE_PROVIDER_OPTIONS.some((o) => o.value === savedProvider);
+          setImageProvider(stillVisible ? savedProvider : DEFAULT_SCENE_IMAGE_PROVIDER);
+        }
         if (meta.secondaryLanguage) {
           setSecondaryLanguage(meta.secondaryLanguage);
         } else if (meta.generateChineseTranslation === true) {

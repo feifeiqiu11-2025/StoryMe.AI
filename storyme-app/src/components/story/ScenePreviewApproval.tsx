@@ -7,7 +7,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { EnhancedScene, ImageProvider, IMAGE_PROVIDER_OPTIONS, DEFAULT_IMAGE_PROVIDER } from '@/lib/types/story';
+import { EnhancedScene, ImageProvider, VISIBLE_IMAGE_PROVIDER_OPTIONS, DEFAULT_SCENE_IMAGE_PROVIDER } from '@/lib/types/story';
 import { getLanguageLabel } from '@/lib/config/languages';
 import type { StoryBibleResult } from '@/lib/ai/scene-enhancer';
 
@@ -87,7 +87,7 @@ export default function ScenePreviewApproval({
   secondaryLanguage = null,
   artStyle = 'classic',
   onArtStyleChange,
-  imageProvider = DEFAULT_IMAGE_PROVIDER,
+  imageProvider = DEFAULT_SCENE_IMAGE_PROVIDER,
   onImageProviderChange,
   onSaveDraft,
   savingDraft = false,
@@ -1005,18 +1005,18 @@ export default function ScenePreviewApproval({
                   const keys = ['ArrowLeft', 'ArrowRight'];
                   if (!keys.includes(e.key)) return;
                   e.preventDefault();
-                  const currentIndex = IMAGE_PROVIDER_OPTIONS.findIndex(o => o.value === imageProvider);
+                  const currentIndex = VISIBLE_IMAGE_PROVIDER_OPTIONS.findIndex(o => o.value === imageProvider);
                   const nextIndex = e.key === 'ArrowRight'
-                    ? (currentIndex + 1) % IMAGE_PROVIDER_OPTIONS.length
-                    : (currentIndex - 1 + IMAGE_PROVIDER_OPTIONS.length) % IMAGE_PROVIDER_OPTIONS.length;
-                  onImageProviderChange(IMAGE_PROVIDER_OPTIONS[nextIndex].value);
+                    ? (currentIndex + 1) % VISIBLE_IMAGE_PROVIDER_OPTIONS.length
+                    : (currentIndex - 1 + VISIBLE_IMAGE_PROVIDER_OPTIONS.length) % VISIBLE_IMAGE_PROVIDER_OPTIONS.length;
+                  onImageProviderChange(VISIBLE_IMAGE_PROVIDER_OPTIONS[nextIndex].value);
                   // Focus the newly selected radio button
                   const container = e.currentTarget;
                   const buttons = container.querySelectorAll<HTMLButtonElement>('[role="radio"]');
                   buttons[nextIndex]?.focus();
                 }}
               >
-                {IMAGE_PROVIDER_OPTIONS.map((option) => {
+                {VISIBLE_IMAGE_PROVIDER_OPTIONS.map((option) => {
                   const isSelected = imageProvider === option.value;
                   return (
                     <button

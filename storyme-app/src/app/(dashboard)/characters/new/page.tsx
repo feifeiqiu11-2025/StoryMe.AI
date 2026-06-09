@@ -18,7 +18,7 @@ import { isAdminEmail } from '@/lib/auth/isAdmin';
 import {
   ImageProvider,
   ImageMedium,
-  IMAGE_PROVIDER_OPTIONS,
+  VISIBLE_IMAGE_PROVIDER_OPTIONS,
   DEFAULT_IMAGE_PROVIDER,
 } from '@/lib/types/story';
 
@@ -795,7 +795,7 @@ export default function NewCharacterPage() {
                   onChange={(e) => setImageProvider(e.target.value as ImageProvider)}
                   className="border border-gray-300 rounded pl-2 pr-7 py-1 text-sm bg-white min-w-[160px]"
                 >
-                  {IMAGE_PROVIDER_OPTIONS.map((opt) => (
+                  {VISIBLE_IMAGE_PROVIDER_OPTIONS.map((opt) => (
                     <option
                       key={opt.value}
                       value={opt.value}

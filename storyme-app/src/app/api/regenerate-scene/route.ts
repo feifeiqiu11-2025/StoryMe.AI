@@ -14,7 +14,7 @@ import { generateImageWithMultipleCharacters, CharacterPromptInfo, sceneContains
 import { generateImageWithGemini, generateImageWithGeminiClassic, isGeminiAvailable, GeminiCharacterInfo, resolveGeminiImageModel } from '@/lib/gemini-image-client';
 import { openaiGenerateScene } from '@/lib/openai-image-client';
 import { extractSceneLocation } from '@/lib/scene-parser';
-import { Character, ClothingConsistency, ImageProvider, normalizeImageProvider, isGeminiProvider, isOpenAIProvider } from '@/lib/types/story';
+import { Character, ClothingConsistency, ImageProvider, normalizeImageProvider, isGeminiProvider, isOpenAIProvider, DEFAULT_SCENE_IMAGE_PROVIDER } from '@/lib/types/story';
 import { createClient } from '@/lib/supabase/server';
 import { StorageService } from '@/lib/services/storage.service';
 import OpenAI from 'openai';
@@ -182,9 +182,13 @@ export async function POST(request: NextRequest) {
     // Determine illustration style (default to 'classic' for 2D storybook)
     const selectedIllustrationStyle: IllustrationStyle = illustrationStyle || 'classic';
 
-    // Determine which image provider to use
-    const defaultProvider = normalizeImageProvider(process.env.IMAGE_PROVIDER);
-    let imageProvider: ImageProvider = normalizeImageProvider(requestedProvider) || defaultProvider;
+    // Determine which image provider to use.
+    // Priority: request param > IMAGE_PROVIDER env var > scene default (gpt-image-2).
+    let imageProvider: ImageProvider = requestedProvider
+      ? normalizeImageProvider(requestedProvider)
+      : process.env.IMAGE_PROVIDER
+        ? normalizeImageProvider(process.env.IMAGE_PROVIDER)
+        : DEFAULT_SCENE_IMAGE_PROVIDER;
     // OpenAI needs only an API key; fall back to Gemini with a clear log if missing.
     if (isOpenAIProvider(imageProvider) && !process.env.OPENAI_API_KEY) {
       console.warn('[Regenerate] ChatGPT Image 2.0 unavailable (missing key) — using Gemini.');

@@ -14,7 +14,7 @@ import {
   SubjectType,
   ImageMedium,
   ImageProvider,
-  IMAGE_PROVIDER_OPTIONS,
+  VISIBLE_IMAGE_PROVIDER_OPTIONS,
   DEFAULT_IMAGE_PROVIDER,
 } from '@/lib/types/story';
 import Link from 'next/link';
@@ -1520,7 +1520,7 @@ export default function CharactersPage() {
                             onChange={(e) => setProviderOverride(e.target.value as ImageProvider)}
                             className="border border-gray-300 rounded pl-2 pr-7 py-1 text-sm bg-white min-w-[160px]"
                           >
-                            {IMAGE_PROVIDER_OPTIONS.map((opt) => (
+                            {VISIBLE_IMAGE_PROVIDER_OPTIONS.map((opt) => (
                               <option
                                 key={opt.value}
                                 value={opt.value}

@@ -44,6 +44,7 @@ import {
   normalizeImageProvider,
   isGeminiProvider,
   isOpenAIProvider,
+  DEFAULT_SCENE_IMAGE_PROVIDER,
   type ImageProvider,
 } from '@/lib/types/story';
 import { compressImage } from '@/lib/services/imageProcessing.service';
@@ -146,7 +147,10 @@ export async function POST(request: NextRequest) {
       imageProvider: requestedProvider,
     } = validation.data;
 
-    const requestedProviderNormalized: ImageProvider = normalizeImageProvider(requestedProvider);
+    // Chapter-book scenes default to gpt-image-2 when the client sends no explicit pick.
+    const requestedProviderNormalized: ImageProvider = requestedProvider
+      ? normalizeImageProvider(requestedProvider)
+      : DEFAULT_SCENE_IMAGE_PROVIDER;
     // Edits require an image-conditioned model. OpenAI gpt-image-2 has
     // true edit semantics; Gemini accepts the prior image as a strong
     // reference. Flux has no clean edit path, so when the kid asks for
