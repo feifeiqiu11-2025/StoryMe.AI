@@ -22,6 +22,7 @@ export interface WorkshopSession {
   afternoon?: WorkshopSessionSlot; // Optional for single-session partners
   series?: number; // 1, 2, etc. — for grouping sessions into enrollable series
   enrollable?: boolean; // defaults true; false = preview-only (not selectable)
+  afternoonEnrollable?: boolean; // defaults true; false = excluded from afternoon single/package enrollment (morning side unaffected)
   topicId?: string; // groups sessions into topic-pair enrollment units (e.g. 'time-management')
   topicLabel?: string; // human-readable topic name (e.g. 'Time Management')
 }
@@ -42,6 +43,14 @@ export interface DualModeProgram {
   // (priced at seriesPackagePrice for the whole bundle).
   introPrice?: number; // cents — special price for the first enrollable session
   seriesPackagePrice?: number; // cents — bundle price for the rest of the series
+  // "Single session OR prorated package" enrollment (e.g. summer SteamOji
+  // afternoon, mid-series). When singleSessionOption is true, the afternoon UI
+  // offers a flat choice between the remaining-series package (all upcoming
+  // afternoon-eligible Sundays, priced at packagePricePerSession each) and a
+  // single Sunday session (priced from pricing.afternoon). Default selection is
+  // the package; it auto-disables once fewer than 2 Sundays remain.
+  singleSessionOption?: boolean;
+  packagePricePerSession?: number; // cents — per-session rate for the remaining-series package
 }
 
 export interface WorkshopSessionPricing {
@@ -134,10 +143,16 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
       ageLabel: 'Ages 7–12',
       timeLabel: '1:00 – 3:00 PM · 2 hours',
       shortDescription:
-        'Chapter Book Project — try a half-price preview on May 31, then commit to the 4-session journey',
+        'Chapter Book Project — join the remaining series at a prorated rate, or drop in for a single Sunday session',
       enrollmentMode: 'series',
-      introPrice: 3500, // $35 — May 31 preview session
-      seriesPackagePrice: 25000, // $250 — Jun 7–28 four-session commitment
+      // Mid-series enrollment (June 2026): the series is sold as a prorated
+      // package of all UPCOMING afternoon-eligible Sundays at $65/session, and
+      // families may instead buy a single Sunday session at $70
+      // (pricing.afternoon). The package auto-disables once fewer than 2
+      // Sundays remain; afternoonEnrollable:false excludes the already-passed
+      // May 31 & Jun 7 dates, so the offered Sundays are Jun 14, 21 & 28.
+      singleSessionOption: true,
+      packagePricePerSession: 6500, // $65/session — prorated remaining-series rate
     },
     partnerUrl: 'https://www.steamoji.com/',
     sessions: [
@@ -149,6 +164,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
         id: 'steamoji-summer-wk1',
         dateLabel: 'Sun, May 31, 2026',
         theme: 'Time Master',
+        afternoonEnrollable: false, // excluded from afternoon series (May 31 intro — already passed)
         topicId: 'time-management',
         topicLabel: 'Time Master',
         themeDescription:
@@ -182,6 +198,7 @@ export const WORKSHOP_PARTNERS: WorkshopPartner[] = [
         id: 'steamoji-summer-wk2',
         dateLabel: 'Sun, Jun 7, 2026',
         theme: 'Plan My Day',
+        afternoonEnrollable: false, // excluded from afternoon series (Jun 7 — already passed)
         morning: {
           time: '9:45–10:45 AM or 11:00 AM–12:00 PM',
           ageRange: 'Ages 4–6',
@@ -863,6 +880,29 @@ export function getEnrollableSessions(partner: WorkshopPartner, series?: number)
     if (s.enrollable === false) return false;
     if (series !== undefined && s.series !== series) return false;
     return true;
+  });
+}
+
+// Helper for the afternoon "single session OR prorated package" enrollment
+// (summer SteamOji afternoon). Returns the afternoon-eligible sessions — those
+// that are enrollable, not flagged afternoonEnrollable:false, and actually have
+// an afternoon slot — in calendar order. Pass `futureOnly` to additionally drop
+// past/same-day sessions (registration is strictly future; same-day can't enroll).
+export function getAfternoonEligibleSessions(
+  partner: WorkshopPartner,
+  futureOnly = false,
+): WorkshopSession[] {
+  const eligible = partner.sessions.filter(
+    (s) => s.enrollable !== false && s.afternoonEnrollable !== false && !!s.afternoon,
+  );
+  if (!futureOnly) return eligible;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return eligible.filter((s) => {
+    const d = new Date(s.dateLabel);
+    if (isNaN(d.getTime())) return true; // unparseable labels stay eligible
+    d.setHours(0, 0, 0, 0);
+    return d.getTime() > today.getTime();
   });
 }
 

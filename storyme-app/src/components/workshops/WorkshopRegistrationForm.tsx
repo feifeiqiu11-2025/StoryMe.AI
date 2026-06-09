@@ -24,6 +24,7 @@ import {
   getPartnerSessionPricing,
   getPartnerCapacity,
   getEnrollableSessions,
+  getAfternoonEligibleSessions,
   getSessionDates,
   getEnrollmentMode,
   getTopicPairs,
@@ -135,6 +136,23 @@ export default function WorkshopRegistrationForm({
   // Topic pairs for topic-pair enrollment mode (e.g. summer SteamOji morning).
   const topicPairs = isTopicPairMode ? getTopicPairs(partner) : [];
 
+  // Afternoon "single session OR prorated package" mode (summer SteamOji
+  // afternoon, mid-series). The user picks one flat option: the remaining-series
+  // package (all upcoming afternoon-eligible Sundays at packagePricePerSession
+  // each) or a single Sunday session (pricing.afternoon). Default = package.
+  const isAfternoonSingleOrPackage =
+    !isSingleMode &&
+    sessionTypeForMode === 'afternoon' &&
+    !!partner.afternoonProgram?.singleSessionOption;
+  // Upcoming afternoon Sundays, in calendar order. Past/this-already-passed
+  // dates are dropped here so the picker never offers a dead date and the
+  // package auto-disappears once fewer than 2 remain.
+  const futureAfternoonSessions = isAfternoonSingleOrPackage
+    ? getAfternoonEligibleSessions(partner, true)
+    : [];
+  const futureAfternoonIds = futureAfternoonSessions.map((s) => s.id);
+  const afternoonPackageOffered = futureAfternoonSessions.length >= 2;
+
   // Clear selectedWorkshopIds when the session type changes so stale IDs from
   // a previous tab (e.g. afternoon series auto-select) don't bleed into the
   // morning topic-pair UI. Declared BEFORE the series-mode auto-select so the
@@ -148,6 +166,8 @@ export default function WorkshopRegistrationForm({
   // Recomputed when the selected location changes (Bellevue/Kirkland have
   // different date schedules so future-vs-past differs by location).
   useEffect(() => {
+    // Afternoon single-or-package mode manages its own default selection below.
+    if (isAfternoonSingleOrPackage) return;
     if (!isSeriesMode || enrollableSessions.length === 0) return;
     // For Avocado (multi-location), use the location's date schedule. For
     // single-location dual-mode partners (summer SteamOji afternoon), use
@@ -174,6 +194,16 @@ export default function WorkshopRegistrationForm({
     setValue('selectedWorkshopIds', futureIds, { shouldValidate: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSeriesMode, selectedLocation, enrollableSessions.length, selectedSessionType]);
+
+  // Default selection for afternoon single-or-package mode: pre-select the
+  // remaining-series package (all upcoming afternoon Sundays) when 2+ remain,
+  // otherwise pre-select the single remaining Sunday. Recomputed when the
+  // session tab changes so switching morning→afternoon lands on the package.
+  useEffect(() => {
+    if (!isAfternoonSingleOrPackage) return;
+    setValue('selectedWorkshopIds', futureAfternoonIds, { shouldValidate: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAfternoonSingleOrPackage, selectedSessionType, futureAfternoonIds.join(',')]);
 
   // Auto-select all FUTURE sessions for individual mode (e.g. summer SteamOji
   // morning, now standalone per-session enrollment). Encourages full-summer
@@ -303,7 +333,19 @@ export default function WorkshopRegistrationForm({
           : 0)) *
       numberOfChildren
     : null;
-  const totalPrice = bundleTotalPrice ?? perSessionTotalPrice;
+  // Afternoon single-or-package pricing: the package (2+ sessions selected) is
+  // priced at packagePricePerSession ($65) each; a single session is priced at
+  // the standard afternoon rate ($70). Mirrors the checkout-route calculation.
+  const afternoonPackagePerSession =
+    partner.afternoonProgram?.packagePricePerSession ?? pricePerSession;
+  const afternoonIsPackageSelected =
+    isAfternoonSingleOrPackage && workshopCount > 1;
+  const afternoonModeTotal = isAfternoonSingleOrPackage
+    ? workshopCount *
+      (afternoonIsPackageSelected ? afternoonPackagePerSession : pricePerSession) *
+      numberOfChildren
+    : null;
+  const totalPrice = afternoonModeTotal ?? bundleTotalPrice ?? perSessionTotalPrice;
   const totalOriginal =
     workshopCount * originalPricePerSession * numberOfChildren;
 
@@ -797,7 +839,242 @@ export default function WorkshopRegistrationForm({
       {/* ═══════════════════════════════════════════════════════ */}
       {/* Section — Topic Pair / Series Overview / Workshop Dates */}
       {/* ═══════════════════════════════════════════════════════ */}
-      {isTopicPairMode ? (
+      {isAfternoonSingleOrPackage ? (
+        /* --- AFTERNOON: single session OR prorated remaining-series package --- */
+        (() => {
+          const selectPackage = () =>
+            setValue('selectedWorkshopIds', futureAfternoonIds, { shouldValidate: true });
+          const selectSingle = (id: string) =>
+            setValue('selectedWorkshopIds', [id], { shouldValidate: true });
+          const packageActive =
+            afternoonPackageOffered &&
+            (selectedWorkshopIds?.length ?? 0) === futureAfternoonIds.length &&
+            futureAfternoonIds.every((id) => selectedWorkshopIds?.includes(id));
+          const isSingleActive = (id: string) =>
+            (selectedWorkshopIds?.length ?? 0) === 1 && selectedWorkshopIds?.[0] === id;
+
+          const fmtDate = (s: (typeof futureAfternoonSessions)[number]) => {
+            const d = new Date(s.dateLabel);
+            return isNaN(d.getTime())
+              ? s.dateLabel
+              : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+          };
+          const pkgFirst = futureAfternoonSessions[0];
+          const pkgLast = futureAfternoonSessions[futureAfternoonSessions.length - 1];
+          const pkgRange = pkgFirst && pkgLast ? `${fmtDate(pkgFirst)} – ${fmtDate(pkgLast)}` : '';
+          const pkgPrice = futureAfternoonSessions.length * afternoonPackagePerSession;
+          const pkgOriginal = futureAfternoonSessions.length * originalPricePerSession;
+
+          const checkDot = (active: boolean) => (
+            <div
+              className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                active ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300 bg-white'
+              }`}
+            >
+              {active && (
+                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+          );
+
+          return (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                2. Choose Your Enrollment
+              </h3>
+              <p className="mb-4 text-sm text-gray-600">
+                Join the full remaining series, or drop in for a single Sunday session.
+              </p>
+
+              {futureAfternoonSessions.length === 0 ? (
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700">
+                  No upcoming afternoon sessions are available right now. Please check back soon.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Remaining-series package — only offered while 2+ Sundays remain */}
+                  {afternoonPackageOffered && (
+                    <label
+                      className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                        packageActive
+                          ? 'border-indigo-500 bg-indigo-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="afternoonChoice"
+                        checked={packageActive}
+                        onChange={selectPackage}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          {checkDot(packageActive)}
+                          <div>
+                            <div className="font-semibold text-gray-900">
+                              Remaining Series — {futureAfternoonSessions.length} sessions
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {pkgRange} · printed chapter book
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right text-sm">
+                          <div>
+                            <span className="line-through text-gray-400 mr-1">
+                              {formatWorkshopPrice(pkgOriginal)}
+                            </span>
+                            <span className="font-semibold text-indigo-700">
+                              {formatWorkshopPrice(pkgPrice)}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500">per child · package</div>
+                        </div>
+                      </div>
+                      <ul className="mt-3 ml-8 space-y-1 text-sm text-gray-600">
+                        {futureAfternoonSessions.map((session) => (
+                          <li key={session.id} className="flex items-center gap-2">
+                            <span className="text-indigo-500">•</span>
+                            <span className="font-medium text-gray-700">{session.dateLabel}</span>
+                            <span className="text-gray-500">— {session.afternoon?.title || session.theme}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </label>
+                  )}
+
+                  {/* Single Sunday session — one option; the Sunday is picked below */}
+                  {(() => {
+                    const currentSingleId =
+                      (selectedWorkshopIds?.length ?? 0) === 1
+                        ? selectedWorkshopIds![0]
+                        : futureAfternoonIds[0] ?? '';
+                    const singleActive = isSingleActive(currentSingleId);
+                    const pickSingle = () => selectSingle(currentSingleId || futureAfternoonIds[0]);
+                    return (
+                      <div
+                        className={`block p-4 border-2 rounded-xl transition-all ${
+                          singleActive
+                            ? 'border-indigo-500 bg-indigo-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div
+                          role="radio"
+                          aria-checked={singleActive}
+                          tabIndex={0}
+                          onClick={pickSingle}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              pickSingle();
+                            }
+                          }}
+                          className="flex items-center justify-between gap-3 cursor-pointer"
+                        >
+                          <div className="flex items-center gap-3">
+                            {checkDot(singleActive)}
+                            <div>
+                              <div className="font-semibold text-gray-900">Single Session</div>
+                              <div className="text-sm text-gray-500">
+                                Pick any one Sunday afternoon
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right text-sm">
+                            <span className="font-semibold text-indigo-700">
+                              {formatWorkshopPrice(pricePerSession)}
+                            </span>
+                            <div className="text-xs text-gray-500">per child · session</div>
+                          </div>
+                        </div>
+                        <div className="mt-3 ml-8">
+                          <label
+                            htmlFor="afternoon-single-date"
+                            className="block text-xs font-medium text-gray-600 mb-1"
+                          >
+                            Choose your Sunday
+                          </label>
+                          <div className="relative inline-block w-full sm:w-auto">
+                            <select
+                              id="afternoon-single-date"
+                              value={singleActive ? currentSingleId : ''}
+                              onChange={(e) => selectSingle(e.target.value)}
+                              className="appearance-none w-full sm:w-auto bg-white pl-3 pr-9 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 cursor-pointer focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            >
+                              {!singleActive && (
+                                <option value="" disabled>
+                                  Select a Sunday afternoon…
+                                </option>
+                              )}
+                              {futureAfternoonSessions.map((session) => (
+                                <option key={session.id} value={session.id}>
+                                  {fmtDate(session)} — {session.afternoon?.title || session.theme}
+                                </option>
+                              ))}
+                            </select>
+                            <svg
+                              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              aria-hidden="true"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {errors.selectedWorkshopIds && (
+                <p className={errorClassName} role="alert">
+                  {errors.selectedWorkshopIds.message}
+                </p>
+              )}
+
+              {totalPrice > 0 && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">
+                        {numberOfChildren > 1
+                          ? `Subtotal · ${numberOfChildren} children`
+                          : 'Subtotal'}
+                      </span>
+                      <span className="text-sm text-gray-700">
+                        {formatWorkshopPrice(totalPrice)}
+                      </span>
+                    </div>
+                    {taxRate > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-500">
+                          Sales tax ({(taxRate * 100).toFixed(1)}%)
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          {formatWorkshopPrice(taxAmount)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center pt-1.5 border-t border-gray-200">
+                      <span className="text-sm font-semibold text-gray-800">Total</span>
+                      <span className="text-lg font-bold text-gray-900">
+                        {formatWorkshopPrice(totalWithTax)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()
+      ) : isTopicPairMode ? (
         /* --- TOPIC PAIR MODE: One card per topic, each topic = a pair of sessions --- */
         (() => {
           const loc = hasLocations

@@ -16,6 +16,7 @@ import {
   getPartnerSessionPricing,
   getPartnerCapacity,
   getEnrollmentMode,
+  getAfternoonEligibleSessions,
 } from '@/lib/workshops/constants';
 import { createClient } from '@supabase/supabase-js';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
@@ -128,6 +129,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Afternoon "single session OR prorated package" mode (summer SteamOji
+    // afternoon). Selected sessions must be afternoon-eligible (excludes the
+    // intro/this-week Sundays flagged afternoonEnrollable:false) so a single
+    // session can't be used to buy an otherwise-unavailable afternoon date.
+    const isAfternoonPkgMode =
+      !isSingleMode &&
+      validated.selectedSessionType === 'afternoon' &&
+      !!partner.afternoonProgram?.singleSessionOption;
+    if (isAfternoonPkgMode) {
+      const afternoonEligibleIds = new Set(
+        getAfternoonEligibleSessions(partner).map((s) => s.id),
+      );
+      const ineligible = validated.selectedWorkshopIds.filter((id) => !afternoonEligibleIds.has(id));
+      if (ineligible.length > 0) {
+        return NextResponse.json(
+          { error: 'Selected afternoon sessions are not available for enrollment', invalidSessions: ineligible },
+          { status: 400 },
+        );
+      }
+    }
+
     // Check spot availability before proceeding
     const supabaseAvailability = createServiceRoleClient();
 
@@ -226,11 +248,22 @@ export async function POST(request: NextRequest) {
       bundleSeriesIds.length > 0 &&
       bundleSeriesIds.every((id) => validated.selectedWorkshopIds.includes(id));
 
-    const totalAmount = isBundlePricing
-      ? ((introInRequest ? programForBundle!.introPrice! : 0) +
-          (seriesInRequest ? programForBundle!.seriesPackagePrice! : 0)) *
-        numberOfChildren
-      : validated.selectedWorkshopIds.length * unitAmount * numberOfChildren;
+    // Afternoon single-or-package pricing: 2+ sessions = prorated package
+    // ($65/session); a single session = standard afternoon rate ($70). Mirrors
+    // the WorkshopRegistrationForm calculation.
+    const afternoonPkgIsPackage =
+      isAfternoonPkgMode && validated.selectedWorkshopIds.length > 1;
+    const afternoonPkgPerSession = afternoonPkgIsPackage
+      ? partner.afternoonProgram?.packagePricePerSession ?? unitAmount
+      : unitAmount;
+
+    const totalAmount = isAfternoonPkgMode
+      ? validated.selectedWorkshopIds.length * afternoonPkgPerSession * numberOfChildren
+      : isBundlePricing
+        ? ((introInRequest ? programForBundle!.introPrice! : 0) +
+            (seriesInRequest ? programForBundle!.seriesPackagePrice! : 0)) *
+          numberOfChildren
+        : validated.selectedWorkshopIds.length * unitAmount * numberOfChildren;
 
     // Calculate sales tax (WA state ESSB 5814 — enrichment workshops)
     let taxRate = 0;
@@ -261,7 +294,9 @@ export async function POST(request: NextRequest) {
           partner_id: validated.partnerId,
           selected_workshop_ids: validated.selectedWorkshopIds,
           selected_session_type: sessionTypeForQuery,
-          is_bundle: currentEnrollmentMode === 'series' || currentEnrollmentMode === 'topic-pair',
+          is_bundle: isAfternoonPkgMode
+            ? validated.selectedWorkshopIds.length > 1
+            : currentEnrollmentMode === 'series' || currentEnrollmentMode === 'topic-pair',
           location: effectiveLocationSlug,
           time_slot: validated.selectedTimeSlot || null,
           promo_code: null,
@@ -324,6 +359,7 @@ export async function POST(request: NextRequest) {
     // (intro + series-package) are handled separately below.
     const isBundle =
       !isBundlePricing &&
+      !isAfternoonPkgMode &&
       (currentEnrollmentMode === 'series' || currentEnrollmentMode === 'topic-pair');
     const bundleLabel = (() => {
       if (currentEnrollmentMode === 'series') {
@@ -354,7 +390,43 @@ export async function POST(request: NextRequest) {
     };
 
     let lineItems: StripeLineItem[];
-    if (isBundlePricing && programForBundle) {
+    if (isAfternoonPkgMode) {
+      // Afternoon single-or-package: one line item. Package = prorated
+      // per-session rate × count; single = standard afternoon rate.
+      const count = validated.selectedWorkshopIds.length;
+      if (afternoonPkgIsPackage) {
+        const pkgSessions = partner.sessions.filter((s) =>
+          validated.selectedWorkshopIds.includes(s.id),
+        );
+        const first = pkgSessions[0]?.dateLabel;
+        const last = pkgSessions[pkgSessions.length - 1]?.dateLabel;
+        const rangeLabel = first && last ? `${first} → ${last}` : `${count} sessions`;
+        lineItems = [{
+          price_data: {
+            currency: partner.pricing.currency,
+            product_data: {
+              name: `${partner.name} — Remaining Series (${count} sessions)`,
+              description: `${sessionDescription} · ${rangeLabel}`,
+            },
+            unit_amount: afternoonPkgPerSession * count,
+          },
+          quantity: numberOfChildren,
+        }];
+      } else {
+        const single = partner.sessions.find((s) => s.id === validated.selectedWorkshopIds[0]);
+        lineItems = [{
+          price_data: {
+            currency: partner.pricing.currency,
+            product_data: {
+              name: `${partner.name} — Single Session`,
+              description: `${sessionDescription} · ${single?.dateLabel || ''}`,
+            },
+            unit_amount: unitAmount,
+          },
+          quantity: numberOfChildren,
+        }];
+      }
+    } else if (isBundlePricing && programForBundle) {
       // Bundle pricing: emit one line item per selected bundle (intro and/or series).
       lineItems = [];
       if (introInRequest && bundleIntroId) {
