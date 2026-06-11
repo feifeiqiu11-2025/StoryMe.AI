@@ -27,12 +27,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { editImageWithGemini, isGeminiEditAvailable, resolveGeminiImageModel } from '@/lib/gemini-image-client';
 import { editImageWithQwen, isQwenAvailable } from '@/lib/qwen-image-client';
+import { openaiEditScene } from '@/lib/openai-image-client';
 import { createClient } from '@/lib/supabase/server';
-import { ImageProvider as GenerationImageProvider, normalizeImageProvider } from '@/lib/types/story';
+import { normalizeImageProvider, isOpenAIProvider } from '@/lib/types/story';
 
 export const maxDuration = 300; // 5 minutes timeout for Vercel
 
-type EditProvider = 'gemini' | 'segmind';
+type EditProvider = 'gemini' | 'segmind' | 'openai';
 
 interface CharacterReference {
   name: string;
@@ -116,11 +117,16 @@ export async function POST(request: NextRequest) {
     console.log(`[Edit Image] Instruction: "${instruction}"`);
     console.log(`[Edit Image] Style: ${illustrationStyle}, Provider preference: ${useProvider || 'auto'}`);
 
-    // Determine which provider to use
-    // Priority: explicit preference > Gemini (if available) > Segmind (fallback)
+    // Determine which provider to use. The edit engine follows the GENERATION
+    // provider so an edited image matches the batch: OpenAI gpt-image-2 images are
+    // edited with gpt-image-2, Gemini images with Gemini. Priority:
+    // explicit segmind override > OpenAI (when the generation provider is OpenAI
+    // and the key is set) > Gemini > Segmind fallback.
     let provider: EditProvider;
     if (useProvider === 'segmind' && isQwenAvailable()) {
       provider = 'segmind';
+    } else if (isOpenAIProvider(generationProvider) && !!process.env.OPENAI_API_KEY) {
+      provider = 'openai';
     } else if (isGeminiEditAvailable()) {
       provider = 'gemini';
     } else if (isQwenAvailable()) {
@@ -138,7 +144,40 @@ export async function POST(request: NextRequest) {
     let resultImageUrl: string;
     let generationTime: number;
 
-    if (provider === 'gemini') {
+    if (provider === 'openai') {
+      // Edit with OpenAI gpt-image-2 so the result matches a gpt-image-2 batch.
+      // On any failure, fall back to Gemini so an edit never hard-fails.
+      try {
+        const result = await openaiEditScene({
+          currentImageUrl: imageUrl,
+          instruction: instruction.trim(),
+          sceneDescription,
+          styleVariant: illustrationStyle,
+          characterReferences,
+          manualReferenceImageBase64,
+        });
+        resultImageUrl = result.imageUrl;
+        generationTime = result.generationTime;
+      } catch (openaiErr) {
+        console.warn(
+          `[Edit Image] OpenAI edit failed, falling back to Gemini:`,
+          openaiErr instanceof Error ? openaiErr.message : openaiErr
+        );
+        if (!isGeminiEditAvailable()) throw openaiErr;
+        provider = 'gemini';
+        const result = await editImageWithGemini({
+          currentImageUrl: imageUrl,
+          editInstruction: instruction.trim(),
+          sceneDescription,
+          illustrationStyle,
+          modelId: geminiModelId,
+          characterReferences,
+          manualReferenceImageBase64,
+        });
+        resultImageUrl = result.imageUrl;
+        generationTime = result.generationTime;
+      }
+    } else if (provider === 'gemini') {
       // Use Gemini for text-guided image editing
       const result = await editImageWithGemini({
         currentImageUrl: imageUrl,

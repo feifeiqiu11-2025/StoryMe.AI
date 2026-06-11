@@ -12,7 +12,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Image from 'next/image';
-import { ImageProvider, Character } from '@/lib/types/story';
+import { ImageProvider, Character, isOpenAIProvider, normalizeImageProvider } from '@/lib/types/story';
 import { detectCharactersInInstruction, DetectedCharacter, detectLocationsInInstruction, DetectedLocation } from '@/lib/utils/character-matcher';
 
 interface EditImageControlProps {
@@ -79,6 +79,13 @@ export default function EditImageControl({
   const [instruction, setInstruction] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Edit model — defaults to the SAME provider the batch used so an edited image
+  // matches the rest of the book. The small dropdown lets the user switch to
+  // Gemini for a more precise/localized edit when needed.
+  const [editProvider, setEditProvider] = useState<ImageProvider>(() =>
+    isOpenAIProvider(normalizeImageProvider(imageProvider)) ? 'openai-gpt-image-2' : 'gemini-3.1'
+  );
 
   // Character detection state
   const [detectedCharacters, setDetectedCharacters] = useState<DetectedCharacter[]>([]);
@@ -212,7 +219,7 @@ export default function EditImageControl({
           imageId,
           illustrationStyle,
           sceneDescription,
-          imageProvider,
+          imageProvider: editProvider,
           characterReferences,
           manualReferenceImageBase64: manualReferenceImage || undefined,
         }),
@@ -459,7 +466,7 @@ export default function EditImageControl({
       )}
 
       {/* Action Buttons */}
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={handleEdit}
           disabled={isEditing || !instruction.trim()}
@@ -482,13 +489,39 @@ export default function EditImageControl({
         >
           Cancel
         </button>
+
+        {/* Model selector — pushed to the far right so it stays secondary to the
+            main action. Defaults to the batch model so edits match the book;
+            switch to Gemini for a more precise/localized edit. */}
+        <div className="relative ml-auto">
+          <select
+            value={editProvider}
+            onChange={(e) => setEditProvider(e.target.value as ImageProvider)}
+            disabled={isEditing}
+            aria-label="Image model for this edit"
+            title="Image model for this edit (defaults to the model used to generate the book)"
+            className="appearance-none text-xs border border-gray-300 rounded-md pl-2 pr-7 py-1.5 bg-white text-gray-500 cursor-pointer hover:text-gray-700 hover:border-gray-400 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="openai-gpt-image-2">gpt-image-2</option>
+            <option value="gemini-3.1">Gemini</option>
+          </select>
+          <svg
+            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
       </div>
 
       {/* Processing Status */}
       {isEditing && (
         <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
           <p className="text-xs text-blue-700">
-            Editing image... This may take 5-15 seconds.
+            Editing image... This may take {editProvider === 'openai-gpt-image-2' ? '30-90' : '5-15'} seconds.
           </p>
         </div>
       )}

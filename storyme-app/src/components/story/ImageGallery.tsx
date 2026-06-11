@@ -612,7 +612,8 @@ export default function ImageGallery({
                     ) : null;
                   })()}
 
-                  {/* Edit Image Button - Uses Gemini for text-guided image editing */}
+                  {/* Edit Image Button — edits with the same model the batch used
+                      (passed via imageProvider), falling back to Gemini. */}
                   {image.status === 'completed' && image.imageUrl && onRegenerateScene && (
                     <div className="mt-3">
                       <EditImageControl
@@ -620,6 +621,7 @@ export default function ImageGallery({
                         imageType="scene"
                         imageId={image.id}
                         illustrationStyle={illustrationStyle ?? 'pixar'}
+                        imageProvider={imageProvider}
                         sceneDescription={image.sceneDescription}
                         characters={characters}
                         bibleLocations={storyBible?.locations ?? undefined}

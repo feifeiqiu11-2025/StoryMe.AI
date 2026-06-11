@@ -3172,6 +3172,7 @@ function CreateStoryPageInner() {
                         imageId="cover"
                         onEditComplete={(newUrl) => setCoverImageUrl(newUrl)}
                         imageProvider={imageProvider}
+                        illustrationStyle={artStyle}
                         characters={characters}
                       />
                     </div>
