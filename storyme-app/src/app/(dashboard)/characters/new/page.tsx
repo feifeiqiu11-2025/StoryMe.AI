@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { SketchGuideViewer, SketchStep } from '@/components/characters/SketchGuideViewer';
 import { isAdminEmail } from '@/lib/auth/isAdmin';
+import { compressImageForUpload } from '@/lib/utils/compress-image';
 import {
   ImageProvider,
   ImageMedium,
@@ -81,38 +82,59 @@ export default function NewCharacterPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [imageProvider, setImageProvider] = useState<ImageProvider>(DEFAULT_IMAGE_PROVIDER);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Validate file size (10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        setError('Image must be less than 10MB');
-        return;
-      }
+    if (!file) return;
 
-      // Validate file type
-      if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) {
-        setError('Image must be JPEG, PNG, or WebP format');
-        return;
-      }
-
-      setImageFile(file);
-      setError(null);
-      setPixarPreviewUrl(null);
-      setClassicPreviewUrl(null);
-      setPreviewStatus('idle');
-      setIsApproved(false);
-
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-
-      // Auto-analyze image immediately after selection
-      autoAnalyzeImage(file);
+    // Reject only formats the canvas can't reliably decode. HEIC/HEIF — the iPad
+    // default — ARE allowed: compressImageForUpload converts them to JPEG below.
+    // That conversion also resizes large iPhone/iPad photos, fixing the size
+    // failures (raw HEIC/large JPEGs previously hit the upload limit).
+    const name = file.name.toLowerCase();
+    const unsupported = ['.avif', '.bmp', '.tiff', '.tif', '.svg'];
+    if (unsupported.some((ext) => name.endsWith(ext))) {
+      setError('Unsupported image format. Please use JPG, PNG, HEIC, GIF, or WebP.');
+      return;
     }
+
+    setError(null);
+    setPixarPreviewUrl(null);
+    setClassicPreviewUrl(null);
+    setPreviewStatus('idle');
+    setIsApproved(false);
+    setIsAnalyzing(true); // covers HEIC decode + compression, then the upload/analyze below
+
+    // Normalize client-side: HEIC→JPEG, downscale long-edge ≤4096, re-encode JPEG.
+    let normalized: File;
+    try {
+      const compressed = await compressImageForUpload(file);
+      console.log(
+        `[characters/new] Normalized ${file.name}: ` +
+        `${(compressed.originalBytes / 1024).toFixed(0)}KB → ${(compressed.compressedBytes / 1024).toFixed(0)}KB ` +
+        `(${compressed.width}×${compressed.height})`
+      );
+      normalized = compressed.file;
+    } catch (err) {
+      console.error('[characters/new] Image normalization failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to read this image. Please try a different photo.');
+      setIsAnalyzing(false);
+      return;
+    }
+
+    // Store the normalized JPEG so the preview, auto-analyze, AND the save-time
+    // fallback upload (uses imageFile directly) all use a provider-safe format —
+    // never a raw HEIC.
+    setImageFile(normalized);
+
+    // Preview from the normalized file
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(normalized);
+
+    // Auto-analyze (manages isAnalyzing in its finally block)
+    autoAnalyzeImage(normalized);
   };
 
   const autoAnalyzeImage = async (file: File) => {
@@ -763,7 +785,7 @@ export default function NewCharacterPage() {
                 <input
                   type="file"
                   id="image-upload"
-                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  accept="image/png,image/jpeg,image/gif,image/webp,image/heic,image/heif,.png,.jpg,.jpeg,.gif,.webp,.heic,.heif"
                   onChange={handleImageChange}
                   className="hidden"
                 />
@@ -772,7 +794,7 @@ export default function NewCharacterPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   <span className="text-sm text-gray-600">Click to upload a photo</span>
-                  <span className="text-xs text-gray-500 mt-1">JPEG, PNG, or WebP (max 10MB)</span>
+                  <span className="text-xs text-gray-500 mt-1">JPG, PNG, HEIC, GIF, or WebP (max 10MB)</span>
                 </label>
               </div>
             )}
