@@ -38,6 +38,16 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
 };
 
 /**
+ * Per-user trial image-cap overrides (one-off support exceptions). Everyone else
+ * keeps the tier default (50). Kept here — rather than reading the per-user
+ * images_limit column — so the default stays 50 for all other users and the
+ * feedback-bonus column values (e.g. 55) are left as-is. Keyed by user id.
+ */
+export const TRIAL_IMAGE_LIMIT_OVERRIDES: Record<string, number> = {
+  '63fbe83d-b544-46e5-86a9-0c0cd97aafdf': 80, // rancui.93@gmail.com — support bump
+};
+
+/**
  * Check if user can generate images based on rate limits
  */
 export async function checkImageGenerationLimit(
@@ -77,31 +87,34 @@ export async function checkImageGenerationLimit(
   const isTrial = user.subscription_tier === 'free' && user.trial_status === 'active';
   const config = RATE_LIMITS[user.subscription_tier] || RATE_LIMITS.free;
 
-  // Check total trial limit (if applicable)
-  if (isTrial && config.totalTrialLimit) {
-    const totalUsed = user.images_generated_count || 0;
-    const totalRemaining = config.totalTrialLimit - totalUsed;
+  // Trial cap = tier default (50), unless this user has a one-off support override.
+  const effectiveTrialLimit = TRIAL_IMAGE_LIMIT_OVERRIDES[userId] ?? config.totalTrialLimit;
 
-    if (totalUsed >= config.totalTrialLimit) {
+  // Check total trial limit (if applicable)
+  if (isTrial && effectiveTrialLimit) {
+    const totalUsed = user.images_generated_count || 0;
+    const totalRemaining = effectiveTrialLimit - totalUsed;
+
+    if (totalUsed >= effectiveTrialLimit) {
       return {
         allowed: false,
-        reason: `You've reached your trial limit of ${config.totalTrialLimit} images. Upgrade to continue creating stories!`,
+        reason: `You've reached your trial limit of ${effectiveTrialLimit} images. Upgrade to continue creating stories!`,
         limits: {
           daily: { used: 0, limit: config.dailyLimit, remaining: config.dailyLimit },
           hourly: { used: 0, limit: config.hourlyLimit, remaining: config.hourlyLimit },
-          total: { used: totalUsed, limit: config.totalTrialLimit, remaining: 0 },
+          total: { used: totalUsed, limit: effectiveTrialLimit, remaining: 0 },
         },
       };
     }
 
-    if (totalUsed + imageCount > config.totalTrialLimit) {
+    if (totalUsed + imageCount > effectiveTrialLimit) {
       return {
         allowed: false,
         reason: `This would exceed your trial limit. You have ${totalRemaining} image${totalRemaining === 1 ? '' : 's'} remaining. Try generating fewer scenes or upgrade for unlimited images!`,
         limits: {
           daily: { used: 0, limit: config.dailyLimit, remaining: config.dailyLimit },
           hourly: { used: 0, limit: config.hourlyLimit, remaining: config.hourlyLimit },
-          total: { used: totalUsed, limit: config.totalTrialLimit, remaining: totalRemaining },
+          total: { used: totalUsed, limit: effectiveTrialLimit, remaining: totalRemaining },
         },
       };
     }
@@ -177,7 +190,7 @@ export async function checkImageGenerationLimit(
 
   // All checks passed
   const totalUsed = isTrial ? (user.images_generated_count || 0) : undefined;
-  const totalLimit = isTrial ? config.totalTrialLimit : undefined;
+  const totalLimit = isTrial ? effectiveTrialLimit : undefined;
 
   return {
     allowed: true,
