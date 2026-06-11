@@ -144,6 +144,9 @@ function CreateStoryPageInner() {
   const [authorAge, setAuthorAge] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  // Surfaces image-generation failures (e.g. trial/daily image limit → 429, or a
+  // server error) that previously failed silently. isLimit drives the upgrade CTA.
+  const [generationError, setGenerationError] = useState<{ message: string; isLimit: boolean } | null>(null);
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [isGeneratingMetadata, setIsGeneratingMetadata] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -1707,7 +1710,10 @@ function CreateStoryPageInner() {
         let errorMessage = 'Failed to save story';
         try {
           const data = await response.json();
-          errorMessage = data.error || data.message || errorMessage;
+          // Prefer the human-friendly `message` (e.g. "You've reached your monthly
+          // limit of 5 stories. Upgrade…") over the terse `error` code so the
+          // story-limit 403 reads clearly instead of just "Story limit reached".
+          errorMessage = data.message || data.error || errorMessage;
         } catch {
           errorMessage = response.status === 413
             ? 'Story data is too large to save. Please try regenerating the images.'
@@ -1867,6 +1873,7 @@ function CreateStoryPageInner() {
     }
 
     setIsGenerating(true);
+    setGenerationError(null);
 
     // Initialize image generation status for all scenes
     const initialStatus = enhancedScenes.map((scene, index) => ({
@@ -2007,8 +2014,13 @@ function CreateStoryPageInner() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Generation failed');
+        // Prefer the human-friendly `message` (e.g. the trial/daily limit reason)
+        // over the terse `error` code, and flag 429s so the UI shows an upgrade CTA.
+        const errorData = await response.json().catch(() => ({} as { error?: string; message?: string }));
+        const friendly = errorData.message || errorData.error || 'Image generation failed. Please try again.';
+        const err = new Error(friendly) as Error & { isLimit?: boolean };
+        err.isLimit = response.status === 429;
+        throw err;
       }
 
       const data = await response.json();
@@ -2042,6 +2054,24 @@ function CreateStoryPageInner() {
           };
         });
         setImageGenerationStatus(updatedImages);
+
+        // A 200 response can still mean every scene failed: the route returns
+        // success:false with all images status:'failed'. The results panel only
+        // renders when ≥1 image completed, so without this the page goes blank
+        // (the same silent failure we're fixing for the 429 path).
+        const completedCount = updatedImages.filter((img: { status?: string }) => img.status === 'completed').length;
+        if (completedCount === 0) {
+          setGenerationError({
+            message: 'We couldn’t generate any images this time. Please try again.',
+            isLimit: false,
+          });
+        }
+      } else {
+        // No images returned at all — surface it instead of failing silently.
+        setGenerationError({
+          message: 'We couldn’t generate any images this time. Please try again.',
+          isLimit: false,
+        });
       }
 
       // Extract image URLs for the gallery
@@ -2049,11 +2079,16 @@ function CreateStoryPageInner() {
       setGeneratedImages(imageUrls);
     } catch (error) {
       console.error('Generation error:', error);
+      const message = error instanceof Error ? error.message : 'Image generation failed. Please try again.';
+      const isLimit = !!(error as { isLimit?: boolean })?.isLimit;
+      // Surface the failure to the user — previously this was console-only, so a
+      // full failure (e.g. 429 image-limit) left the page blank with no feedback.
+      setGenerationError({ message, isLimit });
       // Mark all as failed
       setImageGenerationStatus(initialStatus.map(img => ({
         ...img,
         status: 'failed' as const,
-        error: error instanceof Error ? error.message : 'Generation failed',
+        error: message,
       })));
     } finally {
       setIsGenerating(false);
@@ -2787,6 +2822,43 @@ function CreateStoryPageInner() {
               images={imageGenerationStatus}
               totalScenes={parsedScenes.length}
             />
+          </div>
+        )}
+
+        {/* Generation failure — image/daily limit (429) or a server error.
+            Renders the case where generation finished with zero completed images,
+            which previously showed nothing at all. */}
+        {generationError && !isGenerating && (
+          <div className="mb-8 bg-red-50 border border-red-200 rounded-xl p-4" role="alert" aria-live="assertive">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-red-800">
+                  {generationError.isLimit ? 'Image limit reached' : 'Image generation failed'}
+                </p>
+                <p className="text-sm text-red-700 mt-0.5">{generationError.message}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {generationError.isLimit ? (
+                    <a
+                      href="/upgrade"
+                      className="inline-flex items-center px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+                    >
+                      Upgrade for more images
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleGenerateImages}
+                      className="inline-flex items-center px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+                    >
+                      Try again
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
