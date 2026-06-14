@@ -48,6 +48,24 @@ export const TRIAL_IMAGE_LIMIT_OVERRIDES: Record<string, number> = {
 };
 
 /**
+ * Effective total image cap for a trial user. The per-user `images_limit`
+ * column is the single source of truth: a plain SQL UPDATE bumps a user with
+ * no code deploy. Priority: column (when set to a positive value) → legacy code
+ * override map → tier default (50). (images_limit = -1 / unlimited is handled by
+ * the callers before this is reached.)
+ */
+export function getEffectiveTrialLimit(
+  user: { images_limit?: number | null },
+  userId: string,
+  tierDefault: number = RATE_LIMITS.free.totalTrialLimit ?? 50
+): number {
+  if (typeof user.images_limit === 'number' && user.images_limit > 0) {
+    return user.images_limit;
+  }
+  return TRIAL_IMAGE_LIMIT_OVERRIDES[userId] ?? tierDefault;
+}
+
+/**
  * Check if user can generate images based on rate limits
  */
 export async function checkImageGenerationLimit(
@@ -87,8 +105,9 @@ export async function checkImageGenerationLimit(
   const isTrial = user.subscription_tier === 'free' && user.trial_status === 'active';
   const config = RATE_LIMITS[user.subscription_tier] || RATE_LIMITS.free;
 
-  // Trial cap = tier default (50), unless this user has a one-off support override.
-  const effectiveTrialLimit = TRIAL_IMAGE_LIMIT_OVERRIDES[userId] ?? config.totalTrialLimit;
+  // Trial cap = per-user images_limit column (SQL is the source of truth),
+  // falling back to the legacy override map, then the tier default (50).
+  const effectiveTrialLimit = getEffectiveTrialLimit(user, userId, config.totalTrialLimit);
 
   // Check total trial limit (if applicable)
   if (isTrial && effectiveTrialLimit) {
