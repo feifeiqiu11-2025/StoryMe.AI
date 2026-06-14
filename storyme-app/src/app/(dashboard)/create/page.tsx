@@ -46,6 +46,39 @@ const AUTOSAVE_DEBOUNCE_MS = 3 * 60 * 1000;
 const CHARACTERS_STORAGE_KEY = 'storyme_character_library';
 const ART_STYLE = "children's book illustration, colorful, whimsical";
 
+/**
+ * POST to a save endpoint, transparently recovering from a stale Supabase
+ * access token.
+ *
+ * The cookie-stored access token expires after ~1h. If the user has been idle
+ * (tab backgrounded / machine asleep) the browser client may not have refreshed
+ * it yet, so the first save request hits the server with an expired token and
+ * the route returns 401 — at the auth gate, before any DB write, so retrying is
+ * side-effect-free. We refresh the session once (the refresh token is still
+ * valid), which writes fresh tokens into the cookies, then retry exactly once.
+ *
+ * Scoped to MANUAL saves only — never the background autosave loop — so a
+ * single user-initiated 401 can trigger at most one refresh, avoiding any race
+ * against the client's own auto-refresh and Supabase's refresh-token reuse
+ * detection.
+ */
+async function postWithSessionRetry(url: string, body: string): Promise<Response> {
+  const init: RequestInit = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  };
+  const response = await fetch(url, init);
+  if (response.status !== 401) return response;
+
+  // Stale token: refresh once, then retry once. If the refresh fails (refresh
+  // token truly revoked/expired), fall through with the original 401 so the
+  // caller surfaces the session-expired message.
+  const { error } = await createClient().auth.refreshSession();
+  if (error) return response;
+  return fetch(url, init);
+}
+
 function CreateStoryPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1354,21 +1387,21 @@ function CreateStoryPageInner() {
         hasBase64Urls: (scenesPayload || []).some((s: any) => s.imageUrl?.startsWith?.('data:')),
       });
 
-      const response = await fetch('/api/projects/save-draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: draftBody,
-      });
+      const response = await postWithSessionRetry('/api/projects/save-draft', draftBody);
 
       if (!response.ok) {
         let errorMessage = 'Failed to save draft';
-        try {
-          const errData = await response.json();
-          errorMessage = errData.error || errData.message || errorMessage;
-        } catch {
-          errorMessage = response.status === 413
-            ? 'Draft data is too large to save. Try regenerating some of the images.'
-            : `Draft save failed (${response.status}). Please try again.`;
+        if (response.status === 401) {
+          errorMessage = 'Your session expired. Please refresh the page and log in again.';
+        } else {
+          try {
+            const errData = await response.json();
+            errorMessage = errData.error || errData.message || errorMessage;
+          } catch {
+            errorMessage = response.status === 413
+              ? 'Draft data is too large to save. Try regenerating some of the images.'
+              : `Draft save failed (${response.status}). Please try again.`;
+          }
         }
         saveRequestFailed({
           type: 'draft',
@@ -1699,25 +1732,25 @@ function CreateStoryPageInner() {
         hasBase64Urls: scenesData.some(s => s.imageUrl?.startsWith('data:')),
       });
 
-      const response = await fetch('/api/projects/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: saveBody,
-      });
+      const response = await postWithSessionRetry('/api/projects/save', saveBody);
 
       if (!response.ok) {
         // Handle non-JSON responses (e.g., 413 Request Entity Too Large)
         let errorMessage = 'Failed to save story';
-        try {
-          const data = await response.json();
-          // Prefer the human-friendly `message` (e.g. "You've reached your monthly
-          // limit of 5 stories. Upgrade…") over the terse `error` code so the
-          // story-limit 403 reads clearly instead of just "Story limit reached".
-          errorMessage = data.message || data.error || errorMessage;
-        } catch {
-          errorMessage = response.status === 413
-            ? 'Story data is too large to save. Please try regenerating the images.'
-            : `Save failed (${response.status}). Please try again.`;
+        if (response.status === 401) {
+          errorMessage = 'Your session expired. Please refresh the page and log in again.';
+        } else {
+          try {
+            const data = await response.json();
+            // Prefer the human-friendly `message` (e.g. "You've reached your monthly
+            // limit of 5 stories. Upgrade…") over the terse `error` code so the
+            // story-limit 403 reads clearly instead of just "Story limit reached".
+            errorMessage = data.message || data.error || errorMessage;
+          } catch {
+            errorMessage = response.status === 413
+              ? 'Story data is too large to save. Please try regenerating the images.'
+              : `Save failed (${response.status}). Please try again.`;
+          }
         }
         saveRequestFailed({
           type: 'completed',
