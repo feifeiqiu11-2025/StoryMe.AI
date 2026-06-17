@@ -451,6 +451,21 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // The cover (scene 0) has no bible scene entry, so the block above skips it.
+        // Feature the recurring NEW characters on the cover too — with their anchors —
+        // so the cover's characters match the story's scenes. No-op when there are none.
+        if (isCoverScene && newCharByName.size > 0) {
+          for (const nc of newCharByName.values()) {
+            if (!sceneCharacters.some(c => c.name.toLowerCase() === nc.name.toLowerCase())) {
+              sceneCharacters.push({
+                name: nc.name,
+                referenceImageUrl: nc.reference_image_url || '',
+                description: { fullDescription: nc.description },
+              });
+            }
+          }
+        }
+
         // Generate image using selected provider
         let result;
 
