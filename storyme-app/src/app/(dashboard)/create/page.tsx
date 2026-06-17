@@ -714,8 +714,10 @@ function CreateStoryPageInner() {
 
   // NEW: Handle AI scene enhancement
   const handleEnhanceScenes = async () => {
-    if (!scriptInput.trim() || characters.length === 0) {
-      alert('Please add characters and write scenes first');
+    // Character-optional: factual / world-exploration books can have zero
+    // characters. Only the script is required.
+    if (!scriptInput.trim()) {
+      alert('Please write your scenes first');
       return;
     }
 
@@ -784,41 +786,11 @@ function CreateStoryPageInner() {
       // Fresh enhancement → no stale prompts yet.
       setStalePromptSceneNumbers(new Set());
 
-      // Phase 3: kick off eager reference-image generation for non-backed locations
-      // in the background. Non-blocking — the review page loads immediately; URLs
-      // merge into storyBible.locations as the server responds. generate-images reads
-      // them from the bible prop and passes them as additional references to the provider.
-      if (data.storyBible?.locations?.length) {
-        (async () => {
-          try {
-            const resp = await fetch('/api/locations/generate-references', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ locations: data.storyBible.locations }),
-            });
-            if (!resp.ok) {
-              console.warn('[location refs] non-ok response, skipping reference images');
-              return;
-            }
-            const json = await resp.json();
-            const urlMap: Record<string, string> = json?.locations || {};
-            if (Object.keys(urlMap).length === 0) return;
-            setStoryBible(prev => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                locations: prev.locations.map(l =>
-                  urlMap[l.temp_id] ? { ...l, reference_image_url: urlMap[l.temp_id] } : l
-                ),
-              };
-            });
-            console.log(`✓ Location reference images ready for ${Object.keys(urlMap).length} locations`);
-          } catch (err) {
-            // Non-fatal: image gen will still work with locked-prose consistency
-            console.error('[location refs] Failed, continuing without reference images:', err);
-          }
-        })();
-      }
+      // NOTE: Anchor reference images (location establishing shots + recurring
+      // new characters) are NO LONGER generated eagerly here. The art style isn't
+      // known yet at this point, so eager generation always produced Pixar-styled
+      // anchors. They are now generated at BATCH time inside /api/generate-images,
+      // in the SELECTED illustration style, and reused across scenes.
 
       // Extract and store metadata (title, description)
       if (data.metadata) {
@@ -2192,7 +2164,7 @@ function CreateStoryPageInner() {
           <h2 className="text-xl font-semibold text-gray-900">Define Characters</h2>
         </div>
         <p className="text-gray-600 mb-4 ml-11">
-          Add characters to your story. You can import from your character library or create new ones.
+          Optional: add characters to star in your story, or skip them for a fact-based book (like a butterfly life cycle). Import from your library or create new ones.
         </p>
         <div className="mb-4">
           <div className="flex justify-end gap-2">
@@ -2224,6 +2196,7 @@ function CreateStoryPageInner() {
             onCharactersChange={handleCharactersChange}
             showAddButton={false}
             onSaveToLibrary={handleSaveToLibrary}
+            charactersOptional
           />
         </div>
 
@@ -2598,7 +2571,8 @@ function CreateStoryPageInner() {
         */}
 
         {/* Step 2: Script Input */}
-        {characters.length > 0 && enhancedScenes.length === 0 && (
+        {/* Character-optional: shown pre-enhancement regardless of characters. */}
+        {enhancedScenes.length === 0 && (
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-sm">
@@ -2678,7 +2652,8 @@ function CreateStoryPageInner() {
         )}
 
         {/* Step 3: Story Settings */}
-        {characters.length > 0 && scriptInput.trim() && enhancedScenes.length === 0 && (
+        {/* Character-optional: settings show once a script exists, with or without characters. */}
+        {scriptInput.trim() && enhancedScenes.length === 0 && (
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-sm">
@@ -2811,6 +2786,28 @@ function CreateStoryPageInner() {
                   };
                 });
                 setStalePromptSceneNumbers(prev => new Set(prev).add(sceneNumber));
+              }}
+              onSetLocationReference={(tempId, url) => {
+                setStoryBible(prev => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    locations: prev.locations.map(l =>
+                      l.temp_id === tempId ? { ...l, reference_image_url: url } : l
+                    ),
+                  };
+                });
+              }}
+              onSetCharacterReference={(tempId, url) => {
+                setStoryBible(prev => {
+                  if (!prev || !prev.new_characters) return prev;
+                  return {
+                    ...prev,
+                    new_characters: prev.new_characters.map(c =>
+                      c.temp_id === tempId ? { ...c, reference_image_url: url } : c
+                    ),
+                  };
+                });
               }}
               onRequestAddCharacter={(sceneNumber) => {
                 setAddCharToSceneNumber(sceneNumber);

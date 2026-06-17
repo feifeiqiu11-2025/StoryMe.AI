@@ -323,7 +323,6 @@ export const IMAGE_PROVIDER_OPTIONS: Array<{
     value: 'gemini-3.1',
     label: 'Nano Banana 2',
     description: 'Latest — best quality & consistency',
-    isNew: true,
   },
   {
     value: 'gemini-2.5',
@@ -334,8 +333,7 @@ export const IMAGE_PROVIDER_OPTIONS: Array<{
   {
     value: 'openai-gpt-image-2',
     label: 'ChatGPT Image 2.0',
-    description: 'OpenAI — great for kid drawings',
-    isNew: true,
+    description: "Great for preserving kids' drawings",
   },
   {
     value: 'flux',

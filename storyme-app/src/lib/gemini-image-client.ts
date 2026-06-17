@@ -28,6 +28,7 @@ import {
   openaiGenerateDescriptionOnlyPreviewClassic,
 } from './openai-image-client';
 import { buildKidCreationPrompt, shouldUseFaithfulnessPrompt } from './character-prompts';
+import { ART_STYLE_BY_ID } from './art-styles-config';
 
 /**
  * Safety settings for image generation calls.
@@ -70,10 +71,12 @@ export interface GeminiGenerateParams {
    * 'classic' = modern vibrant 2D cartoon (default). 'ghibli' = Studio Ghibli-inspired
    * look. Ghibli rides on the Classic 2D generator because it shares every functional
    * rule (reference authority, human/animal separation, proportions); only the STYLE
-   * descriptor differs. Ignored by the Pixar (generateImageWithGemini) and Coloring
-   * generators.
+   * descriptor differs. 'realistic' = lifelike/photoreal look for factual & educational
+   * books — it additionally relaxes the "no photo realism" aesthetic rule (while KEEPING
+   * the "no actual real-world photo" guard) and adds real-world scale/anatomy accuracy.
+   * Ignored by the Pixar (generateImageWithGemini) and Coloring generators.
    */
-  styleVariant?: 'classic' | 'ghibli';
+  styleVariant?: 'classic' | 'ghibli' | 'realistic';
 }
 
 export interface GeminiGenerateResult {
@@ -650,7 +653,7 @@ export async function generateImageWithGemini({
   // Build prompt with clear separation between humans and animals
   const fullPrompt = `Create a 3D children's book illustration: ${sceneDescription}
 
-STYLE: 3D animated Pixar/Disney style, soft rounded features, vibrant colors, large expressive eyes. Square 1:1.
+STYLE: ${ART_STYLE_BY_ID.pixar.geminiStyleLine}
 
 PROPORTIONS: Normal, healthy body proportions - not overly fat or chubby. If "big" is mentioned, interpret as LARGE/TALL in size, NOT fat. Maintain natural proportions for the species/character type.
 
@@ -818,6 +821,11 @@ export async function generateImageWithGeminiClassic({
   }
   console.log(`[Gemini Classic] Clothing consistency mode: ${clothingConsistency}`);
 
+  // Realistic style: relax the cartoon aesthetic and add real-world scale/anatomy
+  // accuracy. Every realistic-specific change below is guarded by this flag, so the
+  // classic/ghibli output is unchanged.
+  const isRealistic = styleVariant === 'realistic';
+
   // Build character descriptions using smart prompt builder
   // Handles: animal detection, clothing priority based on clothingConsistency setting
   const characterPrompts = characters.map(c => {
@@ -845,13 +853,16 @@ export async function generateImageWithGeminiClassic({
     ? `HUMAN CHARACTERS (from reference photos):\n${humanCharacters.map(cp => `- ${cp.char.name} (human child) - ${cp.prompt}`).join('\n')}`
     : '';
 
+  const animalDescriptor = isRealistic
+    ? 'realistic, naturalistically-rendered animal with accurate real-world anatomy and proportions, animal face, NO human features'
+    : 'cute 2D illustrated animal, animal face, NO human features';
   const animalCharacterSection = animalCharacters.length > 0
-    ? `ANIMAL CHARACTERS:\n${animalCharacters.map(cp => `- ${cp.prompt} (cute 2D illustrated animal, animal face, NO human features)`).join('\n')}`
+    ? `ANIMAL CHARACTERS:\n${animalCharacters.map(cp => `- ${cp.prompt} (${animalDescriptor})`).join('\n')}`
     : '';
 
   // Detect if scene mentions animals not in character list
   const sceneAnimalSection = hasAnimalsInScene && !hasAnimalCharacters
-    ? `ANIMALS IN SCENE:\n- Any animals mentioned in scene: cute cartoon animals with ANIMAL faces, NOT humanoid, NO human clothing`
+    ? `ANIMALS IN SCENE:\n- Any animals mentioned in scene: ${isRealistic ? 'realistic, naturalistically-rendered animals with accurate anatomy' : 'cute cartoon animals with ANIMAL faces'}, NOT humanoid, NO human clothing`
     : '';
 
   // Build clothing consistency rule based on setting
@@ -866,18 +877,25 @@ export async function generateImageWithGeminiClassic({
   // than "soft watercolor/pastel" so the printed book holds contrast (washed-out
   // pale palettes print poorly).
   const styleLine = styleVariant === 'ghibli'
-    ? 'Studio Ghibli-inspired illustration, warm rich colors. Square 1:1.'
-    : 'Modern 2D digital cartoon, vibrant saturated colors, smooth cel-shading, large glossy expressive eyes, soft warm lighting, clean polished style. Square 1:1.';
+    ? ART_STYLE_BY_ID.ghibli.geminiStyleLine
+    : styleVariant === 'realistic'
+    ? ART_STYLE_BY_ID.realistic.geminiStyleLine
+    : ART_STYLE_BY_ID.classic.geminiStyleLine;
   console.log(`[Gemini Classic] Style variant: ${styleVariant}`);
-  const fullPrompt = `Create a 2D children's book illustration: ${sceneDescription}
+  const fullPrompt = `Create a ${isRealistic ? 'photorealistic, lifelike image — like a high-quality educational photograph' : "2D children's book illustration"}: ${sceneDescription}
 
 STYLE: ${styleLine}
 
 PROPORTIONS: Normal, healthy body proportions - not overly fat or chubby. If "big" is mentioned, interpret as LARGE/TALL in size, NOT fat. Maintain natural proportions for the species/character type.
-
+${isRealistic ? `
+SCALE & ANATOMY (realistic accuracy): Render every subject at its true real-world size — both relative to other subjects AND relative to its surroundings or container — never oversized or overflowing its space. Use accurate, natural anatomy and real-life proportions for each species; no cartoon exaggeration, no oversized eyes or heads.
+` : ''}
 IMPORTANT:
-- Generate a DIGITAL ILLUSTRATION, NOT a photograph, NOT watercolor
-- Characters WITH a reference image: the IMAGE is the AUTHORITATIVE source for visual identity (species, body shape, distinguishing features). If the name and the image disagree, FOLLOW THE IMAGE. Always render in the story's art style (no photo realism).
+${isRealistic
+  ? `- Generate a photorealistic, lifelike image (a GENERATED image, not a real photo). Do NOT output, retrieve, or copy an actual photograph or a real internet/stock image, and do NOT depict real, identifiable people.
+- Keep it age-appropriate and child-friendly: wholesome, gentle, non-scary, and non-graphic.`
+  : `- Generate a DIGITAL ILLUSTRATION, NOT a photograph, NOT watercolor`}
+- Characters WITH a reference image: the IMAGE is the AUTHORITATIVE source for visual identity (species, body shape, distinguishing features). If the name and the image disagree, FOLLOW THE IMAGE. Always render in the story's art style${isRealistic ? '' : ' (no photo realism)'}.
 - Characters WITHOUT a reference image: use the name and description text.
 - Blend each reference naturally into the scene — match the scene's lighting, perspective, and art style; render as a character or scene element based on context. No flat overlays.
 - NO religious figures (Jesus, Buddha, etc.)
@@ -1073,7 +1091,7 @@ This MUST be a BLACK AND WHITE COLORING PAGE.
 
 OUTPUT FORMAT: Pure black line art on pure white background. Like a page from a children's coloring book that has NOT been colored in yet.
 
-STYLE: Clean thin black outlines only. Cartoon style with expressive faces. Simple but recognizable features. Simplified background. Square 1:1.
+STYLE: ${ART_STYLE_BY_ID.coloring.geminiStyleLine}
 
 MANDATORY REQUIREMENTS:
 1. ONLY black lines (#000000) on white background (#FFFFFF)

@@ -144,9 +144,9 @@ export class ProjectService {
       throw new Error('Script must be at least 10 characters long');
     }
 
-    if (!data.characterIds || data.characterIds.length === 0) {
-      throw new Error('At least one character is required');
-    }
+    // Character-optional: factual / world-exploration books may have zero
+    // characters. Coerce to an array so the linking/usage loops below no-op.
+    data.characterIds = data.characterIds ?? [];
 
     if (data.characterIds.length > 5) {
       throw new Error('Maximum 5 characters allowed');

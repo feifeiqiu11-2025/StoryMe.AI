@@ -525,8 +525,25 @@ export interface BibleScene extends EnhancedSceneResult {
   resolved_character_names?: string[];  // pronouns resolved to explicit names from the input list
 }
 
+// A recurring character implied by the script but NOT in the user's provided
+// character list (e.g. "a little girl in a red dress" who appears across scenes).
+// Surfaced so we can pre-generate a consistent reference image for it, exactly
+// like a location. Only emitted for characters appearing in >= 2 scenes.
+export interface NewBibleCharacter {
+  temp_id: string;            // stable within this response: char_1, char_2, ...
+  name: string;               // short name/label
+  description: string;        // 20–30 words, locked visual description
+  first_scene_index: number;  // 0-based index of the first scene using this character
+  // Populated by /api/characters/generate-references after enhance. Null during
+  // the window between enhance returning and the reference generation completing.
+  reference_image_url?: string | null;
+}
+
 export interface StoryBibleResult {
   locations: BibleLocation[];
+  // Recurring characters the model introduced that weren't in the input list.
+  // Optional for backward-compatibility with older saved bibles.
+  new_characters?: NewBibleCharacter[];
   scenes: BibleScene[];
 }
 
@@ -600,7 +617,14 @@ ${getReadingLevelGuidelines(readingLevel)}
 YOUR TASK — produce TWO things together:
 
 A) LOCATIONS (story bible)
-   Identify every distinct setting used across the story. For each:
+   Identify the distinct background SETTINGS used across the story. A setting is the broad
+   environment/backdrop of a scene — not a small object, prop, or focal spot within it; do
+   not promote a focal detail into its own setting. Create a new setting ONLY when the
+   backdrop genuinely changes to a different PLACE; scenes that share the same surroundings
+   share one setting even if they zoom in on different details within it. Do NOT create a
+   separate setting for each stage or step of a process or life cycle that happens in the
+   same place — those are ONE setting. Use only as many settings as there are genuinely
+   distinct places — do not over-split, but do keep genuinely different places separate. For each:
    - Give it a short, human-readable name (2–5 words).
    - Write a LOCKED visual description (25–40 words) specific to THIS story — concrete landmarks, lighting, mood. This description will be reused verbatim for every scene in that location, so make it specific enough that two separate images of this location would look the same.
    - If a SCENE-TYPE CHARACTER listed above is clearly this location, set backing_character_name to that character's exact name AND set the location's name to the SAME exact name (do NOT invent variations like "Rainbow House Morning" — use just "Rainbow House"). Otherwise backing_character_name is null and you may pick any descriptive name.
@@ -610,11 +634,19 @@ B) SCENES
    For each scene produce:
    - title, enhanced_prompt, caption, characterNames, characterTypes (as before)
    - location_temp_id: which location from (A) this scene takes place in. DEFAULT to the previous scene's location unless the script explicitly indicates a change (e.g., "then she went home", "the next day at school"). Never leave this null unless no location can be inferred for the whole story.
-   - resolved_character_names: the full list of characters present in this scene, with ALL pronouns resolved to explicit names from the character list above. "He walked in" → if Connor is the most recent male subject, resolved_character_names includes "Connor". Never leave a pronoun unresolved.
+   - resolved_character_names: the persistent CHARACTERS present in this scene — a person, or a specific recurring animal that acts across scenes — with ALL pronouns resolved to explicit names from the character list above (or to a new character you introduce in C). "He walked in" → if Connor is the most recent male subject, include "Connor". The topic's SUBJECT and its life stages or forms are NOT characters: if a scene only shows the subject (no persistent person/animal), return an empty list. Never leave a pronoun unresolved.
+
+C) NEW CHARACTERS (a PERSISTENT individual not in the provided list — a person, or one specific animal — that recurs across scenes)
+   For each one that appears in 2 OR MORE scenes WITH THE SAME, UNCHANGED appearance:
+   - temp_id: a stable id (char_1, char_2, ...) in order of first appearance.
+   - name: a short, stable label — a name if one is given, otherwise a brief descriptive label.
+   - description: a LOCKED 20–30 word visual description (concrete appearance, clothing, colors) so two separate images of this character would look the same.
+   - first_scene_index: 0-based index of the first scene they appear in.
+   Do NOT include the topic's subject, a creature that changes or grows across scenes, or any of its life stages/forms — render those per scene and NEVER create a separate character for each stage. Return an empty array if there are none (a factual topic often has none).
 
 CRITICAL RULES:
-- Only reference character names from the provided list: ${characterNames}. Do not invent UUIDs.
-- Preserve character names exactly as provided.
+- Use the provided characters by their EXACT names: ${characterNames || '(none provided)'}. Do not invent UUIDs. Preserve provided character names exactly.
+- NEW CHARACTERS: only list a PERSISTENT individual (a person, or one specific animal) that appears in 2+ scenes with the SAME unchanged appearance; give it a short stable label. Do NOT create a character for a one-off person in a single scene; do NOT turn a setting/place/object into a character (those are LOCATIONS); do NOT extract the topic's subject or a creature that changes/grows across scenes — render its stages/forms per scene and NEVER split one subject into a character per stage; and never invent a fictional narrator or anthropomorphize (no talking animals).
 - location_temp_id values must match one of the temp_ids you returned in (A).
 - If a scene contains no characters at all (pure scenery), return an empty array for resolved_character_names.
 - Keep enhanced_prompt and caption semantics identical to a standard enhancement.
@@ -648,6 +680,14 @@ Return a single valid JSON OBJECT (not an array) with this exact shape:
       "name": "short human-readable name",
       "description": "25-40 words, specific visual description",
       "backing_character_name": null,
+      "first_scene_index": 0
+    }
+  ],
+  "new_characters": [
+    {
+      "temp_id": "char_1",
+      "name": "short name or label",
+      "description": "20-30 words, locked visual description",
       "first_scene_index": 0
     }
   ],
@@ -824,6 +864,43 @@ export function parseStoryBibleResponse(
 
   const validTempIds = new Set(locations.map(l => l.temp_id));
 
+  // New characters the model introduced (recurring, not in the provided list).
+  // Drop any whose name matches a provided character — those aren't "new".
+  const providedNames = new Set((characters || []).map(c => c.name.toLowerCase()));
+  // Count how many distinct scenes each name appears in (resolved_character_names),
+  // so we can ENFORCE the "recurring (>=2 scenes)" rule in code. The model doesn't
+  // reliably count and tends to emit single-scene subjects — e.g. each life-cycle
+  // stage of one transforming subject — as separate characters. Those should be
+  // rendered per scene, not tracked, so we drop anything that isn't truly recurring.
+  const sceneNameCounts = new Map<string, number>();
+  for (const s of rawScenes) {
+    const names = Array.isArray(s?.resolved_character_names) ? s.resolved_character_names : [];
+    const seen = new Set<string>();
+    for (const n of names) {
+      if (typeof n === 'string' && n.trim()) {
+        const key = n.toLowerCase();
+        if (!seen.has(key)) { seen.add(key); sceneNameCounts.set(key, (sceneNameCounts.get(key) || 0) + 1); }
+      }
+    }
+  }
+  // Conservative guard: only enforce the recurrence filter when the model actually
+  // populated resolved_character_names somewhere. If it populated none, we have no
+  // signal — keep the model's list rather than dropping everything (avoids nuking a
+  // legitimate recurring character just because labels weren't echoed).
+  const hasResolvedNames = sceneNameCounts.size > 0;
+  const newCharacters: NewBibleCharacter[] = (Array.isArray(parsed.new_characters) ? parsed.new_characters : [])
+    .filter((ch: any) => ch && typeof ch.temp_id === 'string' && typeof ch.name === 'string' && typeof ch.description === 'string')
+    .filter((ch: any) => !providedNames.has(String(ch.name).toLowerCase()))
+    // Enforce recurrence: must actually appear in >=2 distinct scenes. Drops single-
+    // scene subjects (life-cycle stages, one-off figures) that shouldn't be characters.
+    .filter((ch: any) => !hasResolvedNames || (sceneNameCounts.get(String(ch.name).toLowerCase()) || 0) >= 2)
+    .map((ch: any, idx: number) => ({
+      temp_id: String(ch.temp_id),
+      name: String(ch.name),
+      description: String(ch.description),
+      first_scene_index: typeof ch.first_scene_index === 'number' ? ch.first_scene_index : idx,
+    }));
+
   const scenes: BibleScene[] = rawScenes.map((item: any, index: number) => {
     const originalScene = originalScenes[Math.min(index, originalScenes.length - 1)];
 
@@ -848,5 +925,5 @@ export function parseStoryBibleResponse(
     };
   });
 
-  return { locations, scenes };
+  return { locations, new_characters: newCharacters, scenes };
 }

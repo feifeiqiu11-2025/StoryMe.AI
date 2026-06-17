@@ -138,10 +138,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!characterIds || !Array.isArray(characterIds) || characterIds.length === 0) {
-      await log(400, 'At least one character is required');
+    // Character-optional: factual / world-exploration books may have zero
+    // characters. Require a valid array but allow it to be empty.
+    if (!Array.isArray(characterIds)) {
+      await log(400, 'characterIds must be an array');
       return NextResponse.json(
-        { error: 'At least one character is required' },
+        { error: 'characterIds must be an array (it may be empty for character-free books)' },
         { status: 400 }
       );
     }

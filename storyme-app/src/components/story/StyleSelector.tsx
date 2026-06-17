@@ -12,8 +12,10 @@
 'use client';
 
 import { useState } from 'react';
+import type { ArtStyleType } from '@/lib/art-styles-config';
 
-export type ArtStyleType = 'pixar' | 'classic' | 'coloring' | 'ghibli';
+// Re-exported so existing importers of `ArtStyleType` from this component keep working.
+export type { ArtStyleType };
 
 interface StyleSelectorProps {
   selectedStyle: ArtStyleType;

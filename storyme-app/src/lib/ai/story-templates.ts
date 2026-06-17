@@ -158,14 +158,15 @@ Requirements:
     id: 'knowledge',
     name: 'Knowledge & World Exploration',
     tooltip: 'Animals, nature, space, and cultures',
-    placeholderHint: 'What topic should your character explore and learn about?\ne.g., Emma visits the ocean and discovers how dolphins communicate...',
-    basePrompt: `This is a Knowledge & World Exploration story.
-Requirements:
-- Factually accurate and age-appropriate
-- Explain concepts through observation and explanation
-- Use simple comparisons or categories when helpful
-- Avoid fantasy explanations for real topics
-- End with curiosity and understanding`,
+    placeholderHint: 'What real-world topic should this book teach?\ne.g., Learn the life cycle of a butterfly...',
+    basePrompt: `This is a Knowledge & World Exploration book: non-fiction that teaches a real, science-based topic.
+
+- Everything must be true and real-world. Describe things exactly as they are — no make-believe.
+- Cover exactly the topic the user asked for; do not drift to other subjects.
+- Include the important real stages in the correct order; don't skip or merge key transitions.
+- Don't invent fictional characters or a narrator, and never give animals or objects speech, names, or human behavior. A topic with no characters is perfectly fine.
+- If the SAME real subject (a person or animal) appears in several scenes looking the same, treat it as ONE recurring character so it stays visually consistent. If a subject's appearance changes from scene to scene, do NOT lock it — render each scene from its own description.
+- Use clear, simple, age-appropriate language and true comparisons.`,
     coachingFocus: [
       'factual accuracy',
       'explaining concepts through observation',
@@ -175,26 +176,19 @@ Requirements:
     ],
     architecture: {
       requiredBeats: [
-        "Curiosity: Character notices or wonders about something",
-        "Discovery: Character finds opportunity to explore (visit, observe, ask)",
-        "Observation: Character sees or experiences the topic firsthand",
-        "Explanation: Information presented naturally (guide explains, book shows, etc.)",
-        "Understanding: Character connects new knowledge to something familiar",
-        "Wonder: Character expresses excitement or curiosity about what they learned"
+        "Introduce the real topic",
+        "Move through the topic in its true real-world order — one new idea per scene, each building on the last",
+        "End with why it matters or a sense of wonder"
       ],
       sceneFlowGuidance: `
-- Start with character's genuine curiosity or question
-- Create opportunity for exploration (visit museum, meet expert, read book, observe nature)
-- Show character actively observing (not just being told)
-- Information delivered through demonstration, comparison, or storytelling
-- Use analogies or comparisons to familiar concepts
-- End with character feeling curious and excited to learn more`,
+Tell it as narrative non-fiction — a connected journey through the real topic, not a list of facts.
+- Follow the topic's true natural order (its real sequence or steps).
+- Each scene builds on the one before, so understanding grows page by page.
+- Introduce one new idea at a time and keep every scene focused on the real subject.`,
       pedagogicalCheckpoints: [
-        "Topic is factually accurate (no fantasy explanations for real-world topics)",
-        "Information is age-appropriate and uses simple comparisons",
-        "Character actively discovers rather than passively receives information",
-        "Includes at least one 'Aha!' or 'I learned that...' moment",
-        "Ends with curiosity and wonder, not just facts"
+        "Everything stated is true and stays on the exact topic",
+        "Scenes follow the real-world order and connect logically",
+        "No invented characters and no make-believe"
       ]
     },
   },
