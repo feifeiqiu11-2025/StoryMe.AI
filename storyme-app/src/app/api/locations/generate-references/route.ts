@@ -15,7 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { generateImageWithGemini, isGeminiAvailable } from '@/lib/gemini-image-client';
+import { generateImageWithGemini, generateImageWithGeminiClassic, generateImageWithGeminiColoring, isGeminiAvailable } from '@/lib/gemini-image-client';
 import { createClientFromRequest } from '@/lib/supabase/server';
 import { StorageService } from '@/lib/services/storage.service';
 
@@ -44,6 +44,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    // Render the establishing shot in the selected art style so an on-demand
+    // preview matches the book's look (defaults to classic for older callers).
+    const illustrationStyle: string = typeof body?.illustrationStyle === 'string' ? body.illustrationStyle : 'classic';
     const locationsRaw = Array.isArray(body?.locations) ? body.locations : [];
     const locations: LocationInput[] = locationsRaw
       .filter((l: any) => l && typeof l.temp_id === 'string' && typeof l.description === 'string')
@@ -70,12 +73,29 @@ export async function POST(request: NextRequest) {
     const results = await Promise.allSettled(
       toGenerate.map(async loc => {
         const sceneDescription = `Establishing scene, no characters visible, ${loc.description}. Clean, wide view suitable as a reusable background reference across multiple story scenes.`;
-        const gen = await generateImageWithGemini({
-          characters: [],
-          sceneDescription,
-          artStyle: "children's book illustration, colorful, whimsical",
-          clothingConsistency: 'consistent',
-        });
+        // Dispatch to the generator matching the selected art style (same mapping
+        // the batch scene generator uses) so the preview looks like the book.
+        const gen = illustrationStyle === 'coloring'
+          ? await generateImageWithGeminiColoring({
+              characters: [],
+              sceneDescription,
+              artStyle: "children's coloring book, line art",
+              clothingConsistency: 'consistent',
+            })
+          : (illustrationStyle === 'classic' || illustrationStyle === 'ghibli' || illustrationStyle === 'realistic')
+          ? await generateImageWithGeminiClassic({
+              characters: [],
+              sceneDescription,
+              artStyle: "children's book illustration",
+              clothingConsistency: 'consistent',
+              styleVariant: illustrationStyle === 'ghibli' ? 'ghibli' : illustrationStyle === 'realistic' ? 'realistic' : 'classic',
+            })
+          : await generateImageWithGemini({
+              characters: [],
+              sceneDescription,
+              artStyle: "children's book illustration",
+              clothingConsistency: 'consistent',
+            });
 
         // If the result is a base64 data URL, upload to Supabase Storage for a CDN-backed URL.
         // If it's already an https URL, pass through.

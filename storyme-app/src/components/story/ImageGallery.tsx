@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { GeneratedImage, Character, ImageProvider, ClothingConsistency, EnhancedScene } from '@/lib/types/story';
+import type { ArtStyleType } from '@/lib/art-styles-config';
 import { getLanguageLabel } from '@/lib/config/languages';
 import { detectCharactersInInstruction } from '@/lib/utils/character-matcher';
 import SceneRatingCard from './SceneRatingCard';
@@ -20,7 +21,7 @@ interface ImageGalleryProps {
   onRegenerateScene?: (imageId: string, newImageData: any) => void;
   artStyle?: string;
   imageProvider?: ImageProvider;
-  illustrationStyle?: 'pixar' | 'classic' | 'coloring' | 'ghibli';
+  illustrationStyle?: ArtStyleType;
   clothingConsistency?: ClothingConsistency;
   isGuestMode?: boolean; // Hide individual downloads in guest mode
   enhancedScenes?: EnhancedScene[];

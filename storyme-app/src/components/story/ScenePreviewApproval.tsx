@@ -10,9 +10,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { EnhancedScene, ImageProvider, VISIBLE_IMAGE_PROVIDER_OPTIONS, DEFAULT_SCENE_IMAGE_PROVIDER } from '@/lib/types/story';
 import { getLanguageLabel } from '@/lib/config/languages';
 import type { StoryBibleResult } from '@/lib/ai/scene-enhancer';
-
-// Art style type
-type ArtStyleType = 'pixar' | 'classic' | 'coloring' | 'ghibli';
+import { ART_STYLES, type ArtStyleType } from '@/lib/art-styles-config';
+import EditImageControl from './EditImageControl';
 
 interface ScenePreviewApprovalProps {
   enhancedScenes: EnhancedScene[];
@@ -65,6 +64,12 @@ interface ScenePreviewApprovalProps {
   // Set of scene numbers with stale prompts (edits made since last enhancement). Purely visual —
   // surfaces a small indicator so the user knows a prompt refresh will happen on Approve.
   stalePromptSceneNumbers?: Set<number>;
+  // Phase 8: persist an on-demand-generated setting reference image into the bible
+  // (parent sets storyBible.locations[tempId].reference_image_url). The batch reuses it.
+  onSetLocationReference?: (tempId: string, url: string) => void;
+  // Phase 8: same, for recurring NEW characters
+  // (parent sets storyBible.new_characters[tempId].reference_image_url).
+  onSetCharacterReference?: (tempId: string, url: string) => void;
 }
 
 export default function ScenePreviewApproval({
@@ -101,6 +106,8 @@ export default function ScenePreviewApproval({
   onSceneLocationChange,
   onRequestAddCharacter,
   stalePromptSceneNumbers,
+  onSetLocationReference,
+  onSetCharacterReference,
 }: ScenePreviewApprovalProps) {
   // Add Scene Modal State
   const [showAddSceneModal, setShowAddSceneModal] = useState(false);
@@ -127,6 +134,78 @@ export default function ScenePreviewApproval({
     return () => document.removeEventListener('mousedown', onMouseDown);
   }, [swapSceneForScene]);
 
+  // Phase 8: on-demand setting preview. Generates the setting's reference image in the
+  // selected art style, persists it via onSetLocationReference (parent → bible), and the
+  // batch reuses it. previewingTempId tracks the in-flight request for the spinner.
+  const [previewingTempId, setPreviewingTempId] = useState<string | null>(null);
+  const [previewErrorTempId, setPreviewErrorTempId] = useState<string | null>(null);
+  const handlePreviewLocation = async (
+    loc: { temp_id: string; name: string; description: string; backing_character_name?: string | null }
+  ) => {
+    if (!onSetLocationReference || previewingTempId) return;
+    setPreviewingTempId(loc.temp_id);
+    setPreviewErrorTempId(null);
+    try {
+      const resp = await fetch('/api/locations/generate-references', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locations: [loc], illustrationStyle: artStyle }),
+      });
+      if (!resp.ok) throw new Error('Preview generation failed');
+      const json = await resp.json();
+      const url: string | undefined = json?.locations?.[loc.temp_id];
+      if (!url) throw new Error('No image returned');
+      onSetLocationReference(loc.temp_id, url);
+    } catch (err) {
+      setPreviewErrorTempId(loc.temp_id);
+      console.error('[setting preview] failed:', err);
+    } finally {
+      setPreviewingTempId(null);
+    }
+  };
+
+  // Phase 8: on-demand preview for recurring NEW characters (mirrors the setting preview).
+  const newCharEntryByName = React.useMemo(() => {
+    const map = new Map<string, { temp_id: string; name: string; description: string; reference_image_url?: string | null }>();
+    storyBible?.new_characters?.forEach(c => map.set(c.name.toLowerCase(), c));
+    return map;
+  }, [storyBible]);
+  const [previewingCharTempId, setPreviewingCharTempId] = useState<string | null>(null);
+  const [previewErrorCharTempId, setPreviewErrorCharTempId] = useState<string | null>(null);
+  // Phase 8: larger view + edit for an anchor (setting or new character), opened by
+  // clicking its thumbnail. Edit happens here (roomy modal) instead of inside the chip.
+  const [viewingAnchor, setViewingAnchor] = useState<{
+    kind: 'location' | 'character';
+    temp_id: string;
+    name: string;
+    description: string;
+    url: string;
+  } | null>(null);
+  const handlePreviewCharacter = async (
+    c: { temp_id: string; name: string; description: string }
+  ) => {
+    if (!onSetCharacterReference || previewingCharTempId) return;
+    setPreviewingCharTempId(c.temp_id);
+    setPreviewErrorCharTempId(null);
+    try {
+      const resp = await fetch('/api/characters/generate-references', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ characters: [c], illustrationStyle: artStyle }),
+      });
+      if (!resp.ok) throw new Error('Preview generation failed');
+      const json = await resp.json();
+      const url: string | undefined = json?.characters?.[c.temp_id];
+      if (!url) throw new Error('No image returned');
+      onSetCharacterReference(c.temp_id, url);
+    } catch (err) {
+      setPreviewErrorCharTempId(c.temp_id);
+      console.error('[character preview] failed:', err);
+    } finally {
+      setPreviewingCharTempId(null);
+    }
+  };
+
   // Bible lookups for the split Characters/Scene chip display.
   // Empty maps when no bible is provided → chip rendering falls through to the legacy single-row display.
   const bibleSceneByNumber = React.useMemo(() => {
@@ -138,7 +217,7 @@ export default function ScenePreviewApproval({
   }, [storyBible]);
 
   const bibleLocationByTempId = React.useMemo(() => {
-    const map = new Map<string, { name: string; description: string; backing_character_name?: string | null }>();
+    const map = new Map<string, { name: string; description: string; backing_character_name?: string | null; reference_image_url?: string | null }>();
     storyBible?.locations?.forEach(loc => {
       if (loc.temp_id) map.set(loc.temp_id, loc);
     });
@@ -350,82 +429,157 @@ export default function ScenePreviewApproval({
             Review your AI-enhanced story before generating images. This helps you save costs by ensuring the story is perfect first!
           </p>
 
-          {/* Summary Stats */}
-          <div className="mt-4 flex flex-wrap gap-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-              <div className="text-sm text-blue-700 font-medium">Total Scenes</div>
-              <div className="text-2xl font-bold text-blue-900">
-                {enhancedScenes.length}
-                {sceneCountIncreased && (
-                  <span className="text-sm text-blue-600 ml-2">
-                    (+{enhancedScenes.length - originalSceneCount} added)
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-2">
-              <div className="text-sm text-purple-700 font-medium">Characters</div>
-              <div className="text-2xl font-bold text-purple-900">
-                {allCharacters.size}
-                {newCharacters.length > 0 && (
-                  <span className="text-sm text-purple-600 ml-2">
-                    (+{newCharacters.length} new)
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-              <div className="text-sm text-green-700 font-medium">Estimated Time</div>
-              <div className="text-2xl font-bold text-green-900">
-                {Math.ceil(enhancedScenes.length * 0.4)}-{Math.ceil(enhancedScenes.length * 0.5)} min
-              </div>
-            </div>
-          </div>
-
-          {/* New Characters Alert */}
-          {newCharacters.length > 0 && (
-            <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-yellow-800">
-                    AI Added Minor Characters
-                  </p>
-                  <div className="flex flex-wrap gap-1.5 mt-1.5">
-                    {newCharacters.map((char) => (
-                      onDefineNewCharacter ? (
-                        <button
-                          key={char}
-                          type="button"
-                          onClick={() => onDefineNewCharacter(char)}
-                          className="inline-flex items-center gap-1 text-sm px-2.5 py-1 rounded-full font-medium bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-200 hover:border-yellow-400 transition-colors cursor-pointer"
-                        >
-                          {char}
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                          </svg>
-                        </button>
-                      ) : (
-                        <span key={char} className="text-sm px-2.5 py-1 rounded-full font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
-                          {char}
-                        </span>
-                      )
-                    ))}
+          {/* Story elements: recurring new characters + settings. Preview/edit each
+              once in the selected art style; the batch reuses them across scenes. */}
+          {(newCharacters.length > 0 || (onSetLocationReference && (storyBible?.locations || []).some(l => !l.backing_character_name))) && (
+            <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-3">
+              {newCharacters.length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold text-gray-800 mb-1.5">New Characters</p>
+                  <div className="flex flex-wrap gap-2">
+                    {newCharacters.map((char) => {
+                      const entry = newCharEntryByName.get(char.toLowerCase());
+                      return (
+                        <div key={char} className="inline-flex items-center gap-1.5">
+                          {onDefineNewCharacter ? (
+                            <button
+                              type="button"
+                              onClick={() => onDefineNewCharacter(char)}
+                              className="inline-flex items-center gap-1 text-sm px-2.5 py-1 rounded-full font-medium bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-200 hover:border-yellow-400 transition-colors cursor-pointer"
+                            >
+                              {char}
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                            </button>
+                          ) : (
+                            <span className="text-sm px-2.5 py-1 rounded-full font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
+                              {char}
+                            </span>
+                          )}
+                          {/* Phase 8: on-demand character preview in the selected art style. */}
+                          {onSetCharacterReference && entry && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={previewingCharTempId !== null || isGenerating}
+                                onClick={() => handlePreviewCharacter({ temp_id: entry.temp_id, name: entry.name, description: entry.description })}
+                                className="text-xs px-2 py-1 rounded-full font-medium border bg-white text-gray-600 border-gray-300 hover:text-yellow-800 hover:border-yellow-400 hover:bg-yellow-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Generate a preview of this character in your selected art style"
+                              >
+                                {previewingCharTempId === entry.temp_id
+                                  ? 'Generating…'
+                                  : (entry.reference_image_url ? 'Regenerate' : 'Preview')}
+                              </button>
+                              {entry.reference_image_url && (
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingAnchor({ kind: 'character', temp_id: entry.temp_id, name: entry.name, description: entry.description, url: entry.reference_image_url! })}
+                                  className="shrink-0"
+                                  title="Click to view larger and edit"
+                                >
+                                  <img
+                                    src={entry.reference_image_url}
+                                    alt={`Preview of ${char}`}
+                                    className="w-9 h-9 rounded object-cover border border-yellow-200 hover:ring-2 hover:ring-yellow-300"
+                                  />
+                                </button>
+                              )}
+                              {previewErrorCharTempId === entry.temp_id && (
+                                <span className="text-xs text-red-600">Failed</span>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <p className="text-xs text-yellow-600 mt-1.5">
-                    {onDefineNewCharacter
-                      ? 'Click a character to define their appearance for better image consistency.'
-                      : 'These supporting characters will help tell the story. They\'ll appear with generic, age-appropriate appearance.'}
-                  </p>
                 </div>
-              </div>
+              )}
+
+              {onSetLocationReference && (storyBible?.locations || []).some(l => !l.backing_character_name) && (
+                <div>
+                  <p className="text-sm font-semibold text-gray-800 mb-1.5">Settings</p>
+                  <div className="flex flex-wrap gap-2">
+                {(storyBible?.locations || []).filter(l => !l.backing_character_name).map(loc => (
+                  <div key={loc.temp_id} className="inline-flex items-center gap-1.5 bg-white border border-emerald-200 rounded-full pl-2.5 pr-1.5 py-1">
+                    <span className="text-sm font-medium text-emerald-800" title={loc.description}>{loc.name}</span>
+                    <button
+                      type="button"
+                      disabled={previewingTempId !== null || isGenerating}
+                      onClick={() => handlePreviewLocation({ temp_id: loc.temp_id, name: loc.name, description: loc.description, backing_character_name: loc.backing_character_name ?? null })}
+                      className="text-xs px-2 py-0.5 rounded-full font-medium border bg-white text-gray-600 border-gray-300 hover:text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Generate a preview of this setting in your selected art style"
+                    >
+                      {previewingTempId === loc.temp_id ? 'Generating…' : (loc.reference_image_url ? 'Regenerate' : 'Preview')}
+                    </button>
+                    {loc.reference_image_url && (
+                      <button
+                        type="button"
+                        onClick={() => setViewingAnchor({ kind: 'location', temp_id: loc.temp_id, name: loc.name, description: loc.description, url: loc.reference_image_url! })}
+                        className="shrink-0"
+                        title="Click to view larger and edit"
+                      >
+                        <img src={loc.reference_image_url} alt={`Preview of ${loc.name}`} className="w-9 h-9 rounded object-cover border border-emerald-200 hover:ring-2 hover:ring-emerald-300" />
+                      </button>
+                    )}
+                    {previewErrorTempId === loc.temp_id && <span className="text-xs text-red-600">Failed</span>}
+                  </div>
+                ))}
+                  </div>
+                </div>
+              )}
+              <p className="text-xs text-gray-500">Preview each element in your selected art style; the book reuses them across scenes. Click a new character to define its appearance.</p>
             </div>
           )}
         </div>
+
+        {/* Phase 8: larger anchor view + edit modal (opened by clicking a thumbnail) */}
+        {viewingAnchor && (
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setViewingAnchor(null)}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="bg-white rounded-2xl shadow-xl p-5 max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-gray-900">{viewingAnchor.name}</h3>
+                <button
+                  type="button"
+                  onClick={() => setViewingAnchor(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                  aria-label="Close preview"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <img
+                src={viewingAnchor.url}
+                alt={`Preview of ${viewingAnchor.name}`}
+                className="w-full max-h-[60vh] object-contain rounded-lg border border-gray-200 bg-gray-50"
+              />
+              <div className="mt-3">
+                <EditImageControl
+                  currentImageUrl={viewingAnchor.url}
+                  imageType="scene"
+                  imageId={`${viewingAnchor.kind}-${viewingAnchor.temp_id}`}
+                  buttonLabel="Edit image"
+                  illustrationStyle={artStyle}
+                  imageProvider={imageProvider}
+                  sceneDescription={viewingAnchor.description}
+                  onEditComplete={(url) => {
+                    if (viewingAnchor.kind === 'location') onSetLocationReference?.(viewingAnchor.temp_id, url);
+                    else onSetCharacterReference?.(viewingAnchor.temp_id, url);
+                    setViewingAnchor((v) => (v ? { ...v, url } : v));
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Scene List */}
         <div className="space-y-4">
@@ -709,6 +863,9 @@ export default function ScenePreviewApproval({
                                 </div>
                               )}
 
+                              {/* Setting preview/edit now lives in the consolidated "Story Settings"
+                                  strip in the top summary (one entry per setting), not per-scene. */}
+
                               {/* "Save scene" button is temporarily hidden — the save-to-library flow needs more
                                   iteration before re-exposing it. Supporting code (endpoint, handler in
                                   create/page.tsx, savedLocationTempIds state) is intact, so re-enabling is just
@@ -874,114 +1031,37 @@ export default function ScenePreviewApproval({
           {onArtStyleChange && (
             <div className="mb-6">
               <h4 className="text-sm font-semibold text-gray-900 mb-3">Art Style</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {/* 3D Pixar Option */}
-                <button
-                  type="button"
-                  onClick={() => !isGenerating && onArtStyleChange('pixar')}
-                  disabled={isGenerating}
-                  className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all text-left ${
-                    artStyle === 'pixar'
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
-                  } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {/* Custom radio circle */}
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    artStyle === 'pixar'
-                      ? 'border-blue-500 bg-blue-500'
-                      : 'border-gray-300 bg-white'
-                  }`}>
-                    {artStyle === 'pixar' && (
-                      <div className="w-2 h-2 rounded-full bg-white"></div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-900 text-sm">3D Pixar Style</div>
-                    <p className="text-xs text-gray-500">Modern 3D animation look</p>
-                  </div>
-                </button>
-
-                {/* Classic 2D Option */}
-                <button
-                  type="button"
-                  onClick={() => !isGenerating && onArtStyleChange('classic')}
-                  disabled={isGenerating}
-                  className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all text-left ${
-                    artStyle === 'classic'
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
-                  } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {/* Custom radio circle */}
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    artStyle === 'classic'
-                      ? 'border-blue-500 bg-blue-500'
-                      : 'border-gray-300 bg-white'
-                  }`}>
-                    {artStyle === 'classic' && (
-                      <div className="w-2 h-2 rounded-full bg-white"></div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-900 text-sm">Classic 2D</div>
-                    <p className="text-xs text-gray-500">Traditional watercolor illustration</p>
-                  </div>
-                </button>
-
-                {/* Coloring Book Option */}
-                <button
-                  type="button"
-                  onClick={() => !isGenerating && onArtStyleChange('coloring')}
-                  disabled={isGenerating}
-                  className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all text-left ${
-                    artStyle === 'coloring'
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
-                  } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {/* Custom radio circle */}
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    artStyle === 'coloring'
-                      ? 'border-blue-500 bg-blue-500'
-                      : 'border-gray-300 bg-white'
-                  }`}>
-                    {artStyle === 'coloring' && (
-                      <div className="w-2 h-2 rounded-full bg-white"></div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-900 text-sm">Coloring Book</div>
-                    <p className="text-xs text-gray-500">B&W line art for coloring</p>
-                  </div>
-                </button>
-
-                {/* Ghibli Option */}
-                <button
-                  type="button"
-                  onClick={() => !isGenerating && onArtStyleChange('ghibli')}
-                  disabled={isGenerating}
-                  className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all text-left ${
-                    artStyle === 'ghibli'
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
-                  } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {/* Custom radio circle */}
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    artStyle === 'ghibli'
-                      ? 'border-blue-500 bg-blue-500'
-                      : 'border-gray-300 bg-white'
-                  }`}>
-                    {artStyle === 'ghibli' && (
-                      <div className="w-2 h-2 rounded-full bg-white"></div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-900 text-sm">Ghibli Style</div>
-                    <p className="text-xs text-gray-500">Hand-painted, warm and whimsical</p>
-                  </div>
-                </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {/* Art-style options — mapped from the registry (single source of
+                    truth). Adding a style is one entry in art-styles-config.ts. */}
+                {ART_STYLES.map((style) => (
+                  <button
+                    key={style.id}
+                    type="button"
+                    onClick={() => !isGenerating && onArtStyleChange(style.id)}
+                    disabled={isGenerating}
+                    className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all text-left ${
+                      artStyle === style.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
+                    } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {/* Custom radio circle */}
+                    <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      artStyle === style.id
+                        ? 'border-blue-500 bg-blue-500'
+                        : 'border-gray-300 bg-white'
+                    }`}>
+                      {artStyle === style.id && (
+                        <div className="w-2 h-2 rounded-full bg-white"></div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900 text-sm">{style.label}</div>
+                      <p className="text-xs text-gray-500">{style.description}</p>
+                    </div>
+                  </button>
+                ))}
               </div>
               {/* Coloring Book Note */}
               {artStyle === 'coloring' && (

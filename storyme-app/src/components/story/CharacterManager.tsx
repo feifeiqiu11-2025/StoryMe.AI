@@ -11,6 +11,9 @@ interface CharacterManagerProps {
   disabled?: boolean;
   showAddButton?: boolean;
   onSaveToLibrary?: (character: Character) => void;
+  /** When true, characters are optional — hides the "add at least one" empty-state
+   *  prompt (factual / world-exploration books can have zero characters). */
+  charactersOptional?: boolean;
 }
 
 const MAX_CHARACTERS = 5;
@@ -21,7 +24,8 @@ export default function CharacterManager({
   onCharactersChange,
   disabled = false,
   showAddButton = true,
-  onSaveToLibrary
+  onSaveToLibrary,
+  charactersOptional = false
 }: CharacterManagerProps) {
   const [uploadingCharacterId, setUploadingCharacterId] = useState<string | null>(null);
   const [analyzingCharacterId, setAnalyzingCharacterId] = useState<string | null>(null);
@@ -214,10 +218,14 @@ export default function CharacterManager({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">Story Characters</h2>
-        <span className="text-sm text-gray-500">{characters.length} / {MAX_CHARACTERS}</span>
-      </div>
+      {/* Hide the redundant header when characters are optional and none have been
+          added — "Define Characters" above already labels this section. */}
+      {!(charactersOptional && characters.length === 0) && (
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-900">Story Characters</h2>
+          <span className="text-sm text-gray-500">{characters.length} / {MAX_CHARACTERS}</span>
+        </div>
+      )}
 
       {/* Character Cards - Separate library characters (compact) from new characters (full) */}
       {(() => {
@@ -284,7 +292,7 @@ export default function CharacterManager({
         </button>
       )}
 
-      {characters.length === 0 && (
+      {characters.length === 0 && !charactersOptional && (
         <p className="text-center text-gray-500 py-8">
           Add at least one element to start creating your story
         </p>

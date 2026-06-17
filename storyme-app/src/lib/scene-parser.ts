@@ -156,8 +156,10 @@ export function validateCharacterReferences(
   script: string,
   availableCharacters: Character[]
 ): { valid: boolean; error?: string; warnings?: string[] } {
+  // Character-optional: a script with no characters is valid (factual /
+  // world-exploration books). Skip character-reference validation entirely.
   if (availableCharacters.length === 0) {
-    return { valid: false, error: 'Please add at least one character before writing your script' };
+    return { valid: true };
   }
 
   const scenes = parseScriptIntoScenes(script, availableCharacters);

@@ -15,6 +15,7 @@ import {
   shouldUseFaithfulnessPrompt,
   type CharacterStyle,
 } from './character-prompts';
+import { ART_STYLE_BY_ID } from './art-styles-config';
 // NOTE: type-only imports from gemini-image-client to avoid runtime circular dependency.
 import type {
   CharacterPreviewParams,
@@ -551,7 +552,7 @@ export interface OpenAISceneParams {
   characters: OpenAISceneRef[];
   sceneDescription: string;
   /** Visual style for the scene. Mirrors the Gemini illustration styles. */
-  styleVariant?: 'pixar' | 'classic' | 'ghibli' | 'coloring';
+  styleVariant?: 'pixar' | 'classic' | 'ghibli' | 'coloring' | 'realistic';
   /** Optional free-form art style; only used when no styleVariant matches. */
   artStyle?: string;
   /** OpenAI fixed output size. Defaults to square (1024x1024) for picture-book scenes. */
@@ -567,14 +568,11 @@ export interface OpenAISceneResult {
 /** Style line per illustration variant — kept explicit (not the generic
  *  artStyle string) so each look is reproducible. */
 const SCENE_STYLE_LINES: Record<NonNullable<OpenAISceneParams['styleVariant']>, string> = {
-  pixar:
-    '3D Pixar-style animated illustration — soft cinematic lighting, vibrant saturated colors, rounded friendly shapes, gentle depth of field.',
-  classic:
-    "2D classic children's storybook illustration — soft watercolor textures, warm cozy colors, hand-drawn feel.",
-  ghibli:
-    'Studio Ghibli-inspired 2D illustration — painterly backgrounds, soft natural light, gentle muted colors, hand-painted feel.',
-  coloring:
-    'Black-and-white coloring-book line art — clean bold even outlines, NO shading, NO color, pure white background, simple shapes a child can color in.',
+  pixar: ART_STYLE_BY_ID.pixar.openaiSceneLine,
+  classic: ART_STYLE_BY_ID.classic.openaiSceneLine,
+  ghibli: ART_STYLE_BY_ID.ghibli.openaiSceneLine,
+  coloring: ART_STYLE_BY_ID.coloring.openaiSceneLine,
+  realistic: ART_STYLE_BY_ID.realistic.openaiSceneLine,
 };
 
 /**
@@ -693,7 +691,7 @@ export interface OpenAIEditParams {
   /** Optional scene context so the edit stays coherent. */
   sceneDescription?: string;
   /** Visual style — must match the batch so the edited image blends in. */
-  styleVariant?: 'pixar' | 'classic' | 'ghibli' | 'coloring';
+  styleVariant?: 'pixar' | 'classic' | 'ghibli' | 'coloring' | 'realistic';
   /** Character/subject references to keep consistent. */
   characterReferences?: OpenAIEditRef[];
   /** Optional user-supplied reference (base64 data URL or raw base64). */

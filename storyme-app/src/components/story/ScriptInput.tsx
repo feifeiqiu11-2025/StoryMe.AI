@@ -78,18 +78,15 @@ export default function ScriptInput({
     ? value.split('\n').filter(line => line.trim().length > 0).length
     : 0;
 
-  // Dynamic placeholder based on selected template
+  // Dynamic placeholder based on selected template. Characters are optional, so
+  // never gate the placeholder on having a character.
   const getPlaceholder = (): string => {
-    if (characters.length === 0) {
-      return 'Add characters first, then describe your story scenes here';
-    }
-
     if (selectedTemplate && STORY_TEMPLATES[selectedTemplate]) {
       return STORY_TEMPLATES[selectedTemplate].placeholderHint;
     }
 
-    // Default placeholder when no template selected
-    const charName = characters[0]?.name || 'Connor';
+    // Default placeholder when no template selected.
+    const charName = characters[0]?.name || 'Emma';
     return `Enter each scene on a new line, for example:\n\n${charName} playing at the playground on a sunny day\n${charName} swinging on the swing, laughing happily`;
   };
 
@@ -179,7 +176,7 @@ export default function ScriptInput({
       <div className="flex items-center justify-between text-sm">
         <div className="text-gray-500">
           {characters.length === 0
-            ? 'Add characters first to start writing scenes'
+            ? 'Write one scene per line (3-15 scenes recommended). Characters are optional.'
             : 'Mention character names in each scene (3-15 scenes recommended)'}
         </div>
         <div className={`font-medium ${sceneCount > 20 ? 'text-red-600' : sceneCount > 15 ? 'text-orange-600' : 'text-gray-600'}`}>

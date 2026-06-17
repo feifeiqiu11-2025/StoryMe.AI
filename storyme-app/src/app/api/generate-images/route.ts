@@ -8,9 +8,10 @@ import { createClientFromRequest } from '@/lib/supabase/server';
 import { checkImageGenerationLimit, logApiUsage } from '@/lib/utils/rate-limit';
 import { StorageService } from '@/lib/services/storage.service';
 import type { StoryBibleResult, BibleLocation, BibleScene } from '@/lib/ai/scene-enhancer';
+import type { ArtStyleType } from '@/lib/art-styles-config';
 
-// Illustration style type
-type IllustrationStyle = 'pixar' | 'classic' | 'coloring' | 'ghibli';
+// Illustration style type — single source of truth in art-styles-config.
+type IllustrationStyle = ArtStyleType;
 
 export const maxDuration = 300; // 5 minutes timeout for Vercel
 
@@ -44,9 +45,15 @@ export async function POST(request: NextRequest) {
     // so the scene loop falls through to legacy regex-based behavior unchanged).
     const bibleSceneByNumber = new Map<number, BibleScene>();
     const bibleLocationByTempId = new Map<string, BibleLocation>();
+    // How many scenes use each location — only settings that recur (>=2 scenes) get a
+    // pre-generated anchor; single-use settings need no cross-scene consistency.
+    const locationUsageCount = new Map<string, number>();
     if (storyBible?.scenes) {
       for (const s of storyBible.scenes) {
         if (typeof s.sceneNumber === 'number') bibleSceneByNumber.set(s.sceneNumber, s);
+        if (typeof s.location_temp_id === 'string' && s.location_temp_id) {
+          locationUsageCount.set(s.location_temp_id, (locationUsageCount.get(s.location_temp_id) || 0) + 1);
+        }
       }
     }
     if (storyBible?.locations) {
@@ -102,10 +109,12 @@ export async function POST(request: NextRequest) {
     console.log(`🎨 Using image provider: ${useOpenAI ? 'OpenAI (gpt-image-2)' : useGemini ? `Gemini (${geminiModelId})` : 'FLUX'}`);
 
 
-    // Validate inputs
-    if (!characters || characters.length === 0) {
+    // Validate inputs. Character-optional: a factual book can have zero
+    // characters — scene consistency comes from the Story Bible locations (and
+    // any recurring new characters surfaced in the bible). Require a valid array.
+    if (!Array.isArray(characters)) {
       return NextResponse.json(
-        { error: 'At least one character is required' },
+        { error: 'characters must be an array (it may be empty for character-free books)' },
         { status: 400 }
       );
     }
@@ -162,8 +171,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check rate limits BEFORE generating images
-    const rateLimitCheck = await checkImageGenerationLimit(user.id, scenes.length);
+    // Anchors (location establishing shots + recurring new-character references)
+    // are extra image generations that count against the user's image cap.
+    // Reserve them in the limit check so a near-cap user can't overshoot.
+    const anchorCount = (useGemini && storyBible)
+      ? ((storyBible.locations || []).filter(l => !l.backing_character_name && !l.reference_image_url && (locationUsageCount.get(l.temp_id) || 0) >= 2).length
+        + (storyBible.new_characters || []).length)
+      : 0;
+
+    // Check rate limits BEFORE generating images (scenes + anchors)
+    const rateLimitCheck = await checkImageGenerationLimit(user.id, scenes.length + anchorCount);
 
     if (!rateLimitCheck.allowed) {
       // Log the rate limit hit
@@ -240,6 +257,87 @@ export async function POST(request: NextRequest) {
     const characterSeedBase = characters.map((c: Character) => c.name).join('').length;
     const storySeed = Math.floor(Math.random() * 1000000) + characterSeedBase * 1000;
     console.log(`🎲 Story seed for consistency: ${storySeed}`);
+
+    // ---------------------------------------------------------------
+    // Batch anchor generation (style-correct). Anchors — location
+    // establishing shots and recurring NEW-character references — are
+    // generated HERE, at batch time, in the SELECTED illustration style.
+    // (Locations used to be generated eagerly at review time, before the
+    // style was chosen, so they always came out Pixar-styled.) Generated
+    // once and reused across every scene below. Failures are NON-FATAL:
+    // a missing anchor simply falls back to locked-prose consistency.
+    // newCharByName carries recurring new characters into the scene loop.
+    // ---------------------------------------------------------------
+    const newCharByName = new Map<string, { name: string; description: string; reference_image_url?: string | null }>();
+    let anchorsGenerated = 0; // counted into the image tally below
+    if (useGemini && user && storyBible) {
+      const anchorStorage = new StorageService(supabase);
+      const genAnchor = async (kind: 'location' | 'character', id: string, description: string): Promise<string | null> => {
+        try {
+          const sceneDescription = kind === 'location'
+            ? `Establishing scene, no characters visible, ${description}. Clean, wide view suitable as a reusable background reference across multiple story scenes.`
+            : `Character reference, full body, neutral pose, plain simple background. ${description}. Suitable as a reusable character reference across multiple story scenes.`;
+          const common = { characters: [] as GeminiCharacterInfo[], sceneDescription, clothingConsistency, modelId: geminiModelId };
+          let gen;
+          if (selectedIllustrationStyle === 'coloring') {
+            gen = await generateImageWithGeminiColoring({ ...common, artStyle: "children's coloring book, line art" });
+          } else if (selectedIllustrationStyle === 'classic' || selectedIllustrationStyle === 'ghibli' || selectedIllustrationStyle === 'realistic') {
+            gen = await generateImageWithGeminiClassic({
+              ...common,
+              artStyle: "children's book illustration",
+              styleVariant: selectedIllustrationStyle === 'ghibli' ? 'ghibli' : selectedIllustrationStyle === 'realistic' ? 'realistic' : 'classic',
+            });
+          } else {
+            gen = await generateImageWithGemini({ ...common, artStyle: "children's book illustration" });
+          }
+          let url = gen.imageUrl;
+          if (url.startsWith('data:')) {
+            const uploaded = await anchorStorage.uploadGeneratedImageFromBase64(
+              `anchor-refs/${user.id}`,
+              `${kind}-${id}-${selectedIllustrationStyle}`,
+              url
+            );
+            url = uploaded.url;
+          }
+          return url;
+        } catch (e) {
+          console.warn(`[anchor] ${kind} ${id} failed (non-fatal, falling back to prose):`, e);
+          return null;
+        }
+      };
+
+      // Locations: generate only for non-backed, recurring (>=2 scenes) settings that
+      // don't already have a reference. Single-use settings need no shared anchor.
+      const locsToGen = (storyBible.locations || []).filter(l => !l.backing_character_name && !l.reference_image_url && (locationUsageCount.get(l.temp_id) || 0) >= 2);
+      // New characters: generate a reusable reference for each (reuse existing url if present).
+      const newChars = storyBible.new_characters || [];
+      console.log(`[anchor] Generating ${locsToGen.length} location + ${newChars.length} new-character anchors in '${selectedIllustrationStyle}' style`);
+      const [locResults, charResults] = await Promise.all([
+        Promise.allSettled(locsToGen.map(async l => ({ temp_id: l.temp_id, url: await genAnchor('location', l.temp_id, l.description) }))),
+        Promise.allSettled(newChars.map(async c => ({
+          name: c.name,
+          description: c.description,
+          url: c.reference_image_url || await genAnchor('character', c.temp_id, c.description),
+        }))),
+      ]);
+      for (const r of locResults) {
+        if (r.status === 'fulfilled' && r.value.url) {
+          anchorsGenerated++;
+          const loc = bibleLocationByTempId.get(r.value.temp_id);
+          if (loc) loc.reference_image_url = r.value.url; // map holds the same objects used for conditioning
+        }
+      }
+      for (const r of charResults) {
+        if (r.status === 'fulfilled') {
+          if (r.value.url) anchorsGenerated++;
+          newCharByName.set(r.value.name.toLowerCase(), {
+            name: r.value.name,
+            description: r.value.description,
+            reference_image_url: r.value.url,
+          });
+        }
+      }
+    }
 
     // Generate scenes - use staggered parallel for Gemini to avoid rate limits
     // For FLUX, full parallel is fine. For Gemini free tier, we stagger requests.
@@ -337,6 +435,22 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        // Surface recurring NEW characters (introduced by the bible, not in the
+        // user's library) that appear in this scene, with their generated reference
+        // so they stay visually consistent across scenes.
+        if (bibleScene?.resolved_character_names?.length && newCharByName.size > 0) {
+          for (const n of bibleScene.resolved_character_names) {
+            const nc = newCharByName.get(n.toLowerCase());
+            if (nc && !sceneCharacters.some(c => c.name.toLowerCase() === n.toLowerCase())) {
+              sceneCharacters.push({
+                name: nc.name,
+                referenceImageUrl: nc.reference_image_url || '',
+                description: { fullDescription: nc.description },
+              });
+            }
+          }
+        }
+
         // Generate image using selected provider
         let result;
 
@@ -365,17 +479,18 @@ export async function POST(request: NextRequest) {
               clothingConsistency,
               modelId: geminiModelId,
             });
-          } else if (effectiveStyle === 'classic' || effectiveStyle === 'ghibli') {
-            // Classic Storybook (2D) and Ghibli share the same 2D generator;
-            // styleVariant swaps only the STYLE line in the prompt.
-            console.log(`[Scene ${scene.sceneNumber}] Using ${effectiveStyle === 'ghibli' ? 'Ghibli' : 'Classic 2D'} style`);
+          } else if (effectiveStyle === 'classic' || effectiveStyle === 'ghibli' || effectiveStyle === 'realistic') {
+            // Classic Storybook (2D), Ghibli and Realistic share the same 2D generator;
+            // styleVariant swaps the STYLE line (and, for realistic, relaxes the
+            // cartoon-aesthetic rules + adds real-world scale/anatomy accuracy).
+            console.log(`[Scene ${scene.sceneNumber}] Using ${effectiveStyle === 'ghibli' ? 'Ghibli' : effectiveStyle === 'realistic' ? 'Realistic' : 'Classic 2D'} style`);
             result = await generateImageWithGeminiClassic({
               characters: geminiCharacters,
               sceneDescription: sceneDescriptionForPrompt,
               artStyle: artStyle || "children's book illustration, colorful, whimsical",
               clothingConsistency,
               modelId: geminiModelId,
-              styleVariant: effectiveStyle === 'ghibli' ? 'ghibli' : 'classic',
+              styleVariant: effectiveStyle === 'ghibli' ? 'ghibli' : effectiveStyle === 'realistic' ? 'realistic' : 'classic',
             });
           } else {
             // 3D Pixar style (default Gemini behavior)
@@ -545,7 +660,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       statusCode: 200,
       responseTimeMs: Date.now() - startTime,
-      imagesGenerated: successfulCount,
+      imagesGenerated: successfulCount + anchorsGenerated, // scenes + anchors count against the cap
       errorMessage: errors.length > 0 ? errors.join('; ') : undefined,
       requestId,
     });

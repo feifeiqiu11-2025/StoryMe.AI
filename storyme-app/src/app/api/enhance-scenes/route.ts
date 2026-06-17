@@ -74,9 +74,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!characters || !Array.isArray(characters) || characters.length === 0) {
+    // Character-optional: factual / world-exploration books (e.g. a butterfly
+    // life cycle, a mushroom forest) can have ZERO characters — the Story Bible
+    // locks setting consistency and may surface recurring characters from the
+    // script itself. We still require a valid array (reject malformed input).
+    if (!Array.isArray(characters)) {
       return NextResponse.json(
-        { error: 'At least one character is required' },
+        { error: 'characters must be an array (it may be empty for character-free books)' },
         { status: 400 }
       );
     }

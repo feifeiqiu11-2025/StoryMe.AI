@@ -13,6 +13,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { ImageProvider, Character, isOpenAIProvider, normalizeImageProvider } from '@/lib/types/story';
+import type { ArtStyleType } from '@/lib/art-styles-config';
 import { detectCharactersInInstruction, DetectedCharacter, detectLocationsInInstruction, DetectedLocation } from '@/lib/utils/character-matcher';
 
 interface EditImageControlProps {
@@ -22,7 +23,7 @@ interface EditImageControlProps {
   onEditComplete: (newImageUrl: string) => void;
   buttonLabel?: string;
   /** Illustration style to maintain during edit (defaults to 'pixar') */
-  illustrationStyle?: 'pixar' | 'classic' | 'coloring' | 'ghibli';
+  illustrationStyle?: ArtStyleType;
   /** Original scene description for context */
   sceneDescription?: string;
   /** Image provider for Gemini model selection */
