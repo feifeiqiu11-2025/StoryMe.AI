@@ -123,9 +123,10 @@ export async function POST(request: NextRequest) {
 
     if (useGemini) {
       // Use Gemini with reference photos.
-      // Pixar uses the 3D generator; classic and ghibli share the 2D generator
-      // (styleVariant swaps only the STYLE line). Coloring was already remapped
-      // to pixar above so the cover stays colorful.
+      // Pixar uses the 3D generator; classic, ghibli and realistic share the 2D
+      // generator (styleVariant swaps the STYLE line — and, for realistic, the
+      // photographic look). Coloring was already remapped to pixar above so the
+      // cover stays colorful.
       const geminiCharacters: GeminiCharacterInfo[] = preparedCharacters;
       if (selectedStyle === 'pixar') {
         result = await generateImageWithGemini({
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
           characters: geminiCharacters,
           sceneDescription: coverDescription,
           modelId: geminiModelId,
-          styleVariant: selectedStyle === 'ghibli' ? 'ghibli' : 'classic',
+          styleVariant: selectedStyle === 'ghibli' ? 'ghibli' : selectedStyle === 'realistic' ? 'realistic' : 'classic',
         });
       }
     } else {
@@ -150,6 +151,8 @@ export async function POST(request: NextRequest) {
           ? "3D animated Pixar/Disney style, soft rounded features, vibrant colors"
           : selectedStyle === 'ghibli'
           ? "Studio Ghibli-inspired illustration, warm rich colors"
+          : selectedStyle === 'realistic'
+          ? "photorealistic, lifelike image, naturalistic detail, realistic lighting, true-to-life colors"
           : "2D hand-drawn storybook illustration, warm rich colors";
       result = await generateImageWithMultipleCharacters({
         characters: falCharacters,
