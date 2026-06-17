@@ -224,6 +224,20 @@ export default function ScenePreviewApproval({
     return map;
   }, [storyBible]);
 
+  // How many scenes use each location — a setting used in only ONE scene needs no
+  // pre-generated/preview anchor (anchors exist for cross-scene consistency).
+  const locationUsageCount = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    storyBible?.scenes?.forEach(s => {
+      if (s.location_temp_id) counts.set(s.location_temp_id, (counts.get(s.location_temp_id) || 0) + 1);
+    });
+    return counts;
+  }, [storyBible]);
+  const recurringSettings = React.useMemo(
+    () => (storyBible?.locations || []).filter(l => !l.backing_character_name && (locationUsageCount.get(l.temp_id) || 0) >= 2),
+    [storyBible, locationUsageCount]
+  );
+
   // Re-enhance All State
   const [isReEnhancing, setIsReEnhancing] = useState(false);
   // Find characters that AI added (not in user's original list)
@@ -431,7 +445,7 @@ export default function ScenePreviewApproval({
 
           {/* Story elements: recurring new characters + settings. Preview/edit each
               once in the selected art style; the batch reuses them across scenes. */}
-          {(newCharacters.length > 0 || (onSetLocationReference && (storyBible?.locations || []).some(l => !l.backing_character_name))) && (
+          {(newCharacters.length > 0 || (onSetLocationReference && recurringSettings.length > 0)) && (
             <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-3">
               {newCharacters.length > 0 && (
                 <div>
@@ -497,11 +511,11 @@ export default function ScenePreviewApproval({
                 </div>
               )}
 
-              {onSetLocationReference && (storyBible?.locations || []).some(l => !l.backing_character_name) && (
+              {onSetLocationReference && recurringSettings.length > 0 && (
                 <div>
                   <p className="text-sm font-semibold text-gray-800 mb-1.5">Settings</p>
                   <div className="flex flex-wrap gap-2">
-                {(storyBible?.locations || []).filter(l => !l.backing_character_name).map(loc => (
+                {recurringSettings.map(loc => (
                   <div key={loc.temp_id} className="inline-flex items-center gap-1.5 bg-white border border-emerald-200 rounded-full pl-2.5 pr-1.5 py-1">
                     <span className="text-sm font-medium text-emerald-800" title={loc.description}>{loc.name}</span>
                     <button

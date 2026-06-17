@@ -619,10 +619,12 @@ YOUR TASK — produce TWO things together:
 A) LOCATIONS (story bible)
    Identify the distinct background SETTINGS used across the story. A setting is the broad
    environment/backdrop of a scene — not a small object, prop, or focal spot within it; do
-   not promote a focal detail into its own setting. Create a new setting only when the
-   backdrop genuinely changes to a different place; scenes that share the same surroundings
-   share one setting even if they focus on different details within it. Use as many settings
-   as the story genuinely needs — neither over-split nor force them together. For each:
+   not promote a focal detail into its own setting. Create a new setting ONLY when the
+   backdrop genuinely changes to a different PLACE; scenes that share the same surroundings
+   share one setting even if they zoom in on different details within it. Do NOT create a
+   separate setting for each stage or step of a process or life cycle that happens in the
+   same place — those are ONE setting. Use only as many settings as there are genuinely
+   distinct places — do not over-split, but do keep genuinely different places separate. For each:
    - Give it a short, human-readable name (2–5 words).
    - Write a LOCKED visual description (25–40 words) specific to THIS story — concrete landmarks, lighting, mood. This description will be reused verbatim for every scene in that location, so make it specific enough that two separate images of this location would look the same.
    - If a SCENE-TYPE CHARACTER listed above is clearly this location, set backing_character_name to that character's exact name AND set the location's name to the SAME exact name (do NOT invent variations like "Rainbow House Morning" — use just "Rainbow House"). Otherwise backing_character_name is null and you may pick any descriptive name.
