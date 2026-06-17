@@ -376,9 +376,15 @@ export async function POST(request: NextRequest) {
         // location description for this scene, we append it as a "Setting:" block so
         // every scene in this location shares the same visual anchor — this is the
         // Phase 2 prose-based background-consistency fix.
-        const sceneDescriptionForPrompt = bibleLocation
+        const sceneDescriptionForPrompt = (bibleLocation
           ? `${scene.description}\n\nSetting: ${bibleLocation.description}`
-          : scene.description;
+          : scene.description)
+          // The cover prompt is built at enhance time (style unknown) with whimsical
+          // "exciting moment / dynamic poses / colorful" framing that pushes cartoon/
+          // anthropomorphic creatures. For a realistic cover, counter it explicitly.
+          + ((isCoverScene && selectedIllustrationStyle === 'realistic')
+            ? '\n\nDepict every creature and person realistically and true-to-life — accurate anatomy and natural proportions, NO cartoon faces or eyes, NO anthropomorphism.'
+            : '');
 
         // Legacy location consistency (regex-based) — only used when bible has no location.
         const sceneLocation = bibleLocation ? null : extractSceneLocation(scene.description);

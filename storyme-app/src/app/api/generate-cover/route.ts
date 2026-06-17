@@ -54,14 +54,24 @@ export async function POST(request: NextRequest) {
       ? `Add title "${title}" at top in stylized letters. No other text.`
       : `NO TEXT on image. Leave space at top for title.`;
 
+    // Realistic covers must avoid the whimsical/cartoon framing below (which pushes
+    // anthropomorphic creatures with cartoon eyes) and depict everything true-to-life.
+    const isRealistic = selectedStyle === 'realistic';
+    const realismClause = isRealistic
+      ? ' Depict every creature and person realistically and true-to-life — accurate anatomy and natural proportions, NO cartoon faces or eyes, NO anthropomorphism.'
+      : '';
+
     if (customPrompt && customPrompt.trim()) {
       // User provided custom prompt - keep it simple
-      coverDescription = `Book cover scene: ${customPrompt.trim()}. ${textInstructions}`;
+      coverDescription = `Book cover scene: ${customPrompt.trim()}.${realismClause} ${textInstructions}`;
       console.log('Using custom prompt:', coverDescription);
     } else {
       // Default cover description - concise, let style come from Gemini functions
       const storyContext = description ? `Story theme: ${description}. ` : '';
-      coverDescription = `Book COVER for "${title}". ${storyContext}Show ${characterNames} in an exciting moment, dynamic poses, colorful background. ${textInstructions}`;
+      const composition = isRealistic
+        ? `Show ${characterNames} naturally in a real-world scene from the book.`
+        : `Show ${characterNames} in an exciting moment, dynamic poses, colorful background.`;
+      coverDescription = `Book COVER for "${title}". ${storyContext}${composition}${realismClause} ${textInstructions}`;
     }
 
     // Check if selected provider is available
