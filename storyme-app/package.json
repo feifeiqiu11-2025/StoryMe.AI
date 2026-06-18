@@ -59,6 +59,7 @@
     "next": "^15.5.9",
     "nodemailer": "^7.0.10",
     "openai": "^6.5.0",
+    "perfect-freehand": "^1.2.3",
     "posthog-js": "^1.369.3",
     "puppeteer": "^24.26.1",
     "puppeteer-core": "^24.43.0",

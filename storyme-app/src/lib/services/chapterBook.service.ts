@@ -12,7 +12,39 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { ProjectRepository } from '../repositories/project.repository';
+import { createServiceRoleClient } from '../supabase/service-role';
 import type { Project } from '../domain/models';
+import { randomUUID } from 'crypto';
+
+/** Max drawings kept per chapter book (rolling, newest-first). */
+const MAX_DRAWINGS = 10;
+/** Storage bucket shared with uploaded/generated images. */
+const ART_BUCKET = 'generated-images';
+
+/** Lightweight index entry stored in projects.art_drawings. */
+interface DrawingIndexEntry {
+  id: string;
+  pngUrl: string;
+  strokesUrl: string;
+  w: number;
+  h: number;
+  v: number; // stroke-format version, for forward-compat
+  createdAt: string;
+}
+
+/** Gallery list item returned to the client (no strokes). */
+export interface DrawingSummary {
+  id: string;
+  pngUrl: string;
+  w: number;
+  h: number;
+  createdAt: string;
+}
+
+/** Full drawing for re-editing — includes the strokes fetched from storage. */
+export interface DrawingDetail extends DrawingSummary {
+  strokes: unknown[];
+}
 
 /**
  * Starter document for a brand-new chapter book. Tiny scaffold so the kid
@@ -265,6 +297,119 @@ export class ChapterBookService {
     }
     const updated = await this.projectRepo.update(projectId, patch as Partial<Project>);
     return this.toDetail(updated);
+  }
+
+  // ── My Art gallery (Phase 1) ─────────────────────────────────────────
+  //
+  // Drawings are scoped to the book and capped at 5 (newest-first). The
+  // index lives in projects.art_drawings; the heavy stroke data is a JSON
+  // file in storage so the hot book-load path stays light. Editing reopens
+  // the drawing's strokes — never an AI-polished raster (which has none).
+
+  private async loadOwnedIndex(
+    projectId: string,
+    userId: string
+  ): Promise<DrawingIndexEntry[]> {
+    const row = await this.projectRepo.getArtDrawings(projectId);
+    if (!row) throw new Error('Chapter book not found');
+    if (row.user_id !== userId) {
+      throw new Error('Unauthorized: Project does not belong to you');
+    }
+    return (Array.isArray(row.art_drawings) ? row.art_drawings : []) as DrawingIndexEntry[];
+  }
+
+  /** List the book's recent drawings (newest-first, no strokes). */
+  async listDrawings(projectId: string, userId: string): Promise<DrawingSummary[]> {
+    const index = await this.loadOwnedIndex(projectId, userId);
+    return index.map(({ id, pngUrl, w, h, createdAt }) => ({ id, pngUrl, w, h, createdAt }));
+  }
+
+  /** Load one drawing with its strokes (for re-editing). */
+  async getDrawing(
+    projectId: string,
+    userId: string,
+    drawingId: string
+  ): Promise<DrawingDetail> {
+    const index = await this.loadOwnedIndex(projectId, userId);
+    const entry = index.find((d) => d.id === drawingId);
+    if (!entry) throw new Error('Drawing not found');
+
+    let strokes: unknown[] = [];
+    try {
+      const res = await fetch(entry.strokesUrl);
+      if (res.ok) {
+        const parsed = await res.json();
+        if (Array.isArray(parsed)) strokes = parsed;
+      }
+    } catch {
+      // Strokes file unreachable — return an empty editable canvas rather
+      // than failing the whole edit. The PNG still exists for reference.
+    }
+
+    return {
+      id: entry.id,
+      pngUrl: entry.pngUrl,
+      w: entry.w,
+      h: entry.h,
+      createdAt: entry.createdAt,
+      strokes,
+    };
+  }
+
+  /**
+   * Save (insert or update) a drawing. New drawings get a fresh id and are
+   * prepended, then the list is pruned to MAX_DRAWINGS. Editing an existing
+   * id updates that entry in place and moves it to the front. Strokes are
+   * written to storage; only the small index goes in the DB column.
+   */
+  async saveDrawing(
+    projectId: string,
+    userId: string,
+    input: { id?: string; pngUrl: string; strokes: unknown[]; w: number; h: number }
+  ): Promise<DrawingSummary> {
+    const index = await this.loadOwnedIndex(projectId, userId);
+
+    const id = input.id && index.some((d) => d.id === input.id) ? input.id : randomUUID();
+    const existing = index.find((d) => d.id === id);
+
+    // Upload strokes JSON to storage (service role, like image uploads).
+    // upsert:true so re-editing overwrites the same file.
+    const service = createServiceRoleClient();
+    const path = `editor/${userId}/drawings/${id}.json`;
+    const { error: upErr } = await service.storage
+      .from(ART_BUCKET)
+      .upload(path, JSON.stringify(input.strokes), {
+        contentType: 'application/json',
+        cacheControl: '3600',
+        upsert: true,
+      });
+    if (upErr) throw new Error('Failed to save drawing strokes');
+    const { data: { publicUrl } } = service.storage.from(ART_BUCKET).getPublicUrl(path);
+
+    const entry: DrawingIndexEntry = {
+      id,
+      pngUrl: input.pngUrl,
+      strokesUrl: publicUrl,
+      w: input.w,
+      h: input.h,
+      v: 1,
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+    };
+
+    // Move to front (most-recent), drop any stale copy, prune to cap.
+    const next = [entry, ...index.filter((d) => d.id !== id)].slice(0, MAX_DRAWINGS);
+    await this.projectRepo.updateArtDrawings(projectId, next);
+
+    return { id: entry.id, pngUrl: entry.pngUrl, w: entry.w, h: entry.h, createdAt: entry.createdAt };
+  }
+
+  /** Remove a drawing from the gallery index. (Storage file is left as-is.) */
+  async deleteDrawing(projectId: string, userId: string, drawingId: string): Promise<void> {
+    const index = await this.loadOwnedIndex(projectId, userId);
+    const next = index.filter((d) => d.id !== drawingId);
+    if (next.length !== index.length) {
+      await this.projectRepo.updateArtDrawings(projectId, next);
+    }
   }
 
   private toSummary(project: Project): ChapterBookSummary {

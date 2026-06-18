@@ -25,6 +25,7 @@ import {
   CharacterPickerModal,
   type PickerCharacter,
 } from '@/components/character/CharacterPickerModal';
+import { DrawingCanvas, type Stroke } from './DrawingCanvas';
 
 type Tab = 'characters' | 'generate' | 'upload';
 
@@ -34,6 +35,8 @@ interface PickOptions {
 
 interface MediaPanelProps {
   onPick: (url: string, options?: PickOptions) => void;
+  /** Chapter book id — scopes the My Art "Recent drawings" gallery. */
+  bookId: string;
 }
 
 interface CharacterRow {
@@ -43,7 +46,7 @@ interface CharacterRow {
   reference_image_url: string | null;
 }
 
-export function MediaPanel({ onPick }: MediaPanelProps) {
+export function MediaPanel({ onPick, bookId }: MediaPanelProps) {
   const [tab, setTab] = useState<Tab>('characters');
   // Resolved once at panel mount so child tabs + picker don't each pay
   // the auth round-trip. The Supabase client caches sessions in memory,
@@ -68,7 +71,7 @@ export function MediaPanel({ onPick }: MediaPanelProps) {
             [
               ['characters', 'Characters'],
               ['generate', 'Create New'],
-              ['upload', 'Upload'],
+              ['upload', 'My Art'],
             ] as Array<[Tab, string]>
           ).map(([key, label]) => (
             <button
@@ -91,7 +94,12 @@ export function MediaPanel({ onPick }: MediaPanelProps) {
       <div className="p-3 max-h-[calc(100vh-220px)] overflow-y-auto">
         {tab === 'characters' && <CharactersTab onPick={onPick} userId={userId} />}
         {tab === 'generate' && <GenerateTab onPick={onPick} userId={userId} />}
-        {tab === 'upload' && <UploadTab onPick={onPick} />}
+        {/* My Art stays mounted (just hidden when inactive) so an in-progress
+            drawing, upload, or polish survives switching tabs — it's only
+            cleared when the kid taps "Throw it away". */}
+        <div className={tab === 'upload' ? '' : 'hidden'}>
+          <MyArtTab onPick={onPick} bookId={bookId} />
+        </div>
       </div>
     </div>
   );
@@ -859,6 +867,96 @@ function PlusIcon() {
   );
 }
 
+function UploadIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  );
+}
+
+function RemoveIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+function SparkleIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+    >
+      <path d="M12 2l1.9 5.1L19 9l-5.1 1.9L12 16l-1.9-5.1L5 9l5.1-1.9L12 2z" />
+      <path d="M19 14l.9 2.4L22 17l-2.1.6L19 20l-.9-2.4L16 17l2.1-.6L19 14z" />
+    </svg>
+  );
+}
+
+/** Selectable image card for the original-vs-polished comparison. */
+function CompareCard({
+  label,
+  url,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  url: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`flex flex-col gap-1 rounded-lg border-2 p-1.5 text-left transition-colors ${
+        selected ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
+      }`}
+    >
+      <span className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+        {label}
+        <span
+          className={`flex items-center justify-center w-4 h-4 rounded-full border ${
+            selected ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300'
+          }`}
+          aria-hidden
+        >
+          {selected && (
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          )}
+        </span>
+      </span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt={label} className="w-full aspect-square object-contain rounded bg-white" />
+    </button>
+  );
+}
+
 function PaperclipIcon() {
   return (
     <svg
@@ -1026,24 +1124,97 @@ function EditPanel({
   );
 }
 
-// ── Upload ─────────────────────────────────────────────────────────────
+// ── My Art (Draw or Upload) ────────────────────────────────────────────
 
-interface UploadResult {
+interface PendingArt {
   url: string;
   filename: string;
+  /** True when the kid drew it here — used to tailor the card copy. */
+  drawn: boolean;
 }
 
-function UploadTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
+/**
+ * "My Art" tab — the kid's own artwork, two ways in:
+ *   - Draw it here: full-screen DrawingCanvas → PNG → upload
+ *   - Upload a photo: pick a file from device (the original Upload flow)
+ *
+ * Both land in the same "How does it look?" card with Use it / Throw away
+ * and an optional "Save as a character" (reusing the Generate tab's
+ * save-as-character endpoint). AI transformation is intentionally NOT in
+ * this path — drawing is for kids who want their own art used as-is.
+ */
+/** An in-progress drawing the kid minimized (or finished but may re-edit). */
+interface Draft {
+  strokes: Stroke[];
+  preview: string; // data URL, local only — not uploaded until "Done"
+}
+
+/** A saved drawing in the per-book "Recent drawings" gallery (no strokes). */
+interface RecentDrawing {
+  id: string;
+  pngUrl: string;
+  w: number;
+  h: number;
+  createdAt: string;
+}
+
+function MyArtTab({ onPick, bookId }: { onPick: MediaPanelProps['onPick']; bookId: string }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Mirror the Generate tab's preview-then-confirm pattern: upload → show
-  // thumbnail → kid decides whether to insert. Avoids accidental inserts
-  // and gives a chance to back out if they picked the wrong file.
-  const [pending, setPending] = useState<UploadResult | null>(null);
+  const [drawing, setDrawing] = useState(false);
+  const [pending, setPending] = useState<PendingArt | null>(null);
+  // The current drawing kept across minimize / re-edit. Lives here (not in
+  // DrawingCanvas) so it survives the overlay unmounting.
+  const [draft, setDraft] = useState<Draft | null>(null);
+
+  // Per-book "Recent drawings" gallery (last 10). `currentDrawingId` is the
+  // saved drawing the current canvas session maps to (null = new); editing
+  // a recent drawing sets it so Done updates that entry instead of adding.
+  const [recent, setRecent] = useState<RecentDrawing[]>([]);
+  const [currentDrawingId, setCurrentDrawingId] = useState<string | null>(null);
+  // Strokes + original canvas size loaded when re-editing a saved drawing,
+  // so DrawingCanvas can rescale them to the current screen.
+  const [editInitial, setEditInitial] = useState<{ strokes: Stroke[]; w: number; h: number } | null>(null);
+  const [loadingEdit, setLoadingEdit] = useState(false);
+  // True while a just-finished drawing is being saved. Kept separate from
+  // `uploading` (the photo-upload flag) so finishing a drawing doesn't show
+  // "Uploading…" on the unrelated "Upload a photo" card.
+  const [savingDrawing, setSavingDrawing] = useState(false);
+
+  const loadRecent = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/v1/chapter-books/${bookId}/drawings`);
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.drawings)) setRecent(data.drawings);
+    } catch {
+      // Non-fatal — the gallery just stays empty.
+    }
+  }, [bookId]);
+
+  useEffect(() => {
+    void loadRecent();
+  }, [loadRecent]);
+
+  // Save-as-character form (collapsed by default — kids who just want the
+  // picture on the page never see the name input).
+  const [showSaveForm, setShowSaveForm] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [savingChar, setSavingChar] = useState(false);
+
+  // Polish: gentle AI clean-up. Non-destructive — we keep the original and
+  // the polished version side by side and let the kid pick. `chosen` tracks
+  // which one the downstream actions (Use it / Save) operate on.
+  const [polishing, setPolishing] = useState(false);
+  const [polished, setPolished] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<'original' | 'polished'>('original');
+
+  // The image the action buttons act on: the picked version when a polished
+  // one exists, otherwise the original upload/drawing.
+  const activeUrl = polished && chosen === 'polished' ? polished : pending?.url ?? '';
 
   const upload = useCallback(
-    async (file: File) => {
-      if (uploading) return;
+    async (file: File, drawn: boolean): Promise<string | null> => {
+      if (uploading) return null;
       setUploading(true);
       setError(null);
       try {
@@ -1055,9 +1226,13 @@ function UploadTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || 'Upload failed');
-        setPending({ url: data.image.url, filename: file.name });
+        setPending({ url: data.image.url, filename: file.name, drawn });
+        setShowSaveForm(false);
+        setSaveName('');
+        return data.image.url as string;
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Upload failed');
+        return null;
       } finally {
         setUploading(false);
       }
@@ -1065,75 +1240,451 @@ function UploadTab({ onPick }: { onPick: MediaPanelProps['onPick'] }) {
     [uploading]
   );
 
+  // Finish a drawing: upload the PNG (→ pending card) and persist the
+  // editable strokes to the per-book gallery so it survives sessions and
+  // can be re-edited later. New drawings get an id back; edits reuse it.
+  const finishDrawing = useCallback(
+    async (file: File, strokes: Stroke[], dims: { w: number; h: number }) => {
+      // savingDrawing drives a spinner in the "How does it look?" card until
+      // the uploaded PNG (pending) is ready — kept off the photo-upload flag.
+      setSavingDrawing(true);
+      try {
+        const url = await upload(file, true);
+        if (!url) return;
+        const res = await fetch(`/api/v1/chapter-books/${bookId}/drawings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: currentDrawingId ?? undefined,
+            pngUrl: url,
+            strokes,
+            w: dims.w,
+            h: dims.h,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.drawing) {
+          setCurrentDrawingId(data.drawing.id);
+          void loadRecent();
+        }
+      } catch {
+        // History save failed — the drawing is still usable on the page;
+        // it just won't appear in Recent. Don't block the kid.
+      } finally {
+        setSavingDrawing(false);
+      }
+    },
+    [upload, bookId, currentDrawingId, loadRecent]
+  );
+
+  // Open a saved drawing for editing: fetch its strokes, then launch the
+  // canvas seeded with them (rescaled to the current screen size).
+  const editRecent = useCallback(
+    async (drawingId: string) => {
+      if (loadingEdit) return;
+      setLoadingEdit(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/v1/chapter-books/${bookId}/drawings/${drawingId}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || 'Could not open drawing');
+        setDraft(null);
+        setPending(null);
+        setPolished(null);
+        setChosen('original');
+        setCurrentDrawingId(drawingId);
+        setEditInitial({ strokes: data.drawing.strokes ?? [], w: data.drawing.w, h: data.drawing.h });
+        setDrawing(true);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not open drawing');
+      } finally {
+        setLoadingEdit(false);
+      }
+    },
+    [bookId, loadingEdit]
+  );
+
+  const removeRecent = useCallback(
+    async (drawingId: string) => {
+      // Optimistic — drop it from the strip, then tell the server.
+      setRecent((prev) => prev.filter((d) => d.id !== drawingId));
+      try {
+        await fetch(`/api/v1/chapter-books/${bookId}/drawings/${drawingId}`, { method: 'DELETE' });
+      } catch {
+        void loadRecent(); // resync on failure
+      }
+    },
+    [bookId, loadRecent]
+  );
+
+  // Clears the working area (pending / draft / polish / current id). Does
+  // NOT touch the Recent gallery — finished drawings stay there until the
+  // kid removes them.
+  const reset = () => {
+    setPending(null);
+    setDraft(null);
+    setShowSaveForm(false);
+    setSaveName('');
+    setPolished(null);
+    setChosen('original');
+    setCurrentDrawingId(null);
+    setEditInitial(null);
+  };
+
+  // Gentle AI clean-up of the kid's own art. Routes through the shared
+  // generate-image endpoint with intent:'polish' (pins to GPT, preserves
+  // the original style). Non-destructive: result lands beside the original.
+  const polish = useCallback(async () => {
+    if (!pending || polishing) return;
+    setPolishing(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/v1/editor/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ intent: 'polish', previousImageUrl: pending.url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Polish failed');
+      setPolished(data.image.url);
+      setChosen('polished');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Polish failed');
+    } finally {
+      setPolishing(false);
+    }
+  }, [pending, polishing]);
+
+  // Save the artwork to the character library so it's reusable across
+  // pages/stories, then insert it on the current page.
+  const saveAsCharacter = useCallback(async () => {
+    if (!pending || savingChar || !saveName.trim()) return;
+    setSavingChar(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/v1/editor/save-as-character', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl: activeUrl,
+          name: saveName.trim(),
+          prompt: 'Hand-drawn by the artist',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Save failed');
+      onPick(activeUrl, { alt: saveName.trim() });
+      reset();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setSavingChar(false);
+    }
+  }, [pending, savingChar, saveName, activeUrl, onPick]);
+
   return (
     <div className="space-y-3">
-      <label
-        htmlFor="image-upload"
-        className={`flex flex-col items-center justify-center min-h-[120px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer transition-colors ${
-          uploading ? 'bg-gray-50' : 'hover:border-blue-400 hover:bg-blue-50/30'
-        }`}
-      >
-        {uploading ? (
-          <>
-            <div
-              className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mb-2"
-              role="status"
-              aria-label="Uploading"
-            />
-            <span className="text-xs text-gray-600">Uploading…</span>
-          </>
-        ) : (
-          <>
-            <span className="text-sm font-medium text-gray-700">Tap to pick a photo</span>
-            <span className="text-[11px] text-gray-500 mt-1">JPG, PNG, HEIC up to 10 MB</span>
-          </>
-        )}
-        <input
-          id="image-upload"
-          type="file"
-          accept="image/*"
-          className="sr-only"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void upload(file);
-            e.target.value = '';
-          }}
+      {/* Two ways to add the kid's own art, shown side by side as two
+          distinct option cards. Draw is accented as the primary; both
+          read as equal-weight choices. Stacks on very narrow panels. */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => { setEditInitial(null); setDrawing(true); }}
           disabled={uploading}
-        />
-      </label>
+          className="min-h-[76px] flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-blue-600 bg-blue-50 text-blue-700 font-semibold hover:bg-blue-100 disabled:opacity-50 transition-colors px-2 text-center"
+        >
+          <span className="flex items-center gap-1.5 text-sm">
+            <PencilIcon /> Draw it here
+          </span>
+          <span className="text-[11px] font-normal text-blue-500">iPad or Apple Pencil</span>
+        </button>
+
+        <label
+          htmlFor="image-upload"
+          className={`min-h-[76px] flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-gray-200 cursor-pointer transition-colors px-2 text-center ${
+            uploading ? 'bg-gray-50' : 'hover:border-blue-400 hover:bg-blue-50/30'
+          }`}
+        >
+          {uploading && !savingDrawing ? (
+            <>
+              <div
+                className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"
+                role="status"
+                aria-label="Uploading"
+              />
+              <span className="text-xs text-gray-600">Uploading…</span>
+            </>
+          ) : (
+            <>
+              <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                <UploadIcon /> Upload a photo
+              </span>
+              <span className="text-[11px] text-gray-500">JPG, PNG, HEIC</span>
+            </>
+          )}
+          <input
+            id="image-upload"
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void upload(file, false);
+              e.target.value = '';
+            }}
+            disabled={uploading}
+          />
+        </label>
+      </div>
+
       {error && <p className="text-xs text-red-600">{error}</p>}
 
-      {pending && (
-        <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
-          <p className="text-xs font-semibold text-gray-700 truncate">
-            How does it look?
-          </p>
+      {/* Recent drawings (last 10 for this book). Tap to reopen and edit;
+          editing reopens your drawing, not an AI-polished version. */}
+      {recent.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="flex items-baseline gap-2">
+            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              Recent drawings
+            </p>
+            <span className="text-[10px] text-gray-400">your last 10 are kept here</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {recent.map((d) => (
+              <div key={d.id} className="relative flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => void editRecent(d.id)}
+                  disabled={loadingEdit}
+                  title="Tap to edit this drawing"
+                  className="w-16 h-16 rounded-lg border border-gray-200 bg-white overflow-hidden hover:border-blue-400 hover:shadow-sm disabled:opacity-50"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={thumbnailUrl(d.pngUrl, 128) ?? d.pngUrl}
+                    alt="Recent drawing"
+                    loading="lazy"
+                    className="w-full h-full object-contain"
+                  />
+                </button>
+                {/* Sits just inside the top-right corner so the scroll
+                    container can't clip it (overflow-x makes y clip too). */}
+                <button
+                  type="button"
+                  onClick={() => void removeRecent(d.id)}
+                  aria-label="Remove from recent"
+                  title="Remove"
+                  className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full bg-gray-800/80 text-white hover:bg-gray-900 shadow"
+                >
+                  <RemoveIcon />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Minimized draft: kid stepped away from the canvas but kept the
+          work. Only shown when there's a real preview image (from Minimize)
+          — after Done the preview is empty (strokes kept only for "Keep
+          drawing"), so this card stays hidden instead of flashing a broken
+          image during the upload. */}
+      {draft && draft.preview && !pending && !drawing && (
+        <div className="border border-blue-200 rounded-lg p-3 bg-blue-50/40 space-y-2">
+          <p className="text-xs font-semibold text-gray-700">Your drawing is waiting</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={pending.url}
-            alt={pending.filename}
-            className="w-full max-h-48 object-contain rounded bg-white"
+            src={draft.preview}
+            alt="Drawing in progress"
+            className="w-full max-h-40 object-contain rounded bg-white border border-gray-100"
           />
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => {
-                onPick(pending.url, { alt: pending.filename });
-                setPending(null);
-              }}
+              onClick={() => setDrawing(true)}
               className="flex-1 min-h-[36px] bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700"
             >
-              Use it
+              Continue drawing
             </button>
             <button
               type="button"
-              onClick={() => setPending(null)}
+              onClick={() => setDraft(null)}
               className="px-3 min-h-[36px] border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-white"
+            >
+              Start over
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* While a just-finished drawing's PNG is being prepared, show the
+          "How does it look?" card with a spinner so feedback stays in the
+          right place (not on the Upload card). It's quick, so no text. */}
+      {savingDrawing && !pending && (
+        <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
+          <p className="text-xs font-semibold text-gray-700">How does it look?</p>
+          <div className="w-full h-40 flex items-center justify-center rounded bg-white">
+            <span
+              className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600"
+              role="status"
+              aria-label="Preparing your drawing"
+            />
+          </div>
+        </div>
+      )}
+
+      {pending && (
+        <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
+          <p className="text-xs font-semibold text-gray-700 truncate">
+            {polished ? 'Pick the one you like' : 'How does it look?'}
+          </p>
+
+          {polished ? (
+            // Compare: original vs polished, kid taps to choose. The chosen
+            // one is what Use it / Save act on. Non-destructive.
+            <div className="grid grid-cols-2 gap-2">
+              <CompareCard
+                label="Original"
+                url={pending.url}
+                selected={chosen === 'original'}
+                onSelect={() => setChosen('original')}
+              />
+              <CompareCard
+                label="Polished"
+                url={polished}
+                selected={chosen === 'polished'}
+                onSelect={() => setChosen('polished')}
+              />
+            </div>
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={pending.url}
+              alt={pending.filename}
+              className="w-full max-h-48 object-contain rounded bg-white"
+            />
+          )}
+
+          {/* Action buttons in a borderless 2×2 grid. Use it stays the
+              clear primary (solid blue); the rest are soft tinted fills —
+              no borders, lighter footprint. Polish hides once polished;
+              Keep drawing only shows for an editable drawing. */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onPick(activeUrl, { alt: pending.filename });
+                reset();
+              }}
+              className="min-h-[40px] flex items-center justify-center gap-1.5 bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700"
+            >
+              Use it
+            </button>
+
+            {!polished && (
+              <button
+                type="button"
+                onClick={polish}
+                disabled={polishing}
+                title="Gently clean up your lines — keeps your drawing's own style. Nothing is added or changed."
+                className="min-h-[40px] flex items-center justify-center gap-1.5 bg-purple-50 text-purple-700 font-semibold rounded-lg text-sm hover:bg-purple-100 disabled:opacity-60"
+              >
+                {polishing ? (
+                  <>
+                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600" />
+                    Polishing…
+                  </>
+                ) : (
+                  <>
+                    <SparkleIcon /> Polish
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Reopen to keep editing — covers the "tapped Done by accident"
+                case. Draft strokes are kept in state. */}
+            {pending.drawn && draft && (
+              <button
+                type="button"
+                onClick={() => { setPending(null); setPolished(null); setChosen('original'); setDrawing(true); }}
+                className="min-h-[40px] flex items-center justify-center gap-1.5 bg-blue-50 text-blue-700 font-semibold rounded-lg text-sm hover:bg-blue-100"
+              >
+                <PencilIcon /> Keep drawing
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={reset}
+              className="min-h-[40px] flex items-center justify-center gap-1.5 bg-gray-100 text-gray-600 font-semibold rounded-lg text-sm hover:bg-gray-200"
             >
               Throw it away
             </button>
           </div>
+
+          {/* Optional: keep this artwork as a reusable character. */}
+          {showSaveForm ? (
+            <div className="space-y-1.5 pt-1">
+              <label className="block text-[11px] font-semibold text-gray-700">
+                Name this character so you can use it again later
+              </label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  placeholder="e.g. Xarian"
+                  className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  maxLength={80}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={saveAsCharacter}
+                  disabled={savingChar || !saveName.trim()}
+                  className="px-3 min-h-[32px] bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingChar ? 'Saving…' : 'Save & insert'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowSaveForm(true)}
+              className="text-xs text-purple-700 hover:text-purple-900 font-medium"
+            >
+              + Save as a character
+            </button>
+          )}
         </div>
+      )}
+
+      {drawing && (
+        <DrawingCanvas
+          // Editing a saved drawing seeds from its strokes (rescaled via
+          // initialCanvas); otherwise continue the in-session draft.
+          initialStrokes={editInitial ? editInitial.strokes : draft?.strokes}
+          initialCanvas={editInitial ? { w: editInitial.w, h: editInitial.h } : undefined}
+          onClose={() => { setDrawing(false); setDraft(null); setEditInitial(null); }}
+          onMinimize={(strokes, preview) => {
+            // Now an in-session draft at the current canvas size — drop the
+            // original-size info so it isn't rescaled again on reopen.
+            setDraft({ strokes, preview });
+            setEditInitial(null);
+            setDrawing(false);
+          }}
+          onDone={(file, strokes, dims) => {
+            // Keep the strokes so the kid can reopen and edit; the preview
+            // is refreshed on the next minimize/done. Persist to the gallery.
+            setDraft({ strokes, preview: '' });
+            setEditInitial(null);
+            setDrawing(false);
+            void finishDrawing(file, strokes, dims);
+          }}
+        />
       )}
     </div>
   );

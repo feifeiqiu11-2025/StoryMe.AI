@@ -48,6 +48,7 @@ import {
   type ImageProvider,
 } from '@/lib/types/story';
 import { compressImage } from '@/lib/services/imageProcessing.service';
+import { buildPolishPrompt } from '@/lib/character-prompts';
 import { randomUUID } from 'crypto';
 
 const BUCKET = 'generated-images';
@@ -65,7 +66,9 @@ const ART_STYLES = {
 type ArtStyleKey = keyof typeof ART_STYLES;
 
 const GenerateImageSchema = z.object({
-  prompt: z.string().min(3).max(500),
+  // Optional because 'polish' has no kid-typed prompt (it uses a fixed
+  // preservation prompt). Required for normal generation — enforced below.
+  prompt: z.string().min(3).max(500).optional(),
   characterIds: z.array(z.string().uuid()).max(5).optional(),
   referenceImageUrl: z.string().url().optional(),
   /** Set when the kid is editing an earlier generation ("make the wolf
@@ -78,6 +81,11 @@ const GenerateImageSchema = z.object({
     .enum(Object.keys(ART_STYLES) as [ArtStyleKey, ...ArtStyleKey[]])
     .optional(),
   imageProvider: z.string().optional(),
+  /** 'polish' = gentle clean-up of the kid's own art (My Art tab):
+   *  preserves their style/medium, only tidies lines + removes photo
+   *  artifacts. Pins to GPT (best at preservation), ignores artStyle and
+   *  characters, and uses previousImageUrl as the image to clean. */
+  intent: z.enum(['polish']).optional(),
 });
 
 interface CharacterRow {
@@ -145,12 +153,38 @@ export async function POST(request: NextRequest) {
       previousImageUrl,
       artStyle,
       imageProvider: requestedProvider,
+      intent,
     } = validation.data;
 
+    const isPolish = intent === 'polish';
+
+    // Polish must operate on an image. Without one there's nothing to clean.
+    if (isPolish && !previousImageUrl) {
+      return NextResponse.json(
+        { error: 'Polish needs an image to clean up.' },
+        { status: 400 }
+      );
+    }
+    // Normal generation requires a prompt (polish supplies its own).
+    if (!isPolish && (!prompt || prompt.trim().length < 3)) {
+      return NextResponse.json(
+        { error: 'A description is required to generate a picture.' },
+        { status: 400 }
+      );
+    }
+    const safePrompt = prompt ?? '';
+
     // Chapter-book scenes default to gpt-image-2 when the client sends no explicit pick.
-    const requestedProviderNormalized: ImageProvider = requestedProvider
-      ? normalizeImageProvider(requestedProvider)
-      : DEFAULT_SCENE_IMAGE_PROVIDER;
+    // Polish pins to Gemini (Nano Banana): much faster than gpt-image-2 and,
+    // with the preservation-first prompt, keeps the child's drawing intact.
+    // Falls back to GPT only if Gemini isn't configured.
+    const requestedProviderNormalized: ImageProvider = isPolish
+      ? (isGeminiAvailable()
+          ? ('gemini-3.1' as ImageProvider)
+          : ('openai-gpt-image-2' as ImageProvider))
+      : requestedProvider
+        ? normalizeImageProvider(requestedProvider)
+        : DEFAULT_SCENE_IMAGE_PROVIDER;
     // Edits require an image-conditioned model. OpenAI gpt-image-2 has
     // true edit semantics; Gemini accepts the prior image as a strong
     // reference. Flux has no clean edit path, so when the kid asks for
@@ -196,34 +230,36 @@ export async function POST(request: NextRequest) {
     if (useOpenAI) {
       imageBuffer = await withTimeout(
         runOpenAI({
-          prompt,
-          characters,
-          referenceImageUrl,
+          prompt: safePrompt,
+          characters: isPolish ? [] : characters,
+          referenceImageUrl: isPolish ? undefined : referenceImageUrl,
           previousImageUrl,
-          styledArtStyle,
+          styledArtStyle: isPolish ? undefined : styledArtStyle,
+          isPolish,
         }),
         PROVIDER_TIMEOUT_MS,
-        'OpenAI image generation'
+        isPolish ? 'OpenAI polish' : 'OpenAI image generation'
       );
       actualProvider = provider;
     } else if (useGemini) {
       imageBuffer = await withTimeout(
         runGemini({
-          prompt,
-          characters,
-          referenceImageUrl,
+          prompt: safePrompt,
+          characters: isPolish ? [] : characters,
+          referenceImageUrl: isPolish ? undefined : referenceImageUrl,
           previousImageUrl,
-          styledArtStyle,
+          styledArtStyle: isPolish ? undefined : styledArtStyle,
           provider,
+          isPolish,
         }),
         PROVIDER_TIMEOUT_MS,
-        'Gemini image generation'
+        isPolish ? 'Gemini polish' : 'Gemini image generation'
       );
       actualProvider = provider;
     } else {
       imageBuffer = await withTimeout(
         runFal({
-          prompt,
+          prompt: safePrompt,
           characters,
           referenceImageUrl,
           styledArtStyle,
@@ -287,6 +323,10 @@ interface RunArgs {
   previousImageUrl?: string;
   styledArtStyle?: string;
   provider?: ImageProvider;
+  /** Polish mode: gentle clean-up that preserves the child's art (My Art
+   *  tab). Uses the polish prompt and treats previousImageUrl as the
+   *  drawing to tidy, not a scene to re-imagine. */
+  isPolish?: boolean;
 }
 
 /**
@@ -302,6 +342,7 @@ async function runOpenAI({
   referenceImageUrl,
   previousImageUrl,
   styledArtStyle,
+  isPolish = false,
 }: RunArgs): Promise<Buffer> {
   // Collect reference images. Edit-mode: the previous generation goes
   // FIRST so gpt-image-2 treats it as the base to modify. Otherwise the
@@ -311,7 +352,9 @@ async function runOpenAI({
   if (previousImageUrl) {
     refs.push({
       url: previousImageUrl,
-      label: "the previous image — keep its overall composition, characters, and style, but apply the changes described in the prompt",
+      label: isPolish
+        ? "the child's drawing to gently clean up — preserve it exactly, only tidy as instructed"
+        : "the previous image — keep its overall composition, characters, and style, but apply the changes described in the prompt",
     });
   }
   for (const c of characters) {
@@ -350,12 +393,16 @@ async function runOpenAI({
 
   // Build the prompt — only includes the references section when we
   // actually have buffers (a partial fetch failure could empty the list).
-  const fullPrompt = buildChapterBookPrompt({
-    sceneDescription: prompt,
-    references: buffers.length > 0 ? refs.slice(0, buffers.length) : [],
-    styledArtStyle,
-    isEdit: Boolean(previousImageUrl),
-  });
+  // Polish uses its own tight, preservation-first prompt instead of the
+  // scene/edit builder.
+  const fullPrompt = isPolish
+    ? buildPolishPrompt()
+    : buildChapterBookPrompt({
+        sceneDescription: prompt,
+        references: buffers.length > 0 ? refs.slice(0, buffers.length) : [],
+        styledArtStyle,
+        isEdit: Boolean(previousImageUrl),
+      });
 
   const { b64 } = await callOpenAIImage({
     prompt: fullPrompt,
@@ -377,6 +424,7 @@ async function runGemini({
   previousImageUrl,
   styledArtStyle,
   provider,
+  isPolish = false,
 }: RunArgs): Promise<Buffer> {
   const geminiChars: GeminiCharacterInfo[] = [];
   // Edit-mode: previous generation goes first as the strongest reference
@@ -384,11 +432,12 @@ async function runGemini({
   // as a delta.
   if (previousImageUrl) {
     geminiChars.push({
-      name: 'Previous Image',
+      name: isPolish ? "Child's Drawing" : 'Previous Image',
       referenceImageUrl: previousImageUrl,
       description: {
-        ai_description:
-          'The previous version of this picture. Keep its overall composition, characters, and style, and apply the changes described in the prompt.',
+        ai_description: isPolish
+          ? "The child's original drawing. Preserve it exactly and only clean it up as instructed."
+          : 'The previous version of this picture. Keep its overall composition, characters, and style, and apply the changes described in the prompt.',
       } as unknown as GeminiCharacterInfo['description'],
     });
   }
@@ -418,9 +467,12 @@ async function runGemini({
 
   // For edits, frame the prompt as a delta on the prior image so Gemini
   // anchors on it instead of re-imagining the scene from text alone.
-  const sceneDescription = previousImageUrl
-    ? `Edit the "Previous Image" with this change: ${prompt}. Keep everything else about the image the same.`
-    : prompt;
+  // Polish uses its own preservation-first instruction.
+  const sceneDescription = isPolish
+    ? buildPolishPrompt()
+    : previousImageUrl
+      ? `Edit the "Previous Image" with this change: ${prompt}. Keep everything else about the image the same.`
+      : prompt;
 
   const out = await generateImageWithGemini({
     characters: geminiChars,

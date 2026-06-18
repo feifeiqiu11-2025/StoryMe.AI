@@ -328,6 +328,42 @@ export class ProjectRepository extends BaseRepository<Project> {
   }
 
   /**
+   * Read only the My Art gallery index (+ ownership fields) for a chapter
+   * book — deliberately avoids pulling canvas_state (the whole Tiptap doc)
+   * since the gallery is a side panel that changes independently.
+   */
+  async getArtDrawings(
+    id: string
+  ): Promise<{ id: string; user_id: string; art_drawings: unknown[] } | null> {
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select('id, user_id, art_drawings')
+      .eq('id', id)
+      .eq('project_type', 'chapter_book')
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw error;
+    }
+    return data as { id: string; user_id: string; art_drawings: unknown[] };
+  }
+
+  /**
+   * Write the My Art gallery index. Intentionally does NOT bump updated_at:
+   * editing the drawing gallery is a side activity and shouldn't reorder the
+   * book in "My Stories". Writes only the art_drawings column, so it can't
+   * clobber a concurrent canvas_state auto-save.
+   */
+  async updateArtDrawings(id: string, drawings: unknown[]): Promise<void> {
+    const { error } = await this.supabase
+      .from(this.tableName)
+      .update({ art_drawings: drawings })
+      .eq('id', id);
+    if (error) throw error;
+  }
+
+  /**
    * Find public projects with scenes (for landing page)
    * Only returns projects with visibility = 'public'
    */

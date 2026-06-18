@@ -80,3 +80,24 @@ CONTEXT: This is for a children's storybook app for ages 5-8. The child made the
 export function shouldUseFaithfulnessPrompt(medium: ImageMedium | undefined): boolean {
   return medium === 'kid_creation' || medium === 'digital_art';
 }
+
+/**
+ * "Polish" prompt for the chapter-book My Art flow.
+ *
+ * Unlike buildKidCreationPrompt (which RE-RENDERS the art into a polished
+ * Pixar/watercolor style — that's the Create New transform path), polish is
+ * a light touch: clean the lines and remove photo artifacts WITHOUT
+ * restyling. The kid's drawing must stay recognizably theirs — they pick
+ * Original vs Polished afterwards.
+ *
+ * Kept deliberately short: image models follow tight, unambiguous edit
+ * instructions more reliably than long ones. The three load-bearing rules
+ * are "don't restyle", "only tidy", and "don't change elements". Tune here.
+ */
+export function buildPolishPrompt(): string {
+  return `Gently clean up this child's drawing — keep it unmistakably theirs.
+
+- Keep the same style, medium, colors, proportions, and layout. Do NOT restyle, cartoon-ify, or 3D-render it.
+- Only tidy up: smooth shaky lines (keep the hand-drawn feel), even out the colors already there, and remove photo glare, smudges, and background.
+- Do NOT add, remove, or move anything.`;
+}

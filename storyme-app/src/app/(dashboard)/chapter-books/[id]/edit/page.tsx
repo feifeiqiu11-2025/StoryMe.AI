@@ -171,6 +171,7 @@ export default function ChapterBookEditPage() {
 
           <aside id="media-panel" className="lg:h-full lg:overflow-y-auto">
             <MediaPanel
+              bookId={book.id}
               onPick={(url, options) => {
                 const editor = editorRef.current;
                 if (!editor) {
