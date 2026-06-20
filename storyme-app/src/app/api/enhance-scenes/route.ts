@@ -160,10 +160,18 @@ export async function POST(request: NextRequest) {
 
     console.log(`🤖 Using ${model} for ${language === 'zh' ? 'Chinese' : 'English'} story generation`);
 
+    // The bible call clusters settings + resolves pronouns — structuring tasks that get
+    // UNRELIABLE at creative temperatures (gpt-4o intermittently collapses a catalog of
+    // distinct settings into one "umbrella" at 0.7; at ~0.2 it's deterministic). Factual
+    // books (Knowledge & World Exploration) want determinism + accuracy, so use a low
+    // temperature there; creative templates keep some warmth for caption prose.
+    const enhanceTemperature = templateId === 'knowledge' ? 0.2 : 0.7;
+    console.log(`🌡️ Enhance temperature: ${enhanceTemperature} (template: ${templateId ?? 'none'})`);
+
     const completion = await client.chat.completions.create({
       model,
       max_tokens: 4096,
-      temperature: 0.7,
+      temperature: enhanceTemperature,
       messages: [
         {
           role: 'system',
