@@ -617,14 +617,12 @@ ${getReadingLevelGuidelines(readingLevel)}
 YOUR TASK — produce TWO things together:
 
 A) LOCATIONS (story bible)
-   Identify the distinct background SETTINGS used across the story. A setting is the broad
-   environment/backdrop of a scene — not a small object, prop, or focal spot within it; do
-   not promote a focal detail into its own setting. Create a new setting ONLY when the
-   backdrop genuinely changes to a different PLACE; scenes that share the same surroundings
-   share one setting even if they zoom in on different details within it. Do NOT create a
-   separate setting for each stage or step of a process or life cycle that happens in the
-   same place — those are ONE setting. Use only as many settings as there are genuinely
-   distinct places — do not over-split, but do keep genuinely different places separate. For each:
+   For EACH scene, determine the specific place/environment it happens in (real or imagined),
+   then list each DISTINCT place once as a "location" — the broad backdrop of a scene, not a
+   small object or focal spot. Merge only scenes set in the SAME specific place. Keep clearly
+   different environments as SEPARATE locations — do NOT lump them into one broad, general
+   setting (a single "world", "land", or theme that spans different environments). A location
+   used in only one scene is fine; do not split one place for a different detail or stage. For each:
    - Give it a short, human-readable name (2–5 words).
    - Write a LOCKED visual description (25–40 words) specific to THIS story — concrete landmarks, lighting, mood. This description will be reused verbatim for every scene in that location, so make it specific enough that two separate images of this location would look the same.
    - If a SCENE-TYPE CHARACTER listed above is clearly this location, set backing_character_name to that character's exact name AND set the location's name to the SAME exact name (do NOT invent variations like "Rainbow House Morning" — use just "Rainbow House"). Otherwise backing_character_name is null and you may pick any descriptive name.
@@ -633,7 +631,7 @@ A) LOCATIONS (story bible)
 B) SCENES
    For each scene produce:
    - title, enhanced_prompt, caption, characterNames, characterTypes (as before)
-   - location_temp_id: which location from (A) this scene takes place in. DEFAULT to the previous scene's location unless the script explicitly indicates a change (e.g., "then she went home", "the next day at school"). Never leave this null unless no location can be inferred for the whole story.
+   - location_temp_id: which location from (A) this scene takes place in. Infer it from the scene's activities and the whole story even when the scene names no place, and keep the same location across consecutive scenes until the story clearly moves to a different place. Never leave this null unless no location can be inferred for the whole story.
    - resolved_character_names: the persistent CHARACTERS present in this scene — a person, or a specific recurring animal that acts across scenes — with ALL pronouns resolved to explicit names from the character list above (or to a new character you introduce in C). "He walked in" → if Connor is the most recent male subject, include "Connor". The topic's SUBJECT and its life stages or forms are NOT characters: if a scene only shows the subject (no persistent person/animal), return an empty list. Never leave a pronoun unresolved.
 
 C) NEW CHARACTERS (a PERSISTENT individual not in the provided list — a person, or one specific animal — that recurs across scenes)
