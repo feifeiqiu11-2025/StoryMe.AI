@@ -14,11 +14,11 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // Serve the static investor deck at a clean URL under /admin (public, no auth).
+  // Serve the static investor deck at a clean, public shareable URL: /pitch
   async rewrites() {
     return [
-      { source: '/admin/pitch', destination: '/admin/pitch/index.html' },
-      { source: '/admin/pitch/', destination: '/admin/pitch/index.html' },
+      { source: '/pitch', destination: '/pitch/index.html' },
+      { source: '/pitch/', destination: '/pitch/index.html' },
     ];
   },
   experimental: {

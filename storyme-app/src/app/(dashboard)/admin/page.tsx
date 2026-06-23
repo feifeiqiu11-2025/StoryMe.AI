@@ -18,6 +18,7 @@ import {
   Building2,
   Mail,
   Inbox,
+  Presentation,
   ArrowUpRight,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -28,6 +29,7 @@ interface AdminPage {
   description: string;
   href: string;
   icon: ReactNode;
+  external?: boolean; // open in a new tab (e.g. static pages served outside the app router)
 }
 
 interface AdminGroup {
@@ -103,6 +105,13 @@ const groups: AdminGroup[] = [
         href: '/admin/training',
         icon: <BookOpen className="w-[18px] h-[18px]" />,
       },
+      {
+        title: 'Investor deck',
+        description: 'KindleWood pitch deck — public link at /pitch.',
+        href: '/pitch',
+        icon: <Presentation className="w-[18px] h-[18px]" />,
+        external: true,
+      },
     ],
   },
 ];
@@ -166,19 +175,30 @@ export default function AdminIndexPage() {
 }
 
 function AdminCard({ page }: { page: AdminPage }) {
-  return (
-    <Link
-      href={page.href}
-      className="group relative bg-white border border-gray-200 rounded-lg p-4 hover:border-gray-400 hover:bg-gray-50/40 transition-colors"
-    >
-      <div className="flex items-start gap-3">
-        <div className="text-gray-700 mt-[3px] flex-shrink-0">{page.icon}</div>
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-gray-900">{page.title}</h3>
-          <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{page.description}</p>
-        </div>
-        <ArrowUpRight className="w-4 h-4 text-gray-300 group-hover:text-gray-600 transition-colors flex-shrink-0" />
+  const className =
+    'group relative bg-white border border-gray-200 rounded-lg p-4 hover:border-gray-400 hover:bg-gray-50/40 transition-colors';
+  const inner = (
+    <div className="flex items-start gap-3">
+      <div className="text-gray-700 mt-[3px] flex-shrink-0">{page.icon}</div>
+      <div className="flex-1 min-w-0">
+        <h3 className="text-sm font-semibold text-gray-900">{page.title}</h3>
+        <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{page.description}</p>
       </div>
+      <ArrowUpRight className="w-4 h-4 text-gray-300 group-hover:text-gray-600 transition-colors flex-shrink-0" />
+    </div>
+  );
+
+  // Static pages served outside the app router (e.g. /admin/pitch) open in a new tab.
+  if (page.external) {
+    return (
+      <a href={page.href} target="_blank" rel="noopener noreferrer" className={className}>
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <Link href={page.href} className={className}>
+      {inner}
     </Link>
   );
 }
