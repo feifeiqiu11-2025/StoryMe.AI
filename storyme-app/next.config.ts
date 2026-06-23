@@ -14,6 +14,13 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Serve the static investor deck at a clean URL under /admin (public, no auth).
+  async rewrites() {
+    return [
+      { source: '/admin/pitch', destination: '/admin/pitch/index.html' },
+      { source: '/admin/pitch/', destination: '/admin/pitch/index.html' },
+    ];
+  },
   experimental: {
     // Increase body size limit for server actions (image uploads)
     serverActions: {

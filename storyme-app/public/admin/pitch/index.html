@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base href="/admin/pitch/">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KindleWood — Investor Pitch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Jost:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* ===========================================
+     THEME — KindleWood "Storybook + Serif" (cream brand + Playfair/Jost/Mono)
+     Change these to restyle the whole deck.
+     =========================================== */
+  :root{
+    --cream:#FBF6EE; --cream-hi:#FFFDF8; --sand:#F3E8D6; --tan:#EFD9B8;
+    --ink:#2C2018; --ink-soft:#5A4A3A; --wood:#8A5A2B; --terra:#C9551F; --terra-br:#E2703A; --leaf:#6F8F4F;
+    --line:rgba(138,90,43,.20);
+    --font-display:"Playfair Display",serif;
+    --font-body:"Jost",sans-serif;
+    --font-mono:"JetBrains Mono",monospace;
+    --e:cubic-bezier(.2,.8,.2,1);
+    --slide-bg:radial-gradient(125% 125% at 18% 8%, #FFFDF8 0%, #FBF6EE 52%, #F1E4CF 100%);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+
+  /* ===========================================
+     FIXED 16:9 STAGE (from viewport-base.css)
+     =========================================== */
+  html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#EFE4D2;}
+  .deck-viewport{position:fixed;inset:0;overflow:hidden;background:#EFE4D2;}
+  .deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:var(--cream);}
+  .slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;visibility:hidden;opacity:0;pointer-events:none;
+    background:var(--slide-bg);font-family:var(--font-body);font-weight:300;color:var(--ink);}
+  .slide.active,.slide.visible{visibility:visible;opacity:1;pointer-events:auto;z-index:1;}
+  img,video,canvas,svg{max-width:100%;max-height:100%;}
+  @media print{html,body{height:auto;overflow:visible;background:#fff;}.deck-viewport{position:static;overflow:visible;}
+    .deck-stage{position:static;transform:none!important;}.slide{position:relative;visibility:visible!important;opacity:1!important;break-after:page;}}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.2s!important;}}
+
+  /* ===========================================
+     SHARED COMPONENTS
+     =========================================== */
+  .pad{position:absolute;inset:0;padding:92px 120px;display:flex;flex-direction:column;}
+  .center{justify-content:center;}
+  .kik{font-family:var(--font-mono);font-weight:400;font-size:20px;letter-spacing:.24em;text-transform:uppercase;color:var(--wood);}
+  .kik .num{color:var(--terra);}
+  .stitle{font-family:var(--font-display);font-weight:400;font-size:74px;line-height:1.05;color:var(--ink);letter-spacing:-.5px;}
+  .stitle em{font-style:italic;color:var(--terra);}
+  .lead{font-size:29px;line-height:1.5;color:var(--ink-soft);font-weight:300;}
+  .lead strong{font-weight:500;color:var(--ink);}
+  .em-terra{color:var(--terra);}
+  .divider{width:120px;height:2px;background:var(--terra);border-radius:2px;}
+
+  .card{background:var(--cream-hi);border:1px solid var(--line);border-radius:22px;box-shadow:0 18px 44px rgba(90,55,20,.10);}
+  .chip{display:inline-flex;align-items:center;gap:12px;background:var(--sand);border:1px solid var(--line);
+    border-radius:999px;padding:14px 26px;font-size:23px;font-weight:400;color:var(--ink);}
+  .chip .dot{width:12px;height:12px;border-radius:50%;background:var(--terra);}
+  .framed{border-radius:14px;border:7px solid #fff;object-fit:cover;background:#fff;box-shadow:0 22px 52px rgba(90,55,20,.26);}
+
+  .statn{font-family:var(--font-display);font-weight:400;line-height:1;color:var(--wood);}
+  .statl{font-family:var(--font-mono);font-size:16px;letter-spacing:.12em;text-transform:uppercase;color:#6A5A48;margin-top:12px;}
+
+  /* reveal-on-visible (replays each time a slide becomes active) */
+  .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s var(--e),transform .7s var(--e);transition-delay:var(--d,0s);}
+  .slide.visible .reveal{opacity:1;transform:none;}
+  .reveal.pop{transform:translateY(34px) scale(.94);}
+  .slide.visible .reveal.pop{transform:none;}
+
+  /* ===========================================
+     SLIDE 1 — VISION (cover)
+     =========================================== */
+  .cover .wrap{position:absolute;left:140px;top:0;bottom:0;width:1080px;display:flex;flex-direction:column;justify-content:center;}
+  .cover .brand{margin-bottom:46px;}
+  .cover .brand img{height:60px;}
+  .cover h1{font-family:var(--font-display);font-weight:400;font-size:104px;line-height:1.04;letter-spacing:-.5px;color:var(--ink);}
+  .cover h1 em{font-style:italic;color:var(--terra);}
+  .cover .sub{font-size:31px;line-height:1.5;color:var(--ink-soft);max-width:880px;margin-top:40px;}
+  .cover .sub strong{font-weight:500;color:var(--ink);}
+  .cover .tag{font-family:var(--font-display);font-style:italic;font-weight:500;font-size:38px;color:var(--wood);margin-top:30px;}
+  .cover .tag span{color:var(--terra);}
+  .cover .stats{display:flex;margin-top:58px;}
+  .cover .stat{padding:0 50px;border-left:1px solid var(--line);}
+  .cover .stat:first-child{padding-left:0;border-left:none;}
+  .cover .stat .statn{font-size:62px;}
+  .blob{position:absolute;border-radius:46% 54% 58% 42%/52% 46% 54% 48%;filter:blur(2px);}
+  .b1{width:520px;height:520px;left:-150px;top:-160px;background:#F7E7C9;opacity:.5;}
+  .b2{width:360px;height:360px;right:38%;bottom:-150px;background:#F3DEC2;opacity:.45;}
+  .shelf{position:absolute;right:96px;top:0;bottom:0;width:560px;}
+  .shelf .cov{position:absolute;width:300px;height:380px;}
+  .sc1{right:212px;top:74px;transform:rotate(-12deg);}
+  .sc2{right:6px;top:286px;transform:rotate(9deg);z-index:2;}
+  .sc3{right:238px;top:520px;width:266px;height:338px;transform:rotate(-6deg);}
+
+  /* ===========================================
+     SLIDE 2 — WHO WE ARE
+     =========================================== */
+  .founders{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:42px;}
+  .fcard{display:flex;gap:30px;padding:32px;align-items:flex-start;}
+  .fcard img{width:190px;height:230px;border-radius:14px;object-fit:cover;border:6px solid #fff;box-shadow:0 14px 32px rgba(90,55,20,.20);flex:none;}
+  .fcard .nm{font-family:var(--font-display);font-size:40px;color:var(--ink);line-height:1.1;}
+  .fcard .ti{font-family:var(--font-mono);font-size:16px;letter-spacing:.1em;text-transform:uppercase;color:var(--terra);margin:8px 0 14px;}
+  .fcard .bio{font-size:20px;line-height:1.46;color:var(--ink-soft);}
+  .interbar{display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin-top:40px;}
+  .interbar .lbl{font-family:var(--font-mono);font-size:16px;letter-spacing:.12em;text-transform:uppercase;color:var(--wood);}
+  .plus{color:var(--terra);font-size:26px;}
+
+  /* ===========================================
+     SLIDE 3 — WHY NOW
+     =========================================== */
+  .gen{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:46px;}
+  .gencard{padding:36px 34px;position:relative;overflow:hidden;}
+  .gencard .g{font-family:var(--font-mono);font-size:16px;letter-spacing:.14em;text-transform:uppercase;color:#A0876C;}
+  .gencard .v{font-family:var(--font-display);font-size:46px;color:var(--ink);margin-top:10px;}
+  .gencard.now{background:linear-gradient(165deg,#FBE7D6,#F6D9B8);border-color:rgba(201,85,31,.3);}
+  .gencard.now .v{color:var(--terra);}
+  .fourc{display:flex;gap:18px;margin-top:38px;flex-wrap:wrap;}
+  .punch{font-family:var(--font-display);font-style:italic;font-size:40px;color:var(--wood);margin-top:34px;}
+  .punch b{font-style:normal;font-weight:600;color:var(--terra);}
+
+  /* ===========================================
+     SLIDE 4 — WHY STORYTELLING
+     =========================================== */
+  .split{display:grid;grid-template-columns:1.15fr .85fr;gap:70px;align-items:center;height:100%;}
+  .storypage{width:100%;max-width:520px;justify-self:center;transform:rotate(-2deg);}
+  .develops{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:34px;max-width:760px;}
+  .dev{display:flex;align-items:center;gap:14px;font-size:24px;color:var(--ink);}
+  .dev .tick{width:30px;height:30px;border-radius:50%;background:var(--terra);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex:none;}
+
+  /* ===========================================
+     SLIDE 5 — PRODUCT
+     =========================================== */
+  .flow{display:flex;align-items:center;gap:20px;margin-top:30px;}
+  .fstep{font-family:var(--font-display);font-size:34px;color:var(--ink);background:var(--cream-hi);border:1px solid var(--line);border-radius:14px;padding:14px 30px;}
+  .farrow{color:var(--terra);font-size:30px;}
+  .magic{display:flex;flex-direction:column;align-items:center;gap:26px;margin-top:26px;}
+  .mrow{display:flex;align-items:center;justify-content:center;gap:24px;}
+  .magic figure{display:flex;flex-direction:column;align-items:center;gap:10px;}
+  .magic img{width:214px;height:214px;}
+  .magic .pageimg{width:188px;height:240px;object-fit:contain;}
+  .magic figcaption{font-family:var(--font-mono);font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#6A5A48;}
+  .magic .ar{color:var(--terra);font-size:36px;align-self:center;margin-top:-22px;}
+
+  /* ===========================================
+     SLIDE 6 — TRACTION
+     =========================================== */
+  .tract{display:grid;grid-template-columns:1.05fr .95fr;gap:60px;align-items:center;height:100%;}
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:38px;}
+  .metric{padding:26px 30px;}
+  .metric .statn{font-size:58px;}
+  .revs{display:flex;gap:14px;flex-wrap:wrap;margin-top:26px;}
+  .takeaway{font-family:var(--font-display);font-style:italic;font-size:38px;color:var(--wood);margin-top:30px;}
+  .takeaway b{font-style:normal;font-weight:600;color:var(--terra);}
+  .wall{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .wall img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;border:4px solid #fff;box-shadow:0 10px 22px rgba(90,55,20,.18);}
+
+  /* ===========================================
+     SLIDE 7 — WHY WE WIN
+     =========================================== */
+  .winwrap{display:grid;grid-template-columns:1fr .9fr;gap:54px;height:100%;align-items:center;}
+  .cat{display:flex;align-items:center;justify-content:space-between;padding:20px 4px;border-bottom:1px solid var(--line);}
+  .cat .c{font-family:var(--font-display);font-size:28px;color:var(--ink);}
+  .cat .ex{font-size:21px;color:var(--ink-soft);}
+  .winpanel{background:linear-gradient(165deg,#FBE7D6,#F2D3AE);border:1px solid rgba(201,85,31,.28);border-radius:26px;padding:48px;text-align:center;}
+  .winpanel .h{font-family:var(--font-display);font-size:40px;color:var(--ink);}
+  .winpanel .verbs{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:24px 0;}
+  .winpanel .verb{font-family:var(--font-display);font-style:italic;font-size:30px;color:var(--terra);}
+  .winpanel .aud{font-family:var(--font-mono);font-size:17px;letter-spacing:.1em;text-transform:uppercase;color:var(--wood);line-height:2;}
+  .winpanel .eco{margin-top:18px;font-size:22px;color:var(--ink-soft);}
+
+  /* ===========================================
+     SLIDE 8 — MOAT (flywheel)
+     =========================================== */
+  .moatwrap{display:grid;grid-template-columns:.82fr 1.18fr;gap:30px;height:100%;align-items:center;}
+  .wheel{position:relative;width:760px;height:760px;justify-self:center;}
+  .wheel .ring{position:absolute;inset:70px;border:2px dashed rgba(138,90,43,.35);border-radius:50%;}
+  .wheel .hub{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:230px;height:230px;border-radius:50%;
+    background:linear-gradient(160deg,#E2703A,#C9551F);color:#FFF6EE;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+    box-shadow:0 24px 56px rgba(120,50,12,.34);}
+  .wheel .hub .ht{font-family:var(--font-display);font-size:34px;line-height:1.1;}
+  .wheel .hub .hs{font-family:var(--font-mono);font-size:13px;letter-spacing:.12em;text-transform:uppercase;opacity:.92;margin-top:8px;}
+  .node{position:absolute;transform:translate(-50%,-50%);width:188px;text-align:center;
+    font-size:20px;line-height:1.25;color:var(--ink);background:var(--cream-hi);border:1px solid var(--line);border-radius:14px;padding:14px 12px;
+    box-shadow:0 12px 26px rgba(90,55,20,.14);}
+  .node b{display:block;font-family:var(--font-mono);font-size:13px;color:var(--terra);margin-bottom:4px;}
+  .moatline{font-family:var(--font-display);font-size:30px;line-height:1.4;color:var(--ink);margin-top:26px;}
+  .moatline em{font-style:italic;color:var(--terra);}
+
+  /* ===========================================
+     SLIDE 9 — BUSINESS MODEL
+     =========================================== */
+  .streams{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:48px;}
+  .stream{padding:44px 38px;text-align:left;position:relative;}
+  .stream .ic{font-family:var(--font-mono);font-size:16px;letter-spacing:.14em;text-transform:uppercase;color:var(--terra);}
+  .stream .nm{font-family:var(--font-display);font-size:44px;color:var(--ink);margin:10px 0 18px;}
+  .stream .pr{font-family:var(--font-display);font-size:38px;color:var(--wood);}
+  .stream .pr small{font-size:22px;color:var(--ink-soft);}
+  .modelline{display:flex;justify-content:center;gap:50px;margin-top:46px;}
+  .modelline div{font-size:24px;color:var(--ink-soft);}
+  .modelline b{color:var(--terra);font-weight:600;}
+
+  /* ===========================================
+     SLIDE 10 — GROWTH
+     =========================================== */
+  .goals{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-top:46px;}
+  .goal{padding:38px 30px;text-align:center;}
+  .goal .statn{font-size:64px;}
+  .goal .statl{text-align:center;}
+  .kpi{margin-top:48px;text-align:center;}
+  .kpi .lbl{font-family:var(--font-mono);font-size:18px;letter-spacing:.16em;text-transform:uppercase;color:var(--wood);}
+  .kpi .big{font-family:var(--font-display);font-size:60px;color:var(--terra);margin:8px 0 12px;}
+  .kpi .why{font-size:25px;color:var(--ink-soft);}
+
+  /* ===========================================
+     SLIDE 11 — RAISE (close)
+     =========================================== */
+  .raisewrap{display:grid;grid-template-columns:1fr 1fr;gap:64px;height:100%;align-items:center;}
+  .alloc{margin-top:30px;}
+  .arow{margin-bottom:22px;}
+  .arow .top{display:flex;justify-content:space-between;font-size:22px;color:var(--ink);margin-bottom:8px;}
+  .arow .top b{font-family:var(--font-mono);color:var(--terra);}
+  .bar{height:14px;border-radius:8px;background:var(--sand);overflow:hidden;}
+  .bar span{display:block;height:100%;border-radius:8px;background:linear-gradient(90deg,#E2703A,#C9551F);width:0;transition:width 1.1s var(--e) .3s;}
+  .slide.visible .bar span{width:var(--w);}
+  .successbox{padding:40px;}
+  .successbox .h{font-family:var(--font-mono);font-size:16px;letter-spacing:.14em;text-transform:uppercase;color:var(--wood);margin-bottom:22px;}
+  .successbox .s{display:flex;align-items:baseline;gap:16px;padding:14px 0;border-top:1px solid var(--line);font-size:24px;color:var(--ink);}
+  .successbox .s:first-of-type{border-top:none;}
+  .successbox .s b{font-family:var(--font-display);font-size:34px;color:var(--terra);min-width:130px;}
+  .mantra{position:absolute;left:120px;right:120px;bottom:64px;display:flex;align-items:center;justify-content:space-between;}
+  .mantra .m{font-family:var(--font-display);font-style:italic;font-size:40px;color:var(--wood);}
+  .mantra .m b{font-style:normal;color:var(--terra);}
+  .mantra img{height:50px;}
+
+  /* ===========================================
+     DECK CHROME (outside the scaled stage)
+     =========================================== */
+  .progress{position:fixed;top:0;left:0;height:4px;background:var(--terra);z-index:1000;transition:width .4s var(--e);}
+  .counter{position:fixed;right:26px;bottom:20px;font-family:var(--font-mono);font-size:14px;letter-spacing:.1em;color:var(--wood);z-index:1000;}
+  .brandfoot{position:fixed;left:26px;bottom:20px;font-family:var(--font-mono);font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:rgba(138,90,43,.7);z-index:1000;}
+  .hint{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);font-family:var(--font-mono);font-size:12px;letter-spacing:.1em;color:rgba(138,90,43,.55);z-index:1000;}
+
+  /* inline editing */
+  .edit-hotzone{position:fixed;top:0;left:0;width:80px;height:80px;z-index:10000;cursor:pointer;}
+  .edit-toggle{position:fixed;top:18px;left:18px;width:46px;height:46px;border-radius:50%;border:1px solid var(--line);
+    background:var(--cream-hi);font-size:20px;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .3s;z-index:10001;}
+  .edit-toggle.show,.edit-toggle.active{opacity:1;pointer-events:auto;}
+  .edit-toggle.active{background:var(--terra);border-color:var(--terra);}
+  [contenteditable="true"]{outline:2px dashed rgba(201,85,31,.5);outline-offset:4px;border-radius:4px;}
+  .edit-banner{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;
+    font-family:var(--font-mono);font-size:13px;padding:8px 18px;border-radius:999px;z-index:10001;display:none;}
+  .edit-banner.show{display:block;}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+  <main class="deck-stage" id="deckStage">
+
+    <!-- ============ SLIDE 1 — VISION ============ -->
+    <section class="slide cover active">
+      <div class="blob b1"></div><div class="blob b2"></div>
+      <div class="shelf">
+        <img class="framed cov sc3 reveal pop" style="--d:.55s" src="assets/covers/cover-07.jpg" alt="A children's story cover" />
+        <img class="framed cov sc1 reveal pop" style="--d:.4s" src="assets/covers/cover-03.jpg" alt="A children's story cover" />
+        <img class="framed cov sc2 reveal pop" style="--d:.5s" src="assets/covers/cover-01.jpg" alt="A children's story cover" />
+      </div>
+      <div class="wrap">
+        <div class="brand reveal" style="--d:.05s"><img src="assets/logo.png" alt="KindleWood Studio" /></div>
+        <h1 class="reveal" style="--d:.18s">Where children become <em>creators</em>.</h1>
+        <p class="sub reveal" style="--d:.32s">Children are growing up surrounded by AI. Most platforms teach them to consume. KindleWood helps them <strong>create</strong>.</p>
+        <div class="tag reveal" style="--d:.44s">Create. <span>Share.</span> Shine.</div>
+        <div class="stats reveal" style="--d:.56s">
+          <div class="stat"><div class="statn">500+</div><div class="statl">Stories created</div></div>
+          <div class="stat"><div class="statn">200+</div><div class="statl">Young authors</div></div>
+          <div class="stat"><div class="statn">9</div><div class="statl">School partnerships</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 2 — WHO WE ARE ============ -->
+    <section class="slide">
+      <div class="pad center">
+        <div class="kik reveal"><span class="num">02</span> &nbsp;—&nbsp; Who we are</div>
+        <h2 class="stitle reveal" style="--d:.1s;margin-top:18px;">A rare intersection of <em>builders</em>.</h2>
+        <div class="founders">
+          <div class="fcard card reveal" style="--d:.2s">
+            <img src="assets/founder-feifei.webp" alt="Feifei Qiu" />
+            <div>
+              <div class="nm">Feifei Qiu</div>
+              <div class="ti">Founder &amp; CEO</div>
+              <div class="bio">CS degree, Master's in Machine Learning. 10+ years at Microsoft as Engineering Manager &amp; AI Product Manager. Shapes product vision and builds educator partnerships. <em>"I build bridges between imagination, learning, and technology."</em></div>
+            </div>
+          </div>
+          <div class="fcard card reveal" style="--d:.32s">
+            <img src="assets/founder-lu.webp" alt="Lu Pang" />
+            <div>
+              <div class="nm">Lu Pang</div>
+              <div class="ti">Co-Founder</div>
+              <div class="bio">Data-analytics expert, 10+ years in healthcare data modeling. Co-founded Seattle Little Rangers, a nonprofit for nature-based youth learning. Designs and leads the in-person workshops that bring KindleWood into classrooms.</div>
+            </div>
+          </div>
+        </div>
+        <div class="interbar reveal" style="--d:.46s">
+          <span class="lbl">Our intersection:</span>
+          <span class="chip">Technology</span><span class="plus">+</span>
+          <span class="chip">Education</span><span class="plus">+</span>
+          <span class="chip">Creativity</span><span class="plus">+</span>
+          <span class="chip">Nature-based learning</span>
+        </div>
+        <p class="lead reveal" style="--d:.58s;margin-top:30px;"><strong>Mission:</strong> help children become creators in the age of AI.</p>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 3 — WHY NOW ============ -->
+    <section class="slide">
+      <div class="pad center">
+        <div class="kik reveal"><span class="num">03</span> &nbsp;—&nbsp; Why now</div>
+        <h2 class="stitle reveal" style="--d:.1s;margin-top:18px;">The most important skill is <em>changing</em>.</h2>
+        <div class="gen">
+          <div class="gencard card reveal" style="--d:.2s"><div class="g">The previous generation</div><div class="v">learned to search.</div></div>
+          <div class="gencard card reveal" style="--d:.3s"><div class="g">The current generation</div><div class="v">learned to consume.</div></div>
+          <div class="gencard now reveal pop" style="--d:.42s"><div class="g">The next generation</div><div class="v">must learn to create.</div></div>
+        </div>
+        <div class="punch reveal" style="--d:.54s"><b>Creativity</b> is the one skill AI can't replace.</div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 4 — WHY STORYTELLING ============ -->
+    <section class="slide">
+      <div class="pad">
+        <div class="split">
+          <div>
+            <div class="kik reveal"><span class="num">04</span> &nbsp;—&nbsp; Why storytelling</div>
+            <h2 class="stitle reveal" style="--d:.1s;margin-top:18px;">Storytelling is the first <em>creative language</em>.</h2>
+            <p class="lead reveal" style="--d:.22s;margin-top:24px;max-width:680px;">It's what little kids love most — and what they're naturally good at. The most human place to begin.</p>
+            <p class="punch reveal" style="--d:.4s;margin-top:34px;">Our starting point — <b>not our destination.</b></p>
+          </div>
+          <img class="framed storypage reveal pop" style="--d:.3s" src="assets/ninja-page.jpg" alt="A page from a child's narrated storybook" />
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 5 — PRODUCT ============ -->
+    <section class="slide">
+      <div class="pad center">
+        <div class="kik reveal"><span class="num">05</span> &nbsp;—&nbsp; How it works</div>
+        <h2 class="stitle reveal" style="--d:.1s;margin-top:14px;">Imagination becomes a real, narrated <em>storybook</em>.</h2>
+        <div class="flow reveal" style="--d:.2s">
+          <span class="fstep">Imagine</span><span class="farrow">→</span>
+          <span class="fstep">Create</span><span class="farrow">→</span>
+          <span class="fstep">Share</span><span class="farrow">→</span>
+          <span class="fstep">Grow</span>
+        </div>
+        <div class="magic">
+          <div class="mrow reveal pop" style="--d:.3s">
+            <figure><img class="framed" src="assets/peacock-before.jpg" alt="A child's paper craft" /><figcaption>Their craft</figcaption></figure>
+            <span class="ar">→</span>
+            <figure><img class="framed" src="assets/peacock-after.jpg" alt="The AI-illustrated character" /><figcaption>In the story</figcaption></figure>
+            <span class="ar">→</span>
+            <figure><img class="framed pageimg" src="assets/peacock-page.jpg" alt="A finished storybook page" /><figcaption>Their storybook</figcaption></figure>
+          </div>
+          <div class="mrow reveal pop" style="--d:.5s">
+            <figure><img class="framed" src="assets/xarian-before.jpg" alt="A child's sketch" /><figcaption>Their sketch</figcaption></figure>
+            <span class="ar">→</span>
+            <figure><img class="framed" src="assets/xarian-after.jpg" alt="The AI-illustrated character" /><figcaption>In the story</figcaption></figure>
+            <span class="ar">→</span>
+            <figure><img class="framed pageimg" src="assets/xarian-page.jpg" alt="A finished storybook page" /><figcaption>Their storybook</figcaption></figure>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 6 — TRACTION ============ -->
+    <section class="slide">
+      <div class="pad">
+        <div class="tract">
+          <div>
+            <div class="kik reveal"><span class="num">06</span> &nbsp;—&nbsp; Traction</div>
+            <h2 class="stitle reveal" style="--d:.1s;margin-top:18px;">Early validation, <em>already paid</em>.</h2>
+            <div class="metrics">
+              <div class="metric card reveal" style="--d:.2s"><div class="statn">500+</div><div class="statl">Stories created</div></div>
+              <div class="metric card reveal" style="--d:.28s"><div class="statn">200+</div><div class="statl">Young authors</div></div>
+              <div class="metric card reveal" style="--d:.36s"><div class="statn">90%+</div><div class="statl">Returning families</div></div>
+              <div class="metric card reveal" style="--d:.44s"><div class="statn">9</div><div class="statl">School partnerships</div></div>
+            </div>
+            <div class="revs reveal" style="--d:.54s">
+              <span class="chip"><span class="dot"></span>Paid workshops</span>
+              <span class="chip"><span class="dot"></span>Paid school subscriptions</span>
+              <span class="chip"><span class="dot"></span>Growing consumer subscriptions</span>
+            </div>
+            <div class="takeaway reveal" style="--d:.64s">People <b>pay</b> for creativity-based learning.</div>
+          </div>
+          <div class="wall reveal" style="--d:.3s">
+            <img src="assets/covers/cover-08.jpg" alt="" /><img src="assets/covers/cover-09.jpg" alt="" /><img src="assets/covers/cover-10.jpg" alt="" /><img src="assets/covers/cover-11.jpg" alt="" />
+            <img src="assets/covers/cover-12.jpg" alt="" /><img src="assets/covers/cover-13.jpg" alt="" /><img src="assets/covers/cover-14.jpg" alt="" /><img src="assets/covers/cover-15.jpg" alt="" />
+            <img src="assets/covers/cover-16.jpg" alt="" /><img src="assets/covers/cover-17.jpg" alt="" /><img src="assets/covers/cover-18.jpg" alt="" /><img src="assets/covers/cover-19.jpg" alt="" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 7 — WHY WE WIN ============ -->
+    <section class="slide">
+      <div class="pad">
+        <div class="winwrap">
+          <div>
+            <div class="kik reveal"><span class="num">07</span> &nbsp;—&nbsp; Why KindleWood wins</div>
+            <h2 class="stitle reveal" style="--d:.1s;margin:18px 0 20px;">Most products solve <em>one piece</em>.</h2>
+            <div class="cat reveal" style="--d:.2s"><span class="c">Reading</span><span class="ex">Epic!, Raz-Kids</span></div>
+            <div class="cat reveal" style="--d:.26s"><span class="c">AI creation</span><span class="ex">ChatGPT, Claude</span></div>
+            <div class="cat reveal" style="--d:.32s"><span class="c">Coding</span><span class="ex">Scratch, Code.org</span></div>
+            <div class="cat reveal" style="--d:.38s"><span class="c">Game creation</span><span class="ex">Roblox, Minecraft Education</span></div>
+            <div class="cat reveal" style="--d:.44s"><span class="c">Educational content</span><span class="ex">ABCmouse, Khan Academy Kids</span></div>
+          </div>
+          <div class="winpanel reveal pop" style="--d:.36s">
+            <div class="h">KindleWood combines</div>
+            <div class="verbs"><span class="verb">Create</span><span class="verb">Learn</span><span class="verb">Share</span><span class="verb">Grow</span></div>
+            <div class="aud">Children · Parents<br/>Teachers · Schools</div>
+            <div class="eco">…inside <strong>one ecosystem.</strong></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 8 — MOAT ============ -->
+    <section class="slide">
+      <div class="pad">
+        <div class="moatwrap">
+          <div>
+            <div class="kik reveal"><span class="num">08</span> &nbsp;—&nbsp; The moat</div>
+            <h2 class="stitle reveal" style="--d:.1s;margin-top:18px;">We get <em>stronger</em> over time.</h2>
+            <p class="moatline reveal" style="--d:.3s">The moat isn't AI.<br/>It's <em>community, content, relationships,</em> and <em>creator identity</em> — compounding with every school we add.</p>
+          </div>
+          <div class="wheel reveal" style="--d:.25s">
+            <div class="ring"></div>
+            <div class="hub"><div class="ht">Creator<br/>flywheel</div><div class="hs">compounds with scale</div></div>
+            <div class="node" style="left:50%;top:6%"><b>01</b>Schools</div>
+            <div class="node" style="left:78%;top:18%"><b>02</b>Teachers create content</div>
+            <div class="node" style="left:92%;top:50%"><b>03</b>Students create stories</div>
+            <div class="node" style="left:78%;top:82%"><b>04</b>Parents engage</div>
+            <div class="node" style="left:50%;top:94%"><b>05</b>Family subscriptions</div>
+            <div class="node" style="left:22%;top:82%"><b>06</b>More creators</div>
+            <div class="node" style="left:8%;top:50%"><b>07</b>More stories</div>
+            <div class="node" style="left:22%;top:18%"><b>08</b>More community value</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 9 — BUSINESS MODEL ============ -->
+    <section class="slide">
+      <div class="pad center">
+        <div class="kik reveal"><span class="num">09</span> &nbsp;—&nbsp; Business model</div>
+        <h2 class="stitle reveal" style="--d:.1s;margin-top:14px;">Three revenue streams, one <em>flywheel</em>.</h2>
+        <div class="streams">
+          <div class="stream card reveal" style="--d:.2s"><div class="ic">Consumer</div><div class="nm">Families</div><div class="pr">$8.99–$14.99<small> /mo</small></div></div>
+          <div class="stream card reveal" style="--d:.3s"><div class="ic">Institutional</div><div class="nm">Schools</div><div class="pr">$129+<small> /mo</small></div></div>
+          <div class="stream card reveal" style="--d:.4s"><div class="ic">In-person</div><div class="nm">Workshops</div><div class="pr">$40–$70<small> /child</small></div></div>
+        </div>
+        <div class="modelline reveal" style="--d:.54s">
+          <div><b>Workshops</b> create trust.</div>
+          <div><b>Schools</b> create distribution.</div>
+          <div><b>Software</b> creates scale.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 10 — GROWTH ============ -->
+    <section class="slide">
+      <div class="pad center">
+        <div class="kik reveal"><span class="num">10</span> &nbsp;—&nbsp; Growth plan</div>
+        <h2 class="stitle reveal" style="--d:.1s;margin-top:14px;">The 24-month <em>goal</em>.</h2>
+        <div class="goals">
+          <div class="goal card reveal" style="--d:.2s"><div class="statn">100</div><div class="statl">Schools</div></div>
+          <div class="goal card reveal" style="--d:.28s"><div class="statn">2,000</div><div class="statl">Paying families</div></div>
+          <div class="goal card reveal" style="--d:.36s"><div class="statn">10,000</div><div class="statl">Monthly active creators</div></div>
+          <div class="goal card reveal" style="--d:.44s"><div class="statn">$1M</div><div class="statl">Revenue run-rate</div></div>
+        </div>
+        <div class="kpi reveal" style="--d:.58s">
+          <div class="lbl">Primary KPI</div>
+          <div class="big">Monthly Active Creators</div>
+          <div class="why">Because creators drive retention, engagement, and monetization.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 11 — RAISE ============ -->
+    <section class="slide">
+      <div class="pad">
+        <div class="raisewrap">
+          <div>
+            <div class="kik reveal"><span class="num">11</span> &nbsp;—&nbsp; The raise</div>
+            <h2 class="stitle reveal" style="--d:.1s;margin-top:18px;">Raising <em>$500K</em> SAFE.</h2>
+            <p class="lead reveal" style="--d:.22s;margin-top:20px;max-width:660px;">To turn early validation into <strong>repeatable growth.</strong></p>
+            <div class="alloc">
+              <div class="arow reveal" style="--d:.3s"><div class="top"><span>Growth &amp; Distribution</span><b>40%</b></div><div class="bar"><span style="--w:40%"></span></div></div>
+              <div class="arow reveal" style="--d:.36s"><div class="top"><span>Product &amp; Engineering</span><b>35%</b></div><div class="bar"><span style="--w:35%"></span></div></div>
+              <div class="arow reveal" style="--d:.42s"><div class="top"><span>Curriculum &amp; Workshops</span><b>15%</b></div><div class="bar"><span style="--w:15%"></span></div></div>
+              <div class="arow reveal" style="--d:.48s"><div class="top"><span>Operations</span><b>10%</b></div><div class="bar"><span style="--w:10%"></span></div></div>
+            </div>
+          </div>
+          <div class="successbox card reveal" style="--d:.4s">
+            <div class="h">In 24 months, success looks like</div>
+            <div class="s"><b>100</b> schools</div>
+            <div class="s"><b>2,000</b> paying families</div>
+            <div class="s"><b>10K</b> monthly active creators</div>
+            <div class="s"><b>$1M</b> revenue run-rate</div>
+          </div>
+        </div>
+        <div class="mantra reveal" style="--d:.6s">
+          <div class="m">Imagine. <b>Create.</b> Learn. Grow.</div>
+          <img src="assets/logo.png" alt="KindleWood Studio" />
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- deck chrome -->
+<div class="progress" id="progress"></div>
+<div class="brandfoot">KindleWood Studio</div>
+<div class="counter" id="counter">01 / 11</div>
+<div class="hint">← → or Space to navigate · E to edit</div>
+
+<!-- inline editing -->
+<div class="edit-hotzone"></div>
+<button class="edit-toggle" id="editToggle" title="Edit mode (E)">✏️</button>
+<div class="edit-banner" id="editBanner">Edit mode — click any text · Ctrl/⌘+S to save</div>
+
+<script>
+  /* =========================================================
+     SLIDE PRESENTATION CONTROLLER — fixed 16:9 stage
+     ========================================================= */
+  class SlidePresentation{
+    constructor(){
+      this.slides=[...document.querySelectorAll('.slide')];
+      this.i=0;this.stage=document.getElementById('deckStage');
+      this.counter=document.getElementById('counter');this.progress=document.getElementById('progress');
+      this.scale();addEventListener('resize',()=>this.scale());
+      this.keys();this.touch();this.wheelNav();
+      this.show(0);
+    }
+    scale(){const f=Math.min(innerWidth/1920,innerHeight/1080);
+      this.stage.style.transform=`translate(${(innerWidth-1920*f)/2}px,${(innerHeight-1080*f)/2}px) scale(${f})`;}
+    show(n){this.i=Math.max(0,Math.min(n,this.slides.length-1));
+      this.slides.forEach((s,k)=>{const on=k===this.i;s.classList.toggle('active',on);s.classList.toggle('visible',on);});
+      const p=(this.i+1);this.counter.textContent=String(p).padStart(2,'0')+' / '+String(this.slides.length).padStart(2,'0');
+      this.progress.style.width=(p/this.slides.length*100)+'%';}
+    next(){this.show(this.i+1);}prev(){this.show(this.i-1);}
+    keys(){addEventListener('keydown',e=>{
+      if(e.target.getAttribute && e.target.getAttribute('contenteditable')==='true')return;
+      if(['ArrowRight',' ','PageDown','ArrowDown'].includes(e.key)){e.preventDefault();this.next();}
+      else if(['ArrowLeft','PageUp','ArrowUp'].includes(e.key)){e.preventDefault();this.prev();}
+      else if(e.key==='Home'){this.show(0);}else if(e.key==='End'){this.show(this.slides.length-1);}});}
+    touch(){let x=0;addEventListener('touchstart',e=>x=e.touches[0].clientX,{passive:true});
+      addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-x;if(Math.abs(dx)>60){dx<0?this.next():this.prev();}},{passive:true});}
+    wheelNav(){let lock=false;addEventListener('wheel',e=>{if(lock)return;if(Math.abs(e.deltaY)<24)return;
+      lock=true;e.deltaY>0?this.next():this.prev();setTimeout(()=>lock=false,700);},{passive:true});}
+  }
+  const deck=new SlidePresentation();
+
+  /* =========================================================
+     INLINE EDITING — hover hotzone + E key, saves to localStorage
+     ========================================================= */
+  const editor={isActive:false,
+    toggle(){this.isActive=!this.isActive;
+      const banner=document.getElementById('editBanner'),btn=document.getElementById('editToggle');
+      document.querySelectorAll('.stitle,.lead,.punch,.takeaway,.sub,.tag,.nm,.bio,.v,.c,.ex,.statl,.moatline,.why,.big,.h,.eco,h1,figcaption,.fstep,.kik')
+        .forEach(el=>el.setAttribute('contenteditable',this.isActive));
+      btn.classList.toggle('active',this.isActive);banner.classList.toggle('show',this.isActive);
+      if(!this.isActive)this.save();}
+    ,_sel:'.stitle,.lead,.punch,.takeaway,.sub,.tag,.nm,.bio,.v,.c,.ex,.statl,.moatline,.why,.big,.h,.eco,h1,figcaption,.fstep,.kik'
+    ,_sig(){return [...document.querySelectorAll(this._sel)].map(e=>e.tagName+'.'+(e.className||'')).join('|');}
+    ,save(){const els=[...document.querySelectorAll(this._sel)];const items={};
+      els.forEach((el,k)=>items[k]=el.innerHTML);
+      localStorage.setItem('kw-pitch-edits-v2',JSON.stringify({sig:this._sig(),items}));}
+    ,load(){const raw=localStorage.getItem('kw-pitch-edits-v2');if(!raw)return;try{const d=JSON.parse(raw);
+      if(d.sig!==this._sig())return; // structure changed since save -> ignore stale edits (prevents mismatched labels)
+      const all=[...document.querySelectorAll(this._sel)];
+      Object.entries(d.items||{}).forEach(([k,v])=>{if(all[k])all[k].innerHTML=v;});}catch(e){}}
+  };
+  // drop legacy index-based saves that corrupt labels after structural edits
+  try{localStorage.removeItem('kw-pitch-edits');}catch(e){}
+  editor.load();
+  const hz=document.querySelector('.edit-hotzone'),btn=document.getElementById('editToggle');let ht=null;
+  const showBtn=()=>{clearTimeout(ht);btn.classList.add('show');};
+  const hideBtn=()=>{ht=setTimeout(()=>{if(!editor.isActive)btn.classList.remove('show');},400);};
+  hz.addEventListener('mouseenter',showBtn);hz.addEventListener('mouseleave',hideBtn);
+  btn.addEventListener('mouseenter',showBtn);btn.addEventListener('mouseleave',hideBtn);
+  hz.addEventListener('click',()=>editor.toggle());
+  btn.addEventListener('click',()=>editor.toggle());
+  addEventListener('keydown',e=>{
+    if((e.key==='e'||e.key==='E')&&e.target.getAttribute && e.target.getAttribute('contenteditable')!=='true')editor.toggle();
+    if((e.metaKey||e.ctrlKey)&&e.key==='s'){e.preventDefault();editor.save();
+      const b=document.getElementById('editBanner');b.textContent='Saved ✓';setTimeout(()=>b.textContent='Edit mode — click any text · Ctrl/⌘+S to save',1200);}
+  });
+</script>
+</body>
+</html>
