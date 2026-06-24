@@ -79,6 +79,24 @@ async function postWithSessionRetry(url: string, body: string): Promise<Response
   return fetch(url, init);
 }
 
+/**
+ * Upload a base64 `data:` animated preview to Supabase Storage and return its
+ * public URL. Builder-created characters carry the Gemini preview as a multi-MB
+ * data URL; persisting that into character_library bloats later payloads past
+ * Vercel's 4.5MB request limit (FUNCTION_PAYLOAD_TOO_LARGE on /api/generate-images).
+ * Mirrors uploadPreviewToStorage() on the dedicated Characters page.
+ */
+async function uploadPreviewDataUrl(dataUrl: string, userId: string): Promise<string> {
+  const supabase = createClient();
+  const blob = await (await fetch(dataUrl)).blob();
+  const fileName = `${userId}/animated-preview-${Date.now()}.png`;
+  const { error } = await supabase.storage
+    .from('character-images')
+    .upload(fileName, blob, { contentType: 'image/png', upsert: false });
+  if (error) throw new Error(`Failed to upload animated preview: ${error.message}`);
+  return supabase.storage.from('character-images').getPublicUrl(fileName).data.publicUrl;
+}
+
 function CreateStoryPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1275,6 +1293,14 @@ function CreateStoryPageInner() {
           characterPayload.reference_image_filename = character.referenceImage.fileName;
         }
         if (character.animatedPreviewUrl) {
+          // Upload base64 previews to storage first so we persist a small URL,
+          // not a multi-MB data URL (which later trips the 4.5MB request limit).
+          if (character.animatedPreviewUrl.startsWith('data:') && user?.id) {
+            // Write the URL back into in-memory state too, so a same-session
+            // image generation doesn't re-send the base64 (and re-saves don't
+            // re-upload it).
+            character.animatedPreviewUrl = await uploadPreviewDataUrl(character.animatedPreviewUrl, user.id);
+          }
           characterPayload.animated_preview_url = character.animatedPreviewUrl;
         }
         if (character.description?.hairColor) characterPayload.hair_color = character.description.hairColor;
@@ -1283,11 +1309,9 @@ function CreateStoryPageInner() {
         if (character.description?.age) characterPayload.age = character.description.age;
         if (character.description?.otherFeatures) characterPayload.other_features = character.description.otherFeatures;
 
-        const charResponse = await fetch('/api/characters', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(characterPayload),
-        });
+        // Use session-retry POST: a stale token would otherwise 401 here and
+        // abort the whole save before the character is persisted.
+        const charResponse = await postWithSessionRetry('/api/characters', JSON.stringify(characterPayload));
         if (!charResponse.ok) throw new Error(`Failed to create character ${character.name}`);
         const charData = await charResponse.json();
         characterIdMap[character.id] = charData.character.id;
@@ -1627,8 +1651,16 @@ function CreateStoryPageInner() {
                 characterPayload.reference_image_filename = character.referenceImage.fileName;
               }
 
-              // Include animated preview URL if available (from Gemini generation)
+              // Include animated preview URL if available (from Gemini generation).
+              // Upload base64 previews to storage first so we persist a small URL,
+              // not a multi-MB data URL (which later trips the 4.5MB request limit).
               if (character.animatedPreviewUrl) {
+                if (character.animatedPreviewUrl.startsWith('data:') && user?.id) {
+                  // Write the URL back into in-memory state too, so a same-session
+                  // image generation doesn't re-send the base64 (and re-saves don't
+                  // re-upload it).
+                  character.animatedPreviewUrl = await uploadPreviewDataUrl(character.animatedPreviewUrl, user.id);
+                }
                 characterPayload.animated_preview_url = character.animatedPreviewUrl;
               }
 
@@ -1649,11 +1681,9 @@ function CreateStoryPageInner() {
                 characterPayload.other_features = character.description.otherFeatures;
               }
 
-              const charResponse = await fetch('/api/characters', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(characterPayload),
-              });
+              // Use session-retry POST: a stale token would otherwise 401 here
+              // and abort the whole save before the character is persisted.
+              const charResponse = await postWithSessionRetry('/api/characters', JSON.stringify(characterPayload));
 
               if (!charResponse.ok) {
                 const errorData = await charResponse.json();
