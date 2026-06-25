@@ -20,7 +20,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientFromRequest } from '@/lib/supabase/server';
-import { logApiUsage } from '@/lib/utils/rate-limit';
+import { logApiUsage, checkImageGenerationLimit } from '@/lib/utils/rate-limit';
+import { isArtStyle, type ArtStyleType } from '@/lib/art-styles-config';
 import {
   generateCharacterPreview,
   generateCharacterPreviewClassic,
@@ -30,6 +31,7 @@ import {
   generateDescriptionOnlyPreviewClassic,
   detectSubjectType,
   isGeminiAvailable,
+  type ClassicPreviewStyle,
 } from '@/lib/gemini-image-client';
 import {
   CharacterDescription,
@@ -51,7 +53,7 @@ interface GeneratePreviewRequest {
   subjectDescription?: string; // Pre-detected description from UI
   imageProvider?: string; // Image provider — gemini-3.1 (default), gemini-2.5, openai-gpt-image-2, flux
   medium?: ImageMedium; // Detected medium of reference image (real_photo / kid_creation / digital_art)
-  style?: 'pixar' | 'classic'; // Optional - regenerate only one style instead of both
+  style?: ArtStyleType; // Single style to generate (pixar|classic|ghibli|realistic|coloring). Omitted = legacy both-style.
   description: {
     hairColor?: string;
     skinTone?: string;
@@ -87,8 +89,19 @@ export async function POST(request: NextRequest) {
     const body: GeneratePreviewRequest = await request.json();
     const { name, referenceImageUrl, characterType, subjectType: preDetectedType, subjectDescription: preDetectedDescription, description, imageProvider: requestedProvider, medium: requestedMedium, style: rawStyle } = body;
 
-    // Validate optional style parameter
-    const singleStyle = rawStyle === 'pixar' || rawStyle === 'classic' ? rawStyle : undefined;
+    // Single style to render (new Studio flow). Undefined = legacy both-style
+    // request (old preview UI still calls it that way until fully migrated).
+    const requestedStyle: ArtStyleType | undefined = isArtStyle(rawStyle) ? rawStyle : undefined;
+
+    // Cost cap (R1): preview generation now counts against the per-user image
+    // limit — the client-side attempt counter is UX-only and resettable.
+    const rateLimit = await checkImageGenerationLimit(user.id, 1);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: rateLimit.reason || 'Image limit reached', limit: true },
+        { status: 429 }
+      );
+    }
 
     // Normalize provider + medium
     const provider = normalizeImageProvider(requestedProvider);
@@ -100,7 +113,7 @@ export async function POST(request: NextRequest) {
       ? undefined
       : resolveGeminiImageModel(provider);
 
-    console.log(`[API] Provider: ${provider}, Medium: ${medium}, Style: ${singleStyle || 'both'}`);
+    console.log(`[API] Provider: ${provider}, Medium: ${medium}, Style: ${requestedStyle || 'both'}`);
 
     // Validate required fields
     if (!name || !name.trim()) {
@@ -121,158 +134,134 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[API] Generating character previews (both styles) for: ${name}`);
+    console.log(`[API] Generating character preview for: ${name}, style=${requestedStyle || 'both(legacy)'}`);
     console.log(`[API] Mode: ${isDescriptionOnly ? 'Description Only' : 'With Reference Image'}`);
 
-    let pixarResult: PromiseSettledResult<{ imageUrl: string; generationTime: number; subjectType?: SubjectType }>;
-    let classicResult: PromiseSettledResult<{ imageUrl: string; generationTime: number; subjectType?: SubjectType }>;
     let detectedSubjectType: SubjectType = 'human'; // Default for backwards compatibility
     let detectedDescription: string = '';
 
+    // Text description used by description-only generation.
+    const descriptionText = [
+      description?.otherFeatures,
+      description?.age,
+      description?.hairColor ? `${description.hairColor} coloring` : null,
+    ].filter(Boolean).join(', ') || 'cute and friendly';
+
+    // Resolve subject type ONCE (shared by single- and legacy-both paths).
     if (isDescriptionOnly) {
-      // Description-only mode: generate from text description (for animals, fantasy characters)
-      const descriptionText = [
-        description?.otherFeatures,
-        description?.age,
-        description?.hairColor ? `${description.hairColor} coloring` : null,
-      ].filter(Boolean).join(', ') || 'cute and friendly';
-
-      const descParams = {
-        name: name.trim(),
-        characterType: characterType!,
-        description: descriptionText,
-        modelId: geminiModelId,
-        provider,
-      };
-
-      console.log(`[API] Generating from description: ${characterType} - ${descriptionText}`);
-
-      // For description-only, infer subjectType from characterType
-      // This is a simple heuristic - the actual character creation UI handles isAnimal separately
+      // Heuristic from characterType; the UI handles isAnimal separately.
       detectedSubjectType = inferSubjectTypeFromDescription(characterType!);
-
-      // Generate styles (both in parallel, or single if specified)
-      [pixarResult, classicResult] = await Promise.allSettled([
-        singleStyle === 'classic'
-          ? Promise.reject(new Error('skipped'))
-          : generateDescriptionOnlyPreview(descParams),
-        singleStyle === 'pixar'
-          ? Promise.reject(new Error('skipped'))
-          : generateDescriptionOnlyPreviewClassic(descParams),
-      ]);
+    } else if (preDetectedType) {
+      detectedSubjectType = preDetectedType;
+      detectedDescription = preDetectedDescription || description?.otherFeatures || '';
+      console.log(`[API] Using pre-detected subject type: ${detectedSubjectType} - ${detectedDescription}`);
     } else {
-      // Reference image mode: use pre-detected subject type from UI if available
-      // This avoids redundant AI detection since /api/analyze-character already detected it
-      if (preDetectedType) {
-        detectedSubjectType = preDetectedType;
-        detectedDescription = preDetectedDescription || description?.otherFeatures || '';
-        console.log(`[API] Using pre-detected subject type: ${detectedSubjectType} - ${detectedDescription}`);
-      } else {
-        // Fallback: detect subject type (for backward compatibility or if UI didn't provide it)
-        console.log(`[API] Detecting subject type from reference image (fallback)...`);
-
-        try {
-          const imageResponse = await fetch(referenceImageUrl!);
-          const imageBuffer = await imageResponse.arrayBuffer();
-          const base64 = Buffer.from(imageBuffer).toString('base64');
-          const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
-
-          const detection = await detectSubjectType(base64, contentType);
-          detectedSubjectType = detection.subjectType;
-          detectedDescription = detection.briefDescription;
-
-          console.log(`[API] Detected subject type: ${detectedSubjectType} - ${detectedDescription}`);
-        } catch (detectionError) {
-          console.warn('[API] Subject detection failed, defaulting to human:', detectionError);
-          detectedSubjectType = 'human';
-          detectedDescription = 'Detection failed';
-        }
+      console.log(`[API] Detecting subject type from reference image (fallback)...`);
+      try {
+        const imageResponse = await fetch(referenceImageUrl!);
+        const imageBuffer = await imageResponse.arrayBuffer();
+        const base64 = Buffer.from(imageBuffer).toString('base64');
+        const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+        const detection = await detectSubjectType(base64, contentType);
+        detectedSubjectType = detection.subjectType;
+        detectedDescription = detection.briefDescription;
+        console.log(`[API] Detected subject type: ${detectedSubjectType} - ${detectedDescription}`);
+      } catch (detectionError) {
+        console.warn('[API] Subject detection failed, defaulting to human:', detectionError);
+        detectedSubjectType = 'human';
+        detectedDescription = 'Detection failed';
       }
+    }
 
+    // Single-style generator — dispatches by mode + subject. Pixar uses its
+    // dedicated function; classic/ghibli/realistic/coloring reuse the
+    // *Classic generators with styleVariant (the storybook-page mechanism).
+    type StyleResult = { imageUrl: string; generationTime: number };
+    const generateForStyle = async (style: ArtStyleType): Promise<StyleResult> => {
+      const isPixar = style === 'pixar';
+      const classicStyle = style as ClassicPreviewStyle; // only used on the non-pixar branch
+      if (isDescriptionOnly) {
+        const descParams = { name: name.trim(), characterType: characterType!, description: descriptionText, modelId: geminiModelId, provider };
+        const r = isPixar
+          ? await generateDescriptionOnlyPreview(descParams)
+          : await generateDescriptionOnlyPreviewClassic({ ...descParams, styleVariant: classicStyle });
+        return { imageUrl: r.imageUrl, generationTime: r.generationTime };
+      }
       if (detectedSubjectType === 'human') {
-        // Human mode: use existing human-focused generation
         const charDescription: CharacterDescription = {
           hairColor: description?.hairColor,
           skinTone: description?.skinTone,
           age: description?.age,
           otherFeatures: description?.otherFeatures,
         };
-
-        const previewParams = {
-          name: name.trim(),
-          referenceImageUrl: referenceImageUrl!,
-          description: charDescription,
-          modelId: geminiModelId,
-          provider,
-          medium,
-        };
-
-        console.log(`[API] Using human preview generation`);
-
-        // Generate styles (both in parallel, or single if specified)
-        [pixarResult, classicResult] = await Promise.allSettled([
-          singleStyle === 'classic'
-            ? Promise.reject(new Error('skipped'))
-            : generateCharacterPreview(previewParams),
-          singleStyle === 'pixar'
-            ? Promise.reject(new Error('skipped'))
-            : generateCharacterPreviewClassic(previewParams),
-        ]);
-      } else {
-        // Non-human mode: use flexible generation for animals, creatures, objects, scenery
-        const nonHumanParams = {
-          name: name.trim(),
-          referenceImageUrl: referenceImageUrl!,
-          subjectType: detectedSubjectType,
-          briefDescription: detectedDescription,
-          additionalDetails: description?.otherFeatures,
-          modelId: geminiModelId,
-          provider,
-          medium,
-        };
-
-        console.log(`[API] Using non-human preview generation for ${detectedSubjectType}`);
-
-        // Generate styles (both in parallel, or single if specified)
-        [pixarResult, classicResult] = await Promise.allSettled([
-          singleStyle === 'classic'
-            ? Promise.reject(new Error('skipped'))
-            : generateNonHumanPreview(nonHumanParams),
-          singleStyle === 'pixar'
-            ? Promise.reject(new Error('skipped'))
-            : generateNonHumanPreviewClassic(nonHumanParams),
-        ]);
+        const previewParams = { name: name.trim(), referenceImageUrl: referenceImageUrl!, description: charDescription, modelId: geminiModelId, provider, medium };
+        const r = isPixar
+          ? await generateCharacterPreview(previewParams)
+          : await generateCharacterPreviewClassic({ ...previewParams, styleVariant: classicStyle });
+        return { imageUrl: r.imageUrl, generationTime: r.generationTime };
       }
+      const nonHumanParams = { name: name.trim(), referenceImageUrl: referenceImageUrl!, subjectType: detectedSubjectType, briefDescription: detectedDescription, additionalDetails: description?.otherFeatures, modelId: geminiModelId, provider, medium };
+      const r = isPixar
+        ? await generateNonHumanPreview(nonHumanParams)
+        : await generateNonHumanPreviewClassic({ ...nonHumanParams, styleVariant: classicStyle });
+      return { imageUrl: r.imageUrl, generationTime: r.generationTime };
+    };
+
+    const logStyle = async (style: string, gen: StyleResult) => {
+      await logApiUsage({
+        userId: user.id,
+        endpoint: `/api/generate-character-preview?provider=${provider}&medium=${medium}&style=${style}&subject=${detectedSubjectType}`,
+        method: 'POST',
+        statusCode: 200,
+        responseTimeMs: Math.round(gen.generationTime * 1000),
+        imagesGenerated: 1,
+      });
+    };
+
+    // NEW single-style path (Character Preview Studio).
+    if (requestedStyle) {
+      let preview: StyleResult;
+      try {
+        preview = await generateForStyle(requestedStyle);
+      } catch (genErr) {
+        console.error(`[API] ${requestedStyle} preview failed:`, genErr);
+        return NextResponse.json(
+          { error: 'Failed to generate preview', details: genErr instanceof Error ? genErr.message : 'Unknown error' },
+          { status: 500 }
+        );
+      }
+      await logStyle(requestedStyle, preview);
+      return NextResponse.json({
+        success: true,
+        preview,
+        style: requestedStyle,
+        // Back-compat shim for old UI that reads previews.pixar/classic.
+        previews: {
+          pixar: requestedStyle === 'pixar' ? preview : null,
+          classic: requestedStyle === 'pixar' ? null : preview,
+        },
+        subjectType: detectedSubjectType,
+        subjectDescription: detectedDescription,
+        provider,
+        medium,
+        totalTime: (Date.now() - startTime) / 1000,
+      });
     }
 
-    // Extract results, handling any failures gracefully
-    const pixar = pixarResult.status === 'fulfilled' ? {
-      imageUrl: pixarResult.value.imageUrl,
-      generationTime: pixarResult.value.generationTime,
-    } : null;
+    // LEGACY both-style path (old preview UI sends no style).
+    const [pixarResult, classicResult] = await Promise.allSettled([
+      generateForStyle('pixar'),
+      generateForStyle('classic'),
+    ]);
+    const pixar = pixarResult.status === 'fulfilled' ? pixarResult.value : null;
+    const classic = classicResult.status === 'fulfilled' ? classicResult.value : null;
 
-    const classic = classicResult.status === 'fulfilled' ? {
-      imageUrl: classicResult.value.imageUrl,
-      generationTime: classicResult.value.generationTime,
-    } : null;
+    if (pixar) console.log(`[API] 3D Pixar preview generated in ${pixar.generationTime.toFixed(1)}s`);
+    else console.error('[API] 3D Pixar preview failed:', (pixarResult as PromiseRejectedResult).reason);
+    if (classic) console.log(`[API] Classic preview generated in ${classic.generationTime.toFixed(1)}s`);
+    else console.error('[API] Classic preview failed:', (classicResult as PromiseRejectedResult).reason);
 
-    // Log results (skip logging for intentionally skipped styles)
-    if (pixar) {
-      console.log(`[API] 3D Pixar preview generated in ${pixar.generationTime.toFixed(1)}s`);
-    } else if (singleStyle !== 'classic') {
-      console.error('[API] 3D Pixar preview failed:', (pixarResult as PromiseRejectedResult).reason);
-    }
-
-    if (classic) {
-      console.log(`[API] Classic Storybook preview generated in ${classic.generationTime.toFixed(1)}s`);
-    } else if (singleStyle !== 'pixar') {
-      console.error('[API] Classic Storybook preview failed:', (classicResult as PromiseRejectedResult).reason);
-    }
-
-    // If the requested style(s) failed, return error
-    const bothFailed = !pixar && !classic;
-    const requestedStyleFailed = (singleStyle === 'pixar' && !pixar) || (singleStyle === 'classic' && !classic);
-    if (bothFailed || requestedStyleFailed) {
+    if (!pixar && !classic) {
       return NextResponse.json(
         {
           error: 'Failed to generate any preview styles',
@@ -285,35 +274,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Telemetry — one log entry per successful style so we can compare provider/medium cost & latency.
-    // Provider/medium/style encoded in endpoint string for grep-ability (api_usage_logs has no metadata column).
-    const generatedStyles: string[] = [];
-    if (pixar) generatedStyles.push('pixar');
-    if (classic) generatedStyles.push('classic');
-
-    for (const style of generatedStyles) {
-      await logApiUsage({
-        userId: user.id,
-        endpoint: `/api/generate-character-preview?provider=${provider}&medium=${medium}&style=${style}&subject=${detectedSubjectType}`,
-        method: 'POST',
-        statusCode: 200,
-        responseTimeMs: style === 'pixar' && pixar ? Math.round(pixar.generationTime * 1000) : (classic ? Math.round(classic.generationTime * 1000) : 0),
-        imagesGenerated: 1,
-      });
-    }
+    if (pixar) await logStyle('pixar', pixar);
+    if (classic) await logStyle('classic', classic);
 
     return NextResponse.json({
       success: true,
-      previews: {
-        pixar,
-        classic,
-      },
-      // Keep backward compatibility - return first successful preview as "preview"
+      previews: { pixar, classic },
       preview: pixar || classic,
-      // Return detected subject type so UI can adjust form fields
       subjectType: detectedSubjectType,
       subjectDescription: detectedDescription,
-      // Echo back resolved provider/medium so the UI can show what was used
       provider,
       medium,
       totalTime: (Date.now() - startTime) / 1000,

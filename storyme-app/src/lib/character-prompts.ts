@@ -5,8 +5,23 @@
  */
 
 import type { ImageMedium } from './types/story';
+import type { ArtStyleType } from './art-styles-config';
 
-export type CharacterStyle = 'pixar' | 'classic';
+export type CharacterStyle = ArtStyleType;
+
+/**
+ * Per-style "light polish" rendering line for the faithfulness prompt. Every
+ * style keeps the SAME preservation rules (render every element, keep layout) —
+ * only this finishing line changes, so a multi-element kid drawing is respected
+ * in any art style instead of collapsing to a single portrait.
+ */
+const KID_CREATION_STYLE_LINES: Record<ArtStyleType, string> = {
+  pixar: '3D animated rendering — soft textures, warm flattering light, like a Pixar still.',
+  classic: '2D illustrated rendering — soft watercolor feel, warm tones, classic storybook quality.',
+  ghibli: 'Studio Ghibli-inspired 2D rendering — soft natural light, gentle painterly colors, hand-painted feel.',
+  realistic: 'Photorealistic, lifelike rendering — naturalistic light and textures, true-to-life colors (a generated image, not a real photo).',
+  coloring: 'Black-and-white coloring-book line art — clean bold outlines, NO color and NO shading, white background.',
+};
 
 interface KidCreationPromptOptions {
   style: CharacterStyle;
@@ -40,10 +55,22 @@ export function buildKidCreationPrompt(opts: KidCreationPromptOptions): string {
     ? 'USE THE ATTACHED IMAGE as the primary source — the text below is supporting context only.\n\n'
     : '';
 
-  const styleLine =
-    style === 'pixar'
-      ? '3D animated rendering — soft textures, warm flattering light, like a Pixar still.'
-      : '2D illustrated rendering — soft watercolor feel, warm tones, classic storybook quality.';
+  const styleLine = KID_CREATION_STYLE_LINES[style] ?? KID_CREATION_STYLE_LINES.classic;
+
+  // Coloring is black-and-white line art, so the usual "preserve the color
+  // palette / keep the colors / refined shading" faithfulness lines directly
+  // contradict it (ChatGPT then renders full color, Gemini leaks color). Swap
+  // those lines for shape/layout preservation only when style === 'coloring'.
+  const isColoring = style === 'coloring';
+  const preserveLine = isColoring
+    ? "- Preserve the child's INTENTIONAL choices: proportions, shapes, distinctive features, and overall character. This is a COLORING PAGE — render as black-and-white line art only; do NOT add color."
+    : "- Preserve the child's INTENTIONAL choices: proportions, color palette, distinctive features, and overall character.";
+  const unusualLine = isColoring
+    ? "- Treat unusual choices (simplified or exaggerated shapes, missing or extra features) as deliberate artistic decisions and keep them."
+    : "- Treat unusual choices (non-realistic colors, simplified or exaggerated shapes, missing or extra features) as deliberate artistic decisions and keep them.";
+  const polishLine = isColoring
+    ? '- Clean, smooth black outlines only — NO shading, NO color, white background.'
+    : '- Smoother edges, refined shading, gentle lighting.';
 
   const subjectLine = name ? `Subject: ${name}.\n\n` : '';
 
@@ -59,14 +86,14 @@ Render EVERY element listed above. Do not omit any character, object, or accesso
 
 ${subjectLine}${elementsBlock}PRIMARY GOAL — HONOR THE CHILD'S WORK:
 - The animated result must be instantly recognizable as the same creation. A child should look at it and say "that's MY drawing/sculpture, just polished."
-- Preserve the child's INTENTIONAL choices: proportions, color palette, distinctive features, and overall character.
-- Treat unusual choices (non-realistic colors, simplified or exaggerated shapes, missing or extra features) as deliberate artistic decisions and keep them.
+${preserveLine}
+${unusualLine}
 - Do NOT normalize or "correct" the creation into a generic version of what it depicts.
 
 DO NOT preserve obvious unintentional artifacts (smudges, stray pencil marks, paper folds, lighting glare on the photo of the artwork). A stray line is not a feature; a clearly drawn shape is.
 
 LIGHT POLISH (secondary):
-- Smoother edges, refined shading, gentle lighting.
+${polishLine}
 - ${styleLine}
 - Maintain the original spatial layout — keep elements roughly where the child placed them.
 

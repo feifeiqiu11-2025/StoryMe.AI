@@ -15,7 +15,7 @@ import {
   shouldUseFaithfulnessPrompt,
   type CharacterStyle,
 } from './character-prompts';
-import { ART_STYLE_BY_ID } from './art-styles-config';
+import { ART_STYLE_BY_ID, type ArtStyleType } from './art-styles-config';
 // NOTE: type-only imports from gemini-image-client to avoid runtime circular dependency.
 import type {
   CharacterPreviewParams,
@@ -261,6 +261,23 @@ interface BuildPromptArgs {
   hasReference: boolean;
 }
 
+/** Per-style portrait description for the non-faithfulness OpenAI path. */
+function openaiPreviewStyleDescription(style: ArtStyleType): string {
+  switch (style) {
+    case 'pixar':
+      return '3D animated character portrait in Pixar / Disney Junior style — vibrant colors, smooth textures, large expressive eyes, friendly approachable expression, warm flattering lighting, head-and-shoulders composition, clean gradient background.';
+    case 'ghibli':
+      return `${ART_STYLE_BY_ID.ghibli.openaiSceneLine} Character portrait, large expressive eyes, friendly expression, head-and-shoulders composition, soft background.`;
+    case 'realistic':
+      return `${ART_STYLE_BY_ID.realistic.openaiSceneLine} Head-and-shoulders character portrait, accurate natural proportions, soft simple background.`;
+    case 'coloring':
+      return `${ART_STYLE_BY_ID.coloring.openaiSceneLine} Head-and-shoulders character portrait, single subject, pure white background.`;
+    case 'classic':
+    default:
+      return "2D illustrated character portrait in classic children's storybook style — soft watercolor feel, warm golden-hour lighting, pastel palette, large expressive eyes, soft hand-drawn quality, head-and-shoulders composition, soft background.";
+  }
+}
+
 function buildPrompt({
   style,
   medium,
@@ -285,11 +302,10 @@ function buildPrompt({
 
   // Default real_photo / no-reference path: concise stylization prompt.
   // OpenAI's reasoning model handles the heavy lifting that the Gemini
-  // 35-line prompt did defensively. Keep it short.
-  const styleDescription =
-    style === 'pixar'
-      ? '3D animated character portrait in Pixar / Disney Junior style — vibrant colors, smooth textures, large expressive eyes, friendly approachable expression, warm flattering lighting, head-and-shoulders composition, clean gradient background.'
-      : '2D illustrated character portrait in classic children\'s storybook style — soft watercolor feel, warm golden-hour lighting, pastel palette, large expressive eyes, soft hand-drawn quality, head-and-shoulders composition, soft background.';
+  // 35-line prompt did defensively. Keep it short. pixar/classic kept verbatim
+  // (behavior-preserving); ghibli/realistic/coloring reuse the centralized
+  // openaiSceneLine + portrait framing.
+  const styleDescription = openaiPreviewStyleDescription(style);
 
   if (!hasReference) {
     // Description-only mode.
@@ -301,13 +317,20 @@ ${details ? `Details: ${details}.` : ''}
 Audience: children's storybook app, ages 5-8. Make the character appealing, memorable, and kid-friendly.`;
   }
 
-  // Photo-based real_photo path.
+  // Photo-based real_photo path. The "do NOT photorealistically copy" guard is
+  // for the stylized looks; for the realistic style it would contradict the
+  // photorealistic intent, so we ask for a fresh lifelike rendering instead.
+  const faithfulnessLine =
+    style === 'realistic'
+      ? 'FAITHFULNESS: preserve the subject\'s identity from the reference image — face shape, skin tone, hair color and style, distinctive features. Render a fresh, lifelike image (do NOT reproduce the exact reference photo or depict a real, identifiable person).'
+      : 'FAITHFULNESS: preserve the subject\'s identity from the reference image — face shape, skin tone, hair color and style, distinctive features. Render in the animated style above; do NOT photorealistically copy the reference.';
+
   return `Render a ${styleDescription}
 
 Character: ${name}${characterType ? ` (${characterType})` : ''}.
 ${details ? `Details: ${details}.` : ''}
 
-FAITHFULNESS: preserve the subject's identity from the reference image — face shape, skin tone, hair color and style, distinctive features. Render in the animated style above; do NOT photorealistically copy the reference.
+${faithfulnessLine}
 
 Audience: children's storybook app, ages 5-8.`;
 }
@@ -359,7 +382,8 @@ export async function openaiGenerateCharacterPreview(
 
 export async function openaiGenerateCharacterPreviewClassic(
   params: CharacterPreviewParams,
-  medium: ImageMedium = 'real_photo'
+  medium: ImageMedium = 'real_photo',
+  styleVariant: ArtStyleType = 'classic'
 ): Promise<CharacterPreviewResult> {
   const startTime = Date.now();
   const { name, referenceImageUrl, description } = params;
@@ -371,7 +395,7 @@ export async function openaiGenerateCharacterPreviewClassic(
   if (description.otherFeatures) detailParts.push(description.otherFeatures);
 
   const prompt = buildPrompt({
-    style: 'classic',
+    style: styleVariant,
     medium,
     name,
     details: detailParts.join(', ') || undefined,
@@ -438,14 +462,15 @@ export async function openaiGenerateNonHumanPreview(
 
 export async function openaiGenerateNonHumanPreviewClassic(
   params: NonHumanPreviewParams,
-  medium: ImageMedium = 'real_photo'
+  medium: ImageMedium = 'real_photo',
+  styleVariant: ArtStyleType = 'classic'
 ): Promise<NonHumanPreviewResult> {
   const startTime = Date.now();
   const { name, referenceImageUrl, subjectType, briefDescription, additionalDetails } = params;
 
   const details = [briefDescription, additionalDetails].filter(Boolean).join('. ');
   const prompt = buildPrompt({
-    style: 'classic',
+    style: styleVariant,
     medium,
     name,
     characterType: subjectType,
@@ -508,13 +533,14 @@ export async function openaiGenerateDescriptionOnlyPreview(
 // ============================================================================
 
 export async function openaiGenerateDescriptionOnlyPreviewClassic(
-  params: DescriptionOnlyPreviewParams
+  params: DescriptionOnlyPreviewParams,
+  styleVariant: ArtStyleType = 'classic'
 ): Promise<DescriptionOnlyPreviewResult> {
   const startTime = Date.now();
   const { name, characterType, description } = params;
 
   const prompt = buildPrompt({
-    style: 'classic',
+    style: styleVariant,
     medium: 'real_photo',
     name,
     characterType,

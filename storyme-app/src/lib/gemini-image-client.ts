@@ -1834,6 +1834,67 @@ export function isHumanSubjectType(subjectType: SubjectType | undefined): boolea
 /**
  * Character Preview Generation Parameters
  */
+/**
+ * Classic-family preview looks. Pixar is rendered by its own dedicated
+ * functions, so it is intentionally excluded here.
+ */
+export type ClassicPreviewStyle = 'classic' | 'ghibli' | 'realistic' | 'coloring';
+
+/**
+ * Build the style-dependent portrait prompt block for the classic-family
+ * character-preview generators. This REUSES the same per-style mechanism as the
+ * storybook-page generator (generateImageWithGeminiClassic): the STYLE line is
+ * the centralized ART_STYLE_BY_ID[style].geminiStyleLine, and `realistic` flips
+ * the medium framing + drops the anti-photoreal guard exactly like the page path.
+ * The caller appends its own character/preservation rules after this block.
+ */
+function buildPreviewStyleBlock(style: ClassicPreviewStyle): { openingMedium: string; renderingRules: string } {
+  const styleLine = ART_STYLE_BY_ID[style].geminiStyleLine;
+
+  if (style === 'realistic') {
+    return {
+      openingMedium: 'photorealistic, lifelike character portrait (a GENERATED image, not a real photo)',
+      renderingRules: `=== RENDERING STYLE (MANDATORY) ===
+- Render a photorealistic, lifelike image. Do NOT output, retrieve, or copy an actual photograph or real internet/stock image, and do NOT depict real, identifiable people.
+- Keep it age-appropriate and child-friendly: wholesome, gentle, non-scary.
+
+=== ART STYLE ===
+- STYLE: ${styleLine}
+- Accurate, natural anatomy and true-to-life proportions; no cartoon exaggeration, no oversized eyes/heads.
+- Soft, flattering natural lighting; clean, simple background.
+- Head and shoulders composition (portrait style).`,
+    };
+  }
+
+  if (style === 'coloring') {
+    return {
+      openingMedium: 'black-and-white COLORING BOOK line-art portrait',
+      renderingRules: `=== RENDERING STYLE (MANDATORY) ===
+- Black-and-white line art ONLY. No color, no shading, no grayscale fills. Pure white background.
+
+=== ART STYLE ===
+- STYLE: ${styleLine}
+- Clean, bold, even outlines a child can color in. Simple, recognizable shapes.
+- Head and shoulders composition (portrait style).`,
+    };
+  }
+
+  // classic + ghibli: 2D illustration framing; only the STYLE line differs.
+  return {
+    openingMedium: '2D illustrated character portrait',
+    renderingRules: `=== CRITICAL RENDERING STYLE (MANDATORY) ===
+- Render as a 2D HAND-DRAWN/DIGITAL ILLUSTRATION (NOT 3D CGI), not a photograph
+- Do NOT create 3D rendered or CGI style - this must look hand-drawn/painted
+
+=== ART STYLE ===
+- STYLE: ${styleLine}
+- Warm, rich color palette with good contrast (print-friendly, avoid washed-out pastels)
+- Soft edges, hand-drawn quality, cozy heartwarming feeling
+- Clean soft gradient or nature background
+- Head and shoulders composition (portrait style)`,
+  };
+}
+
 export interface CharacterPreviewParams {
   name: string;
   referenceImageUrl: string;
@@ -1844,6 +1905,12 @@ export interface CharacterPreviewParams {
   provider?: ImageProvider;
   /** Detected medium of the reference image; drives prompt selection. Defaults to 'real_photo'. */
   medium?: ImageMedium;
+  /**
+   * Which classic-family look to render. Only consumed by the *Classic preview
+   * functions (pixar has its own dedicated function). Defaults to 'classic'.
+   * Reuses the storybook-page STYLE mechanism via buildPreviewStyleBlock().
+   */
+  styleVariant?: ClassicPreviewStyle;
 }
 
 export interface CharacterPreviewResult {
@@ -2029,10 +2096,12 @@ export async function generateCharacterPreviewClassic({
   modelId,
   provider,
   medium,
+  styleVariant = 'classic',
 }: CharacterPreviewParams): Promise<CharacterPreviewResult> {
-  // Provider branch — delegate to OpenAI sibling when admin selects gpt-image-2
+  // Provider branch — delegate to OpenAI sibling when admin selects gpt-image-2.
+  // OpenAI sibling renders the same styleVariant (pixar handled separately).
   if (provider && isOpenAIProvider(provider)) {
-    return openaiGenerateCharacterPreviewClassic({ name, referenceImageUrl, description }, medium);
+    return openaiGenerateCharacterPreviewClassic({ name, referenceImageUrl, description }, medium, styleVariant);
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -2048,35 +2117,22 @@ export async function generateCharacterPreviewClassic({
   // Build minimal character description as fallback
   const charDesc = buildMinimalCharacterDescription(name, description);
 
-  // Classic Storybook style prompt - 2D, warm, watercolor feel
-  // For kid_creation medium, swap in the faithfulness-first prompt (preserves child's drawing).
+  // Style-dependent block reuses the storybook-page STYLE mechanism (see
+  // buildPreviewStyleBlock). For kid_creation/digital_art drawings we ALWAYS use
+  // the faithfulness prompt (in the chosen style) so a multi-element drawing keeps
+  // every element instead of collapsing to a single portrait — same as 2D/3D.
+  const styleBlock = buildPreviewStyleBlock(styleVariant);
   const fullPrompt = shouldUseFaithfulnessPrompt(medium)
     ? buildKidCreationPrompt({
-        style: 'classic',
+        style: styleVariant,
         name,
         emphasizeReference: true,
         elementsDescription: description.otherFeatures,
       })
-    : `Create a 2D illustrated character portrait showing: ${name}
+    : `Create a ${styleBlock.openingMedium} showing: ${name}
 
-=== CRITICAL RENDERING STYLE (MANDATORY) ===
-- Render as a 2D HAND-DRAWN/DIGITAL ILLUSTRATION (NOT 3D CGI)
-- Style: Classic children's storybook illustration, anime-inspired chibi proportions
-- Do NOT create 3D rendered or CGI style - this must look hand-drawn/painted
-- Use the reference photo ONLY to understand: face shape, skin tone, hair color/style, and key features
-- Then ILLUSTRATE the character in 2D storybook style with those features
-- Output should look like a page from a classic children's picture book
-
-=== ART STYLE ===
-- 2D digital illustration with soft painted feel
-- Warm golden hour lighting with soft bokeh background
-- Warm, rich color palette with good contrast (print-friendly, avoid washed-out pastels)
-- Large expressive eyes (anime/chibi inspired)
-- Soft edges and dreamy atmosphere
-- Hand-drawn quality, not computer generated look
-- Nostalgic, cozy, heartwarming feeling
-- Clean soft gradient or nature background (forest, meadow with soft blur)
-- Head and shoulders composition (portrait style)
+${styleBlock.renderingRules}
+- Use the reference photo ONLY to understand: face shape, skin tone, hair color/style, and key features, then render the character in the style above.
 
 === CHARACTER ===
 - ${charDesc}
@@ -2085,14 +2141,13 @@ export async function generateCharacterPreviewClassic({
 
 === CHARACTER RULES ===
 1. PHOTO IS PRIMARY: Use the reference photo to capture the character's identity
-2. Skin tone: MUST match reference photo exactly (rendered in illustrated style)
+2. Skin tone: MUST match reference photo (rendered in the chosen style)
 3. Hair: Match color and general style from reference photo
-4. Face: Recognizable from photo but stylized for 2D illustration
+4. Face: Recognizable from photo but rendered in the chosen style
 5. Clothing: Simple, casual clothes in warm, friendly colors
 6. Expression: Friendly, happy, gentle smile
-7. MUST BE 2D ILLUSTRATED - not 3D rendered
 
-This is a CHARACTER PREVIEW for a children's storybook app. The style should feel warm, nostalgic, and like a classic children's book illustration.`;
+This is a CHARACTER PREVIEW for a children's storybook app.`;
 
   // Build content parts with the reference image for the new SDK format
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2195,6 +2250,8 @@ export interface NonHumanPreviewParams {
   provider?: ImageProvider;
   /** Detected medium of the reference image; drives prompt selection. Defaults to 'real_photo'. */
   medium?: ImageMedium;
+  /** Classic-family look (classic/ghibli/realistic/coloring). Consumed by the *Classic generator. */
+  styleVariant?: ClassicPreviewStyle;
 }
 
 export interface NonHumanPreviewResult {
@@ -2383,12 +2440,15 @@ export async function generateNonHumanPreviewClassic({
   modelId,
   provider,
   medium,
+  styleVariant = 'classic',
 }: NonHumanPreviewParams): Promise<NonHumanPreviewResult> {
-  // Provider branch — delegate to OpenAI sibling when admin selects gpt-image-2
+  // Provider branch — delegate to OpenAI sibling when admin selects gpt-image-2.
+  // OpenAI sibling renders the same styleVariant (pixar handled separately).
   if (provider && isOpenAIProvider(provider)) {
     return openaiGenerateNonHumanPreviewClassic(
       { name, referenceImageUrl, subjectType, briefDescription, additionalDetails },
-      medium
+      medium,
+      styleVariant
     );
   }
 
@@ -2403,38 +2463,27 @@ export async function generateNonHumanPreviewClassic({
   // Build subject-specific rules
   const subjectRules = getSubjectSpecificRules(subjectType);
 
-  // Build the prompt for non-human subjects in classic 2D style
-  // For kid_creation medium, swap in the faithfulness-first prompt (preserves child's drawing).
+  // Style-dependent block reuses the storybook-page STYLE mechanism (see
+  // buildPreviewStyleBlock). For kid_creation/digital_art we ALWAYS use the
+  // faithfulness prompt (in the chosen style) so multi-element drawings keep
+  // every element instead of collapsing to a single subject — same as 2D/3D.
+  const styleBlock = buildPreviewStyleBlock(styleVariant);
   const fullPrompt = shouldUseFaithfulnessPrompt(medium)
     ? buildKidCreationPrompt({
-        style: 'classic',
+        style: styleVariant,
         name,
         emphasizeReference: true,
         elementsDescription: [briefDescription, additionalDetails].filter(Boolean).join('. '),
       })
-    : `Create a 2D illustrated version of the subject in this reference image.
+    : `Create a ${styleBlock.openingMedium} of the subject in this reference image.
 
 === SUBJECT INFORMATION ===
 - Name: ${name}
 - Type: ${subjectType} (${briefDescription})
 ${additionalDetails ? `- Additional details: ${additionalDetails}` : ''}
 
-=== CRITICAL RENDERING STYLE (MANDATORY) ===
-- Transform the reference image into a 2D HAND-DRAWN/DIGITAL ILLUSTRATION
-- Do NOT create 3D rendered or CGI style - this must look hand-drawn/painted
-- Style: Classic children's storybook illustration with soft painted feel
-- Do NOT just copy the reference - CREATE an illustrated interpretation
-
-=== ART STYLE ===
-- 2D digital illustration with soft painted feel
-- Warm golden hour lighting with soft bokeh background
-- Warm, rich color palette with good contrast (print-friendly, avoid washed-out pastels)
-- Large expressive features (anime/chibi inspired proportions where appropriate)
-- Soft edges and dreamy atmosphere
-- Hand-drawn quality, not computer generated look
-- Nostalgic, cozy, heartwarming feeling
-- Clean soft gradient or nature background
-- Portrait/centered composition
+${styleBlock.renderingRules}
+- Do NOT just copy the reference - CREATE an interpretation in the style above.
 
 === PRESERVATION RULES ===
 1. Keep the SAME colors from the reference (if it's purple, stay purple)
@@ -2444,7 +2493,6 @@ ${additionalDetails ? `- Additional details: ${additionalDetails}` : ''}
 ${subjectRules}
 
 === DO NOT ===
-- Make it photorealistic or 3D rendered
 - Change the fundamental nature of the subject
 - Add human features to non-human subjects
 - Make it scary or inappropriate for children
@@ -2580,6 +2628,8 @@ export interface DescriptionOnlyPreviewParams {
   modelId?: string;
   /** Image provider — when 'openai-gpt-image-2', request is delegated to openai-image-client */
   provider?: ImageProvider;
+  /** Classic-family look (classic/ghibli/realistic/coloring). Consumed by the *Classic generator. */
+  styleVariant?: ClassicPreviewStyle;
 }
 
 export interface DescriptionOnlyPreviewResult {
@@ -2726,10 +2776,12 @@ export async function generateDescriptionOnlyPreviewClassic({
   description,
   modelId,
   provider,
+  styleVariant = 'classic',
 }: DescriptionOnlyPreviewParams): Promise<DescriptionOnlyPreviewResult> {
-  // Provider branch — delegate to OpenAI sibling when admin selects gpt-image-2
+  // Provider branch — delegate to OpenAI sibling when admin selects gpt-image-2.
+  // OpenAI sibling renders the same styleVariant (pixar handled separately).
   if (provider && isOpenAIProvider(provider)) {
-    return openaiGenerateDescriptionOnlyPreviewClassic({ name, characterType, description });
+    return openaiGenerateDescriptionOnlyPreviewClassic({ name, characterType, description }, styleVariant);
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -2746,26 +2798,12 @@ export async function generateDescriptionOnlyPreviewClassic({
   const hasChubbyDescription = description ?
     /\b(chubby|plump|round|fat|chunky|pudgy|stocky|big)\b/i.test(description) : false;
 
-  // Build description-based prompt for Classic 2D style
-  const fullPrompt = `Create a 2D illustrated character portrait showing: ${name} (a ${characterType})
+  // Style-dependent block reuses the storybook-page STYLE mechanism (see buildPreviewStyleBlock).
+  const styleBlock = buildPreviewStyleBlock(styleVariant);
+  const fullPrompt = `Create a ${styleBlock.openingMedium} showing: ${name} (a ${characterType})
 
-=== CRITICAL RENDERING STYLE (MANDATORY) ===
-- Render as a 2D HAND-DRAWN/DIGITAL ILLUSTRATION (NOT 3D CGI)
-- This is a ${characterType} character - create a cute, appealing illustrated version
-- Style: Classic children's storybook illustration with soft painted feel
-- Do NOT create 3D rendered or CGI style - this must look hand-drawn/painted
-
-=== ART STYLE ===
-- 2D digital illustration with soft painted feel
-- Warm golden hour lighting with soft bokeh background
-- Warm, rich color palette with good contrast (print-friendly, avoid washed-out pastels)
-- Large expressive eyes (anime/chibi inspired proportions)
-- ${hasChubbyDescription ? 'Soft, rounded body shape' : 'Balanced, well-proportioned body with normal features'}
-- Soft edges and dreamy atmosphere
-- Hand-drawn quality, not computer generated look
-- Nostalgic, cozy, heartwarming feeling
-- Clean soft gradient or nature background (forest, meadow with soft blur)
-- Head/upper body composition (portrait style)
+${styleBlock.renderingRules}
+- ${hasChubbyDescription ? 'Soft, rounded body shape as described' : 'Balanced, well-proportioned body with normal features'}
 
 === CHARACTER DETAILS ===
 - Name: ${name}
@@ -2776,12 +2814,10 @@ export async function generateDescriptionOnlyPreviewClassic({
 1. Make the character appealing and kid-friendly
 2. Use the character type description to determine species/form
 3. Add personality through expression and pose
-4. Keep colors warm and rich with good contrast (print-friendly)
-5. Expression: Friendly, happy, gentle
-6. MUST BE 2D ILLUSTRATED - not 3D rendered
-7. ${hasChubbyDescription ? 'Character has a chubby/plump body as described' : 'IMPORTANT: Use normal, balanced proportions - avoid making the character overly round or chubby unless specified in description'}
+4. Expression: Friendly, happy, gentle
+5. ${hasChubbyDescription ? 'Character has a chubby/plump body as described' : 'IMPORTANT: Use normal, balanced proportions - avoid making the character overly round or chubby unless specified in description'}
 
-This is a CHARACTER PREVIEW for a children's storybook app. The style should feel warm, nostalgic, and like a classic children's book illustration.`;
+This is a CHARACTER PREVIEW for a children's storybook app.`;
 
   // Build content parts (text only - no reference image)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

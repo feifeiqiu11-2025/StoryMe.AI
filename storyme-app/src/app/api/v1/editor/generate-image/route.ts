@@ -49,17 +49,22 @@ import {
 } from '@/lib/types/story';
 import { compressImage } from '@/lib/services/imageProcessing.service';
 import { buildPolishPrompt } from '@/lib/character-prompts';
+import { checkImageGenerationLimit, logApiUsage } from '@/lib/utils/rate-limit';
 import { randomUUID } from 'crypto';
 
 const BUCKET = 'generated-images';
 
-// Canonical chapter-book art styles, matching the picture-book flow
-// (ScenePreviewApproval): 'pixar' (3D), 'classic' (watercolor 2D),
-// 'coloring' (B&W line art). Each maps to a prompt fragment passed to
-// the image model. The MediaPanel UI sends these exact keys.
+// Canonical art styles, matching the picture-book flow (ScenePreviewApproval):
+// 'pixar' (3D), 'classic' (watercolor 2D), 'ghibli', 'realistic', 'coloring'
+// (B&W line art). Each maps to a prompt fragment passed to the image model.
+// The MediaPanel and Character Preview Studio UIs send these exact keys.
+// Existing three kept verbatim (behavior-preserving); ghibli/realistic added
+// for the character-preview refine flow.
 const ART_STYLES = {
   pixar: '3D Pixar style, modern 3D animation look, soft lighting, expressive characters',
   classic: "classic 2D children's book illustration, watercolor, gentle colors, painterly",
+  ghibli: 'Studio Ghibli-inspired 2D illustration, painterly, soft natural light, gentle muted colors, hand-painted feel',
+  realistic: 'photorealistic, lifelike illustration, naturalistic detail, realistic lighting and textures, true-to-life colors and accurate proportions; wholesome and age-appropriate (a generated image, not a real photo)',
   coloring: 'black and white coloring book line art, clean outlines, no fill, printable',
 } as const;
 
@@ -131,11 +136,22 @@ async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise
 }
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
   try {
     const supabase = await createClientFromRequest(request);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Cost cap (R1): inline generation/edits count against the per-user image
+    // limit. The client-side attempt counter is UX-only and resettable.
+    const rateLimit = await checkImageGenerationLimit(user.id, 1);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: rateLimit.reason || 'Image limit reached', limit: true },
+        { status: 429 }
+      );
     }
 
     const body = await request.json().catch(() => null);
@@ -290,6 +306,18 @@ export async function POST(request: NextRequest) {
     const { data: { publicUrl } } = serviceClient.storage
       .from(BUCKET)
       .getPublicUrl(path);
+
+    // Count this generation toward the per-user image limit. checkImageGenerationLimit's
+    // daily cap reads api_usage_logs, so without this the editor/refine path would be
+    // uncapped (the client-side attempt counter is resettable by reopening the modal).
+    await logApiUsage({
+      userId: user.id,
+      endpoint: `/api/v1/editor/generate-image?provider=${actualProvider}${isPolish ? '&intent=polish' : previousImageUrl ? '&intent=edit' : '&intent=generate'}`,
+      method: 'POST',
+      statusCode: 200,
+      responseTimeMs: Date.now() - startTime,
+      imagesGenerated: 1,
+    });
 
     return NextResponse.json({
       success: true,
