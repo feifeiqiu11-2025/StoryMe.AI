@@ -71,7 +71,7 @@
   /* ===========================================
      SLIDE 1 — VISION (cover)
      =========================================== */
-  .cover .wrap{position:absolute;left:140px;top:0;bottom:0;width:1080px;display:flex;flex-direction:column;justify-content:center;}
+  .cover .wrap{position:absolute;left:140px;top:0;bottom:0;width:820px;display:flex;flex-direction:column;justify-content:center;}
   .cover .brand{margin-bottom:46px;}
   .cover .brand img{height:60px;}
   .cover h1{font-family:var(--font-display);font-weight:400;font-size:104px;line-height:1.04;letter-spacing:-.5px;color:var(--ink);}
@@ -87,11 +87,20 @@
   .blob{position:absolute;border-radius:46% 54% 58% 42%/52% 46% 54% 48%;filter:blur(2px);}
   .b1{width:520px;height:520px;left:-150px;top:-160px;background:#F7E7C9;opacity:.5;}
   .b2{width:360px;height:360px;right:38%;bottom:-150px;background:#F3DEC2;opacity:.45;}
-  .shelf{position:absolute;right:96px;top:0;bottom:0;width:560px;}
-  .shelf .cov{position:absolute;width:300px;height:380px;}
-  .sc1{right:212px;top:74px;transform:rotate(-12deg);}
-  .sc2{right:6px;top:286px;transform:rotate(9deg);z-index:2;}
-  .sc3{right:238px;top:520px;width:266px;height:338px;transform:rotate(-6deg);}
+  /* cover video player (click-to-play, 16:9) */
+  .covervid{position:absolute;right:56px;top:300px;width:880px;}
+  .vidframe{position:relative;width:100%;aspect-ratio:16/9;border-radius:18px;border:0;overflow:hidden;
+    background:#EDE7DC;box-shadow:0 26px 64px rgba(90,55,20,.26);cursor:pointer;}
+  .vidframe img.poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .vidframe iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+  .vidframe .scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(44,32,24,0) 45%,rgba(44,32,24,.22));pointer-events:none;}
+  .vidframe .play{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);width:104px;height:104px;border-radius:50%;
+    background:rgba(201,85,31,.92);display:flex;align-items:center;justify-content:center;box-shadow:0 14px 34px rgba(120,50,12,.42);
+    transition:transform .25s var(--e),background .25s;}
+  .vidframe:hover .play{transform:translate(-50%,-50%) scale(1.08);background:var(--terra);}
+  .vidframe .play::after{content:"";margin-left:7px;border-style:solid;border-width:21px 0 21px 35px;border-color:transparent transparent transparent #fff;}
+  .vidcap{font-family:var(--font-mono);font-size:16px;letter-spacing:.14em;text-transform:uppercase;color:var(--wood);margin-top:22px;text-align:center;}
+  .vidcap span{color:var(--terra);}
 
   /* ===========================================
      SLIDE 2 — WHO WE ARE
@@ -124,6 +133,12 @@
      =========================================== */
   .split{display:grid;grid-template-columns:1.15fr .85fr;gap:70px;align-items:center;height:100%;}
   .storypage{width:100%;max-width:520px;justify-self:center;transform:rotate(-2deg);}
+  /* slide 4 — cascading scatter of finished storybook covers */
+  .bookfan{position:relative;width:680px;height:760px;justify-self:center;}
+  .bookfan .cov{position:absolute;width:290px;height:368px;}
+  .bf-dragon{left:24px;top:0;transform:rotate(-4deg);z-index:1;}
+  .bf-butterfly{left:332px;top:196px;transform:rotate(5deg);z-index:2;}
+  .bf-dragonfly{left:66px;top:392px;transform:rotate(-2deg);z-index:3;}
   .develops{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:34px;max-width:760px;}
   .dev{display:flex;align-items:center;gap:14px;font-size:24px;color:var(--ink);}
   .dev .tick{width:30px;height:30px;border-radius:50%;background:var(--terra);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex:none;}
@@ -260,10 +275,13 @@
     <!-- ============ SLIDE 1 — VISION ============ -->
     <section class="slide cover active">
       <div class="blob b1"></div><div class="blob b2"></div>
-      <div class="shelf">
-        <img class="framed cov sc3 reveal pop" style="--d:.55s" src="assets/covers/cover-07.jpg" alt="A children's story cover" />
-        <img class="framed cov sc1 reveal pop" style="--d:.4s" src="assets/covers/cover-03.jpg" alt="A children's story cover" />
-        <img class="framed cov sc2 reveal pop" style="--d:.5s" src="assets/covers/cover-01.jpg" alt="A children's story cover" />
+      <div class="covervid reveal pop" style="--d:.5s">
+        <div class="vidframe" data-yt="lUhl05J11gI" role="button" tabindex="0" aria-label="Play the KindleWood video">
+          <img class="poster" src="assets/video-poster.jpg" alt="Watch how a child's drawing becomes a real storybook" />
+          <div class="scrim"></div>
+          <div class="play" aria-hidden="true"></div>
+        </div>
+        <div class="vidcap">Watch · <span>kids becoming creators</span></div>
       </div>
       <div class="wrap">
         <div class="brand reveal" style="--d:.05s"><img src="assets/logo.png" alt="KindleWood Studio" /></div>
@@ -336,7 +354,11 @@
             <p class="lead reveal" style="--d:.22s;margin-top:24px;max-width:680px;">It's what little kids love most — and what they're naturally good at. The most human place to begin.</p>
             <p class="punch reveal" style="--d:.4s;margin-top:34px;">Our starting point — <b>not our destination.</b></p>
           </div>
-          <img class="framed storypage reveal pop" style="--d:.3s" src="assets/ninja-page.jpg" alt="A page from a child's narrated storybook" />
+          <div class="bookfan">
+            <img class="framed cov bf-dragon reveal pop" style="--d:.3s" src="assets/covers/cover-03.jpg" alt="A child's finished storybook cover" />
+            <img class="framed cov bf-butterfly reveal pop" style="--d:.42s" src="assets/covers/cover-01.jpg" alt="A child's finished storybook cover" />
+            <img class="framed cov bf-dragonfly reveal pop" style="--d:.54s" src="assets/covers/cover-07.jpg" alt="A child's finished storybook cover" />
+          </div>
         </div>
       </div>
     </section>
@@ -560,6 +582,21 @@
       lock=true;e.deltaY>0?this.next():this.prev();setTimeout(()=>lock=false,700);},{passive:true});}
   }
   const deck=new SlidePresentation();
+
+  /* =========================================================
+     COVER VIDEO — click-to-play, swaps poster for YouTube iframe (with sound)
+     ========================================================= */
+  document.querySelectorAll('.vidframe[data-yt]').forEach(frame=>{
+    const playVideo=(e)=>{
+      e.stopPropagation();
+      const id=frame.getAttribute('data-yt');
+      frame.innerHTML='<iframe src="https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&modestbranding=1&playsinline=1" '
+        +'allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="KindleWood video"></iframe>';
+      frame.style.cursor='default';
+    };
+    frame.addEventListener('click',playVideo);
+    frame.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();playVideo(e);}});
+  });
 
   /* =========================================================
      INLINE EDITING — hover hotzone + E key, saves to localStorage
