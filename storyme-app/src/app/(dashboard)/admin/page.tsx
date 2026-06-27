@@ -19,6 +19,7 @@ import {
   Mail,
   Inbox,
   Presentation,
+  Handshake,
   ArrowUpRight,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -110,6 +111,13 @@ const groups: AdminGroup[] = [
         description: 'KindleWood pitch deck — public link at /pitch.',
         href: '/pitch',
         icon: <Presentation className="w-[18px] h-[18px]" />,
+        external: true,
+      },
+      {
+        title: 'Partnership deck',
+        description: 'KindleWood × STEAMOJI proposal — public link at /partnership.',
+        href: '/partnership',
+        icon: <Handshake className="w-[18px] h-[18px]" />,
         external: true,
       },
     ],

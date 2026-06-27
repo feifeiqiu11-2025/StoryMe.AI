@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base href="/partnership/">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KindleWood × STEAMOJI — Partnership Proposal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Jost:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* ===========================================
+     THEME — KindleWood "Storybook + Serif" house style
+     (cream brand + Playfair/Jost/Mono). STEAMOJI sun-yellow paired
+     against KindleWood terracotta to express the two-brand partnership.
+     =========================================== */
+  :root{
+    --cream:#FBF6EE; --cream-hi:#FFFDF8; --sand:#F3E8D6; --tan:#EFD9B8;
+    --ink:#2C2018; --ink-soft:#5A4A3A; --wood:#8A5A2B; --terra:#C9551F; --terra-br:#E2703A; --leaf:#6F8F4F;
+    --sun:#D99A1C; --sun-fill:#F8E7B0; /* STEAMOJI accent (deepened for contrast on cream) */
+    --line:rgba(138,90,43,.20);
+    --font-display:"Playfair Display",serif;
+    --font-body:"Jost",sans-serif;
+    --font-mono:"JetBrains Mono",monospace;
+    --e:cubic-bezier(.2,.8,.2,1);
+    --slide-bg:radial-gradient(125% 125% at 18% 8%, #FFFDF8 0%, #FBF6EE 52%, #F1E4CF 100%);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+
+  /* ===========================================
+     FIXED 16:9 STAGE (from viewport-base.css)
+     =========================================== */
+  html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#EFE4D2;}
+  .deck-viewport{position:fixed;inset:0;overflow:hidden;background:#EFE4D2;}
+  .deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:var(--cream);}
+  .slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;visibility:hidden;opacity:0;pointer-events:none;
+    background:var(--slide-bg);font-family:var(--font-body);font-weight:300;color:var(--ink);}
+  .slide.active,.slide.visible{visibility:visible;opacity:1;pointer-events:auto;z-index:1;}
+  img,video,canvas,svg{max-width:100%;max-height:100%;}
+  @media print{html,body{height:auto;overflow:visible;background:#fff;}.deck-viewport{position:static;overflow:visible;}
+    .deck-stage{position:static;transform:none!important;}.slide{position:relative;visibility:visible!important;opacity:1!important;break-after:page;}}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.2s!important;}}
+
+  /* ===========================================
+     SHARED COMPONENTS
+     =========================================== */
+  .pad{position:absolute;inset:0;padding:84px 120px;display:flex;flex-direction:column;}
+  .center{justify-content:center;}
+  .kik{font-family:var(--font-mono);font-weight:400;font-size:20px;letter-spacing:.24em;text-transform:uppercase;color:var(--wood);}
+  .kik .num{color:var(--terra);}
+  .stitle{font-family:var(--font-display);font-weight:400;font-size:72px;line-height:1.05;color:var(--ink);letter-spacing:-.5px;}
+  .stitle.sm{font-size:58px;}
+  .stitle em{font-style:italic;color:var(--terra);}
+  .lead{font-size:28px;line-height:1.5;color:var(--ink-soft);font-weight:300;}
+  .lead strong{font-weight:500;color:var(--ink);}
+  .em-terra{color:var(--terra);}
+  .em-sun{color:var(--sun);}
+  .divider{width:120px;height:2px;background:var(--terra);border-radius:2px;}
+
+  .card{background:var(--cream-hi);border:1px solid var(--line);border-radius:22px;box-shadow:0 18px 44px rgba(90,55,20,.10);}
+  .chip{display:inline-flex;align-items:center;gap:12px;background:var(--sand);border:1px solid var(--line);
+    border-radius:999px;padding:13px 24px;font-size:22px;font-weight:400;color:var(--ink);}
+  .chip .dot{width:11px;height:11px;border-radius:50%;background:var(--terra);}
+  .chip.sun{background:var(--sun-fill);border-color:rgba(217,154,28,.36);}
+  .chip.sun .dot{background:var(--sun);}
+  .framed{border-radius:14px;border:7px solid #fff;object-fit:cover;background:#fff;box-shadow:0 22px 52px rgba(90,55,20,.26);}
+
+  .statn{font-family:var(--font-display);font-weight:400;line-height:1;color:var(--wood);}
+  .statl{font-family:var(--font-mono);font-size:16px;letter-spacing:.12em;text-transform:uppercase;color:#6A5A48;margin-top:12px;}
+  .punch{font-family:var(--font-display);font-style:italic;font-size:38px;color:var(--wood);}
+  .punch b{font-style:normal;font-weight:600;color:var(--terra);}
+  .takeaway{font-family:var(--font-display);font-style:italic;font-size:36px;color:var(--wood);}
+  .takeaway b{font-style:normal;font-weight:600;color:var(--terra);}
+
+  /* terracotta-dot bullet list (reused on many slides) */
+  .blist{display:flex;flex-direction:column;gap:11px;margin-top:8px;}
+  .blist li{list-style:none;display:flex;gap:13px;align-items:flex-start;font-size:21px;line-height:1.32;color:var(--ink);}
+  .blist li::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--terra);flex:none;margin-top:9px;}
+  .blist.sun li::before{background:var(--sun);}
+
+  /* brand lockup — two bare logos = "partnership" (no chip/border) */
+  .lockup{display:flex;align-items:center;gap:30px;}
+  .logochip{display:flex;align-items:center;}
+  .logochip img{display:block;}
+  .logochip.kw img{height:66px;transform:translateY(-11px);}   /* bigger + nudged up to optically match steamoji */
+  .logochip.so img{height:54px;}
+  .lockup .x{font-family:var(--font-display);font-size:38px;color:var(--terra);}
+
+  /* reveal-on-visible (replays each time a slide becomes active) */
+  .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s var(--e),transform .7s var(--e);transition-delay:var(--d,0s);}
+  .slide.visible .reveal{opacity:1;transform:none;}
+  .reveal.pop{transform:translateY(34px) scale(.94);}
+  .slide.visible .reveal.pop{transform:none;}
+
+  /* ===========================================
+     SLIDE 1 — VISION (cover)
+     =========================================== */
+  .cover .wrap{position:absolute;left:140px;top:0;bottom:0;width:810px;display:flex;flex-direction:column;justify-content:center;}
+  .cover .eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:.26em;text-transform:uppercase;color:var(--terra);margin:34px 0 14px;}
+  .cover h1{font-family:var(--font-display);font-weight:400;font-size:80px;line-height:1.04;letter-spacing:-.5px;color:var(--ink);}
+  .cover h1 em{font-style:italic;color:var(--terra);}
+  .cover .sub{font-size:26px;line-height:1.52;color:var(--ink-soft);max-width:780px;margin-top:30px;}
+  .cover .sub strong{font-weight:500;color:var(--ink);}
+  .cover .tag{font-family:var(--font-display);font-style:italic;font-weight:500;font-size:34px;color:var(--wood);margin-top:28px;}
+  .cover .tag span{color:var(--terra);}
+  .blob{position:absolute;border-radius:46% 54% 58% 42%/52% 46% 54% 48%;filter:blur(2px);}
+  .b1{width:520px;height:520px;left:-150px;top:-160px;background:#F7E7C9;opacity:.5;}
+  .b2{width:380px;height:380px;right:34%;bottom:-160px;background:#F6EBC4;opacity:.5;}
+  /* cover right — click-to-play video player (matches /pitch deck spec) */
+  .covervid{position:absolute;right:56px;top:400px;width:880px;}
+  .vidframe{position:relative;width:100%;aspect-ratio:16/9;border-radius:18px;border:0;overflow:hidden;
+    background:#EDE7DC;box-shadow:0 26px 64px rgba(90,55,20,.26);cursor:pointer;}
+  .vidframe img.poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .vidframe iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+  .vidframe .scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(44,32,24,0) 45%,rgba(44,32,24,.22));pointer-events:none;}
+  .vidframe .play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:104px;height:104px;border-radius:50%;
+    background:rgba(201,85,31,.92);display:flex;align-items:center;justify-content:center;box-shadow:0 14px 34px rgba(120,50,12,.42);
+    transition:transform .25s var(--e),background .25s;}
+  .vidframe:hover .play{transform:translate(-50%,-50%) scale(1.08);background:var(--terra);}
+  .vidframe .play::after{content:"";margin-left:7px;border-style:solid;border-width:21px 0 21px 35px;border-color:transparent transparent transparent #fff;}
+  .vidcap{font-family:var(--font-mono);font-size:16px;letter-spacing:.14em;text-transform:uppercase;color:var(--wood);margin-top:22px;text-align:center;}
+  .vidcap span{color:var(--terra);}
+
+  /* ===========================================
+     SLIDE 2 — WHY TOGETHER (complementary strengths)
+     =========================================== */
+  /* two strength columns that converge into one journey band */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:70px;margin-top:24px;}
+  .col{border:2px solid var(--line);border-radius:20px;overflow:hidden;background:var(--cream-hi);
+    box-shadow:0 16px 40px rgba(90,55,20,.10);display:flex;flex-direction:column;}
+  .col.steam{border-color:rgba(217,154,28,.55);}
+  .col.kw{border-color:rgba(201,85,31,.42);}
+  .col .hd{display:flex;align-items:center;justify-content:center;padding:22px;border-bottom:2px solid;}
+  .col.steam .hd{background:var(--sun-fill);border-bottom-color:rgba(217,154,28,.4);}
+  .col.kw .hd{background:#FBE7D6;border-bottom-color:rgba(201,85,31,.3);}
+  .col .hd .lbl{font-family:var(--font-body);font-weight:600;font-size:32px;}
+  .col.steam .hd .lbl{color:#9A6B12;letter-spacing:.12em;text-transform:uppercase;}
+  .col.kw .hd .lbl{color:var(--wood);letter-spacing:.01em;}
+  .col .items{padding:26px 20px 30px;display:flex;flex-direction:column;gap:17px;}
+  .col .items div{text-align:center;font-size:26px;color:var(--ink);}
+  .converge{display:grid;grid-template-columns:1fr 1fr;gap:70px;margin:16px 0 14px;}
+  .converge .fatarrow{justify-self:center;}
+  .fatarrow{position:relative;width:44px;height:62px;}
+  .fatarrow .stem{position:absolute;left:50%;transform:translateX(-50%);top:0;width:18px;height:36px;border-radius:2px;}
+  .fatarrow .head{position:absolute;left:50%;transform:translateX(-50%);bottom:0;width:0;height:0;
+    border-left:22px solid transparent;border-right:22px solid transparent;border-top:26px solid;}
+  .fatarrow.sun .stem{background:var(--sun);}.fatarrow.sun .head{border-top-color:var(--sun);}
+  .fatarrow.terra .stem{background:var(--terra);}.fatarrow.terra .head{border-top-color:var(--terra);}
+  .band{background:var(--ink);border-radius:18px;padding:26px;display:flex;align-items:center;justify-content:center;gap:22px;
+    box-shadow:0 20px 48px rgba(44,32,24,.30);}
+  .band .w{font-family:var(--font-display);font-size:42px;color:var(--cream-hi);}
+  .band .a{color:var(--terra-br);font-size:34px;}
+  .keymsg2{text-align:center;font-size:25px;color:var(--ink-soft);margin-top:24px;}
+  .keymsg2 b{color:var(--terra);font-weight:500;}
+  .keymsg{text-align:center;font-family:var(--font-display);font-style:italic;font-size:30px;color:var(--wood);margin-top:24px;}
+  .keymsg b{font-style:normal;font-weight:600;color:var(--terra);}
+
+  /* ===========================================
+     SLIDE 3 — HOW WE COLLABORATE (3 cards)
+     =========================================== */
+  .collab{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:28px;}
+  .ccard{padding:32px 30px;display:flex;flex-direction:column;}
+  .ccard .ic{font-family:var(--font-mono);font-size:15px;letter-spacing:.13em;text-transform:uppercase;color:var(--terra);}
+  .ccard .nm{font-family:var(--font-display);font-size:30px;color:var(--ink);margin:9px 0 12px;line-height:1.12;}
+  .ccard .ds{font-size:18px;line-height:1.4;color:var(--ink-soft);margin-bottom:16px;}
+  .ccard .blist li{font-size:19px;}
+  .ccard .blist li::before{margin-top:8px;}
+  .ccard.focus{border-color:rgba(201,85,31,.42);box-shadow:0 20px 48px rgba(201,85,31,.16);}
+  .nextchip{display:inline-flex;align-items:center;gap:10px;margin-top:auto;align-self:center;
+    font-family:var(--font-mono);font-size:15px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#FFF6EE;
+    background:linear-gradient(165deg,#E2703A,#C9551F);border:1px solid var(--terra);border-radius:999px;padding:13px 28px;
+    box-shadow:0 12px 26px rgba(201,85,31,.34);animation:nextpulse 1.8s var(--e) infinite;}
+  .nextchip .ar{font-size:18px;}
+  @keyframes nextpulse{0%,100%{transform:translateY(0);box-shadow:0 12px 26px rgba(201,85,31,.34);}
+    50%{transform:translateY(-4px);box-shadow:0 18px 34px rgba(201,85,31,.46);}}
+
+  /* ===========================================
+     SLIDE 4 — PARTNERSHIP ROADMAP (phased timeline)
+     =========================================== */
+  .bcrumb{display:inline-flex;align-items:center;gap:10px;margin-top:16px;align-self:flex-start;
+    font-family:var(--font-mono);font-size:15px;letter-spacing:.03em;color:var(--ink-soft);
+    background:var(--sand);border:1px solid var(--line);border-radius:999px;padding:9px 20px;}
+  .bcrumb b{color:var(--terra);font-weight:500;}
+  .bcrumb .ar{color:var(--terra);font-size:17px;}
+  .tlabels,.tdetails{display:grid;grid-template-columns:1fr 1fr;}
+  .tlabels{margin-top:34px;}
+  .tlabel{text-align:center;font-family:var(--font-display);font-size:36px;line-height:1.16;color:var(--ink);}
+  .tlabel em{font-style:normal;}
+  .tnode-today .tlabel em{color:var(--wood);}
+  .tnode-future .tlabel em{color:var(--terra);}
+  .rail{position:relative;height:54px;margin:18px 0 28px;}
+  .rail .bar{position:absolute;top:50%;left:25%;right:25%;height:8px;transform:translateY(-50%);
+    background:linear-gradient(90deg,var(--wood),var(--terra-br));border-radius:8px;}
+  .rail .dot{position:absolute;top:50%;transform:translate(-50%,-50%);width:48px;height:48px;border-radius:50%;border:5px solid var(--cream);}
+  .rail .dot.l{left:25%;background:var(--wood);box-shadow:0 0 0 9px rgba(138,90,43,.16);}
+  .rail .dot.r{left:75%;background:var(--terra);box-shadow:0 0 0 9px rgba(201,85,31,.16);}
+  .tcol{max-width:640px;margin:0 auto;padding:0 12px;}
+  .pintro{font-size:22px;line-height:1.42;color:var(--ink-soft);}
+  .pintro b{color:var(--ink);font-weight:600;}
+  .tbl{list-style:none;margin-top:18px;display:flex;flex-direction:column;gap:15px;}
+  .tbl li{display:flex;gap:13px;font-size:21px;line-height:1.34;color:var(--ink);}
+  .tbl li::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--terra);margin-top:9px;flex:none;}
+  .tbl b{color:var(--terra);font-weight:600;}
+
+  /* ===========================================
+     SLIDE 5 — PROGRAMS TODAY (2 age cards)
+     =========================================== */
+  /* feature cards — full-height photo panel beside text (mirrored), no banner crop */
+  .progs{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:30px;}
+  .pcard{display:flex;min-height:512px;border-radius:24px;overflow:hidden;background:var(--cream-hi);
+    border:1px solid var(--line);box-shadow:0 18px 44px rgba(90,55,20,.12);}
+  .pcard.rev{flex-direction:row-reverse;}
+  .pcard .photo{position:relative;width:45%;flex:none;background:#EDE7DC;}
+  .pcard .photo img{width:100%;height:100%;object-fit:cover;display:block;}
+  .pcard .photo .age{position:absolute;left:22px;top:22px;background:var(--terra);color:#fff;font-family:var(--font-mono);
+    font-size:15px;letter-spacing:.1em;border-radius:999px;padding:9px 20px;box-shadow:0 8px 20px rgba(120,50,12,.34);}
+  .pcard .body{flex:1;padding:44px 46px;display:flex;flex-direction:column;}
+  .pcard .nm{font-family:var(--font-display);font-size:40px;color:var(--ink);line-height:1.1;}
+  .pcard .blist{margin-top:24px;}
+  .pcard .blist li{font-size:22px;}
+  .pclose{font-family:var(--font-display);font-style:italic;font-size:26px;color:var(--terra);margin-top:auto;padding-top:26px;}
+
+  /* ===========================================
+     SLIDE 5 — FUTURE OPPORTUNITIES (3 pillars)
+     =========================================== */
+  .pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:34px;}
+  .pillar{padding:40px 36px;display:flex;flex-direction:column;min-height:360px;position:relative;overflow:hidden;}
+  .pillar .pn{font-family:var(--font-mono);font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:#A0876C;}
+  .pillar .pt{font-family:var(--font-display);font-size:38px;color:var(--ink);margin:12px 0 16px;line-height:1.08;}
+  .pillar .pd{font-size:21px;line-height:1.46;color:var(--ink-soft);}
+  .pillar .tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:auto;padding-top:24px;}
+  .pillar .tags span{font-family:var(--font-mono);font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--wood);
+    background:var(--sand);border:1px solid var(--line);border-radius:999px;padding:7px 14px;}
+  .pillar.now{background:linear-gradient(165deg,#FBE7D6,#F4D4AF);border-color:rgba(201,85,31,.32);}
+  .pillar.now .pt{color:var(--terra);}
+  .pillar.now .tags span{background:rgba(255,255,255,.6);}
+  .spotlead{text-align:center;font-family:var(--font-display);font-style:italic;font-size:27px;color:var(--wood);margin-top:30px;}
+  .spotlead b{font-style:normal;font-weight:600;color:var(--terra);}
+
+  /* ===========================================
+     SLIDE 6 — SPOTLIGHT: STORYBOOK → MINECRAFT
+     =========================================== */
+  .mcsteps{display:flex;align-items:stretch;justify-content:center;gap:12px;margin-top:22px;}
+  .mcstep{flex:1;background:var(--cream-hi);border:1px solid var(--line);border-radius:16px;padding:18px 16px;text-align:center;
+    box-shadow:0 12px 28px rgba(90,55,20,.09);display:flex;flex-direction:column;gap:7px;align-items:center;}
+  .mcstep .n{font-family:var(--font-mono);font-size:13px;letter-spacing:.1em;color:var(--terra);}
+  .mcstep .t{font-family:var(--font-display);font-size:21px;color:var(--ink);line-height:1.16;}
+  .mcar{display:flex;align-items:center;color:var(--terra);font-size:24px;}
+  /* body: left = skills + outcome, right = two smaller framed images + play link */
+  .mcsplit2{display:grid;grid-template-columns:1.04fr .96fr;gap:42px;margin-top:24px;align-items:stretch;}
+  .mccol{display:flex;flex-direction:column;gap:18px;}
+  .whymc{padding:26px 32px;}
+  .whymc .h{font-family:var(--font-display);font-size:30px;color:var(--ink);}
+  .whymc .s{font-size:19px;color:var(--ink-soft);margin:8px 0 16px;}
+  .whymc .chips{display:flex;flex-wrap:wrap;gap:10px;}
+  .whymc .chip{font-size:19px;padding:11px 20px;}
+  .mcout{background:linear-gradient(165deg,#E2703A,#C9551F);border-radius:20px;padding:26px 32px;display:flex;flex-direction:column;justify-content:center;
+    box-shadow:0 22px 50px rgba(120,50,12,.30);}
+  .mcout .ol{font-family:var(--font-mono);font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:#FFE6D2;}
+  .mcout .ot{font-family:var(--font-display);font-size:32px;line-height:1.16;color:#FFF6EE;margin-top:10px;}
+  .mcout .ot em{font-style:italic;color:#FFD9A8;}
+  .spotmini{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;}
+  .minirow{display:flex;align-items:center;gap:22px;}
+  .minifig{display:flex;flex-direction:column;align-items:center;gap:10px;}
+  .minifig .cap{font-family:var(--font-mono);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--wood);}
+  .minifig .cap b{color:var(--terra);font-weight:500;}
+  .minibook{height:284px;border-radius:10px;border:6px solid #fff;background:#fff;box-shadow:0 20px 46px rgba(90,55,20,.28);transform:rotate(-3deg);}
+  .minigame{height:284px;border-radius:10px;border:6px solid #fff;background:#fff;box-shadow:0 20px 46px rgba(44,32,24,.30);transform:rotate(2deg);}
+  .miniarrow{color:var(--terra);font-family:var(--font-display);font-size:40px;}
+  .playbtn{display:inline-flex;align-items:center;gap:13px;text-decoration:none;
+    background:linear-gradient(165deg,#E2703A,#C9551F);color:#FFF6EE;font-family:var(--font-body);font-weight:600;font-size:19px;
+    border-radius:999px;padding:13px 28px;box-shadow:0 14px 30px rgba(201,85,31,.36);transition:transform .2s var(--e),box-shadow .2s;}
+  .playbtn:hover{transform:translateY(-3px);box-shadow:0 20px 42px rgba(201,85,31,.48);}
+  .playbtn .tri{width:0;height:0;border-style:solid;border-width:8px 0 8px 14px;border-color:transparent transparent transparent #FFF6EE;}
+
+  /* ===========================================
+     SLIDE 7 — BEYOND CODING (builder mindset)
+     =========================================== */
+  .bmwrap{display:grid;grid-template-columns:0.66fr 1.0fr 1.05fr;gap:40px;margin-top:26px;align-items:center;}
+  .bmmid{display:flex;align-items:center;justify-content:flex-start;}
+  .fwk-h{font-family:var(--font-mono);font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--terra);margin-bottom:16px;}
+  .framework{display:flex;flex-direction:column;gap:11px;}
+  .fwk{display:flex;gap:18px;align-items:center;}
+  .fwk .no{font-family:var(--font-mono);font-size:16px;width:40px;height:40px;border-radius:50%;background:var(--sand);
+    border:1px solid var(--line);color:var(--terra);display:flex;align-items:center;justify-content:center;flex:none;}
+  .fwk .tx{font-size:23px;color:var(--ink);}
+  .bmright .intro{font-size:22px;line-height:1.45;color:var(--ink-soft);}
+  .bmright .intro b{color:var(--ink);font-weight:500;}
+  .learns{display:flex;flex-wrap:wrap;gap:12px;margin:26px 0 28px;}
+  .learns span{font-family:var(--font-body);font-size:22px;color:var(--ink);background:var(--cream-hi);border:1px solid var(--line);
+    border-radius:999px;padding:13px 24px;box-shadow:0 8px 20px rgba(90,55,20,.07);}
+  .bmpunch{font-family:var(--font-display);font-size:30px;line-height:1.32;color:var(--ink);}
+  .bmpunch em{font-style:italic;color:var(--terra);}
+  .bmphoto{display:block;width:100%;border-radius:16px;border:7px solid #fff;
+    box-shadow:0 22px 50px rgba(90,55,20,.26);transform:rotate(-1.2deg);}
+
+  /* ===========================================
+     SLIDE 8 — THE CREATOR JOURNEY (ladder)
+     =========================================== */
+  .ladder{display:grid;grid-template-columns:1fr 56px 1fr 56px 1fr;align-items:stretch;margin-top:34px;}
+  .rung{border-radius:22px;padding:38px 32px;display:flex;flex-direction:column;border:1px solid var(--line);box-shadow:0 16px 40px rgba(90,55,20,.1);}
+  .rung .stage{font-family:var(--font-mono);font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--terra);}
+  .rung .role{font-family:var(--font-display);font-size:46px;color:var(--ink);margin:8px 0 14px;}
+  .rung .quote{font-family:var(--font-display);font-style:italic;font-size:27px;color:var(--terra);margin-bottom:16px;}
+  .rung .desc{font-size:21px;line-height:1.4;color:var(--ink-soft);}
+  .rung.r1{background:var(--cream-hi);}
+  .rung.r2{background:var(--sand);}
+  .rung.r3{background:linear-gradient(165deg,#E2703A,#C9551F);border-color:rgba(201,85,31,.4);}
+  .rung.r3 .stage{color:#FFE0C4;}
+  .rung.r3 .role{color:#FFF6EE;}
+  .rung.r3 .quote{color:#FFD9A8;}
+  .rung.r3 .desc{color:#FCEAD9;}
+  .lar{display:flex;align-items:center;justify-content:center;color:var(--terra);font-size:34px;font-family:var(--font-display);}
+  .align{text-align:center;font-size:23px;color:var(--ink-soft);margin-top:30px;}
+  .align b{color:var(--terra);font-weight:500;}
+
+  /* ===========================================
+     SLIDE 9 — PARTNERSHIP ROADMAP
+     =========================================== */
+  .roadmap{display:grid;grid-template-columns:1fr 70px 1fr;align-items:stretch;margin-top:30px;}
+  .phase{padding:38px 38px 34px;display:flex;flex-direction:column;border-radius:22px;border:1px solid var(--line);box-shadow:0 16px 40px rgba(90,55,20,.1);}
+  .phase .ph{font-family:var(--font-mono);font-size:16px;letter-spacing:.13em;text-transform:uppercase;color:var(--terra);}
+  .phase .pt{font-family:var(--font-display);font-size:34px;color:var(--ink);margin:10px 0 6px;}
+  .phase .note{font-size:19px;line-height:1.4;color:var(--ink-soft);margin-top:auto;padding-top:20px;}
+  .phase.p1{background:var(--cream-hi);}
+  .phase.p2{background:linear-gradient(165deg,#FBE7D6,#F4D4AF);border-color:rgba(201,85,31,.3);}
+  .roaditem{padding:18px 0;border-top:1px solid var(--line);}
+  .roaditem:first-of-type{border-top:none;}
+  .roaditem .ri-t{font-family:var(--font-display);font-size:25px;color:var(--ink);}
+  .roaditem .ri-d{font-size:18px;line-height:1.36;color:var(--ink-soft);margin-top:5px;}
+  .roadar{display:flex;align-items:center;justify-content:center;color:var(--terra);font-size:34px;}
+  .roadkey{text-align:center;font-family:var(--font-display);font-style:italic;font-size:28px;color:var(--wood);margin-top:26px;}
+  .roadkey b{font-style:normal;font-weight:600;color:var(--terra);}
+
+  /* ===========================================
+     SLIDE 10 — VISION FOR THE FUTURE (close)
+     =========================================== */
+  .roles{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:40px;}
+  .role-chip{font-family:var(--font-display);font-size:34px;color:var(--ink);background:var(--cream-hi);border:1px solid var(--line);
+    border-radius:16px;padding:18px 30px;box-shadow:0 14px 32px rgba(90,55,20,.1);}
+  .role-chip:nth-child(2){color:var(--wood);}
+  .role-chip:nth-child(4){color:var(--terra);}
+  .role-chip:last-child{background:linear-gradient(165deg,#E2703A,#C9551F);color:#FFF6EE;border-color:transparent;}
+  .mantra{position:absolute;left:120px;right:120px;bottom:60px;display:flex;align-items:center;justify-content:center;}
+  .mantra .m{font-family:var(--font-display);font-style:italic;font-size:36px;color:var(--wood);}
+  .mantra .m b{font-style:normal;color:var(--terra);}
+  .mantra .ml{display:flex;align-items:center;gap:18px;}
+  .mantra .ml img{height:40px;}
+  .mantra .ml .x{font-family:var(--font-display);font-size:26px;color:var(--terra);}
+
+  /* ===========================================
+     DECK CHROME (outside the scaled stage)
+     =========================================== */
+  .progress{position:fixed;top:0;left:0;height:4px;background:var(--terra);z-index:1000;transition:width .4s var(--e);}
+  .counter{position:fixed;right:26px;bottom:20px;font-family:var(--font-mono);font-size:14px;letter-spacing:.1em;color:var(--wood);z-index:1000;}
+  .brandfoot{position:fixed;left:26px;bottom:20px;font-family:var(--font-mono);font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:rgba(138,90,43,.7);z-index:1000;}
+  .hint{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);font-family:var(--font-mono);font-size:12px;letter-spacing:.1em;color:rgba(138,90,43,.55);z-index:1000;}
+
+  /* inline editing */
+  .edit-hotzone{position:fixed;top:0;left:0;width:80px;height:80px;z-index:10000;cursor:pointer;}
+  .edit-toggle{position:fixed;top:18px;left:18px;width:46px;height:46px;border-radius:50%;border:1px solid var(--line);
+    background:var(--cream-hi);font-size:20px;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .3s;z-index:10001;}
+  .edit-toggle.show,.edit-toggle.active{opacity:1;pointer-events:auto;}
+  .edit-toggle.active{background:var(--terra);border-color:var(--terra);}
+  [contenteditable="true"]{outline:2px dashed rgba(201,85,31,.5);outline-offset:4px;border-radius:4px;}
+  .edit-banner{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;
+    font-family:var(--font-mono);font-size:13px;padding:8px 18px;border-radius:999px;z-index:10001;display:none;}
+  .edit-banner.show{display:block;}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+  <main class="deck-stage" id="deckStage">
+
+    <!-- ============ SLIDE 1 — VISION (cover) ============ -->
+    <section class="slide cover active">
+      <div class="blob b1"></div><div class="blob b2"></div>
+      <div class="covervid reveal pop" style="--d:.5s">
+        <div class="vidframe" data-yt="lUhl05J11gI" role="button" tabindex="0" aria-label="Play the KindleWood video">
+          <img class="poster" src="assets/video-poster.jpg?v=2" alt="Watch how a child's drawing becomes a real storybook" />
+          <div class="scrim"></div>
+          <div class="play" aria-hidden="true"></div>
+        </div>
+        <div class="vidcap">Watch · <span>kids becoming creators</span></div>
+      </div>
+      <div class="wrap">
+        <div class="lockup reveal" style="--d:.05s">
+          <span class="logochip kw"><img src="assets/logo.png" alt="KindleWood Studio" /></span>
+          <span class="x">×</span>
+          <span class="logochip so"><img src="assets/steamoji-logo.png" alt="STEAMOJI" /></span>
+        </div>
+        <div class="eyebrow reveal" style="--d:.16s">Partnership Proposal</div>
+        <h1 class="reveal" style="--d:.24s">From Imagination<br/>to <em>Innovation</em>.</h1>
+        <p class="sub reveal" style="--d:.4s">Supporting the next generation of master makers, builders, and innovators — through <strong>storytelling, creativity, technology,</strong> and real-world project experiences.</p>
+        <div class="tag reveal" style="--d:.52s">Imagine · Design · Build · <span>Share.</span></div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 2 — WHY TOGETHER ============ -->
+    <section class="slide">
+      <div class="pad center">
+        <div class="kik reveal"><span class="num">02</span> &nbsp;—&nbsp; Why together</div>
+        <h2 class="stitle sm reveal" style="--d:.1s;margin-top:14px;max-width:1560px;">A complete learning journey requires both <em>technical foundation</em> and <em>creative vision</em>.</h2>
+        <div class="cols">
+          <div class="col steam reveal pop" style="--d:.2s">
+            <div class="hd"><span class="lbl">STEAMOJI</span></div>
+            <div class="items">
+              <div>STEM &amp; Engineering</div>
+              <div>Robotics &amp; Coding</div>
+              <div>Technical Skills</div>
+              <div>Hands-on Building</div>
+              <div>Maker Mindset</div>
+            </div>
+          </div>
+          <div class="col kw reveal pop" style="--d:.32s">
+            <div class="hd"><span class="lbl">KindleWood</span></div>
+            <div class="items">
+              <div>Storytelling &amp; Creativity</div>
+              <div>Creative Writing</div>
+              <div>Product Thinking</div>
+              <div>AI-Powered Creation</div>
+              <div>Creator Mindset</div>
+            </div>
+          </div>
+        </div>
+        <div class="converge reveal" style="--d:.46s">
+          <span class="fatarrow sun"><span class="stem"></span><span class="head"></span></span>
+          <span class="fatarrow terra"><span class="stem"></span><span class="head"></span></span>
+        </div>
+        <div class="band reveal pop" style="--d:.54s">
+          <span class="w">Imagine</span><span class="a">&rarr;</span>
+          <span class="w">Design</span><span class="a">&rarr;</span>
+          <span class="w">Build</span><span class="a">&rarr;</span>
+          <span class="w">Share</span>
+        </div>
+        <div class="keymsg2 reveal" style="--d:.64s">Together, we help children grow from <b>curious learners</b> into <b>confident creators</b>.</div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 3 — HOW WE COLLABORATE ============ -->
+    <section class="slide">
+      <div class="pad center">
+        <div class="kik reveal"><span class="num">03</span> &nbsp;—&nbsp; How we collaborate</div>
+        <h2 class="stitle sm reveal" style="--d:.1s;margin-top:14px;">Three ways to build <em>together</em>.</h2>
+        <div class="collab">
+          <div class="ccard card reveal" style="--d:.2s">
+            <div class="ic">Technology layer</div>
+            <div class="nm">AI &amp; Technology Support</div>
+            <div class="ds">A flexible technology layer that can support existing or future programs across STEAMOJI locations.</div>
+            <ul class="blist">
+              <li>AI integration support</li>
+              <li>Emerging technology exploration</li>
+              <li>Implementation guidance</li>
+              <li>Program prototyping &amp; testing</li>
+              <li>Instructor training &amp; coaching</li>
+            </ul>
+          </div>
+          <div class="ccard card focus reveal" style="--d:.3s">
+            <div class="ic">Program design</div>
+            <div class="nm">Creative Learning &amp; Development</div>
+            <div class="ds">Designing engaging experiences that blend creativity, storytelling, technology, and hands-on learning.</div>
+            <ul class="blist">
+              <li>Curriculum development</li>
+              <li>Camp &amp; workshop design</li>
+              <li>New learning experiences</li>
+              <li>Creator-focused learning pathways</li>
+            </ul>
+            <div class="nextchip">Detailed next&nbsp;<span class="ar">&rarr;</span></div>
+          </div>
+          <div class="ccard card reveal" style="--d:.4s">
+            <div class="ic">Grow together</div>
+            <div class="nm">Shared Resources &amp; Growth</div>
+            <div class="ds">As opportunities grow, we can explore deeper, shared investments together.</div>
+            <ul class="blist">
+              <li>Shared instructor resources</li>
+              <li>Teacher training</li>
+              <li>Curriculum co-development</li>
+              <li>Pilot programs</li>
+              <li>Local innovation initiatives</li>
+            </ul>
+          </div>
+        </div>
+        <div class="keymsg reveal" style="--d:.54s">A partnership that combines <b>technical innovation</b> with <b>creativity</b> — helping children move from imagination to creation.</div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 4 — PARTNERSHIP ROADMAP (phased timeline) ============ -->
+    <section class="slide">
+      <div class="pad center">
+        <div class="kik reveal"><span class="num">04</span> &nbsp;—&nbsp; Partnership roadmap</div>
+        <h2 class="stitle sm reveal" style="--d:.1s;margin-top:14px;max-width:1440px;">A phased approach to growing our ecosystem <em>together</em>.</h2>
+        <div class="bcrumb reveal" style="--d:.16s"><span class="ar">&#8627;</span> Detailing our <b>Creative Learning &amp; Program Development</b> track</div>
+        <div class="roadmap-tl">
+          <div class="tlabels">
+            <div class="tnode-today reveal" style="--d:.2s"><div class="tlabel">Today<br/><em>Proven Programs</em></div></div>
+            <div class="tnode-future reveal" style="--d:.28s"><div class="tlabel">Future Expansion<br/><em>New Frontiers</em></div></div>
+          </div>
+          <div class="rail reveal pop" style="--d:.36s">
+            <div class="bar"></div>
+            <div class="dot l"></div>
+            <div class="dot r"></div>
+          </div>
+          <div class="tdetails">
+            <div class="tcol reveal" style="--d:.44s">
+              <div class="pintro"><b>Phase 1:</b> Focus on expanding programs with demonstrated engagement.</div>
+              <ul class="tbl">
+                <li><span><b>Creative Storytelling Adventures</b> — Ages 3–6</span></li>
+                <li><span><b>Creative Writing &amp; World Building</b> — Ages 7–10</span></li>
+              </ul>
+            </div>
+            <div class="tcol reveal" style="--d:.54s">
+              <div class="pintro"><b>Phase 2:</b> Growing into AI, game creation, and innovation.</div>
+              <ul class="tbl">
+                <li><span><b>Minecraft World Builders</b> — transforming stories into interactive game experiences.</span></li>
+                <li><span><b>Creator Entrepreneurship</b> — how ideas become products and businesses.</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 5 — PROGRAMS TODAY ============ -->
+    <section class="slide">
+      <div class="pad center">
+        <div class="kik reveal"><span class="num">05</span> &nbsp;—&nbsp; Programs we bring today</div>
+        <h2 class="stitle sm reveal" style="--d:.1s;margin-top:14px;">Proven programs, <em>ready now</em>.</h2>
+        <div class="progs">
+          <div class="pcard reveal pop" style="--d:.22s">
+            <div class="photo">
+              <img src="assets/creative.jpg" alt="A child proudly holding the storybook they created" style="object-position:center 28%;" />
+              <span class="age">AGES 3–6</span>
+            </div>
+            <div class="body">
+              <div class="nm">Creative Storytelling</div>
+              <ul class="blist">
+                <li>Dramatic play</li>
+                <li>Storytelling</li>
+                <li>Hands-on projects</li>
+              </ul>
+              <div class="pclose">Every child becomes the creator of their own story.</div>
+            </div>
+          </div>
+          <div class="pcard rev reveal pop" style="--d:.34s">
+            <div class="photo">
+              <img src="assets/creative-writing.jpg" alt="An older child writing and illustrating their own story" style="object-position:center 42%;" />
+              <span class="age">AGES 7–10</span>
+            </div>
+            <div class="body">
+              <div class="nm">Creative Writing &amp; World Building</div>
+              <ul class="blist">
+                <li>Create characters &amp; build worlds</li>
+                <li>Develop and present stories</li>
+                <li>Think like creators</li>
+              </ul>
+              <div class="pclose">Write chapter books &middot; make their own podcast.</div>
+            </div>
+          </div>
+        </div>
+        <div class="keymsg reveal" style="--d:.5s">Stories become <b>books, games, and future projects.</b></div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 6 — SPOTLIGHT: STORYBOOK → MINECRAFT ============ -->
+    <section class="slide">
+      <div class="pad center">
+        <div class="kik reveal"><span class="num">06</span> &nbsp;—&nbsp; Spotlight</div>
+        <h2 class="stitle sm reveal" style="--d:.1s;margin-top:14px;">From storybook to a playable <em>Minecraft world</em>.</h2>
+        <p class="lead reveal" style="--d:.16s;margin-top:10px;max-width:1240px;">Carter, age 3, wrote <strong>“The Night the Bandit Became a Friend”</strong> — and we turned his story into a Minecraft-style world he can walk through and play.</p>
+        <div class="mcsteps reveal" style="--d:.22s">
+          <div class="mcstep"><div class="n">01</div><div class="t">Come up with an idea</div></div>
+          <div class="mcar">&rarr;</div>
+          <div class="mcstep"><div class="n">02</div><div class="t">Design characters</div></div>
+          <div class="mcar">&rarr;</div>
+          <div class="mcstep"><div class="n">03</div><div class="t">Build the story world</div></div>
+          <div class="mcar">&rarr;</div>
+          <div class="mcstep"><div class="n">04</div><div class="t">Recreate in Minecraft</div></div>
+          <div class="mcar">&rarr;</div>
+          <div class="mcstep"><div class="n">05</div><div class="t">Share &amp; play together</div></div>
+        </div>
+        <div class="mcsplit2">
+          <div class="mccol reveal" style="--d:.34s">
+            <div class="whymc card">
+              <div class="h">Why Minecraft?</div>
+              <div class="s">Kids already love it. We turn passive gameplay into real creation:</div>
+              <div class="chips">
+                <span class="chip">Creativity</span>
+                <span class="chip">World building</span>
+                <span class="chip">Design</span>
+                <span class="chip">Coding concepts</span>
+                <span class="chip">Collaboration</span>
+                <span class="chip">Storytelling</span>
+              </div>
+            </div>
+            <div class="mcout">
+              <div class="ol">The outcome</div>
+              <div class="ot">Every child becomes a <em>creator</em>, not just a player.</div>
+            </div>
+          </div>
+          <div class="spotmini reveal pop" style="--d:.46s">
+            <div class="minirow">
+              <div class="minifig">
+                <img class="minibook" src="assets/bandit-book.png" alt="Carter's storybook cover: The Night the Bandit Became a Friend" />
+                <div class="cap">Carter's story</div>
+              </div>
+              <div class="miniarrow">&rarr;</div>
+              <div class="minifig">
+                <img class="minigame" src="assets/bandit-game2.png" alt="The playable Minecraft-style game built from Carter's story" />
+                <div class="cap"><b>His playable game</b></div>
+              </div>
+            </div>
+            <a class="playbtn" href="https://claude.ai/public/artifacts/faae8702-4435-4b85-a5c7-c1efb3d9da3a" target="_blank" rel="noopener"><span class="tri"></span>Try it &mdash; play here</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 7 — BEYOND CODING ============ -->
+    <section class="slide">
+      <div class="pad center">
+        <div class="kik reveal"><span class="num">07</span> &nbsp;—&nbsp; Beyond coding</div>
+        <h2 class="stitle sm reveal" style="--d:.1s;margin-top:14px;">We teach the <em>builder mindset</em>.</h2>
+        <div class="bmwrap">
+          <div class="reveal" style="--d:.2s">
+            <div class="fwk-h">The KindleWood Creator Framework</div>
+            <div class="framework">
+              <div class="fwk"><span class="no">1</span><span class="tx">Identify a problem</span></div>
+              <div class="fwk"><span class="no">2</span><span class="tx">Imagine solutions</span></div>
+              <div class="fwk"><span class="no">3</span><span class="tx">Create a prototype</span></div>
+              <div class="fwk"><span class="no">4</span><span class="tx">Test &amp; improve</span></div>
+              <div class="fwk"><span class="no">5</span><span class="tx">Build a working product</span></div>
+              <div class="fwk"><span class="no">6</span><span class="tx">Share with users</span></div>
+              <div class="fwk"><span class="no">7</span><span class="tx">Launch &amp; tell the story</span></div>
+            </div>
+          </div>
+          <div class="bmmid reveal pop" style="--d:.4s">
+            <img class="bmphoto" src="assets/coding.png" alt="Kids coding while thinking like builders: what problem should I solve, who is this for, what's the success metric" />
+          </div>
+          <div class="bmright reveal" style="--d:.5s">
+            <div class="intro">Many programs teach coding. <b>Few teach children how ideas become real products.</b></div>
+            <div class="fwk-h" style="margin-top:26px;">What kids learn</div>
+            <div class="learns">
+              <span>Creativity</span><span>Design thinking</span><span>Problem solving</span>
+              <span>Communication</span><span>Product thinking</span><span>Entrepreneurship</span>
+            </div>
+            <div class="bmpunch">We don't just teach kids how to code.<br/>We teach kids how creators <em>build things that matter.</em></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 8 — THE CREATOR JOURNEY ============ -->
+    <section class="slide">
+      <div class="pad center">
+        <div class="kik reveal"><span class="num">08</span> &nbsp;—&nbsp; The creator journey</div>
+        <h2 class="stitle sm reveal" style="--d:.1s;margin-top:14px;">From storyteller to builder to <em>creator</em>.</h2>
+        <div class="ladder">
+          <div class="rung r1 reveal pop" style="--d:.22s">
+            <div class="stage">Stage 01</div>
+            <div class="role">Storyteller</div>
+            <div class="quote">"I have an idea."</div>
+            <div class="desc">Children create stories and imagine whole worlds of their own.</div>
+          </div>
+          <div class="lar reveal" style="--d:.3s">→</div>
+          <div class="rung r2 reveal pop" style="--d:.34s">
+            <div class="stage">Stage 02</div>
+            <div class="role">Builder</div>
+            <div class="quote">"I can make this."</div>
+            <div class="desc">Children turn ideas into real prototypes and projects.</div>
+          </div>
+          <div class="lar reveal" style="--d:.42s">→</div>
+          <div class="rung r3 reveal pop" style="--d:.46s">
+            <div class="stage">Stage 03</div>
+            <div class="role">Creator</div>
+            <div class="quote">"I can bring this to life."</div>
+            <div class="desc">Children build products, games, experiences, and solutions.</div>
+          </div>
+        </div>
+        <div class="align reveal" style="--d:.6s">This supports <b>KindleWood's</b> growth journey and complements <b>STEAMOJI's</b> STEM foundation.</div>
+      </div>
+    </section>
+
+    <!-- ============ SLIDE 9 — VISION FOR THE FUTURE ============ -->
+    <section class="slide">
+      <div class="pad center">
+        <div class="kik reveal"><span class="num">09</span> &nbsp;—&nbsp; Vision for the future</div>
+        <h2 class="stitle reveal" style="--d:.1s;margin-top:14px;max-width:1320px;">Helping kids become <em>creators</em>, not just consumers.</h2>
+        <p class="lead reveal" style="--d:.24s;margin-top:24px;max-width:1280px;">Technology gets easier every year. What grows more valuable is the ability to <strong>imagine, create, communicate, and solve meaningful problems.</strong> Together, STEAMOJI and KindleWood help children grow into:</p>
+        <div class="roles">
+          <span class="role-chip reveal pop" style="--d:.36s">Storytellers</span>
+          <span class="role-chip reveal pop" style="--d:.42s">Builders</span>
+          <span class="role-chip reveal pop" style="--d:.48s">Creators</span>
+          <span class="role-chip reveal pop" style="--d:.54s">Innovators</span>
+          <span class="role-chip reveal pop" style="--d:.6s">Future entrepreneurs</span>
+        </div>
+        <div class="mantra reveal" style="--d:.72s">
+          <div class="m">Imagine. <b>Create.</b> Learn. Grow.</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- deck chrome -->
+<div class="progress" id="progress"></div>
+<div class="brandfoot">KindleWood × STEAMOJI</div>
+<div class="counter" id="counter">01 / 09</div>
+<div class="hint">← → or Space to navigate · E to edit</div>
+
+<!-- inline editing -->
+<div class="edit-hotzone"></div>
+<button class="edit-toggle" id="editToggle" title="Edit mode (E)">✏️</button>
+<div class="edit-banner" id="editBanner">Edit mode — click any text · Ctrl/⌘+S to save</div>
+
+<script>
+  /* =========================================================
+     SLIDE PRESENTATION CONTROLLER — fixed 16:9 stage
+     ========================================================= */
+  class SlidePresentation{
+    constructor(){
+      this.slides=[...document.querySelectorAll('.slide')];
+      this.i=0;this.stage=document.getElementById('deckStage');
+      this.counter=document.getElementById('counter');this.progress=document.getElementById('progress');
+      this.scale();addEventListener('resize',()=>this.scale());
+      this.keys();this.touch();this.wheelNav();
+      this.show(0);
+    }
+    scale(){const f=Math.min(innerWidth/1920,innerHeight/1080);
+      this.stage.style.transform=`translate(${(innerWidth-1920*f)/2}px,${(innerHeight-1080*f)/2}px) scale(${f})`;}
+    show(n){this.i=Math.max(0,Math.min(n,this.slides.length-1));
+      this.slides.forEach((s,k)=>{const on=k===this.i;s.classList.toggle('active',on);s.classList.toggle('visible',on);});
+      const p=(this.i+1);this.counter.textContent=String(p).padStart(2,'0')+' / '+String(this.slides.length).padStart(2,'0');
+      this.progress.style.width=(p/this.slides.length*100)+'%';}
+    next(){this.show(this.i+1);}prev(){this.show(this.i-1);}
+    keys(){addEventListener('keydown',e=>{
+      if(e.target.getAttribute && e.target.getAttribute('contenteditable')==='true')return;
+      if(['ArrowRight',' ','PageDown','ArrowDown'].includes(e.key)){e.preventDefault();this.next();}
+      else if(['ArrowLeft','PageUp','ArrowUp'].includes(e.key)){e.preventDefault();this.prev();}
+      else if(e.key==='Home'){this.show(0);}else if(e.key==='End'){this.show(this.slides.length-1);}});}
+    touch(){let x=0;addEventListener('touchstart',e=>x=e.touches[0].clientX,{passive:true});
+      addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-x;if(Math.abs(dx)>60){dx<0?this.next():this.prev();}},{passive:true});}
+    wheelNav(){let lock=false;addEventListener('wheel',e=>{if(lock)return;if(Math.abs(e.deltaY)<24)return;
+      lock=true;e.deltaY>0?this.next():this.prev();setTimeout(()=>lock=false,700);},{passive:true});}
+  }
+  const deck=new SlidePresentation();
+
+  /* =========================================================
+     COVER VIDEO — click-to-play, swaps poster for YouTube iframe (with sound)
+     ========================================================= */
+  document.querySelectorAll('.vidframe[data-yt]').forEach(frame=>{
+    const playVideo=(e)=>{
+      e.stopPropagation();
+      const id=frame.getAttribute('data-yt');
+      frame.innerHTML='<iframe src="https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&modestbranding=1&playsinline=1" '
+        +'allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="KindleWood video"></iframe>';
+      frame.style.cursor='default';
+    };
+    frame.addEventListener('click',playVideo);
+    frame.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();playVideo(e);}});
+  });
+
+  /* =========================================================
+     INLINE EDITING — hover hotzone + E key, saves to localStorage
+     ========================================================= */
+  const editor={isActive:false,
+    _sel:'.stitle,.lead,.punch,.takeaway,.sub,.tag,.eyebrow,.kik,.nm,.ds,.ic,.pt,.pd,.role,.quote,.desc,.stage,.tx,.fwk-h,.intro,.bmpunch,.ph,.ri-t,.ri-d,.note,.pclose,.keymsg,.keymsg2,.spotlead,.h,.s,.ol,.ot,.align,.roadkey,.cap,.role-chip,h1,figcaption,.fstep,.t,.cols .hd .lbl,.cols .items div,.band .w,.bcrumb,.nextchip,.tlabel,.pintro,.tbl li,.whymc .h,.whymc .s,.mcout .ot,.minifig .cap,.learns span,.mantra .m'
+    ,toggle(){this.isActive=!this.isActive;
+      const banner=document.getElementById('editBanner'),btn=document.getElementById('editToggle');
+      document.querySelectorAll(this._sel).forEach(el=>el.setAttribute('contenteditable',this.isActive));
+      btn.classList.toggle('active',this.isActive);banner.classList.toggle('show',this.isActive);
+      if(!this.isActive)this.save();}
+    ,_sig(){return [...document.querySelectorAll(this._sel)].map(e=>e.tagName+'.'+(e.className||'')).join('|');}
+    ,save(){const els=[...document.querySelectorAll(this._sel)];const items={};
+      els.forEach((el,k)=>items[k]=el.innerHTML);
+      localStorage.setItem('kw-partnership-edits-v1',JSON.stringify({sig:this._sig(),items}));}
+    ,load(){const raw=localStorage.getItem('kw-partnership-edits-v1');if(!raw)return;try{const d=JSON.parse(raw);
+      if(d.sig!==this._sig())return; // structure changed since save -> ignore stale edits
+      const all=[...document.querySelectorAll(this._sel)];
+      Object.entries(d.items||{}).forEach(([k,v])=>{if(all[k])all[k].innerHTML=v;});}catch(e){}}
+  };
+  editor.load();
+  const hz=document.querySelector('.edit-hotzone'),btn=document.getElementById('editToggle');let ht=null;
+  const showBtn=()=>{clearTimeout(ht);btn.classList.add('show');};
+  const hideBtn=()=>{ht=setTimeout(()=>{if(!editor.isActive)btn.classList.remove('show');},400);};
+  hz.addEventListener('mouseenter',showBtn);hz.addEventListener('mouseleave',hideBtn);
+  btn.addEventListener('mouseenter',showBtn);btn.addEventListener('mouseleave',hideBtn);
+  hz.addEventListener('click',()=>editor.toggle());
+  btn.addEventListener('click',()=>editor.toggle());
+  addEventListener('keydown',e=>{
+    if((e.key==='e'||e.key==='E')&&e.target.getAttribute && e.target.getAttribute('contenteditable')!=='true')editor.toggle();
+    if((e.metaKey||e.ctrlKey)&&e.key==='s'){e.preventDefault();editor.save();
+      const b=document.getElementById('editBanner');b.textContent='Saved ✓';setTimeout(()=>b.textContent='Edit mode — click any text · Ctrl/⌘+S to save',1200);}
+  });
+</script>
+</body>
+</html>
