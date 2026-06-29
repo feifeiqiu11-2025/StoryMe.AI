@@ -16,7 +16,6 @@ import ReadingModeViewer, { ReadingPage } from '@/components/story/ReadingModeVi
 import Tooltip from '@/components/ui/Tooltip';
 import TagSelector from '@/components/story/TagSelector';
 import { getLanguageLabel, getLanguageConfig } from '@/lib/config/languages';
-import { isAdminEmail } from '@/lib/auth/isAdmin';
 import Recorder, { RecordingPage, SaveRecordingArgs } from '@/components/audio/Recorder';
 
 export default function StoryViewerPage() {
@@ -243,10 +242,10 @@ export default function StoryViewerPage() {
     }
   };
 
-  // Admin-only: revert this story to draft and open it in the create flow
+  // Revert this story to draft and open it in the create flow
   // (lands on the image review page since the project already has scenes + images).
-  // Refuses if the story is currently public — admin should make it private first.
-  const handleAdminEditStory = async () => {
+  // Refuses if the story is currently public — the user must make it private first.
+  const handleEditStory = async () => {
     if (!project) return;
 
     if (project.visibility === 'public') {
@@ -1135,18 +1134,16 @@ export default function StoryViewerPage() {
                   Story Actions
                 </h3>
                 <div className="flex flex-wrap gap-2">
-                  {/* Admin-only: Edit story — reverts to draft and opens the create flow */}
-                  {isAdminEmail(user?.email) && (
-                    <Tooltip text="Admin: revert to draft and edit scenes/images in the create flow">
-                      <button
-                        onClick={handleAdminEditStory}
-                        className="flex items-center gap-2 px-4 py-2 text-sm bg-amber-100 text-amber-800 border border-amber-300 rounded-lg hover:bg-amber-200 font-medium transition-all"
-                      >
-                        <span>✏️</span>
-                        <span>Edit</span>
-                      </button>
-                    </Tooltip>
-                  )}
+                  {/* Edit story — reverts to draft and opens the create flow at the image review step */}
+                  <Tooltip text="Edit this story's scenes and images">
+                    <button
+                      onClick={handleEditStory}
+                      className="flex items-center gap-2 px-4 py-2 text-sm bg-amber-100 text-amber-800 border border-amber-300 rounded-lg hover:bg-amber-200 font-medium transition-all"
+                    >
+                      <span>✏️</span>
+                      <span>Edit</span>
+                    </button>
+                  </Tooltip>
                   {/* Read Mode */}
                   <Tooltip text="Read this story in fullscreen mode with narration">
                     <button
@@ -1271,7 +1268,7 @@ export default function StoryViewerPage() {
                       ) : (
                         <>
                           <span>📄</span>
-                          <span>Customize & Export</span>
+                          <span>Export</span>
                         </>
                       )}
                     </button>
