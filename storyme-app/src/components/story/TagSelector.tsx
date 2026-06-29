@@ -118,12 +118,17 @@ export default function TagSelector({
     );
   }
 
-  // Group tags by category for hierarchical display
-  const groupedTags = groupTagsByCategory(availableTags);
+  // Group tags by category for hierarchical display.
+  // Avocado (AMA) is retired: hide it from the options offered. This only filters
+  // what's selectable — it does NOT touch already-saved selections (selectedTags),
+  // so stories previously tagged with it keep that association on save.
+  const groupedTags = groupTagsByCategory(
+    availableTags.filter(tag => tag.category !== 'avocado-ama')
+  );
 
   return (
     <div className={wrapperClass}>
-      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+      <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3">
         Tags & Categories
       </h3>
       <p className="text-sm text-gray-600 mb-4">
@@ -137,9 +142,9 @@ export default function TagSelector({
             {/* Category Header */}
             <div className="flex items-center gap-2 mb-3">
               {!hideEmojis && <span className="text-lg">{group.icon}</span>}
-              <h4 className="text-sm font-semibold text-gray-700">
+              <h4 className="text-xs font-medium text-gray-500">
                 {group.name}
-                <span className="text-xs text-gray-500 ml-2 font-normal">
+                <span className="text-xs text-gray-400 ml-2 font-normal">
                   (pick all that apply)
                 </span>
               </h4>
@@ -154,10 +159,10 @@ export default function TagSelector({
                   <button
                     key={tag.id}
                     onClick={() => toggleTag(tag)}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all inline-flex items-center gap-1.5 ${
+                    className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-all inline-flex items-center gap-1.5 border ${
                       isSelected
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-blue-50 text-gray-800 border-blue-200 hover:bg-blue-100 hover:border-blue-300'
                     }`}
                   >
                     {!hideEmojis && tag.icon && <span className="text-base leading-none">{tag.icon}</span>}

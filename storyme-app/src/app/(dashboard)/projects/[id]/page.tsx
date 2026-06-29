@@ -1130,7 +1130,7 @@ export default function StoryViewerPage() {
             <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
               {/* Section 1: Story Actions */}
               <div className="mb-5">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3">
                   Story Actions
                 </h3>
                 <div className="flex flex-wrap gap-2">
@@ -1288,7 +1288,7 @@ export default function StoryViewerPage() {
 
               {/* Section 2: Publishing */}
               <div className="mb-5">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3">
                   Publishing
                 </h3>
                 <div className="flex flex-wrap gap-2">
@@ -1397,6 +1397,8 @@ export default function StoryViewerPage() {
                 <TagSelector
                   projectId={projectId}
                   initialTags={project.tags || []}
+                  hideEmojis
+                  unwrapped
                 />
               </div>
 
