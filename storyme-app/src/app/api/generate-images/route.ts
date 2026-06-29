@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
 import { generateImageWithGemini, generateImageWithGeminiClassic, generateImageWithGeminiColoring, isGeminiAvailable, GeminiCharacterInfo, clearOutfitCache, resolveGeminiImageModel } from '@/lib/gemini-image-client';
-import { openaiGenerateScene } from '@/lib/openai-image-client';
+import { openaiGenerateScene, MultiImageEditError } from '@/lib/openai-image-client';
 import { parseScriptIntoScenes, buildConsistentSceneSettings, extractSceneLocation } from '@/lib/scene-parser';
 import { GeneratedImage, Character, CharacterRating, ClothingConsistency, ImageProvider, normalizeImageProvider, isGeminiProvider, isOpenAIProvider, DEFAULT_SCENE_IMAGE_PROVIDER } from '@/lib/types/story';
 import { createClientFromRequest } from '@/lib/supabase/server';
@@ -207,6 +207,10 @@ export async function POST(request: NextRequest) {
     // Generate images for each scene
     const generatedImages: GeneratedImage[] = [];
     const errors: string[] = [];
+    // Per-scene notices when a scene had to deviate from the requested provider
+    // (e.g. OpenAI couldn't combine all references → generated on Gemini). Surfaced
+    // so the UI/caller knows a scene wasn't silently degraded.
+    const referenceNotices: { scene: number; note: string }[] = [];
 
     // Convert relative URLs to absolute URLs for Fal.ai
     const baseUrl = process.env.VERCEL_URL
@@ -475,57 +479,57 @@ export async function POST(request: NextRequest) {
         // Generate image using selected provider
         let result;
 
-        if (useGemini) {
-          // Use Gemini with actual reference images
-          const geminiCharacters: GeminiCharacterInfo[] = sceneCharacters.map(char => ({
-            name: char.name,
-            referenceImageUrl: char.referenceImageUrl,
-            description: char.description,
-          }));
-
-          // Choose generation function based on illustration style
+        // Gemini scene generation, factored out so it serves BOTH the primary
+        // Gemini path and the OpenAI multi-reference fallback below. Resolves a
+        // model id even when Gemini isn't the primary provider.
+        const geminiCharacters: GeminiCharacterInfo[] = sceneCharacters.map(char => ({
+          name: char.name,
+          referenceImageUrl: char.referenceImageUrl,
+          description: char.description,
+        }));
+        const runGeminiScene = async () => {
+          const modelId = geminiModelId ?? resolveGeminiImageModel('gemini-3.1');
           // For coloring book mode: cover (scene 0) uses Pixar style, other scenes use coloring
-          const isCoverScene = scene.sceneNumber === 0;
           const effectiveStyle = (selectedIllustrationStyle === 'coloring' && isCoverScene)
             ? 'pixar'  // Cover always colorful even in coloring book mode
             : selectedIllustrationStyle;
 
           if (effectiveStyle === 'coloring') {
-            // Coloring Book - B&W line art for kids to color
             console.log(`[Scene ${scene.sceneNumber}] Using Coloring Book style (B&W line art)`);
-            result = await generateImageWithGeminiColoring({
+            return generateImageWithGeminiColoring({
               characters: geminiCharacters,
               sceneDescription: sceneDescriptionForPrompt,
               artStyle: artStyle || "children's coloring book, line art",
               clothingConsistency,
-              modelId: geminiModelId,
+              modelId,
             });
           } else if (effectiveStyle === 'classic' || effectiveStyle === 'ghibli' || effectiveStyle === 'realistic') {
             // Classic Storybook (2D), Ghibli and Realistic share the same 2D generator;
             // styleVariant swaps the STYLE line (and, for realistic, relaxes the
             // cartoon-aesthetic rules + adds real-world scale/anatomy accuracy).
             console.log(`[Scene ${scene.sceneNumber}] Using ${effectiveStyle === 'ghibli' ? 'Ghibli' : effectiveStyle === 'realistic' ? 'Realistic' : 'Classic 2D'} style`);
-            result = await generateImageWithGeminiClassic({
+            return generateImageWithGeminiClassic({
               characters: geminiCharacters,
               sceneDescription: sceneDescriptionForPrompt,
               artStyle: artStyle || "children's book illustration, colorful, whimsical",
               clothingConsistency,
-              modelId: geminiModelId,
+              modelId,
               styleVariant: effectiveStyle === 'ghibli' ? 'ghibli' : effectiveStyle === 'realistic' ? 'realistic' : 'classic',
             });
           } else {
             // 3D Pixar style (default Gemini behavior)
-            if (selectedIllustrationStyle === 'coloring' && isCoverScene) {
-              console.log(`[Scene ${scene.sceneNumber}] Cover in coloring mode - using Pixar style for colorful cover`);
-            }
-            result = await generateImageWithGemini({
+            return generateImageWithGemini({
               characters: geminiCharacters,
               sceneDescription: sceneDescriptionForPrompt,
               artStyle: artStyle || "children's book illustration, colorful, whimsical",
               clothingConsistency,
-              modelId: geminiModelId,
+              modelId,
             });
           }
+        };
+
+        if (useGemini) {
+          result = await runGeminiScene();
 
         } else if (useOpenAI) {
           // OpenAI gpt-image-2 — multi-reference scene generation.
@@ -535,22 +539,39 @@ export async function POST(request: NextRequest) {
             ? 'pixar'
             : selectedIllustrationStyle;
           console.log(`[Scene ${scene.sceneNumber}] Using OpenAI gpt-image-2 (${effectiveStyle})`);
-          result = await openaiGenerateScene({
-            characters: sceneCharacters.map(char => ({
-              name: char.name,
-              referenceImageUrl: char.referenceImageUrl,
-              descriptionText: char.description?.fullDescription
-                || [
-                  char.description?.age,
-                  char.description?.hairColor && `${char.description.hairColor} hair`,
-                  char.description?.clothing && `wearing ${char.description.clothing}`,
-                ].filter(Boolean).join(', ')
-                || undefined,
-            })),
-            sceneDescription: sceneDescriptionForPrompt,
-            styleVariant: effectiveStyle,
-            artStyle,
-          });
+          try {
+            result = await openaiGenerateScene({
+              characters: sceneCharacters.map(char => ({
+                name: char.name,
+                referenceImageUrl: char.referenceImageUrl,
+                descriptionText: char.description?.fullDescription
+                  || [
+                    char.description?.age,
+                    char.description?.hairColor && `${char.description.hairColor} hair`,
+                    char.description?.clothing && `wearing ${char.description.clothing}`,
+                  ].filter(Boolean).join(', ')
+                  || undefined,
+              })),
+              sceneDescription: sceneDescriptionForPrompt,
+              styleVariant: effectiveStyle,
+              artStyle,
+            });
+          } catch (err) {
+            // No silent reference drop: if gpt-image can't combine all of this
+            // scene's references, fall back to Gemini (which inlines every
+            // reference) so the scene keeps ALL its characters instead of
+            // rendering from just the first one.
+            if (err instanceof MultiImageEditError && isGeminiAvailable()) {
+              console.warn(`[Scene ${scene.sceneNumber}] OpenAI couldn't combine ${err.refCount} references — falling back to Gemini to keep all characters`);
+              referenceNotices.push({
+                scene: scene.sceneNumber,
+                note: `OpenAI couldn't combine ${err.refCount} character references; this scene was generated with Nano Banana so every character is kept.`,
+              });
+              result = await runGeminiScene();
+            } else {
+              throw err;
+            }
+          }
         } else {
           // Use FLUX LoRA (text-based prompts only)
           result = await generateImageWithMultipleCharacters({
@@ -695,6 +716,7 @@ export async function POST(request: NextRequest) {
       limits: rateLimitCheck.limits,
       imageProvider: useOpenAI ? 'openai-gpt-image-2' : useGemini ? 'gemini' : 'flux', // Report which provider was used
       providerFallback,  // Non-null only when OpenAI was requested but unavailable (missing key) → Gemini
+      referenceNotices: referenceNotices.length > 0 ? referenceNotices : undefined, // Scenes that fell back to Gemini to keep all references
     });
   } catch (error) {
     console.error('Generate images error:', error);
