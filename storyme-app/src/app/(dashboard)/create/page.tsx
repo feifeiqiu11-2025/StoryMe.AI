@@ -38,6 +38,8 @@ import {
 } from '@/lib/telemetry/save-events';
 import { identify as identifyTelemetry } from '@/lib/telemetry/posthog';
 import { useAutosaveDraft, type RunAutosaveResult } from './useAutosaveDraft';
+import { useLocalDraftBackup } from './useLocalDraftBackup';
+import { loadLocalDraft, clearLocalDraft } from '@/lib/drafts/localDraft';
 
 // Safety margin under the ~500KB JSONB metadata cap on the save-draft route.
 const MAX_DRAFT_PAYLOAD_BYTES = 450 * 1024;
@@ -95,6 +97,38 @@ async function uploadPreviewDataUrl(dataUrl: string, userId: string): Promise<st
     .upload(fileName, blob, { contentType: 'image/png', upsert: false });
   if (error) throw new Error(`Failed to upload animated preview: ${error.message}`);
   return supabase.storage.from('character-images').getPublicUrl(fileName).data.publicUrl;
+}
+
+/**
+ * The slice of editor state mirrored to on-device storage (NLW-2). Restoring
+ * these fields rebuilds an in-progress story after a crash/refresh. Kept in
+ * sync with buildLocalSnapshot/applyLocalSnapshot below.
+ */
+interface LocalDraftData {
+  scriptInput: string;
+  characters: Character[];
+  parsedScenes: Scene[];
+  enhancedScenes: EnhancedScene[];
+  storyTitle: string;
+  storyDescription: string;
+  imageGenerationStatus: GeneratedImage[];
+  readingLevel: number;
+  storyTone: StoryTone;
+  clothingConsistency: ClothingConsistency;
+  expansionLevel: ExpansionLevel;
+  contentLanguage: 'en' | 'zh';
+  secondaryLanguage: string | null;
+  artStyle: ArtStyleType;
+  imageProvider: ImageProvider;
+  selectedTemplate: StoryTemplateId | null;
+  coverImageUrl: string | null;
+  coverImagePrompt: string;
+  customCoverPrompt: string;
+  coverApproved: boolean;
+  authorName: string;
+  authorAge: string;
+  quizData: unknown;
+  storyBible: StoryBibleResult | null;
 }
 
 function CreateStoryPageInner() {
@@ -228,6 +262,20 @@ function CreateStoryPageInner() {
   // into the URL after a first save — otherwise server state would overwrite
   // the user's in-memory edits.
   const hasResumedRef = useRef(false);
+
+  // NLW-2 local-first restore: a recoverable on-device snapshot (offered via a
+  // banner), the loaded server draft's timestamp (for reconcile), and a
+  // run-once guard so we check exactly once after load settles.
+  const [recoverableDraft, setRecoverableDraft] = useState<LocalDraftData | null>(null);
+  const serverLoadedAtRef = useRef<string | null>(null);
+  const localRestoreCheckedRef = useRef(false);
+
+  // NLW-1: a stable client-generated id for this story session, sent in every
+  // draft save so the FIRST save inserts and the rest update — a brand-new
+  // draft can never 404. A resumed draft's id (draftProjectId) takes precedence
+  // in the save body, so this only supplies the id for never-yet-saved stories.
+  const draftIdRef = useRef<string | null>(null);
+  if (!draftIdRef.current) draftIdRef.current = crypto.randomUUID();
 
   useEffect(() => {
     const loadUser = async () => {
@@ -429,6 +477,9 @@ function CreateStoryPageInner() {
         }
 
         setDraftProjectId(resumeProjectId);
+        // Reconcile anchor for NLW-2: a local snapshot only wins if it's newer
+        // than this server version.
+        serverLoadedAtRef.current = project.updatedAt || project.updated_at || null;
         const meta = project.draftMetadata || {};
 
         // Restore characters from draft metadata (has full client-side Character shape)
@@ -1255,7 +1306,10 @@ function CreateStoryPageInner() {
     const coverImageUrlToSave = coverImage?.imageUrl || coverImageUrl || undefined;
 
     const draftBody = JSON.stringify({
-      projectId: draftProjectId || undefined,
+      // NLW-1: always send a stable id — the resumed/saved draft id if we have
+      // one, otherwise this session's client-generated id. The server upserts on
+      // it, so the first save inserts and the rest update (no 404s).
+      projectId: draftProjectId || draftIdRef.current,
       title: storyTitle || saveTitle || undefined,
       description: storyDescription || saveDescription || undefined,
       authorName: authorName || undefined,
@@ -1529,9 +1583,17 @@ function CreateStoryPageInner() {
             Unsaved image changes — click Save as Draft
           </span>
         );
+      case 'failed':
+        return (
+          <span className="text-xs text-red-600">
+            Couldn&apos;t save — retrying. Your work is safe on this device.
+          </span>
+        );
       case 'paused':
         return (
-          <span className="text-xs text-red-600">Autosave paused — click Save as Draft</span>
+          <span className="text-xs text-red-600">
+            Couldn&apos;t save — your work is safe on this device. Click Save as Draft to retry.
+          </span>
         );
       case 'idle':
       default:
@@ -1568,6 +1630,167 @@ function CreateStoryPageInner() {
       quizData,
     ],
   });
+
+  // ---- NLW-2: local-first on-device backup + restore ----
+  // The snapshot prioritizes the irreplaceable TEXT (script, scenes, captions,
+  // settings). Heavy transient `data:` base64 blobs (in-flight images / inline
+  // character previews) are stripped so each write stays small and fast — they
+  // re-upload to URLs and also live in temp storage, so they're regenerable.
+  const buildLocalSnapshot = (): LocalDraftData => {
+    const isDataUrl = (u?: string | null): boolean => typeof u === 'string' && u.startsWith('data:');
+    return {
+      scriptInput,
+      characters: characters.map((c) => ({
+        ...c,
+        referenceImage:
+          c.referenceImage && isDataUrl(c.referenceImage.url)
+            ? { ...c.referenceImage, url: '' }
+            : c.referenceImage,
+        animatedPreviewUrl: isDataUrl(c.animatedPreviewUrl) ? '' : c.animatedPreviewUrl,
+      })),
+      parsedScenes,
+      enhancedScenes,
+      storyTitle,
+      storyDescription,
+      imageGenerationStatus: imageGenerationStatus.map((img) =>
+        isDataUrl(img.imageUrl) ? { ...img, imageUrl: '' } : img
+      ),
+      readingLevel,
+      storyTone,
+      clothingConsistency,
+      expansionLevel,
+      contentLanguage,
+      secondaryLanguage,
+      artStyle,
+      imageProvider,
+      selectedTemplate,
+      coverImageUrl: isDataUrl(coverImageUrl) ? null : coverImageUrl,
+      coverImagePrompt,
+      customCoverPrompt,
+      coverApproved,
+      authorName,
+      authorAge,
+      quizData,
+      storyBible,
+    };
+  };
+
+  const applyLocalSnapshot = (d: LocalDraftData) => {
+    setScriptInput(d.scriptInput || '');
+    setCharacters(d.characters || []);
+    setParsedScenes(d.parsedScenes || []);
+    setEnhancedScenes(d.enhancedScenes || []);
+    setStoryTitle(d.storyTitle || '');
+    setStoryDescription(d.storyDescription || '');
+    if (typeof d.readingLevel === 'number') setReadingLevel(d.readingLevel);
+    if (d.storyTone) setStoryTone(d.storyTone);
+    if (d.clothingConsistency) setClothingConsistency(d.clothingConsistency);
+    if (d.expansionLevel) setExpansionLevel(d.expansionLevel);
+    if (d.contentLanguage) setContentLanguage(d.contentLanguage);
+    setSecondaryLanguage(d.secondaryLanguage ?? null);
+    if (d.artStyle) setArtStyle(d.artStyle);
+    if (d.imageProvider) setImageProvider(d.imageProvider);
+    setSelectedTemplate(d.selectedTemplate ?? null);
+    setCoverImageUrl(d.coverImageUrl ?? null);
+    setCoverImagePrompt(d.coverImagePrompt || '');
+    setCustomCoverPrompt(d.customCoverPrompt || '');
+    setCoverApproved(!!d.coverApproved);
+    setAuthorName(d.authorName || '');
+    setAuthorAge(d.authorAge || '');
+    setQuizData(d.quizData ?? null);
+    setStoryBible(d.storyBible ?? null);
+    setImageGenerationStatus(d.imageGenerationStatus || []);
+    const urls = (d.imageGenerationStatus || [])
+      .filter((img) => img.imageUrl && img.status === 'completed')
+      .map((img) => img.imageUrl);
+    if (urls.length > 0) {
+      setGeneratedImages(urls);
+      setSession({
+        characters: d.characters || [],
+        script: d.scriptInput || '',
+        scenes: [],
+        generatedImages: d.imageGenerationStatus || [],
+        status: 'completed',
+      });
+    }
+  };
+
+  const hasBackupContent =
+    scriptInput.trim().length > 0 || enhancedScenes.length > 0 || characters.length > 0;
+
+  // Continuously mirror the in-progress story to on-device storage, so a
+  // refresh/crash (or a failed server save) can never lose the child's work.
+  useLocalDraftBackup({
+    enabled: hasBackupContent,
+    projectId: draftProjectId,
+    buildSnapshot: buildLocalSnapshot,
+    fingerprint: [
+      characters,
+      scriptInput,
+      parsedScenes,
+      enhancedScenes,
+      storyTitle,
+      storyDescription,
+      imageGenerationStatus,
+      readingLevel,
+      storyTone,
+      contentLanguage,
+      secondaryLanguage,
+      artStyle,
+      clothingConsistency,
+      expansionLevel,
+      coverImageUrl,
+      coverImagePrompt,
+      customCoverPrompt,
+      imageProvider,
+      authorName,
+      authorAge,
+      selectedTemplate,
+      coverApproved,
+      quizData,
+      storyBible,
+    ],
+  });
+
+  // Once per load (after any server-draft resume settles), offer to restore a
+  // newer on-device snapshot. New story: only when the editor is still empty
+  // and the snapshot was never saved to the server. Resumed draft: only when
+  // the local snapshot is strictly newer than the loaded server version.
+  useEffect(() => {
+    if (!user || restoringDraft || localRestoreCheckedRef.current) return;
+    localRestoreCheckedRef.current = true;
+    void (async () => {
+      const env = await loadLocalDraft<LocalDraftData>();
+      const d = env?.data;
+      if (!d) return;
+      const hasContent = !!(d.scriptInput?.trim() || (d.enhancedScenes?.length ?? 0) > 0);
+      if (!hasContent) return;
+
+      const serverLoadedAt = serverLoadedAtRef.current;
+      if (serverLoadedAt) {
+        // Compare as instants, not strings: the server timestamp (Postgres,
+        // +00:00, microseconds) and the local one (toISOString, Z, ms) use
+        // different formats and would not sort correctly lexically.
+        const localIsNewer = new Date(env.savedAt).getTime() > new Date(serverLoadedAt).getTime();
+        if (env.projectId === draftProjectId && localIsNewer) {
+          setRecoverableDraft(d);
+        }
+      } else if (env.projectId == null && !scriptInput.trim() && enhancedScenes.length === 0) {
+        setRecoverableDraft(d);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, restoringDraft]);
+
+  const handleRestoreLocalDraft = () => {
+    if (recoverableDraft) applyLocalSnapshot(recoverableDraft);
+    setRecoverableDraft(null);
+  };
+
+  const handleDiscardLocalDraft = () => {
+    setRecoverableDraft(null);
+    void clearLocalDraft();
+  };
 
   const handleSaveStory = async () => {
     if (!saveTitle.trim()) {
@@ -2171,6 +2394,29 @@ function CreateStoryPageInner() {
       */}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {recoverableDraft && (
+          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <span className="text-sm text-blue-900 font-medium">
+              We found unsaved work on this device. Restore it?
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleRestoreLocalDraft}
+                className="min-h-[40px] px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+              >
+                Restore
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardLocalDraft}
+                className="min-h-[40px] px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
         {draftProjectId && (
           <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
             <span className="inline-block w-2 h-2 bg-amber-500 rounded-full"></span>

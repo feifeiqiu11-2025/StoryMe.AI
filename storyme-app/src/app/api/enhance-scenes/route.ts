@@ -104,6 +104,23 @@ export async function POST(request: NextRequest) {
 
     console.log(`Enhancing ${scenes.length} scenes with reading level ${readingLevel}, ${storyTone} tone, ${expansionLevel} expansion, language: ${language}${secondaryLanguage ? `, secondary: ${secondaryLanguage}` : ''}`);
 
+    // NLW-6: 24h raw-script backstop. The child's raw script (and per-scene
+    // as-written text) only exist as this transient request body — nothing
+    // persists it until a successful save. Emit ONE greppable line so a pre-save
+    // crash is recoverable from Vercel logs (~24h retention). This is a SECONDARY
+    // safety net behind on-device + draft persistence. PRIVACY: contains a child's
+    // writing — must be redacted at any log drain (see DESIGN.md §5.F / NLW-6).
+    const requestId = `enh-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    console.log('[raw-script-backstop]', JSON.stringify({
+      requestId,
+      scriptLength: typeof script === 'string' ? script.length : 0,
+      script: typeof script === 'string' ? script : null,
+      scenes: (scenes as Array<{ sceneNumber?: number; description?: string }>).map((s) => ({
+        n: s.sceneNumber,
+        text: s.description,
+      })),
+    }));
+
     // Get story architecture if template is selected
     const storyArchitecture = templateId
       ? getStoryArchitecture(templateId as StoryTemplateId)

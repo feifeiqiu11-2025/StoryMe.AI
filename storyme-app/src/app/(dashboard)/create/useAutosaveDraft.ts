@@ -22,7 +22,7 @@ import {
   type AutosaveSkipReason,
 } from '@/lib/telemetry/save-events';
 
-export type AutosaveUiState = 'idle' | 'saving' | 'saved' | 'unsaved_images' | 'paused';
+export type AutosaveUiState = 'idle' | 'saving' | 'saved' | 'unsaved_images' | 'paused' | 'failed';
 
 export interface RunAutosaveResult {
   ok: boolean;
@@ -79,6 +79,20 @@ export function useAutosaveDraft({
     }
   }, []);
 
+  // A real save failure must stay visible — never silently revert to 'saved'.
+  // First failures surface as 'failed' (we keep retrying on the next edit);
+  // repeated failures escalate to 'paused' so we stop hammering the server.
+  const registerFailure = useCallback((errorMessage: string) => {
+    autosaveFailed({ errorMessage });
+    consecutiveFailuresRef.current += 1;
+    if (consecutiveFailuresRef.current >= 2) {
+      pausedRef.current = true;
+      setUiState('paused');
+    } else {
+      setUiState('failed');
+    }
+  }, []);
+
   const tick = useCallback(async () => {
     timerRef.current = null;
 
@@ -111,14 +125,7 @@ export function useAutosaveDraft({
         return;
       }
       if (!result.ok) {
-        autosaveFailed({ errorMessage: result.errorMessage || 'unknown' });
-        consecutiveFailuresRef.current += 1;
-        if (consecutiveFailuresRef.current >= 2) {
-          pausedRef.current = true;
-          setUiState('paused');
-        } else {
-          setUiState(lastSavedAtRef.current ? 'saved' : 'idle');
-        }
+        registerFailure(result.errorMessage || 'unknown');
         return;
       }
       autosaveFired({ sceneCount: result.sceneCount });
@@ -129,19 +136,11 @@ export function useAutosaveDraft({
       setLastSavedAt(now);
       setUiState('saved');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'unknown';
-      autosaveFailed({ errorMessage: msg });
-      consecutiveFailuresRef.current += 1;
-      if (consecutiveFailuresRef.current >= 2) {
-        pausedRef.current = true;
-        setUiState('paused');
-      } else {
-        setUiState(lastSavedAtRef.current ? 'saved' : 'idle');
-      }
+      registerFailure(err instanceof Error ? err.message : 'unknown');
     } finally {
       autoInFlightRef.current = false;
     }
-  }, [minGapMs]);
+  }, [minGapMs, registerFailure]);
 
   // Re-arm the debounce on any fingerprint change while enabled.
   useEffect(() => {
@@ -150,10 +149,12 @@ export function useAutosaveDraft({
       return;
     }
     // Any fresh edit clears the paused state — user is active again.
+    // Go to 'idle' (not 'saved'): their latest edits are not yet persisted,
+    // and a retry tick is now armed.
     if (pausedRef.current) {
       pausedRef.current = false;
       consecutiveFailuresRef.current = 0;
-      setUiState(lastSavedAtRef.current ? 'saved' : 'idle');
+      setUiState('idle');
     }
     clearTimer();
     timerRef.current = setTimeout(() => {
@@ -184,9 +185,10 @@ export function useAutosaveDraft({
 
   const markManualSaveFailed = useCallback(() => {
     manualInFlightRef.current = false;
-    // Leave lastSavedAt alone — the prior value is still accurate.
-    // Don't flip to 'paused' from a manual failure; the user saw an explicit error.
-    setUiState(lastSavedAtRef.current ? 'saved' : 'idle');
+    // Leave lastSavedAt alone — the prior successful-save time is still accurate.
+    // Surface the failure rather than reverting to 'saved'; don't escalate to
+    // 'paused' (that's for the silent autosave loop — the user saw an explicit error here).
+    setUiState('failed');
   }, []);
 
   return {
