@@ -658,64 +658,75 @@ export class ProjectService {
 
     let projectId: string;
 
+    // Shared INSERT payload for the two create paths (a brand-new draft, or the
+    // first save of a client-generated id). The UPDATE path is handled inline
+    // below because it preserves a few existing-row values.
+    const buildCreateData = (id?: string) => ({
+      ...(id ? { id } : {}),
+      user_id: userId,
+      title: data.title || 'Untitled Draft',
+      description: data.description,
+      author_name: data.authorName,
+      author_age: data.authorAge,
+      cover_image_url: data.coverImageUrl,
+      original_script: data.originalScript,
+      reading_level: data.readingLevel,
+      story_tone: data.storyTone,
+      content_language: data.language || 'en',
+      secondary_language: data.secondaryLanguage || null,
+      visibility: 'private', // Drafts always private
+      status: 'draft',
+      draft_metadata: data.draftMetadata,
+      uses_story_bible: usesStoryBible,
+    });
+
     if (data.projectId) {
-      // Update existing draft
       const existing = await this.projectRepo.findById(data.projectId);
-      if (!existing) throw new Error('Draft not found');
-      if (existing.user_id !== userId) throw new Error('Unauthorized: Draft does not belong to you');
-      if (existing.status !== 'draft') throw new Error('Cannot update a non-draft project');
 
-      // Update project fields
-      await this.projectRepo.update(data.projectId, {
-        title: data.title || existing.title,
-        description: data.description,
-        author_name: data.authorName,
-        author_age: data.authorAge,
-        cover_image_url: data.coverImageUrl,
-        original_script: data.originalScript,
-        reading_level: data.readingLevel,
-        story_tone: data.storyTone,
-        content_language: data.language || 'en',
-        secondary_language: data.secondaryLanguage ?? existing.secondary_language,
-        visibility: 'private', // Drafts always private
-        draft_metadata: data.draftMetadata,
-        // Only flip the bible flag ON when fresh bible data is supplied; preserve existing value otherwise.
-        ...(usesStoryBible ? { uses_story_bible: true } : {}),
-      } as any);
+      if (existing) {
+        // Update existing draft.
+        if (existing.user_id !== userId) throw new Error('Unauthorized: Draft does not belong to you');
+        if (existing.status !== 'draft') throw new Error('Cannot update a non-draft project');
 
-      projectId = data.projectId;
+        await this.projectRepo.update(data.projectId, {
+          title: data.title || existing.title,
+          description: data.description,
+          author_name: data.authorName,
+          author_age: data.authorAge,
+          cover_image_url: data.coverImageUrl,
+          original_script: data.originalScript,
+          reading_level: data.readingLevel,
+          story_tone: data.storyTone,
+          content_language: data.language || 'en',
+          secondary_language: data.secondaryLanguage ?? existing.secondary_language,
+          visibility: 'private', // Drafts always private
+          draft_metadata: data.draftMetadata,
+          // Only flip the bible flag ON when fresh bible data is supplied; preserve existing value otherwise.
+          ...(usesStoryBible ? { uses_story_bible: true } : {}),
+        } as any);
 
-      // Delete existing scenes (cascade deletes images) for clean recreate
-      await supabase.from('scenes').delete().eq('project_id', projectId);
+        projectId = data.projectId;
 
-      // Delete existing character links for clean recreate
-      await supabase.from('project_characters').delete().eq('project_id', projectId);
+        // Delete existing scenes (cascade deletes images) for clean recreate
+        await supabase.from('scenes').delete().eq('project_id', projectId);
 
-      // Clean recreate of story_locations when bible data is being resubmitted
-      if (usesStoryBible) {
-        await this.storyLocationRepo.deleteByProjectId(projectId);
+        // Delete existing character links for clean recreate
+        await supabase.from('project_characters').delete().eq('project_id', projectId);
+
+        // Clean recreate of story_locations when bible data is being resubmitted
+        if (usesStoryBible) {
+          await this.storyLocationRepo.deleteByProjectId(projectId);
+        }
+      } else {
+        // First save of a client-generated id → insert WITH that id. A retry or
+        // the next save will then find it and take the update path, so a draft
+        // can never 404. (NLW-1)
+        const project = await this.projectRepo.create(buildCreateData(data.projectId) as any);
+        projectId = project.id;
       }
-
     } else {
-      // Create new draft project
-      const project = await this.projectRepo.create({
-        user_id: userId,
-        title: data.title || 'Untitled Draft',
-        description: data.description,
-        author_name: data.authorName,
-        author_age: data.authorAge,
-        cover_image_url: data.coverImageUrl,
-        original_script: data.originalScript,
-        reading_level: data.readingLevel,
-        story_tone: data.storyTone,
-        content_language: data.language || 'en',
-        secondary_language: data.secondaryLanguage || null,
-        visibility: 'private', // Drafts always private
-        status: 'draft',
-        draft_metadata: data.draftMetadata,
-        uses_story_bible: usesStoryBible,
-      } as any);
-
+      // Legacy path: no id supplied — let the DB mint one.
+      const project = await this.projectRepo.create(buildCreateData() as any);
       projectId = project.id;
     }
 

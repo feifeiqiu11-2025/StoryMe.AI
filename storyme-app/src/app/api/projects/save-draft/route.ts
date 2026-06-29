@@ -97,36 +97,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validate projectId is for a draft if provided
+    // Validate the projectId ONLY when it already exists. A client-generated id
+    // that doesn't exist yet is expected — the draft is upserted (the first save
+    // inserts it), so a brand-new draft can never 404. (NLW-1)
     if (projectId) {
       const { data: existingProject } = await supabase
         .from('projects')
         .select('id, status, user_id')
         .eq('id', projectId)
-        .single();
+        .maybeSingle();
 
-      if (!existingProject) {
-        await log(404, 'Draft project not found');
-        return NextResponse.json(
-          { error: 'Draft project not found' },
-          { status: 404 }
-        );
-      }
+      if (existingProject) {
+        if (existingProject.user_id !== user.id) {
+          await log(403, 'Draft does not belong to user');
+          return NextResponse.json(
+            { error: 'Unauthorized: Draft does not belong to you' },
+            { status: 403 }
+          );
+        }
 
-      if (existingProject.user_id !== user.id) {
-        await log(403, 'Draft does not belong to user');
-        return NextResponse.json(
-          { error: 'Unauthorized: Draft does not belong to you' },
-          { status: 403 }
-        );
-      }
-
-      if (existingProject.status !== 'draft') {
-        await log(400, `Cannot update non-draft project (status=${existingProject.status})`);
-        return NextResponse.json(
-          { error: 'Cannot update a non-draft project. Only drafts can be updated via this endpoint.' },
-          { status: 400 }
-        );
+        if (existingProject.status !== 'draft') {
+          await log(400, `Cannot update non-draft project (status=${existingProject.status})`);
+          return NextResponse.json(
+            { error: 'Cannot update a non-draft project. Only drafts can be updated via this endpoint.' },
+            { status: 400 }
+          );
+        }
       }
     }
 
