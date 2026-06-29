@@ -7,7 +7,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ProjectService } from '@/lib/services/project.service';
-import { isAdminEmail } from '@/lib/auth/isAdmin';
 
 export async function GET(
   request: NextRequest,
@@ -125,21 +124,16 @@ export async function PATCH(
       await projectService.updateProject(id, user.id, { visibility });
     }
 
-    // Handle status revert (admin-only) — used by the admin "Edit" button on the
-    // story detail page to move a completed story back into the create-flow's
-    // resume-draft path. Only 'draft' is allowed as a target value here; other
-    // status transitions are not exposed through this endpoint.
+    // Handle status revert — used by the "Edit" button on the story detail page
+    // to move a completed story back into the create-flow's resume-draft path.
+    // Only 'draft' is allowed as a target value here; other status transitions are
+    // not exposed through this endpoint. Ownership is enforced by projectService
+    // (updateProject / buildDraftMetadataFromCompletedProject reject other users' projects).
     if (status) {
       if (status !== 'draft') {
         return NextResponse.json(
-          { error: 'Only status="draft" is supported for admin revert' },
+          { error: 'Only status="draft" is supported' },
           { status: 400 }
-        );
-      }
-      if (!isAdminEmail(user.email)) {
-        return NextResponse.json(
-          { error: 'Forbidden: admin only' },
-          { status: 403 }
         );
       }
 
