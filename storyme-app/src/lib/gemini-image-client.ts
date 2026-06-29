@@ -29,6 +29,7 @@ import {
 } from './openai-image-client';
 import { buildKidCreationPrompt, shouldUseFaithfulnessPrompt } from './character-prompts';
 import { ART_STYLE_BY_ID } from './art-styles-config';
+import { REFERENCE_AUTHORITATIVE_RULE } from './ai/reference-rules';
 
 /**
  * Safety settings for image generation calls.
@@ -581,6 +582,30 @@ function buildSmartCharacterPrompt(
 }
 
 /**
+ * Build the named-character section for a scene prompt.
+ *
+ * Characters WITH a reference image are listed reference-first (the attached
+ * image is authoritative) and are deliberately NOT labelled "human child" —
+ * their species is whatever the reference shows, so a dragon stored as
+ * subject_type='human' (a known mis-classification we intentionally don't
+ * depend on here) still renders as a dragon. Characters WITHOUT a reference
+ * keep the legacy "(human child)" hint since the name/description is the only
+ * signal. Shared by all three Gemini scene builders so the wording can't drift.
+ */
+function buildNamedCharacterSection(
+  characters: { char: { name: string; referenceImageUrl?: string }; prompt: string }[]
+): string {
+  if (characters.length === 0) return '';
+  const lines = characters.map(cp => {
+    const hasReference = !!cp.char.referenceImageUrl?.trim();
+    return hasReference
+      ? `- ${cp.char.name}: match the attached reference image exactly (appearance, species, colors, features) — ${cp.prompt}`
+      : `- ${cp.char.name} (human child) - ${cp.prompt}`;
+  });
+  return `CHARACTERS (match each reference image exactly):\n${lines.join('\n')}`;
+}
+
+/**
  * Generate image with Gemini using actual character reference images
  * Uses new @google/genai SDK with imageConfig for proper 1:1 aspect ratio
  */
@@ -632,9 +657,7 @@ export async function generateImageWithGemini({
   const humanCharacters = characterPrompts.filter(cp => !cp.isAnimal);
   const animalCharacters = characterPrompts.filter(cp => cp.isAnimal);
 
-  const humanCharacterSection = humanCharacters.length > 0
-    ? `HUMAN CHARACTERS (from reference photos):\n${humanCharacters.map(cp => `- ${cp.char.name} (human child) - ${cp.prompt}`).join('\n')}`
-    : '';
+  const humanCharacterSection = buildNamedCharacterSection(humanCharacters);
 
   const animalCharacterSection = animalCharacters.length > 0
     ? `ANIMAL CHARACTERS:\n${animalCharacters.map(cp => `- ${cp.prompt} (cute animated animal, animal face, NO human features)`).join('\n')}`
@@ -659,11 +682,11 @@ PROPORTIONS: Normal, healthy body proportions - not overly fat or chubby. If "bi
 
 IMPORTANT:
 - Generate an ILLUSTRATED 3D animated image, NOT a photograph
-- Characters WITH a reference image: the IMAGE is the AUTHORITATIVE source for visual identity (species, body shape, distinguishing features). If the name and the image disagree, FOLLOW THE IMAGE. Always render in the story's art style (no photo realism).
+- ${REFERENCE_AUTHORITATIVE_RULE} Always render in the story's art style (no photo realism).
 - Characters WITHOUT a reference image: use the name and description text.
 - Blend each reference naturally into the scene — match the scene's lighting, perspective, and art style; render as a character or scene element based on context. No flat overlays.
 - NO religious figures (Jesus, Buddha, etc.)
-${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? `- CRITICAL: Human children have HUMAN faces. Animals have ANIMAL faces. NEVER mix - no human-animal hybrids, no human body with animal head, no animal body with human face.` : ''}
+${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? `- CRITICAL: Render each character to match its OWN reference image — keep every character's species and features distinct. Do NOT blend features between different characters and do NOT invent human-animal hybrids.` : ''}
 
 ${humanCharacterSection}
 ${animalCharacterSection}
@@ -849,9 +872,7 @@ export async function generateImageWithGeminiClassic({
   const humanCharacters = characterPrompts.filter(cp => !cp.isAnimal);
   const animalCharacters = characterPrompts.filter(cp => cp.isAnimal);
 
-  const humanCharacterSection = humanCharacters.length > 0
-    ? `HUMAN CHARACTERS (from reference photos):\n${humanCharacters.map(cp => `- ${cp.char.name} (human child) - ${cp.prompt}`).join('\n')}`
-    : '';
+  const humanCharacterSection = buildNamedCharacterSection(humanCharacters);
 
   const animalDescriptor = isRealistic
     ? 'realistic, naturalistically-rendered animal with accurate real-world anatomy and proportions, animal face, NO human features'
@@ -895,11 +916,11 @@ ${isRealistic
   ? `- Generate a photorealistic, lifelike image (a GENERATED image, not a real photo). Do NOT output, retrieve, or copy an actual photograph or a real internet/stock image, and do NOT depict real, identifiable people.
 - Keep it age-appropriate and child-friendly: wholesome, gentle, non-scary, and non-graphic.`
   : `- Generate a DIGITAL ILLUSTRATION, NOT a photograph, NOT watercolor`}
-- Characters WITH a reference image: the IMAGE is the AUTHORITATIVE source for visual identity (species, body shape, distinguishing features). If the name and the image disagree, FOLLOW THE IMAGE. Always render in the story's art style${isRealistic ? '' : ' (no photo realism)'}.
+- ${REFERENCE_AUTHORITATIVE_RULE} Always render in the story's art style${isRealistic ? '' : ' (no photo realism)'}.
 - Characters WITHOUT a reference image: use the name and description text.
 - Blend each reference naturally into the scene — match the scene's lighting, perspective, and art style; render as a character or scene element based on context. No flat overlays.
 - NO religious figures (Jesus, Buddha, etc.)
-${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? `- CRITICAL: Human children have HUMAN faces. Animals have ANIMAL faces. NEVER mix - no human-animal hybrids, no human body with animal head, no animal body with human face.` : ''}
+${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? `- CRITICAL: Render each character to match its OWN reference image — keep every character's species and features distinct. Do NOT blend features between different characters and do NOT invent human-animal hybrids.` : ''}
 
 ${humanCharacterSection}
 ${animalCharacterSection}
@@ -1060,9 +1081,7 @@ export async function generateImageWithGeminiColoring({
   const humanCharacters = characterPrompts.filter(cp => !cp.isAnimal);
   const animalCharacters = characterPrompts.filter(cp => cp.isAnimal);
 
-  const humanCharacterSection = humanCharacters.length > 0
-    ? `HUMAN CHARACTERS (from reference photos):\n${humanCharacters.map(cp => `- ${cp.char.name} (human child) - ${cp.prompt}`).join('\n')}`
-    : '';
+  const humanCharacterSection = buildNamedCharacterSection(humanCharacters);
 
   const animalCharacterSection = animalCharacters.length > 0
     ? `ANIMAL CHARACTERS:\n${animalCharacters.map(cp => `- ${cp.prompt} (cute cartoon animal in line art, animal face, NO human features)`).join('\n')}`
@@ -1103,11 +1122,11 @@ MANDATORY REQUIREMENTS:
 PROPORTIONS: Normal healthy body proportions. If "big" is mentioned, interpret as LARGE/TALL, NOT fat.
 
 CHARACTER GUIDELINES:
-- Characters WITH a reference image: the IMAGE is the AUTHORITATIVE source for visual identity (species, body shape, distinguishing features). If the name and the image disagree, FOLLOW THE IMAGE. Render as simple BLACK LINE ART only — no color from the reference.
+- ${REFERENCE_AUTHORITATIVE_RULE} Render as simple BLACK LINE ART only — no color from the reference.
 - Characters WITHOUT a reference image: use the name and description text.
 - Blend each reference naturally into the scene as line art — match the perspective and outline style; render as a character or scene element based on context. No flat overlays.
 - NO religious figures
-${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? `- Human children have HUMAN faces. Animals have ANIMAL faces. NEVER mix.` : ''}
+${(hasAnimalsInScene || hasAnimalCharacters) && hasHumanCharacters ? `- Render each character to match its OWN reference image; keep every character's species and features distinct (no blending between characters, no hybrids).` : ''}
 
 ${humanCharacterSection}
 ${animalCharacterSection}

@@ -16,6 +16,7 @@ import {
   type CharacterStyle,
 } from './character-prompts';
 import { ART_STYLE_BY_ID, type ArtStyleType } from './art-styles-config';
+import { REFERENCE_AUTHORITATIVE_RULE, buildReferenceBindingLine } from './ai/reference-rules';
 // NOTE: type-only imports from gemini-image-client to avoid runtime circular dependency.
 import type {
   CharacterPreviewParams,
@@ -118,6 +119,27 @@ interface CallOpenAIParams {
    */
   quality?: 'low' | 'medium' | 'high' | 'auto';
   logTag: string;
+  /**
+   * What to do when a MULTI-image edit is rejected by gpt-image:
+   *   - 'fallback-single' (default) → retry with just the first reference.
+   *     Fine for stickers/previews/editor where one reference is the subject.
+   *   - 'throw' → surface a MultiImageEditError instead of silently dropping
+   *     the other references. Scene generation uses this so the caller can
+   *     fall back to a provider that keeps every reference (Gemini) rather than
+   *     render a scene that's missing most of its characters.
+   */
+  multiImageFailureMode?: 'fallback-single' | 'throw';
+}
+
+/**
+ * Thrown by callOpenAIImage when a multi-image edit is rejected and the caller
+ * opted into 'throw' instead of the silent single-reference fallback.
+ */
+export class MultiImageEditError extends Error {
+  constructor(message: string, readonly refCount: number) {
+    super(message);
+    this.name = 'MultiImageEditError';
+  }
 }
 
 /** Single call wrapper used by all preview functions. Handles retries + edit vs generate. */
@@ -127,6 +149,7 @@ export async function callOpenAIImage({
   size = '1024x1024',
   quality = 'high',
   logTag,
+  multiImageFailureMode = 'fallback-single',
 }: CallOpenAIParams): Promise<{ b64: string; mimeType: string }> {
   const { client, toFile } = await getOpenAIClient();
 
@@ -207,6 +230,15 @@ export async function callOpenAIImage({
           // they're transient and retrying with single-image won't help.
           if (msg.includes('429') || msg.includes('rate') || msg.includes('quota')) {
             throw multiErr;
+          }
+          // No silent reference drop: when the caller opted into 'throw', surface
+          // the failure so it can fall back to a provider that keeps every
+          // reference (Gemini) instead of rendering with just the first one.
+          if (multiImageFailureMode === 'throw') {
+            throw new MultiImageEditError(
+              `multi-image edit rejected (${buffers.length} refs): ${msg}`,
+              buffers.length
+            );
           }
           console.warn(
             `[${logTag}] multi-image edit failed (${buffers.length} refs) — retrying with first ref only:`,
@@ -655,9 +687,11 @@ export async function openaiGenerateScene({
   if (labels.length > 0) {
     lines.push(
       '',
-      'Use the attached reference images. Each subject (character, animal, object, or setting) must appear faithfully — keep its appearance, colors, and key features intact:'
+      REFERENCE_AUTHORITATIVE_RULE,
+      '',
+      'Each attached image IS the named character/subject — match it exactly (appearance, species, colors, key features) and render it in the story art style:'
     );
-    labels.forEach((label, i) => lines.push(`  - Image ${i + 1}: ${label}`));
+    labels.forEach((label, i) => lines.push(buildReferenceBindingLine(i, label)));
   }
   lines.push('', `Style: ${styleLine}`);
   lines.push(
@@ -676,6 +710,9 @@ export async function openaiGenerateScene({
     size: size || '1024x1024',
     quality: sceneQuality,
     logTag: `OpenAI Scene (${sceneQuality})`,
+    // With multiple references, never silently collapse to the first one — let
+    // the route fall back to Gemini (which keeps all references) instead.
+    multiImageFailureMode: buffers.length > 1 ? 'throw' : 'fallback-single',
   });
 
   // OpenAI returns large lossless PNG. Re-encode to JPEG (capped at 1536px) so the
