@@ -246,11 +246,12 @@ export default function CommunityStoriesView() {
 
           {availableTags
             .filter(tag =>
+              // Avocado (AMA) retired: excluded from the browse filters.
               ((!tag.isLeaf && tag.parentId === null && tag.category !== 'custom') ||
-              (tag.isLeaf && tag.parentId === null && (tag.category === 'avocado-ama' || tag.category === 'original-stories')))
+              (tag.isLeaf && tag.parentId === null && tag.category === 'original-stories'))
             )
             .sort((a, b) => {
-              const order = ['collections', 'learning', 'avocado-ama', 'original-stories'];
+              const order = ['collections', 'learning', 'original-stories'];
               return order.indexOf(a.category || '') - order.indexOf(b.category || '');
             })
             .map(tag => (
