@@ -17,10 +17,10 @@ import { ArtStyleType } from '@/components/story/StyleSelector';
 import GenerationProgress from '@/components/story/GenerationProgress';
 import ImageGallery from '@/components/story/ImageGallery';
 import FeedbackModal from '@/components/feedback/FeedbackModal';
-import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScene, ExpansionLevel, ClothingConsistency, ImageProvider, DEFAULT_SCENE_IMAGE_PROVIDER, VISIBLE_IMAGE_PROVIDER_OPTIONS } from '@/lib/types/story';
+import { Character, Scene, StorySession, GeneratedImage, StoryTone, EnhancedScene, ExpansionLevel, ClothingConsistency, ImageProvider, DEFAULT_SCENE_IMAGE_PROVIDER, VISIBLE_IMAGE_PROVIDER_OPTIONS, MAX_EDITS_PER_IMAGE } from '@/lib/types/story';
 import type { StoryBibleResult } from '@/lib/ai/scene-enhancer';
 import { StoryTemplateId, STORY_TEMPLATES } from '@/lib/ai/story-templates';
-import { parseScriptIntoScenes } from '@/lib/scene-parser';
+import { parseScriptIntoScenes, MAX_PICTURE_BOOK_SCENES, SCENE_LIMIT_MESSAGE } from '@/lib/scene-parser';
 import Link from 'next/link';
 import { generateAndDownloadStoryPDF } from '@/lib/services/pdf.service';
 import { getGuestStory, clearGuestStory } from '@/lib/utils/guest-story-storage';
@@ -240,6 +240,8 @@ function CreateStoryPageInner() {
 
   // Cover preview state
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  // Edits left on the cover (persisted edit cap) — surfaced in the cover edit UI.
+  const [coverEditsRemaining, setCoverEditsRemaining] = useState<number | undefined>(undefined);
   const [coverImagePrompt, setCoverImagePrompt] = useState<string>('');
   const [customCoverPrompt, setCustomCoverPrompt] = useState<string>('');
   const [showPromptEditor, setShowPromptEditor] = useState(false);
@@ -528,9 +530,18 @@ function CreateStoryPageInner() {
         if (project.title && project.title !== 'Untitled Draft') setStoryTitle(project.title);
         if (project.description) setStoryDescription(project.description);
 
-        // Restore image generation status from metadata
+        // Restore image generation status from metadata. Merge in each image's
+        // persisted edit count (cover = scene 0) so the "X edits left" indicator
+        // shows immediately — before the first edit — and the limit is clear up front.
         if (meta.imageGenerationStatus && meta.imageGenerationStatus.length > 0) {
-          setImageGenerationStatus(meta.imageGenerationStatus);
+          const ec = data.editCounts as { cover?: number; scenes?: Record<number, number> } | undefined;
+          const withEditCounts = meta.imageGenerationStatus.map((img: GeneratedImage) => {
+            if (!ec) return img;
+            const used = img.sceneNumber === 0 ? (ec.cover ?? 0) : (ec.scenes?.[img.sceneNumber] ?? 0);
+            return { ...img, editsRemaining: Math.max(0, MAX_EDITS_PER_IMAGE - used) };
+          });
+          setImageGenerationStatus(withEditCounts);
+          setCoverEditsRemaining(ec ? Math.max(0, MAX_EDITS_PER_IMAGE - (ec.cover ?? 0)) : undefined);
           // Extract image URLs for the generatedImages array
           const urls = meta.imageGenerationStatus
             .filter((img: any) => img.imageUrl && img.status === 'completed')
@@ -787,6 +798,15 @@ function CreateStoryPageInner() {
     // characters. Only the script is required.
     if (!scriptInput.trim()) {
       alert('Please write your scenes first');
+      return;
+    }
+
+    // Enforce the picture-book scene cap BEFORE captions/images so the user fixes
+    // the length up front instead of getting blocked later. No auto-truncation —
+    // we ask them to shorten.
+    const sceneCountCheck = parseScriptIntoScenes(scriptInput, characters);
+    if (sceneCountCheck.length > MAX_PICTURE_BOOK_SCENES) {
+      alert(`${SCENE_LIMIT_MESSAGE}\n\nYour story currently has ${sceneCountCheck.length} scenes.`);
       return;
     }
 
@@ -3183,6 +3203,7 @@ function CreateStoryPageInner() {
             <ImageGallery
               generatedImages={imageGenerationStatus}
               characters={characters}
+              projectId={savedProjectId || draftProjectId || undefined}
               artStyle={ART_STYLE}
               imageProvider={imageProvider}
               illustrationStyle={artStyle}
@@ -3476,6 +3497,9 @@ function CreateStoryPageInner() {
                         currentImageUrl={coverImageUrl}
                         imageType="cover"
                         imageId="cover"
+                        projectId={savedProjectId || draftProjectId || undefined}
+                        sceneNumber={0}
+                        initialEditsRemaining={coverEditsRemaining}
                         onEditComplete={(newUrl) => setCoverImageUrl(newUrl)}
                         imageProvider={imageProvider}
                         illustrationStyle={artStyle}

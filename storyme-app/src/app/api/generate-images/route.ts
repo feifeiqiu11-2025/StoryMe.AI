@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateImageWithMultipleCharacters, CharacterPromptInfo } from '@/lib/fal-client';
 import { generateImageWithGemini, generateImageWithGeminiClassic, generateImageWithGeminiColoring, isGeminiAvailable, GeminiCharacterInfo, clearOutfitCache, resolveGeminiImageModel } from '@/lib/gemini-image-client';
 import { openaiGenerateScene, MultiImageEditError } from '@/lib/openai-image-client';
-import { parseScriptIntoScenes, buildConsistentSceneSettings, extractSceneLocation } from '@/lib/scene-parser';
+import { parseScriptIntoScenes, buildConsistentSceneSettings, extractSceneLocation, MAX_PICTURE_BOOK_SCENES, SCENE_LIMIT_MESSAGE } from '@/lib/scene-parser';
 import { GeneratedImage, Character, CharacterRating, ClothingConsistency, ImageProvider, normalizeImageProvider, isGeminiProvider, isOpenAIProvider, DEFAULT_SCENE_IMAGE_PROVIDER } from '@/lib/types/story';
 import { createClientFromRequest } from '@/lib/supabase/server';
 import { checkImageGenerationLimit, logApiUsage } from '@/lib/utils/rate-limit';
@@ -132,6 +132,16 @@ export async function POST(request: NextRequest) {
     if (scenes.length === 0) {
       return NextResponse.json(
         { error: 'No valid scenes found in script' },
+        { status: 400 }
+      );
+    }
+
+    // Hard cap (backstop for the create-flow UI check): reject — never truncate —
+    // a story over the scene limit so the user keeps all their scenes and shortens
+    // intentionally. Cover is added separately, so the cap is on story scenes only.
+    if (scenes.length > MAX_PICTURE_BOOK_SCENES) {
+      return NextResponse.json(
+        { error: SCENE_LIMIT_MESSAGE },
         { status: 400 }
       );
     }

@@ -223,7 +223,18 @@ export interface GeneratedImage {
   userExpectationScore?: number; // 1-5
   ratingFeedback?: string;
   ratedAt?: string;
+
+  // Edits left for THIS image under the per-image edit cap (set on load from the
+  // story's persisted counts). Undefined = unknown/untracked (e.g. unsaved).
+  editsRemaining?: number;
 }
+
+/**
+ * Max edits allowed per image (scene or cover) under the persistent edit cap.
+ * Enforced in /api/edit-image and shown in the edit UI. Its own constant — not
+ * tied to the character-preview flow's limit, so they can diverge.
+ */
+export const MAX_EDITS_PER_IMAGE = 6;
 
 export interface StorySession {
   characters: Character[]; // Multiple characters support

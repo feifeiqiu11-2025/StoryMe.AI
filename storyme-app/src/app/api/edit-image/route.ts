@@ -29,7 +29,7 @@ import { editImageWithGemini, isGeminiEditAvailable, resolveGeminiImageModel, MA
 import { editImageWithQwen, isQwenAvailable } from '@/lib/qwen-image-client';
 import { openaiEditScene } from '@/lib/openai-image-client';
 import { createClient } from '@/lib/supabase/server';
-import { normalizeImageProvider, isOpenAIProvider } from '@/lib/types/story';
+import { normalizeImageProvider, isOpenAIProvider, MAX_EDITS_PER_IMAGE } from '@/lib/types/story';
 
 export const maxDuration = 300; // 5 minutes timeout for Vercel
 
@@ -46,6 +46,10 @@ interface EditImageRequest {
   instruction: string;
   imageType: 'scene' | 'cover';
   imageId: string;
+  /** Project id — required to track/limit edits (scene by scene_number, cover on the project). */
+  projectId?: string;
+  /** Scene position: 0 = cover, 1..N = scenes. The reliable key for the edit limit. */
+  sceneNumber?: number;
   illustrationStyle?: 'pixar' | 'classic' | 'coloring' | 'ghibli';
   sceneDescription?: string;
   useProvider?: EditProvider;
@@ -64,6 +68,8 @@ export async function POST(request: NextRequest) {
       instruction,
       imageType,
       imageId,
+      projectId,
+      sceneNumber,
       illustrationStyle = 'pixar',
       sceneDescription,
       useProvider,
@@ -117,6 +123,48 @@ export async function POST(request: NextRequest) {
     console.log(`[Edit Image] ${requestId} - Type: ${imageType}, ID: ${imageId}`);
     console.log(`[Edit Image] Instruction: "${instruction}"`);
     console.log(`[Edit Image] Style: ${illustrationStyle}, Provider preference: ${useProvider || 'auto'}`);
+
+    // Auth + per-image edit cap (persistent). Created here (before generation) so
+    // we can reject an over-limit edit BEFORE spending a generation.
+    //
+    // Keyed by the only identifiers that are reliable at edit time:
+    //   - projectId   (always present once the story is saved/drafted)
+    //   - sceneNumber (0 = cover, 1..N = scenes)
+    // Counts live in projects.edit_counts (a JSONB keyed by sceneNumber as text) —
+    // on the PROJECT row, NOT scene rows, because the save flow deletes + recreates
+    // scene rows on every save (which would reset a per-scene count). The project row
+    // persists, so the count survives saves/regenerates. RLS scopes it to the owner.
+    // Unsaved/guest images (no projectId or no row) → no enforcement. The increment
+    // happens only AFTER a successful generation below, so failed edits don't count.
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const editKey = typeof sceneNumber === 'number' ? String(sceneNumber) : null;
+    let currentEditCount = 0;
+    let trackEdits = false;
+    if (projectId && editKey !== null) {
+      const { data: proj } = await supabase
+        .from('projects')
+        .select('edit_counts')
+        .eq('id', projectId)
+        .maybeSingle();
+      if (proj) {
+        trackEdits = true;
+        const counts = (proj.edit_counts as Record<string, number> | null) || {};
+        currentEditCount = counts[editKey] ?? 0;
+        if (currentEditCount >= MAX_EDITS_PER_IMAGE) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `You've reached the ${MAX_EDITS_PER_IMAGE}-edit limit for this image. You can't edit it any further.`,
+              editsRemaining: 0,
+              limitReached: true,
+            },
+            { status: 429 }
+          );
+        }
+      }
+    }
 
     // Determine which provider to use. The edit engine follows the GENERATION
     // provider so an edited image matches the batch: OpenAI gpt-image-2 images are
@@ -203,11 +251,30 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Edit Image] ${provider} returned image in ${generationTime.toFixed(1)}s`);
 
-    // Upload the edited image to Supabase Storage
-    const supabase = await createClient();
+    // Generation succeeded → count this edit (accept-or-not, every successful
+    // generation counts; failures don't reach here). Re-read edit_counts right
+    // before writing to minimize the lost-update window — the edit UI is sequential
+    // (one proposal at a time), so concurrent edits on one project don't realistically
+    // happen. No-op for unsaved/guest.
+    let editsRemaining: number | undefined = undefined;
+    if (trackEdits && projectId && editKey !== null) {
+      const { data: fresh } = await supabase
+        .from('projects')
+        .select('edit_counts')
+        .eq('id', projectId)
+        .maybeSingle();
+      const counts = (fresh?.edit_counts as Record<string, number> | null) || {};
+      const cur = counts[editKey] ?? currentEditCount;
+      const newCount = cur + 1;
+      await supabase
+        .from('projects')
+        .update({ edit_counts: { ...counts, [editKey]: newCount } })
+        .eq('id', projectId);
+      editsRemaining = Math.max(0, MAX_EDITS_PER_IMAGE - newCount);
+    }
 
-    // Get user (authenticated or guest)
-    const { data: { user } } = await supabase.auth.getUser();
+    // Upload the edited image to Supabase Storage (reuse the client/user from the
+    // pre-check above).
     const userId = user?.id || 'guest';
 
     // Convert base64 data URL to buffer
@@ -248,6 +315,7 @@ export async function POST(request: NextRequest) {
         generationTime,
         provider,
         uploadFailed: true,
+        editsRemaining,
       });
     }
 
@@ -265,6 +333,7 @@ export async function POST(request: NextRequest) {
       editInstruction: instruction,
       generationTime,
       provider,
+      editsRemaining,
     });
 
   } catch (error) {
