@@ -15,6 +15,8 @@ import EditImageControl from './EditImageControl';
 interface ImageGalleryProps {
   characters: Character[];
   generatedImages: GeneratedImage[];
+  /** Project id — needed so COVER edits count against the per-image edit limit. */
+  projectId?: string;
   onRating?: (imageId: string, characterId: string, rating: 'good' | 'bad') => void;
   onDownloadAll?: () => void;
   onStartOver?: () => void;
@@ -43,6 +45,7 @@ interface ImageGalleryProps {
 export default function ImageGallery({
   characters,
   generatedImages,
+  projectId,
   onRating,
   onDownloadAll,
   onStartOver,
@@ -619,8 +622,14 @@ export default function ImageGallery({
                     <div className="mt-3">
                       <EditImageControl
                         currentImageUrl={image.imageUrl}
-                        imageType="scene"
-                        imageId={image.id}
+                        imageType={image.sceneNumber === 0 ? 'cover' : 'scene'}
+                        // Route convention: cover uses 'cover'; a scene is keyed by
+                        // its DB scene id (sceneId) so the persistent edit count
+                        // lands on the right scenes row.
+                        imageId={image.sceneNumber === 0 ? 'cover' : (image.sceneId || image.id)}
+                        projectId={projectId}
+                        sceneNumber={image.sceneNumber}
+                        initialEditsRemaining={image.editsRemaining}
                         illustrationStyle={illustrationStyle ?? 'pixar'}
                         imageProvider={imageProvider}
                         sceneDescription={image.sceneDescription}

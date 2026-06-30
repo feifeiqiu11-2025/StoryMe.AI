@@ -37,9 +37,28 @@ export async function GET(
       );
     }
 
+    // Per-image edit counts for the persistent edit cap UI. Stored on the project in
+    // one JSONB keyed by sceneNumber ("0" = cover, "1".."N" = scenes) so they survive
+    // the save flow's scene delete+recreate. RLS already scoped to the owner.
+    const { data: projRow } = await supabase
+      .from('projects')
+      .select('edit_counts')
+      .eq('id', id)
+      .maybeSingle();
+    const rawCounts = (projRow?.edit_counts as Record<string, number> | null) || {};
+    const editCounts = {
+      cover: rawCounts['0'] ?? 0,
+      scenes: Object.fromEntries(
+        Object.entries(rawCounts)
+          .filter(([k]) => k !== '0')
+          .map(([k, v]) => [Number(k), v])
+      ) as Record<number, number>,
+    };
+
     return NextResponse.json({
       success: true,
       project,
+      editCounts,
     });
 
   } catch (error) {

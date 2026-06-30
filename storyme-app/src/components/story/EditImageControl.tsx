@@ -20,6 +20,12 @@ interface EditImageControlProps {
   currentImageUrl: string;
   imageType: 'scene' | 'cover';
   imageId: string;
+  /** Project id — needed so edits count against the per-image edit limit. */
+  projectId?: string;
+  /** Scene position: 0 = cover, 1..N = scenes. The reliable key for the edit limit. */
+  sceneNumber?: number;
+  /** Edits left for this image at mount (from the story's persisted count). Undefined = unknown/untracked. */
+  initialEditsRemaining?: number;
   onEditComplete: (newImageUrl: string) => void;
   buttonLabel?: string;
   /** Illustration style to maintain during edit (defaults to 'pixar') */
@@ -67,6 +73,9 @@ export default function EditImageControl({
   currentImageUrl,
   imageType,
   imageId,
+  projectId,
+  sceneNumber,
+  initialEditsRemaining,
   onEditComplete,
   buttonLabel = 'Edit Image',
   illustrationStyle = 'pixar',
@@ -80,6 +89,11 @@ export default function EditImageControl({
   const [instruction, setInstruction] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Per-image edit budget (persisted server-side). Undefined = unknown/untracked
+  // (e.g. unsaved story). 0 = used up → editing is blocked for this image.
+  const [editsRemaining, setEditsRemaining] = useState<number | undefined>(initialEditsRemaining);
+  const limitReached = editsRemaining === 0;
 
   // Edit model — defaults to the SAME provider the batch used so an edited image
   // matches the rest of the book. The small dropdown lets the user switch to
@@ -204,6 +218,11 @@ export default function EditImageControl({
       return;
     }
 
+    if (limitReached) {
+      setError(`You've reached the edit limit for this image.`);
+      return;
+    }
+
     setIsEditing(true);
     setError(null);
 
@@ -218,6 +237,8 @@ export default function EditImageControl({
           instruction: instruction.trim(),
           imageType,
           imageId,
+          projectId,
+          sceneNumber,
           illustrationStyle,
           sceneDescription,
           imageProvider: editProvider,
@@ -227,6 +248,12 @@ export default function EditImageControl({
       });
 
       const data = await response.json();
+
+      // Keep the remaining-edit count in sync whenever the server reports it
+      // (both on success and on a limit rejection).
+      if (typeof data.editsRemaining === 'number') {
+        setEditsRemaining(data.editsRemaining);
+      }
 
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to edit image');
@@ -338,9 +365,19 @@ export default function EditImageControl({
     >
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-gray-900">
-          What would you like to change?
-        </h4>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h4 className="text-sm font-semibold text-gray-900">
+            What would you like to change?
+          </h4>
+          {/* Per-image edit budget — red so the limit is obvious up front. */}
+          {typeof editsRemaining === 'number' && (
+            <span className="text-xs font-semibold text-red-600" title="Each image can be edited a limited number of times">
+              {limitReached
+                ? 'No edits left for this image'
+                : `${editsRemaining} edit${editsRemaining === 1 ? '' : 's'} left`}
+            </span>
+          )}
+        </div>
         <button
           onClick={handleCancel}
           disabled={isEditing}
@@ -470,7 +507,7 @@ export default function EditImageControl({
       <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={handleEdit}
-          disabled={isEditing || !instruction.trim()}
+          disabled={isEditing || !instruction.trim() || limitReached}
           className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-md hover:from-blue-700 hover:to-purple-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm"
         >
           {isEditing ? (

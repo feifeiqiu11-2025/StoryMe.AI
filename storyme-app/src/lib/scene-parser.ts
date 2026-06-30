@@ -1,6 +1,17 @@
 import { Scene, Character } from './types/story';
 
 /**
+ * Hard limit on the number of story scenes in a picture book. A cover is added
+ * automatically on top of this (so the book has at most 15 scenes + 1 cover = 16
+ * images). Independent constant — not shared with other per-image limits, so it
+ * can be tuned on its own.
+ */
+export const MAX_PICTURE_BOOK_SCENES = 15;
+
+/** User-facing message when a story exceeds the scene cap. */
+export const SCENE_LIMIT_MESSAGE = `Picture books can have up to ${MAX_PICTURE_BOOK_SCENES} scenes. Please shorten your story to ${MAX_PICTURE_BOOK_SCENES} scenes or fewer to continue.`;
+
+/**
  * Extract character names from a scene description
  * Looks for character names at the start of the description or in common patterns
  */
@@ -124,8 +135,8 @@ export function validateScript(script: string): { valid: boolean; error?: string
     return { valid: false, error: 'Please enter at least one scene description' };
   }
 
-  if (scenes.length > 15) {
-    return { valid: false, error: 'Maximum 15 scenes allowed for the POC' };
+  if (scenes.length > MAX_PICTURE_BOOK_SCENES) {
+    return { valid: false, error: SCENE_LIMIT_MESSAGE };
   }
 
   // Check if any scene description is too short
