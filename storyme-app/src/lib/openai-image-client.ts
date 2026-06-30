@@ -255,6 +255,11 @@ export async function callOpenAIImage({
       }
       return { b64, mimeType: 'image/png' };
     } catch (error) {
+      // A multi-image rejection won't succeed on retry — surface it immediately
+      // so the caller (scene route) can fall back to Gemini without burning the
+      // remaining attempts re-running the same failing edit.
+      if (error instanceof MultiImageEditError) throw error;
+
       lastError = error instanceof Error ? error : new Error(String(error));
       const errorMessage = lastError.message;
       console.error(`[${logTag}] Error attempt ${attempt}/${MAX_RETRIES}:`, errorMessage);
@@ -760,6 +765,14 @@ export interface OpenAIEditParams {
   /** Optional user-supplied reference (base64 data URL or raw base64). */
   manualReferenceImageBase64?: string;
   size?: '1024x1024' | '1024x1536' | '1536x1024';
+  /**
+   * True when editing a book COVER. Covers can have the title baked into the
+   * image (English) or no text at all (other languages), so instead of the
+   * scene "avoid adding text" guidance we tell the model to keep WHATEVER text
+   * is already there and not add any — which preserves an English title without
+   * inventing one on a text-less cover.
+   */
+  isCover?: boolean;
 }
 
 export interface OpenAIEditResult {
@@ -784,6 +797,7 @@ export async function openaiEditScene({
   characterReferences,
   manualReferenceImageBase64,
   size,
+  isCover,
 }: OpenAIEditParams): Promise<OpenAIEditResult> {
   const startTime = Date.now();
   const variant = styleVariant || 'classic';
@@ -832,13 +846,26 @@ export async function openaiEditScene({
     lines.push('', `Scene context: ${sceneDescription}`);
   }
   if (fetched.length > 0) {
-    lines.push('', 'The remaining attached images are references — keep these subjects faithful (appearance, colors, key features):');
+    lines.push(
+      '',
+      REFERENCE_AUTHORITATIVE_RULE,
+      '',
+      'The FIRST attached image is the one being edited (Image 1). The remaining attached images are references — each IS the named character; match it exactly:'
+    );
+    // Offset by 1: the edit target is Image 1, so references start at Image 2.
     fetched.forEach((f, i) =>
-      lines.push(`  - Reference ${i + 1}: ${f.ref.description ? `${f.ref.name} — ${f.ref.description}` : f.ref.name}`)
+      lines.push(buildReferenceBindingLine(i + 1, f.ref.description ? `${f.ref.name} — ${f.ref.description}` : f.ref.name))
     );
   }
   lines.push('', `Style: ${styleLine}`);
-  lines.push('', 'Keep it age-appropriate, warm, and free of scary content. Avoid adding text unless the scene requires it.');
+  lines.push(
+    '',
+    `Keep it age-appropriate, warm, and free of scary content. ${
+      isCover
+        ? 'Keep any title or text already in the image exactly as it appears; do not add, remove, or re-letter text.'
+        : 'Avoid adding text unless the scene requires it.'
+    }`
+  );
   const prompt = lines.join('\n');
 
   const quality = getSceneImageQuality();
@@ -848,6 +875,10 @@ export async function openaiEditScene({
     size: size || '1024x1024',
     quality,
     logTag: `OpenAI Edit (${quality})`,
+    // buffers[0] is the edit target; anything beyond it is a reference. Never
+    // silently collapse to the target alone — let the edit route fall back to
+    // Gemini edit (which keeps every reference) instead of editing with none.
+    multiImageFailureMode: buffers.length > 1 ? 'throw' : 'fallback-single',
   });
 
   return {

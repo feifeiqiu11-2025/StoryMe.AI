@@ -51,7 +51,7 @@ const IMAGE_SAFETY_SETTINGS = [
 // quality/cost/latency balance — covers all realistic kid-book scenes
 // (typically 1–3 characters) while leaving headroom for occasional bigger
 // casts. Bump if you ever see large-cast scenes drop the wrong character.
-const MAX_REFERENCE_IMAGES_PER_SCENE = 8;
+export const MAX_REFERENCE_IMAGES_PER_SCENE = 8;
 
 export interface GeminiCharacterInfo {
   name: string;
@@ -606,6 +606,31 @@ function buildNamedCharacterSection(
 }
 
 /**
+ * Build the creature/animal section for a scene prompt.
+ *
+ * A creature WITH a reference image (very often a kid's drawing) must be
+ * translated FAITHFULLY — its own shape/colors/features preserved and rendered
+ * into the story's art style — NOT replaced with a generic "cute animal". That
+ * generic descriptor is what made hand-drawn creatures (e.g. a candy/snake
+ * creature) morph from scene to scene. A creature WITHOUT a reference falls back
+ * to the per-builder descriptor (`noRefDescriptor`), since there's no image to
+ * preserve. Shared by all three Gemini scene builders.
+ */
+function buildCreatureSection(
+  animals: { char: { name: string; referenceImageUrl?: string }; prompt: string }[],
+  noRefDescriptor: string
+): string {
+  if (animals.length === 0) return '';
+  const lines = animals.map(cp => {
+    const hasReference = !!cp.char.referenceImageUrl?.trim();
+    return hasReference
+      ? `- ${cp.char.name}: render THIS creature exactly as shown in its reference image — preserve its distinctive shape, colors, and features; translate it faithfully into the story's art style; do NOT replace it with a generic or realistic animal. ${cp.prompt}`
+      : `- ${cp.prompt} (${noRefDescriptor})`;
+  });
+  return `CREATURE CHARACTERS (match each reference image exactly):\n${lines.join('\n')}`;
+}
+
+/**
  * Generate image with Gemini using actual character reference images
  * Uses new @google/genai SDK with imageConfig for proper 1:1 aspect ratio
  */
@@ -659,9 +684,7 @@ export async function generateImageWithGemini({
 
   const humanCharacterSection = buildNamedCharacterSection(humanCharacters);
 
-  const animalCharacterSection = animalCharacters.length > 0
-    ? `ANIMAL CHARACTERS:\n${animalCharacters.map(cp => `- ${cp.prompt} (cute animated animal, animal face, NO human features)`).join('\n')}`
-    : '';
+  const animalCharacterSection = buildCreatureSection(animalCharacters, 'cute animated animal, animal face, NO human features');
 
   // Detect if scene mentions animals not in character list
   const sceneAnimalSection = hasAnimalsInScene && !hasAnimalCharacters
@@ -877,9 +900,7 @@ export async function generateImageWithGeminiClassic({
   const animalDescriptor = isRealistic
     ? 'realistic, naturalistically-rendered animal with accurate real-world anatomy and proportions, animal face, NO human features'
     : 'cute 2D illustrated animal, animal face, NO human features';
-  const animalCharacterSection = animalCharacters.length > 0
-    ? `ANIMAL CHARACTERS:\n${animalCharacters.map(cp => `- ${cp.prompt} (${animalDescriptor})`).join('\n')}`
-    : '';
+  const animalCharacterSection = buildCreatureSection(animalCharacters, animalDescriptor);
 
   // Detect if scene mentions animals not in character list
   const sceneAnimalSection = hasAnimalsInScene && !hasAnimalCharacters
@@ -1083,9 +1104,7 @@ export async function generateImageWithGeminiColoring({
 
   const humanCharacterSection = buildNamedCharacterSection(humanCharacters);
 
-  const animalCharacterSection = animalCharacters.length > 0
-    ? `ANIMAL CHARACTERS:\n${animalCharacters.map(cp => `- ${cp.prompt} (cute cartoon animal in line art, animal face, NO human features)`).join('\n')}`
-    : '';
+  const animalCharacterSection = buildCreatureSection(animalCharacters, 'cute cartoon animal in line art, animal face, NO human features');
 
   // Detect if scene mentions animals not in character list
   const sceneAnimalSection = hasAnimalsInScene && !hasAnimalCharacters
@@ -2928,6 +2947,12 @@ export interface GeminiEditParams {
   }>;
   /** User-uploaded reference image (base64 data URL, already resized client-side) */
   manualReferenceImageBase64?: string;
+  /**
+   * True when editing a book COVER — preserve any existing title/text in the
+   * image and don't add new text (covers may have a baked-in title or, in some
+   * languages, none at all).
+   */
+  isCover?: boolean;
 }
 
 /**
@@ -2963,6 +2988,7 @@ export async function editImageWithGemini({
   modelId,
   characterReferences,
   manualReferenceImageBase64,
+  isCover,
 }: GeminiEditParams): Promise<GeminiEditResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -2998,7 +3024,7 @@ export async function editImageWithGemini({
   const hasManualRef = manualReferenceImageBase64 && manualReferenceImageBase64.trim().length > 0;
   let characterSection = '';
   if (hasCharacterRefs) {
-    const charLines = characterReferences.slice(0, 3).map(ref =>
+    const charLines = characterReferences.slice(0, MAX_REFERENCE_IMAGES_PER_SCENE).map(ref =>
       `- ${ref.name}${ref.description ? `: ${ref.description}` : ''}`
     ).join('\n');
     characterSection = `\nCHARACTER REFERENCES (match these characters exactly):\n${charLines}\nReference images for these characters are attached below.\n`;
@@ -3018,12 +3044,12 @@ PROPORTIONS TO MAINTAIN: Normal, healthy body proportions - not overly fat or ch
 IMPORTANT RULES:
 - Apply ONLY the requested edit
 - Keep the same illustration style (${styleLabel})
-${hasCharacterRefs ? '- Characters MUST match their attached reference images in appearance\n' : ''}- Preserve character appearances and expressions unless specifically asked to change them
+${hasCharacterRefs ? `- ${REFERENCE_AUTHORITATIVE_RULE}\n` : ''}- Preserve character appearances and expressions unless specifically asked to change them
 ${illustrationStyle === 'coloring'
   ? '- MUST remain black and white line art ONLY - NO colors, NO shading, NO gradients\n- Keep clean outlines on white background'
   : '- Maintain the same color palette and lighting'}
 - Keep the same background unless specifically asked to change it
-- Output must be a children's book illustration, NOT a photograph
+${isCover ? '- Keep any title or text already in the image exactly as it appears; do not add, remove, or re-letter text\n' : ''}- Output must be a children's book illustration, NOT a photograph
 - Square 1:1 aspect ratio`;
 
   console.log(`[Gemini Edit] Editing image with instruction: "${editInstruction}"`);
@@ -3054,7 +3080,7 @@ ${illustrationStyle === 'coloring'
 
   // Append character reference images (max 3, fetched server-side from URLs)
   if (hasCharacterRefs) {
-    for (const ref of characterReferences!.slice(0, 3)) {
+    for (const ref of characterReferences!.slice(0, MAX_REFERENCE_IMAGES_PER_SCENE)) {
       const url = ref.referenceImageUrl?.trim();
       if (!url) continue;
       try {
