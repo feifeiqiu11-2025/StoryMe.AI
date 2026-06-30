@@ -25,7 +25,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { editImageWithGemini, isGeminiEditAvailable, resolveGeminiImageModel } from '@/lib/gemini-image-client';
+import { editImageWithGemini, isGeminiEditAvailable, resolveGeminiImageModel, MAX_REFERENCE_IMAGES_PER_SCENE } from '@/lib/gemini-image-client';
 import { editImageWithQwen, isQwenAvailable } from '@/lib/qwen-image-client';
 import { openaiEditScene } from '@/lib/openai-image-client';
 import { createClient } from '@/lib/supabase/server';
@@ -72,9 +72,10 @@ export async function POST(request: NextRequest) {
       manualReferenceImageBase64,
     } = body;
 
-    // Validate and cap character references (max 3)
+    // Validate and cap character references — same cap as batch generation so
+    // edit and batch behave consistently.
     const characterReferences = Array.isArray(rawCharacterRefs)
-      ? rawCharacterRefs.slice(0, 3).filter(
+      ? rawCharacterRefs.slice(0, MAX_REFERENCE_IMAGES_PER_SCENE).filter(
           (ref): ref is CharacterReference =>
             typeof ref.name === 'string' && typeof ref.referenceImageUrl === 'string'
         )
@@ -155,6 +156,7 @@ export async function POST(request: NextRequest) {
           styleVariant: illustrationStyle,
           characterReferences,
           manualReferenceImageBase64,
+          isCover: imageType === 'cover',
         });
         resultImageUrl = result.imageUrl;
         generationTime = result.generationTime;
@@ -173,6 +175,7 @@ export async function POST(request: NextRequest) {
           modelId: geminiModelId,
           characterReferences,
           manualReferenceImageBase64,
+          isCover: imageType === 'cover',
         });
         resultImageUrl = result.imageUrl;
         generationTime = result.generationTime;
@@ -187,6 +190,7 @@ export async function POST(request: NextRequest) {
         modelId: geminiModelId,
         characterReferences,
         manualReferenceImageBase64,
+        isCover: imageType === 'cover',
       });
       resultImageUrl = result.imageUrl;
       generationTime = result.generationTime;
