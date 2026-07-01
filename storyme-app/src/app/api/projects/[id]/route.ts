@@ -181,6 +181,17 @@ export async function PATCH(
         status: 'draft',
         draft_metadata: rebuiltMetadata,
       } as any);
+
+      // This story was completed before being reverted for editing. Mark it as
+      // already-completed (if not already) so the re-save through
+      // /api/projects/save is treated as an edit — not a new story — and isn't
+      // blocked by or charged against the monthly story quota. Belt-and-braces
+      // for stories the backfill migration couldn't detect.
+      await supabase
+        .from('projects')
+        .update({ first_completed_at: new Date().toISOString() })
+        .eq('id', id)
+        .is('first_completed_at', null);
     }
 
     return NextResponse.json({

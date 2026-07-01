@@ -48,26 +48,9 @@ export async function POST(request: NextRequest) {
     }
     userId = user.id;
 
-    // CHECK STORY CREATION LIMIT - Phase 2A subscription system
-    const subscriptionStatus = await checkStoryCreationLimit(user.id);
-
-    if (!subscriptionStatus.canCreate) {
-      await log(403, `Story limit reached: ${subscriptionStatus.reason}`);
-      return NextResponse.json({
-        error: 'Story limit reached',
-        message: subscriptionStatus.reason,
-        subscription: {
-          tier: subscriptionStatus.tier,
-          status: subscriptionStatus.status,
-          storiesUsed: subscriptionStatus.storiesUsed,
-          storiesLimit: subscriptionStatus.storiesLimit,
-          trialEndsAt: subscriptionStatus.trialEndsAt,
-        },
-        upgradeRequired: true,
-      }, { status: 403 });
-    }
-
-    // Parse request body
+    // Parse request body FIRST — projectId tells a brand-new story apart from a
+    // re-save of an existing one. Editing reverts a completed story to draft and
+    // re-saves it here; those edits must NOT be gated by the create limit.
     const body = await request.json();
     const {
       projectId,        // Optional: draft→completed transition
@@ -89,10 +72,11 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // If projectId provided, verify it's a draft owned by this user
+    let isReSave = false;
     if (projectId) {
       const { data: existingProject } = await supabase
         .from('projects')
-        .select('id, status, user_id')
+        .select('id, status, user_id, first_completed_at')
         .eq('id', projectId)
         .single();
 
@@ -118,6 +102,33 @@ export async function POST(request: NextRequest) {
           { error: 'Only draft projects can be completed via this endpoint' },
           { status: 400 }
         );
+      }
+
+      // A project that has already been completed at least once is an EDIT, not
+      // a new story. Re-saving it must never be blocked by the quota or
+      // re-counted (the bug: editing was treated as new creation).
+      isReSave = !!existingProject.first_completed_at;
+    }
+
+    // CHECK STORY CREATION LIMIT — only for genuinely new stories.
+    // Editing/re-saving an existing story bypasses the create limit entirely.
+    if (!isReSave) {
+      const subscriptionStatus = await checkStoryCreationLimit(user.id);
+
+      if (!subscriptionStatus.canCreate) {
+        await log(403, `Story limit reached: ${subscriptionStatus.reason}`);
+        return NextResponse.json({
+          error: 'Story limit reached',
+          message: subscriptionStatus.reason,
+          subscription: {
+            tier: subscriptionStatus.tier,
+            status: subscriptionStatus.status,
+            storiesUsed: subscriptionStatus.storiesUsed,
+            storiesLimit: subscriptionStatus.storiesLimit,
+            trialEndsAt: subscriptionStatus.trialEndsAt,
+          },
+          upgradeRequired: true,
+        }, { status: 403 });
       }
     }
 
@@ -219,12 +230,27 @@ export async function POST(request: NextRequest) {
     });
 
     // INCREMENT STORY COUNT - Phase 2A subscription system
-    // This updates the user's monthly story counter and usage tracking
-    try {
-      await incrementStoryCount(user.id);
-    } catch (countError) {
-      // Log error but don't fail the request - story was already saved
-      console.error('Failed to increment story count:', countError);
+    // Only a first-ever completion counts. Re-saves of an already-counted story
+    // are edits and must not re-charge the monthly quota.
+    if (!isReSave) {
+      try {
+        // Stamp first_completed_at only if still null. This marks the story as
+        // counted (so future edits are free) AND closes the double-submit race:
+        // we increment only when this write actually set the flag.
+        const { data: flagged } = await supabase
+          .from('projects')
+          .update({ first_completed_at: new Date().toISOString() })
+          .eq('id', project.id)
+          .is('first_completed_at', null)
+          .select('id');
+
+        if (flagged && flagged.length > 0) {
+          await incrementStoryCount(user.id);
+        }
+      } catch (countError) {
+        // Log error but don't fail the request - story was already saved
+        console.error('Failed to increment story count:', countError);
+      }
     }
 
     await log(200);
