@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KindleWood × STEAMOJI — Workshop Feedback</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* KindleWood "Storybook + Serif" theme — shared with /pitch and /partnership.
+     STEAMOJI sun-yellow paired against KindleWood terracotta for the partnership. */
+  :root{
+    --cream:#FBF6EE; --cream-hi:#FFFDF8; --sand:#F3E8D6; --tan:#EFD9B8;
+    --ink:#2C2018; --ink-soft:#5A4A3A; --wood:#8A5A2B; --terra:#C9551F; --terra-br:#E2703A; --leaf:#6F8F4F;
+    --sun:#D99A1C; --sun-fill:#F8E7B0;
+    --line:rgba(138,90,43,.20);
+    --font-display:"Playfair Display",serif;
+    --font-body:"Jost",sans-serif;
+    --font-mono:"JetBrains Mono",monospace;
+    --e:cubic-bezier(.2,.8,.2,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:var(--font-body);font-weight:300;color:var(--ink);
+    background:radial-gradient(125% 125% at 18% 4%, #FFFDF8 0%, #FBF6EE 52%, #F1E4CF 100%);
+    background-attachment:fixed;min-height:100vh;line-height:1.5;position:relative;overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* soft decorative blobs, like the deck cover */
+  .blob{position:fixed;border-radius:46% 54% 58% 42%/52% 46% 54% 48%;filter:blur(3px);z-index:0;pointer-events:none;}
+  .b1{width:440px;height:440px;left:-180px;top:-150px;background:#F7E7C9;opacity:.5;}
+  .b2{width:320px;height:320px;right:-140px;top:34%;background:#F6EBC4;opacity:.45;}
+  .wrap{position:relative;z-index:1;max-width:680px;margin:0 auto;padding:48px 24px 90px;}
+
+  /* ---- Header: co-brand lockup ---- */
+  .lockup{display:flex;align-items:center;justify-content:center;gap:24px;margin-bottom:30px;}
+  .lockup img{display:block;}
+  .lockup .kw{height:60px;transform:translateY(-9px);}   /* nudge to optically match steamoji */
+  .lockup .so{height:48px;}
+  .lockup .x{font-family:var(--font-display);font-size:32px;color:var(--terra);}
+  .eyebrow{font-family:var(--font-mono);font-weight:400;font-size:13px;letter-spacing:.26em;text-transform:uppercase;color:var(--terra);text-align:center;}
+  h1{font-family:var(--font-display);font-weight:400;font-size:clamp(34px,8vw,52px);line-height:1.07;letter-spacing:-.5px;color:var(--ink);text-align:center;margin:16px 0 0;}
+  h1 em{font-style:italic;color:var(--terra);}
+  .intro{font-size:clamp(16px,4.4vw,19px);color:var(--ink-soft);text-align:center;max-width:540px;margin:22px auto 0;}
+  .intro strong{font-weight:500;color:var(--ink);}
+  .rule{width:90px;height:2px;background:var(--terra);border-radius:2px;margin:36px auto 8px;}
+
+  /* ---- Question (no card — clean flow, divider between) ---- */
+  .q{padding:22px 2px 6px;}
+  .q .qn{font-family:var(--font-mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--wood);}
+  .q .qn b{color:var(--terra);font-weight:500;}
+  .q .qn .opt{color:var(--ink-soft);letter-spacing:.12em;}
+  .q .label{font-family:var(--font-display);font-weight:400;font-size:clamp(21px,5.4vw,26px);line-height:1.28;color:var(--ink);margin:10px 0 14px;}
+  .q .qhint{font-size:15px;color:var(--ink-soft);margin:-4px 0 16px;line-height:1.5;}
+
+  /* ---- Rating / choice control — compact pills, label sits on the anchors ---- */
+  .scale{display:flex;flex-wrap:wrap;gap:8px;}
+  .scale input{position:absolute;opacity:0;width:0;height:0;}
+  .scale label{
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    min-height:44px;padding:0 16px;border:1px solid var(--line);border-radius:11px;background:var(--cream-hi);
+    color:var(--ink);font-family:var(--font-body);font-size:16px;font-weight:400;cursor:pointer;
+    transition:all .16s var(--e);user-select:none;white-space:nowrap;
+  }
+  .scale label .n{font-weight:500;}
+  .scale label .w{font-size:14px;color:var(--ink-soft);}
+  /* recommend 1–10: even grid so every pill is equal width (no orphan row) */
+  .scale.nums{display:grid;grid-template-columns:repeat(10,1fr);gap:8px;}
+  .scale.nums label{min-width:0;padding:0 4px;flex-direction:column;gap:2px;text-align:center;}
+  .scale.nums label .w{display:block;font-size:11px;line-height:1.12;}
+  .scale.choice label{flex:1 1 30%;min-width:96px;}     /* word choices share the row */
+  .scale label:hover{border-color:var(--terra-br);background:#FFF4E8;}
+  .scale input:checked + label{background:var(--terra);border-color:var(--terra);color:#fff;box-shadow:0 7px 16px rgba(201,85,31,.26);}
+  .scale input:checked + label .w{color:#fff;opacity:.92;}
+  .scale input:focus-visible + label{outline:3px solid var(--terra-br);outline-offset:2px;}
+
+  /* ---- Free text + contact ---- */
+  textarea,input[type=text],input[type=email]{
+    width:100%;font-family:var(--font-body);font-size:16px;color:var(--ink);background:var(--cream-hi);
+    border:1px solid var(--line);border-radius:12px;padding:14px 15px;resize:vertical;transition:border-color .16s;
+  }
+  textarea{min-height:88px;}
+  textarea::placeholder,input::placeholder{color:#A89478;}
+  textarea:focus,input:focus{outline:none;border-color:var(--terra-br);}
+  .contact-grid{display:flex;gap:12px;flex-wrap:wrap;}
+  .contact-grid > div{flex:1 1 220px;}
+  .contact-grid label.fl{display:block;font-size:14px;color:var(--ink-soft);margin-bottom:6px;}
+
+  /* ---- Submit ---- */
+  .submit{
+    width:100%;min-height:58px;margin-top:38px;border:none;border-radius:14px;cursor:pointer;
+    font-family:var(--font-body);font-weight:500;font-size:19px;color:#fff;background:var(--terra);
+    box-shadow:0 14px 30px rgba(201,85,31,.30);transition:transform .16s var(--e),background .16s;
+  }
+  .submit:hover{background:#b94a18;transform:translateY(-1px);}
+  .submit:disabled{opacity:.6;cursor:default;transform:none;}
+  .foot{font-family:var(--font-display);font-style:italic;font-size:18px;color:var(--wood);text-align:center;margin-top:20px;}
+  .err{color:#b4421c;font-size:15px;text-align:center;margin-top:14px;display:none;}
+
+  /* ---- Thank you ---- */
+  .thanks{display:none;text-align:center;padding:80px 20px;}
+  .thanks.show{display:block;animation:rise .6s var(--e);}
+  @keyframes rise{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:none;}}
+  .thanks .mark{width:84px;height:84px;border-radius:50%;background:var(--leaf);margin:0 auto 28px;
+        display:flex;align-items:center;justify-content:center;box-shadow:0 14px 30px rgba(111,143,79,.32);}
+  .thanks .mark::after{content:"";width:30px;height:16px;border-left:5px solid #fff;border-bottom:5px solid #fff;
+        transform:rotate(-45deg) translate(2px,-3px);}
+  .thanks h2{font-family:var(--font-display);font-size:40px;color:var(--ink);}
+  .thanks h2 em{font-style:italic;color:var(--terra);}
+  .thanks p{font-size:18px;color:var(--ink-soft);max-width:440px;margin:18px auto 0;}
+
+  @media (max-width:560px){
+    .wrap{padding:32px 18px 80px;}
+    .lockup{gap:16px;} .lockup .kw{height:48px;transform:translateY(-7px);} .lockup .so{height:38px;} .lockup .x{font-size:26px;}
+    .q{padding-top:28px;}
+    /* even, tappable rows on phones — recommend becomes a tidy 5×2 grid */
+    .scale{gap:7px;}
+    .scale.nums{grid-template-columns:repeat(5,1fr);gap:7px;}
+    .scale.choice label{flex:1 1 100%;}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+</style>
+<style>
+  /* ===== ON-LOAD REVEAL — subtle staggered rise (single page) ===== */
+  @keyframes svRise{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:none;}}
+  #surveyForm > *{animation:svRise .55s var(--e) both;}
+  #surveyForm > *:nth-child(1){animation-delay:.00s;}
+  #surveyForm > *:nth-child(2){animation-delay:.06s;}
+  #surveyForm > *:nth-child(3){animation-delay:.12s;}
+  #surveyForm > *:nth-child(4){animation-delay:.18s;}
+  #surveyForm > *:nth-child(5){animation-delay:.24s;}
+  #surveyForm > *:nth-child(6){animation-delay:.30s;}
+  #surveyForm > *:nth-child(7){animation-delay:.36s;}
+  #surveyForm > *:nth-child(8){animation-delay:.42s;}
+  #surveyForm > *:nth-child(9){animation-delay:.48s;}
+  #surveyForm > *:nth-child(n+10){animation-delay:.54s;}
+  /* selected pill gets a touch more life */
+  .scale input:checked + label{transform:translateY(-1px);}
+
+  /* ===== REVIEW MODE — inline edit (E) + comment (C), gated by ?review ===== */
+  .edit-hotzone{position:fixed;top:0;left:0;width:80px;height:80px;z-index:10000;cursor:pointer;display:none;}
+  body.review-on .edit-hotzone{display:block;}
+  .edit-toggle{position:fixed;top:18px;left:18px;width:46px;height:46px;border-radius:50%;border:1px solid var(--line);
+    background:var(--cream-hi);color:var(--ink);display:grid;place-items:center;cursor:pointer;opacity:0;pointer-events:none;
+    transition:opacity .3s;z-index:10001;box-shadow:0 4px 14px rgba(44,32,24,.12);}
+  .edit-toggle svg{width:20px;height:20px;}
+  .edit-toggle.show,.edit-toggle.active{opacity:1;pointer-events:auto;}
+  .edit-toggle.active{background:var(--terra);border-color:var(--terra);color:#fff;}
+  [contenteditable="true"]{outline:2px dashed rgba(201,85,31,.5);outline-offset:4px;border-radius:4px;}
+  .edit-banner{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;
+    font-family:var(--font-mono);font-size:13px;padding:8px 18px;border-radius:999px;z-index:10002;display:none;}
+  .edit-banner.show{display:block;}
+
+  .cm-toggle{position:fixed;top:18px;left:72px;width:46px;height:46px;border-radius:50%;border:1px solid var(--line);
+    background:var(--cream-hi);color:var(--ink);display:grid;place-items:center;cursor:pointer;opacity:0;pointer-events:none;
+    transition:opacity .3s ease;z-index:10001;box-shadow:0 4px 14px rgba(44,32,24,.12);}
+  .cm-toggle.show,.cm-toggle.active{opacity:1;pointer-events:auto;}
+  .cm-toggle.active{background:var(--leaf);border-color:var(--leaf);color:#fff;}
+  .cm-toggle svg{width:22px;height:22px;}
+  .cm-badge{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;
+    background:var(--terra);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center;display:none;}
+  .cm-badge.show{display:block;}
+  body.cm-on .wrap,body.cm-on .wrap *{cursor:crosshair;}
+  body.cm-on .cm-hover{outline:2px solid var(--leaf)!important;outline-offset:2px;border-radius:3px;}
+
+  .cm-card{position:fixed;z-index:10006;width:300px;max-width:calc(100vw - 24px);background:var(--cream-hi);
+    border:1px solid var(--leaf);border-radius:14px;box-shadow:0 18px 50px rgba(44,32,24,.28);padding:14px;
+    color:var(--ink);font-size:14px;line-height:1.45;display:none;}
+  .cm-card.show{display:block;}
+  .cm-card .cm-h{font-weight:700;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;}
+  .cm-card .cm-ref{font-size:12px;color:var(--ink-soft);background:var(--sand);border-radius:8px;padding:6px 9px;margin-bottom:9px;max-height:54px;overflow:auto;font-style:italic;}
+  .cm-card textarea{width:100%;min-height:74px;resize:vertical;border:1px solid var(--line);border-radius:9px;background:var(--cream);color:var(--ink);padding:9px;font:inherit;}
+  .cm-card .cm-row{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;}
+  .cm-btn{border:0;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer;}
+  .cm-btn.primary{background:var(--leaf);color:#fff;}
+  .cm-btn.ghost{background:var(--sand);color:var(--ink);}
+  .cm-panel{position:fixed;top:0;right:0;width:340px;max-width:90vw;height:100vh;z-index:10005;background:var(--cream-hi);
+    border-left:1px solid var(--line);box-shadow:-12px 0 40px rgba(44,32,24,.18);transform:translateX(100%);
+    transition:transform .3s var(--e);display:flex;flex-direction:column;color:var(--ink);font-size:14px;line-height:1.45;}
+  .cm-panel.show{transform:translateX(0);}
+  .cm-panel header{padding:18px 18px 13px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+  .cm-panel header h3{margin:0;font-size:16px;font-family:var(--font-display);font-weight:500;}
+  .cm-list{flex:1;overflow:auto;padding:12px 14px;}
+  .cm-item{border:1px solid var(--line);border-radius:10px;padding:10px 11px;margin-bottom:10px;background:var(--cream);}
+  .cm-item .cm-del{float:right;border:0;background:none;color:var(--ink-soft);cursor:pointer;font-size:11px;text-decoration:underline;}
+  .cm-item .cm-meta{font-size:11px;font-weight:700;color:var(--terra);text-transform:uppercase;letter-spacing:.04em;cursor:pointer;}
+  .cm-item .cm-quote{font-size:12px;color:var(--ink-soft);margin:5px 0;font-style:italic;}
+  .cm-item .cm-note{font-size:13px;}
+  .cm-empty{color:var(--ink-soft);text-align:center;padding:34px 14px;font-size:13px;line-height:1.6;}
+  .cm-foot{padding:12px 14px;border-top:1px solid var(--line);display:flex;gap:8px;}
+  .cm-foot .cm-btn{flex:1;padding:10px;}
+  .cm-foot .primary{background:var(--terra);}
+  .review-hint{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9999;display:none;
+    font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#fff;
+    background:rgba(44,32,24,.86);padding:8px 16px;border-radius:999px;}
+  .review-hint b{color:var(--terra-br);}
+  body.review-on .review-hint{display:block;}
+</style>
+</head>
+<body>
+<div class="blob b1"></div>
+<div class="blob b2"></div>
+<div class="wrap">
+
+  <form id="surveyForm" novalidate>
+    <header>
+      <div class="lockup">
+        <img class="kw" src="/survey/assets/logo.png" alt="KindleWood Studio" />
+        <span class="x">×</span>
+        <img class="so" src="/survey/assets/steamoji-logo.png" alt="STEAMOJI" />
+      </div>
+      <h1>How did our <em>workshops</em> go?</h1>
+      <p class="intro">Our summer creative storyteller workshop series just wrapped, and we'd love to hear how it went for you and your child. We'd <strong>appreciate 1–2 minutes</strong> of your time to answer these questions.</p>
+      <div class="rule"></div>
+    </header>
+
+    <!-- Q1 expectations -->
+    <div class="q">
+      <div class="qn">Question <b>01</b></div>
+      <div class="label">How well did the series meet your expectations?</div>
+      <div class="scale choice" data-key="expectations" role="radiogroup" aria-label="Expectations">
+        <input type="radio" id="exp3" name="expectations" value="3"><label for="exp3">Exceeded them</label>
+        <input type="radio" id="exp2" name="expectations" value="2"><label for="exp2">Met them</label>
+        <input type="radio" id="exp1" name="expectations" value="1"><label for="exp1">Fell short</label>
+      </div>
+    </div>
+
+    <!-- Q2 enjoyment -->
+    <div class="q">
+      <div class="qn">Question <b>02</b></div>
+      <div class="label">How much did your child enjoy the workshops?</div>
+      <div class="scale choice" data-key="enjoyment" role="radiogroup" aria-label="Enjoyment">
+        <input type="radio" id="enj3" name="enjoyment" value="Really enjoyed it"><label for="enj3">Really enjoyed it</label>
+        <input type="radio" id="enj2" name="enjoyment" value="It was okay"><label for="enj2">It was okay</label>
+        <input type="radio" id="enj1" name="enjoyment" value="Not much"><label for="enj1">Not much</label>
+      </div>
+    </div>
+
+    <!-- Q3 mission -->
+    <div class="q">
+      <div class="qn">Question <b>03</b></div>
+      <div class="label">Our workshops are all about helping kids become creators and confident storytellers. How well did the series bring that to life?</div>
+      <div class="scale choice" data-key="mission" role="radiogroup" aria-label="Mission">
+        <input type="radio" id="mis4" name="mission" value="4"><label for="mis4">Very well</label>
+        <input type="radio" id="mis3" name="mission" value="3"><label for="mis3">Well</label>
+        <input type="radio" id="mis2" name="mission" value="2"><label for="mis2">Somewhat</label>
+        <input type="radio" id="mis1" name="mission" value="1"><label for="mis1">Not really</label>
+      </div>
+    </div>
+
+    <!-- Q4 recommend -->
+    <div class="q">
+      <div class="qn">Question <b>04</b></div>
+      <div class="label">How likely are you to recommend a KindleWood workshop to another family?</div>
+      <div class="scale nums" data-key="recommend" role="radiogroup" aria-label="Recommend">
+        <input type="radio" id="rec10" name="recommend" value="10"><label for="rec10"><span class="n">10</span> <span class="w">Very likely</span></label>
+        <input type="radio" id="rec9" name="recommend" value="9"><label for="rec9"><span class="n">9</span></label>
+        <input type="radio" id="rec8" name="recommend" value="8"><label for="rec8"><span class="n">8</span></label>
+        <input type="radio" id="rec7" name="recommend" value="7"><label for="rec7"><span class="n">7</span></label>
+        <input type="radio" id="rec6" name="recommend" value="6"><label for="rec6"><span class="n">6</span></label>
+        <input type="radio" id="rec5" name="recommend" value="5"><label for="rec5"><span class="n">5</span></label>
+        <input type="radio" id="rec4" name="recommend" value="4"><label for="rec4"><span class="n">4</span></label>
+        <input type="radio" id="rec3" name="recommend" value="3"><label for="rec3"><span class="n">3</span></label>
+        <input type="radio" id="rec2" name="recommend" value="2"><label for="rec2"><span class="n">2</span></label>
+        <input type="radio" id="rec1" name="recommend" value="1"><label for="rec1"><span class="n">1</span> <span class="w">Not likely</span></label>
+      </div>
+    </div>
+
+    <!-- Q5 keep creating -->
+    <div class="q">
+      <div class="qn">Question <b>05</b></div>
+      <div class="label">Would you want your child to keep creating stories at home?</div>
+      <div class="scale choice" data-key="keep_creating" role="radiogroup" aria-label="Keep creating">
+        <input type="radio" id="keep3" name="keep_creating" value="Yes"><label for="keep3">Yes</label>
+        <input type="radio" id="keep2" name="keep_creating" value="Maybe"><label for="keep2">Maybe</label>
+        <input type="radio" id="keep1" name="keep_creating" value="No"><label for="keep1">No</label>
+      </div>
+    </div>
+
+    <!-- Q6 loved most -->
+    <div class="q">
+      <div class="qn">Question <b>06</b> <span class="opt">· optional</span></div>
+      <div class="label">What did you and your child love most?</div>
+      <textarea data-key="loved_most" name="loved_most" placeholder="Maybe the writing, watching their characters come to life, or holding the finished book they made all by themselves."></textarea>
+    </div>
+
+    <!-- Q7 improve -->
+    <div class="q">
+      <div class="qn">Question <b>07</b> <span class="opt">· optional</span></div>
+      <div class="label">Anything we could improve?</div>
+      <textarea data-key="improve" name="improve" placeholder="Anything at all, whether it's the online creation tool, the workshop process, or the activities."></textarea>
+    </div>
+
+    <!-- Q8 contact -->
+    <div class="q">
+      <div class="qn">Question <b>08</b> <span class="opt">· optional</span></div>
+      <div class="label">Stay in touch?</div>
+      <p class="intro" style="text-align:left;margin:0 0 16px;font-size:16px;">Leave your details and we may reach out for a short chat to help us keep improving. We'll also share news about future workshops.</p>
+      <div class="contact-grid">
+        <div>
+          <label class="fl" for="name">Name</label>
+          <input type="text" id="name" name="name" autocomplete="name" placeholder="Your name" />
+        </div>
+        <div>
+          <label class="fl" for="email">Email</label>
+          <input type="email" id="email" name="email" autocomplete="email" placeholder="you@example.com" />
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="submit" id="submitBtn">Send feedback</button>
+    <div class="err" id="errMsg">Something went wrong. Please try again.</div>
+    <p class="foot">Thank you for being part of the KindleWood creative journey.</p>
+  </form>
+
+  <div class="thanks" id="thanks">
+    <div class="mark" aria-hidden="true"></div>
+    <h2>Thank you<em>!</em></h2>
+    <p>Your feedback helps us make every KindleWood workshop better. We can't wait to see what your young storyteller creates next.</p>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var params = new URLSearchParams(location.search);
+  var SURVEY_SLUG = params.get('s') || 'summer-2026-storyteller';
+  var SURVEY_TYPE = params.get('type') || 'workshop_feedback';
+
+  var form = document.getElementById('surveyForm');
+  var btn = document.getElementById('submitBtn');
+  var errMsg = document.getElementById('errMsg');
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    errMsg.style.display = 'none';
+
+    var answers = {};
+    ['expectations','enjoyment','mission','recommend','keep_creating'].forEach(function(key){
+      var checked = form.querySelector('input[name="'+key+'"]:checked');
+      if (checked) {
+        var v = checked.value;
+        answers[key] = /^\d+$/.test(v) ? Number(v) : v;
+      }
+    });
+    ['loved_most','improve'].forEach(function(key){
+      var val = (form.querySelector('[name="'+key+'"]').value || '').trim();
+      if (val) answers[key] = val;
+    });
+
+    var name = (form.querySelector('[name="name"]').value || '').trim();
+    var email = (form.querySelector('[name="email"]').value || '').trim();
+
+    var payload = {
+      survey_slug: SURVEY_SLUG, survey_type: SURVEY_TYPE,
+      answers: answers, name: name || null, email: email || null
+    };
+
+    btn.disabled = true; btn.textContent = 'Sending…';
+
+    fetch('/api/v1/surveys/submit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    }).then(function(res){
+      if (!res.ok) throw new Error('bad status ' + res.status);
+      return res.json();
+    }).then(function(){
+      form.style.display = 'none';
+      document.getElementById('thanks').classList.add('show');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }).catch(function(){
+      btn.disabled = false; btn.textContent = 'Send feedback'; errMsg.style.display = 'block';
+    });
+  });
+})();
+</script>
+
+<!-- ===== REVIEW TOOLING (only active with ?review — invisible on the public link) ===== -->
+<div class="edit-hotzone"></div>
+<button class="edit-toggle" id="editToggle" title="Edit mode (E)" aria-label="Edit mode">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+</button>
+<div class="edit-banner" id="editBanner">Edit mode — click any text · Ctrl/⌘+S to save</div>
+<button class="cm-toggle" id="cmToggle" title="Comment mode (C)" aria-label="Comment mode">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+  <span class="cm-badge" id="cmBadge">0</span>
+</button>
+<div class="cm-card" id="cmCard">
+  <div class="cm-h" id="cmCardH">Comment</div>
+  <div class="cm-ref" id="cmRef"></div>
+  <textarea id="cmText" placeholder="What should change here?"></textarea>
+  <div class="cm-row">
+    <button class="cm-btn ghost" id="cmCancel">Cancel</button>
+    <button class="cm-btn primary" id="cmAdd">Add comment</button>
+  </div>
+</div>
+<aside class="cm-panel" id="cmPanel" aria-label="Comments">
+  <header><h3>Comments</h3><button class="cm-btn ghost" id="cmClose" style="padding:6px 10px;">Close</button></header>
+  <div class="cm-list" id="cmList"></div>
+  <div class="cm-foot">
+    <button class="cm-btn ghost" id="cmClear">Clear all</button>
+    <button class="cm-btn primary" id="cmCopy">Copy for agent</button>
+  </div>
+</aside>
+<div class="review-hint">Review mode · <b>E</b> edit text · <b>C</b> comment</div>
+
+<script>
+/* =========================================================
+   REVIEW TOOLING — inline edit (E) + point-and-comment (C).
+   Adapted from /pitch for a single-page survey: "slides" -> "questions".
+   Only initializes when the URL has ?review, so the public parent link
+   stays completely clean. Zero dependency, saves to localStorage.
+   ========================================================= */
+(function(){
+  var params = new URLSearchParams(location.search);
+  if(!params.has('review')) return;           // public link: no edit/comment affordances at all
+  document.body.classList.add('review-on');
+
+  var qList = [...document.querySelectorAll('.q')];
+  var stageEl = document.querySelector('.wrap');
+  function qNo(el){var q=el&&el.closest&&el.closest('.q');return q?qList.indexOf(q)+1:0;}
+  function qName(n){return n?('Question '+String(n).padStart(2,'0')):'Header';}
+  function scrollToQ(n){var t=n?qList[n-1]:document.querySelector('header');
+    if(t)t.scrollIntoView({behavior:'smooth',block:'center'});}
+
+  /* ---- inline editing ---- */
+  var EDIT_SEL='h1,.intro,.qn,.label,.qhint,.foot,.thanks h2,.thanks p';
+  var editor={isActive:false,_sel:EDIT_SEL,
+    toggle(){this.isActive=!this.isActive;
+      var banner=document.getElementById('editBanner'),btn=document.getElementById('editToggle');
+      document.querySelectorAll(this._sel).forEach(function(el){el.setAttribute('contenteditable',editor.isActive);});
+      document.body.classList.toggle('edit-on',this.isActive);
+      btn.classList.toggle('active',this.isActive);banner.classList.toggle('show',this.isActive);
+      if(!this.isActive)this.save();},
+    _sig(){return [...document.querySelectorAll(this._sel)].map(function(e){return e.tagName+'.'+(e.className||'');}).join('|');},
+    save(){var els=[...document.querySelectorAll(this._sel)],items={};
+      els.forEach(function(el,k){items[k]=el.innerHTML;});
+      try{localStorage.setItem('kw-survey-edits-v1',JSON.stringify({sig:this._sig(),items:items}));}catch(e){}},
+    load(){var raw=localStorage.getItem('kw-survey-edits-v1');if(!raw)return;try{var d=JSON.parse(raw);
+      if(d.sig!==this._sig())return; var all=[...document.querySelectorAll(this._sel)];
+      Object.entries(d.items||{}).forEach(function(p){if(all[p[0]])all[p[0]].innerHTML=p[1];});}catch(e){}}
+  };
+  editor.load();
+
+  var hz=document.querySelector('.edit-hotzone'),btn=document.getElementById('editToggle');
+  var cmBtnEl=document.getElementById('cmToggle'),ht=null;
+  var showBtn=function(){clearTimeout(ht);btn.classList.add('show');cmBtnEl.classList.add('show');};
+  var hideBtn=function(){ht=setTimeout(function(){if(!editor.isActive)btn.classList.remove('show');if(!cm.on)cmBtnEl.classList.remove('show');},400);};
+  hz.addEventListener('mouseenter',showBtn);hz.addEventListener('mouseleave',hideBtn);
+  btn.addEventListener('mouseenter',showBtn);btn.addEventListener('mouseleave',hideBtn);
+  cmBtnEl.addEventListener('mouseenter',showBtn);cmBtnEl.addEventListener('mouseleave',hideBtn);
+  var enterEdit=function(){if(cm.on)cm.toggle();editor.toggle();};
+  hz.addEventListener('click',enterEdit);btn.addEventListener('click',enterEdit);
+  addEventListener('keydown',function(e){
+    var t=e.target,inField=t&&(t.tagName==='TEXTAREA'||t.tagName==='INPUT'||(t.getAttribute&&t.getAttribute('contenteditable')==='true'));
+    if((e.key==='e'||e.key==='E')&&!inField){enterEdit();}
+    if((e.metaKey||e.ctrlKey)&&e.key==='s'){e.preventDefault();editor.save();
+      var b=document.getElementById('editBanner');b.textContent='Saved ✓';setTimeout(function(){b.textContent='Edit mode — click any text · Ctrl/⌘+S to save';},1200);}
+  });
+
+  /* ---- comment / annotate mode ---- */
+  var esc=function(s){return String(s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});};
+  var inUi=function(el){return !!(el&&el.closest&&el.closest('.cm-card,.cm-panel,.cm-toggle,.edit-toggle,.edit-hotzone'));};
+  function cmClasses(el){return (typeof el.className==='string'?el.className.trim().split(/\s+/):[]).filter(function(c){return c&&c!=='cm-hover';});}
+  function cmLabel(el){var cls=cmClasses(el).slice(0,2);return el.tagName.toLowerCase()+(cls.length?'.'+cls.join('.'):'');}
+  function cmPath(el){var parts=[],n=el;
+    while(n&&n.nodeType===1&&n!==stageEl&&parts.length<4){
+      if(n.id){parts.unshift('#'+n.id);break;}
+      var p=n.tagName.toLowerCase(),c0=cmClasses(n)[0];if(c0)p+='.'+c0;
+      var sibs=n.parentElement?[...n.parentElement.children].filter(function(c){return c.tagName===n.tagName;}):[];
+      if(sibs.length>1)p+=':nth-of-type('+(sibs.indexOf(n)+1)+')';
+      parts.unshift(p);n=n.parentElement;}
+    return parts.join(' > ');}
+
+  var cm={on:false,key:'kw-survey-comments-v1',items:[],pending:null,
+    el(id){return document.getElementById(id);},
+    toggle(){this.on=!this.on;
+      if(this.on&&editor.isActive)editor.toggle();
+      document.body.classList.toggle('cm-on',this.on);
+      this.el('cmToggle').classList.toggle('active',this.on);
+      this.el('cmToggle').classList.toggle('show',this.on);
+      this.el('cmPanel').classList.toggle('show',this.on);
+      if(!this.on)this.closeCard();},
+    openCard(target,kind,text,x,y){var n=qNo(target);
+      this.pending={q:n,kind:kind,selector:cmPath(target),label:cmLabel(target),text:(text||'').slice(0,200)};
+      this.el('cmCardH').textContent=(kind==='text'?'Comment on text':'Comment on element')+' · '+qName(n);
+      this.el('cmRef').textContent=(text||'').slice(0,160)||'(no text)';
+      var ta=this.el('cmText');ta.value='';
+      var card=this.el('cmCard');card.classList.add('show');
+      card.style.left=Math.max(12,Math.min((x||120)+12,innerWidth-320))+'px';
+      card.style.top=Math.max(12,Math.min((y||120)+12,innerHeight-250))+'px';
+      ta.focus();},
+    closeCard(){this.el('cmCard').classList.remove('show');this.pending=null;},
+    commit(){var note=this.el('cmText').value.trim();
+      if(!note||!this.pending){this.closeCard();return;}
+      this.items.push(Object.assign({id:Date.now()},this.pending,{note:note}));this.save();this.render();this.closeCard();},
+    remove(id){this.items=this.items.filter(function(it){return it.id!==id;});this.save();this.render();},
+    clearAll(){if(this.items.length&&confirm('Delete all comments?')){this.items=[];this.save();this.render();}},
+    render(){var n=this.items.length,badge=this.el('cmBadge');
+      badge.textContent=n;badge.classList.toggle('show',n>0);
+      var list=this.el('cmList');
+      if(!n){list.innerHTML='<div class="cm-empty">No comments yet.<br>Press <b>C</b>, then click any text or element to leave a note.</div>';return;}
+      list.innerHTML=this.items.map(function(it){return '<div class="cm-item">'
+        +'<button class="cm-del" data-del="'+it.id+'">delete</button>'
+        +'<div class="cm-meta" data-jump="'+it.q+'">'+qName(it.q)+' · '+esc(it.label)+'</div>'
+        +(it.text?'<div class="cm-quote">“'+esc(it.text)+'”</div>':'')
+        +'<div class="cm-note">'+esc(it.note)+'</div></div>';}).join('');},
+    copy(){if(!this.items.length)return;
+      var lines=['# Survey page feedback ('+this.items.length+' comment'+(this.items.length>1?'s':'')+')',''];
+      var by={};this.items.forEach(function(it){(by[it.q]=by[it.q]||[]).push(it);});
+      Object.keys(by).sort(function(a,b){return a-b;}).forEach(function(s){lines.push('## '+qName(Number(s)));
+        by[s].forEach(function(it){lines.push('- **'+it.label+'**  `'+it.selector+'`');
+          if(it.text)lines.push('  - '+(it.kind==='text'?'Selected text':'Current text')+': "'+it.text+'"');
+          lines.push('  - Change: '+it.note);});lines.push('');});
+      var out=lines.join('\n'),self=this,done=function(){self.flash('Copied for agent');};
+      if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(out).then(done).catch(function(){self.fallback(out);});
+      else this.fallback(out);},
+    fallback(out){var ta=document.createElement('textarea');ta.value=out;document.body.appendChild(ta);
+      ta.select();try{document.execCommand('copy');this.flash('Copied for agent');}catch(e){prompt('Copy this feedback:',out);}ta.remove();},
+    flash(msg){var b=this.el('cmCopy'),old=b.textContent;b.textContent=msg;setTimeout(function(){b.textContent=old;},1400);},
+    save(){try{localStorage.setItem(this.key,JSON.stringify(this.items));}catch(e){}},
+    load(){try{this.items=JSON.parse(localStorage.getItem(this.key)||'[]')||[];}catch(e){this.items=[];}},
+    init(){this.load();this.render();var self=this;
+      this.el('cmToggle').addEventListener('click',function(){self.toggle();});
+      this.el('cmClose').addEventListener('click',function(){self.toggle();});
+      this.el('cmAdd').addEventListener('click',function(){self.commit();});
+      this.el('cmCancel').addEventListener('click',function(){self.closeCard();});
+      this.el('cmCopy').addEventListener('click',function(){self.copy();});
+      this.el('cmClear').addEventListener('click',function(){self.clearAll();});
+      this.el('cmText').addEventListener('keydown',function(e){
+        if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();self.commit();}
+        if(e.key==='Escape'){e.preventDefault();self.closeCard();}});
+      this.el('cmList').addEventListener('click',function(e){
+        var del=e.target.getAttribute('data-del');if(del){self.remove(Number(del));return;}
+        var jump=e.target.getAttribute('data-jump');if(jump!==null&&jump!==undefined&&e.target.classList.contains('cm-meta')){scrollToQ(Number(jump));}});}
+  };
+  cm.init();
+
+  var cmHover=null;
+  document.addEventListener('mouseover',function(e){if(!cm.on)return;var t=e.target;
+    if(inUi(t)||!stageEl.contains(t))return;
+    if(cmHover&&cmHover!==t)cmHover.classList.remove('cm-hover');cmHover=t;t.classList.add('cm-hover');});
+  document.addEventListener('mouseout',function(){if(cmHover){cmHover.classList.remove('cm-hover');cmHover=null;}});
+  document.addEventListener('click',function(e){if(!cm.on)return;
+    if(inUi(e.target)||!stageEl.contains(e.target))return;
+    e.preventDefault();e.stopPropagation();
+    var sel=window.getSelection();
+    var selText=sel&&!sel.isCollapsed?sel.toString().trim().replace(/\s+/g,' '):'';
+    if(selText){var t=sel.anchorNode?(sel.anchorNode.nodeType===1?sel.anchorNode:sel.anchorNode.parentElement):e.target;
+      cm.openCard(t,'text',selText,e.clientX,e.clientY);}
+    else{var el=e.target;cm.openCard(el,'element',(el.innerText||el.textContent||'').trim().replace(/\s+/g,' '),e.clientX,e.clientY);}
+  },true);
+  addEventListener('keydown',function(e){
+    if((e.key==='c'||e.key==='C')&&!e.metaKey&&!e.ctrlKey&&!e.altKey
+       &&e.target.tagName!=='TEXTAREA'&&e.target.tagName!=='INPUT'
+       &&!(e.target.getAttribute&&e.target.getAttribute('contenteditable')==='true'))cm.toggle();
+    if(e.key==='Escape'&&cm.on){if(cm.pending)cm.closeCard();else cm.toggle();}});
+})();
+</script>
+</body>
+</html>

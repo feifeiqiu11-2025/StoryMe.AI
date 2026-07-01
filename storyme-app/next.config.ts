@@ -21,6 +21,8 @@ const nextConfig: NextConfig = {
       { source: '/pitch/', destination: '/pitch/index.html' },
       { source: '/partnership', destination: '/partnership/index.html' },
       { source: '/partnership/', destination: '/partnership/index.html' },
+      { source: '/survey', destination: '/survey/index.html' },
+      { source: '/survey/', destination: '/survey/index.html' },
     ];
   },
   experimental: {
