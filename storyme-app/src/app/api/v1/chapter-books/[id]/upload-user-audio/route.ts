@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClientFromRequest } from '@/lib/supabase/server';
 import { docToPages } from '@/lib/chapter-book/docToPages';
 import { hashPageContent } from '@/lib/audio/content-hash';
-import { processAndUploadRecording } from '@/lib/audio/upload-recording.service';
+import { processAndUploadRecording, EmptyRecordingError } from '@/lib/audio/upload-recording.service';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -125,9 +125,11 @@ export async function POST(
         trimEndSec,
       });
     } catch (uploadError: any) {
+      // Empty/degenerate recording → 400 (user should re-record), not a 500.
+      const status = uploadError instanceof EmptyRecordingError ? 400 : 500;
       return NextResponse.json(
         { error: uploadError.message || 'Upload failed' },
-        { status: 500 }
+        { status }
       );
     }
 

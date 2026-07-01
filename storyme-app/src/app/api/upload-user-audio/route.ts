@@ -284,12 +284,21 @@ export async function POST(request: NextRequest) {
       console.error('Failed pages:', failedPages);
     }
 
+    // Truthful success: only claim success when at least one page actually
+    // persisted. A total failure previously returned `success:true`, so the
+    // recorder marked the page saved and discarded the in-memory blob — silent
+    // data loss. `successfulPages`/`failedPages` let a single-page caller detect
+    // its own outcome precisely; partial batches keep succeeding (unchanged).
+    const anySucceeded = uploadedPages.length > 0;
     return NextResponse.json({
-      success: true,
+      success: anySucceeded,
       message: `Uploaded audio for ${uploadedPages.length} pages`,
       totalPages: audioMetadata.length,
       successfulPages: uploadedPages.length,
       failedPages: failedPages.length > 0 ? failedPages : undefined,
+      // Surface a human-readable reason on total failure so callers that only
+      // read `data.error` show something meaningful instead of "undefined".
+      error: anySucceeded ? undefined : (failedPages[0]?.error || 'Upload failed'),
       voiceProfileId: voiceProfile.id,
       audioPages: uploadedPages,
     });

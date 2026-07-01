@@ -21,6 +21,25 @@ ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 const STORAGE_BUCKET = 'story-audio-files';
 
+/**
+ * Minimum size (bytes) for a recording we'll accept. A real take — even the
+ * shortest quiz answer at the recorder's 0.5s floor — is several KB of Opus.
+ * A degenerate capture (mic denied mid-record, codec produced nothing) yields
+ * a near-empty container; we've seen 5-byte WebM files reach storage. Rejecting
+ * below this floor turns silent loss into an actionable "try again" instead of
+ * persisting an unplayable file. Kept low so it only catches empties, never
+ * legitimately short clips. */
+const MIN_RECORDING_BYTES = 1024;
+
+/** Thrown when the uploaded recording is empty/degenerate. Callers surface this
+ *  to the user so they can re-record, rather than committing silence. */
+export class EmptyRecordingError extends Error {
+  constructor(bytes: number) {
+    super(`Recording is empty or too short to save (${bytes} bytes). Please record again.`);
+    this.name = 'EmptyRecordingError';
+  }
+}
+
 export interface ProcessAndUploadParams {
   supabase: SupabaseClient;
   projectId: string;
@@ -103,6 +122,14 @@ export async function processAndUploadRecording(
   let buffer: Buffer = Buffer.from(arrayBuffer);
   let contentType = audioFile.type;
   let fileExtension: 'mp3' | 'm4a' | 'webm' = 'mp3';
+
+  // Reject empty/degenerate captures BEFORE any conversion. Guarding the raw
+  // input (not the converted output) keeps this orthogonal to the FFmpeg
+  // fallback below: a real recording that merely fails to convert still falls
+  // back to playable WebM, while a genuinely empty take is stopped here.
+  if (buffer.length < MIN_RECORDING_BYTES) {
+    throw new EmptyRecordingError(buffer.length);
+  }
 
   if (audioFile.type.includes('webm')) {
     try {

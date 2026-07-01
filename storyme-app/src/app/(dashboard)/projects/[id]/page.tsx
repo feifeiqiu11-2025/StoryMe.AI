@@ -444,14 +444,19 @@ export default function StoryViewerPage() {
         body: formData,
       });
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Upload failed' };
+      // The recorder uploads exactly ONE page per request, so a genuine save
+      // must come back with success AND a persisted page. Checking
+      // successfulPages/audioPages (not just data.success) closes the silent-
+      // loss path where the server accepted the request but stored nothing —
+      // the recorder would otherwise mark the page saved and drop the blob.
+      const firstPage = (data.audioPages ?? [])[0];
+      if (!res.ok || !data.success || (data.successfulPages ?? 0) < 1 || !firstPage) {
+        const reason = data.failedPages?.[0]?.error || data.error || 'Upload failed';
+        return { success: false, error: reason };
       }
       setHasAudio(true);
-      // The route uploads one page at a time from the recorder, so the
-      // returned audioPages array has exactly one entry — its id and
-      // audio_url drive the post-upload PATCH /layers when SFX were placed.
-      const firstPage = (data.audioPages ?? [])[0];
+      // firstPage.id / audio_url drive the post-upload PATCH /layers when SFX
+      // were placed on the page.
       return {
         success: true,
         audioPageId: firstPage?.id,

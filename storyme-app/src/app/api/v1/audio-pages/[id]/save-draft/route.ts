@@ -21,7 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClientFromRequest } from '@/lib/supabase/server';
 import { AudioLayersSchema } from '@/lib/audio/layers.types';
-import { processAndUploadRecording } from '@/lib/audio/upload-recording.service';
+import { processAndUploadRecording, EmptyRecordingError } from '@/lib/audio/upload-recording.service';
 
 export const maxDuration = 60;
 
@@ -122,6 +122,13 @@ export async function POST(
       draft_updated_at: now,
     });
   } catch (error: any) {
+    // An empty/degenerate recording is a user-input problem, not a server
+    // fault — return 400 so it surfaces as "please record again" without
+    // polluting error monitoring. The prior draft is left untouched (the
+    // update below never ran), so a good earlier take is preserved.
+    if (error instanceof EmptyRecordingError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error('POST /api/v1/audio-pages/[id]/save-draft error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to save draft' },

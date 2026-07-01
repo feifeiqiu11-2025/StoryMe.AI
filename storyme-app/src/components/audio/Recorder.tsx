@@ -22,6 +22,31 @@ import type { VocalSegment, AudioLayers } from '@/lib/audio/layers.types';
 import { mixTimeToOriginal, originalToMixTime, totalMixDuration, splitSegmentsAtMixTime } from '@/lib/audio/segment-time';
 import { saveDraft as apiSaveDraft, renderFinal as apiRenderFinal, shrinkSource as apiShrinkSource } from '@/lib/audio/draft-api.client';
 
+/**
+ * Peak-amplitude floor below which a decoded take is treated as silent.
+ * A muted mic (or no sound reaching it) still yields a valid, non-empty
+ * container of digital silence — the byte-size guard can't catch that, only
+ * loudness can. Normalized samples run 0..1; real speech peaks well above 0.1
+ * even when soft, while a muted mic sits near 0. 0.01 (~-40 dBFS) leaves a wide
+ * margin so we never reject a genuinely quiet child, only true silence. */
+const SILENCE_PEAK_THRESHOLD = 0.01;
+
+/** Largest absolute sample across all channels — the loudest moment in the
+ *  take. Strides ~1ms so it stays cheap on long recordings; any real sound
+ *  spans far more than one sample, so striding can't miss speech. */
+function peakAmplitude(buffer: AudioBuffer): number {
+  const stride = Math.max(1, Math.floor(buffer.sampleRate / 1000));
+  let peak = 0;
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const data = buffer.getChannelData(ch);
+    for (let i = 0; i < data.length; i += stride) {
+      const a = Math.abs(data[i]);
+      if (a > peak) peak = a;
+    }
+  }
+  return peak;
+}
+
 export interface RecordingPage {
   pageNumber: number;
   pageType: 'cover' | 'scene' | 'chapter_page' | 'quiz_transition' | 'quiz_question';
@@ -285,6 +310,15 @@ export default function Recorder({
   // is the navigation action the user originally tried to take; we run it
   // after Save (or Discard) resolves.
   const [navConfirm, setNavConfirm] = useState<{ proceed: () => void } | null>(null);
+  // Separate confirm for the picture-book close path: a recorded-but-not-yet-
+  // uploaded take lives only in memory (pageRecordings), so closing would lose
+  // it silently. Unlike navConfirm (draft flow, has a Save-draft action), these
+  // pages save via Finish & Continue, so this dialog only offers keep/discard.
+  const [closeConfirm, setCloseConfirm] = useState(false);
+  // Latest "has an unsaved in-memory recording" flag, read by the beforeunload
+  // guard below. A ref (not state) so the once-registered listener always sees
+  // the current value without re-subscribing every render.
+  const hasUnsavedRecordingRef = useRef(false);
   // Active drag of an inner boundary between two voice segments. `side`
   // says which edge the user grabbed: 'left' = segments[boundaryIdx].endSec,
   // 'right' = segments[boundaryIdx + 1].startSec. Captured at drag start
@@ -835,14 +869,35 @@ export default function Recorder({
       return stream;
     } catch (err: any) {
       console.error('Microphone access error:', err);
-      if (err.name === 'NotAllowedError') {
-        alert('Microphone access denied. Please allow microphone access in your browser settings.');
-      } else if (err.name === 'NotFoundError') {
-        alert('No microphone found. Please connect a microphone and try again.');
-      } else {
-        alert(`Failed to access microphone: ${err.message}`);
-      }
+      alert(micErrorMessage(err));
       return null;
+    }
+  };
+
+  /** Map a getUserMedia failure to a friendly, actionable message. Browsers use
+   *  different error names for the same situation, so we group by cause and
+   *  always tell the user what to DO, never surface a raw technical string. */
+  const micErrorMessage = (err: { name?: string } | null | undefined): string => {
+    switch (err?.name) {
+      case 'NotAllowedError':
+      case 'PermissionDeniedError':
+      case 'SecurityError':
+        // Permission was blocked/denied for this site.
+        return 'Microphone is blocked. Click the microphone (or lock) icon in your browser\'s address bar, choose "Allow", then tap Record again.';
+      case 'NotFoundError':
+      case 'DevicesNotFoundError':
+        return 'No microphone found. Please plug in or turn on a microphone, then tap Record again.';
+      case 'NotReadableError':
+      case 'TrackStartError':
+      case 'AbortError':
+        // Device exists but can't be opened — usually muted at the system
+        // level or held by another app (Zoom, Photo Booth, etc.).
+        return 'Your microphone is muted or being used by another app. Unmute it (or close the other app), then tap Record again.';
+      case 'OverconstrainedError':
+      case 'ConstraintNotSatisfiedError':
+        return 'Your microphone couldn\'t be started with the required settings. Try a different microphone, then tap Record again.';
+      default:
+        return 'We couldn\'t turn on your microphone. Please check that it\'s connected and unmuted, then tap Record again.';
     }
   };
 
@@ -883,8 +938,13 @@ export default function Recorder({
           return;
         }
         const blob = new Blob(chunks, { type: recorder!.mimeType });
-        if (blob.size === 0) {
-          alert('Recording failed — empty audio. Please try again.');
+        // Reject empty/degenerate captures on the spot so the child re-records
+        // immediately instead of losing the take at save time. The 1KB floor
+        // mirrors the server's MIN_RECORDING_BYTES; a real ≥0.5s clip is many
+        // KB of Opus, so this only catches genuine empties (we've seen 5-byte
+        // blobs), never legitimately short recordings.
+        if (blob.size < 1024) {
+          alert("We didn't catch any audio that time. Please check your microphone and record again.");
           return;
         }
         const url = URL.createObjectURL(blob);
@@ -929,18 +989,42 @@ export default function Recorder({
           next.delete(capturedPageIndex);
           return next;
         });
-        // Refine duration via Web Audio decode. HTMLAudioElement reports
-        // Infinity for WebM blobs until a seek past end; decodeAudioData
-        // is reliable for all our supported codecs.
+        // Decode to (a) refine duration and (b) verify the take actually has
+        // sound. HTMLAudioElement reports Infinity for WebM blobs until a seek
+        // past end; decodeAudioData is reliable for all our supported codecs.
         (async () => {
           try {
             const buf = await blob.arrayBuffer();
             const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
             const decoded = await tempCtx.decodeAudioData(buf);
             const exact = decoded.duration;
+            const peak = peakAmplitude(decoded);
             await tempCtx.close().catch(() => undefined);
+            // Silent take (muted mic / no sound). The optimistic commit above
+            // already stored this take, so roll it back and prompt a redo —
+            // otherwise it would save as valid-but-silent narration.
+            if (peak < SILENCE_PEAK_THRESHOLD) {
+              setPageRecordings((prev) => {
+                if (!prev.has(capturedPageIndex)) return prev;
+                const next = new Map(prev);
+                const existing = next.get(capturedPageIndex);
+                // Only revoke/remove if this is still the same take (a newer
+                // recording may have replaced it while we were decoding).
+                if (existing && existing.url === url) {
+                  URL.revokeObjectURL(existing.url);
+                  next.delete(capturedPageIndex);
+                  return next;
+                }
+                return prev;
+              });
+              alert("We couldn't hear any sound in that recording. Please check your microphone isn't muted, then record again.");
+              return;
+            }
             if (isFinite(exact) && exact > 0) commitRecording(exact);
           } catch (err) {
+            // Decode failed — we can't verify loudness, so keep the take rather
+            // than risk discarding a real recording. Duration stays the timer
+            // estimate from the optimistic commit.
             console.warn('Could not decode blob for precise duration; using timer fallback:', err);
           }
         })();
@@ -1958,6 +2042,49 @@ export default function Recorder({
     onClose();
   };
 
+  /** True when any page holds a recorded take that only lives in memory and
+   *  hasn't been uploaded yet. Scoped to the picture-book direct-upload flow
+   *  (no server-side audioPageId): those takes persist only via Finish &
+   *  Continue, so until savedPages marks them done they'd vanish on close/
+   *  refresh. Draft-flow pages autosave and are covered by navConfirm. */
+  const hasUnsavedRecording = (): boolean => {
+    for (const idx of pageRecordings.keys()) {
+      if (!getAudioPageId(idx) && !savedPages.has(idx)) return true;
+    }
+    return false;
+  };
+
+  /** Entry point for the X buttons. Routes to the correct guard:
+   *  draft-flow dirty page → existing navConfirm (offers Save draft);
+   *  picture-book unsaved take → closeConfirm (keep/discard); else close. */
+  const handleCloseRequest = () => {
+    if (getAudioPageId(currentPageIndex) && isPageDirty(currentPageIndex)) {
+      setNavConfirm({ proceed: handleClose });
+      return;
+    }
+    if (hasUnsavedRecording()) {
+      setCloseConfirm(true);
+      return;
+    }
+    handleClose();
+  };
+
+  // Keep the beforeunload guard's snapshot fresh every render.
+  hasUnsavedRecordingRef.current = hasUnsavedRecording();
+
+  // Native safety net for tab close / refresh / browser-back while a recorded
+  // take is still only in memory. In-app navigation and the X buttons are
+  // guarded separately; this catches the paths React can't intercept.
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!hasUnsavedRecordingRef.current) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
+
   if (!currentPage) return null;
 
   const audioElement = (
@@ -2203,7 +2330,7 @@ export default function Recorder({
                   <Minimize2 className="w-5 h-5" />
                 </button>
                 <button
-                  onClick={() => guardedNavigate(() => handleClose())}
+                  onClick={handleCloseRequest}
                   aria-label="Close recording mode"
                   className="p-1.5 rounded-md text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
                 >
@@ -3025,7 +3152,7 @@ export default function Recorder({
                   <Maximize2 className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={handleClose}
+                  onClick={handleCloseRequest}
                   aria-label="Close recording mode"
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
@@ -3182,6 +3309,42 @@ export default function Recorder({
                   {savingDraftPage !== null ? 'Saving…' : 'Save draft'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {closeConfirm && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="close-confirm-title"
+        >
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-5">
+            <h3 id="close-confirm-title" className="text-base font-semibold text-gray-900 mb-2">
+              Close without saving your recording?
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              You&apos;ve recorded audio that hasn&apos;t been saved yet. Tap &ldquo;Finish &amp; Continue&rdquo; to
+              keep it — if you close now, this recording will be lost.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setCloseConfirm(false)}
+                className="px-4 py-2 rounded-md bg-purple-600 text-white hover:bg-purple-700 text-sm font-medium transition-colors"
+              >
+                Keep editing
+              </button>
+              <button
+                onClick={() => {
+                  setCloseConfirm(false);
+                  handleClose();
+                }}
+                className="px-4 py-2 rounded-md border border-red-200 bg-white text-red-700 hover:bg-red-50 text-sm font-medium transition-colors"
+              >
+                Discard &amp; close
+              </button>
             </div>
           </div>
         </div>
