@@ -9,7 +9,7 @@
  */
 
 import sharp from 'sharp';
-import { OPENAI_IMAGE_MODEL, type ImageMedium } from './types/story';
+import { OPENAI_IMAGE_MODEL, type ImageMedium, type SubjectType } from './types/story';
 import {
   buildKidCreationPrompt,
   shouldUseFaithfulnessPrompt,
@@ -296,15 +296,17 @@ interface BuildPromptArgs {
   details?: string;
   /** True when there is a reference image (photo modes). */
   hasReference: boolean;
+  /** Detected subject type — gates the anti-anthropomorphism guard (animals/creatures only). */
+  subjectType?: SubjectType;
 }
 
 /** Per-style portrait description for the non-faithfulness OpenAI path. */
 function openaiPreviewStyleDescription(style: ArtStyleType): string {
   switch (style) {
     case 'pixar':
-      return '3D animated character portrait in Pixar / Disney Junior style — vibrant colors, smooth textures, large expressive eyes, friendly approachable expression, warm flattering lighting, head-and-shoulders composition, clean gradient background.';
+      return '3D animated character portrait in Pixar / Disney Junior style — vibrant colors, smooth textures, large expressive eyes, an expression that suits the character, warm flattering lighting, head-and-shoulders composition, clean gradient background.';
     case 'ghibli':
-      return `${ART_STYLE_BY_ID.ghibli.openaiSceneLine} Character portrait, large expressive eyes, friendly expression, head-and-shoulders composition, soft background.`;
+      return `${ART_STYLE_BY_ID.ghibli.openaiSceneLine} Character portrait, large expressive eyes, an expression that suits the character, head-and-shoulders composition, soft background.`;
     case 'realistic':
       return `${ART_STYLE_BY_ID.realistic.openaiSceneLine} Head-and-shoulders character portrait, accurate natural proportions, soft simple background.`;
     case 'coloring':
@@ -322,6 +324,7 @@ function buildPrompt({
   characterType,
   details,
   hasReference,
+  subjectType,
 }: BuildPromptArgs): string {
   // Kid creations + digital art → faithfulness-first prompt.
   if (shouldUseFaithfulnessPrompt(medium) && hasReference) {
@@ -346,12 +349,16 @@ function buildPrompt({
 
   if (!hasReference) {
     // Description-only mode.
+    // For real animals/creatures, keep them animal — no human clothing or poses.
+    const anthroGuard = (subjectType === 'animal' || subjectType === 'creature')
+      ? ` Keep it a real ${characterType} with natural animal anatomy and pose — do NOT add human clothing, accessories, or human gestures (no standing upright, waving, or raised hands) unless the details ask for them.`
+      : '';
     return `Render a ${styleDescription}
 
 Character: ${name}${characterType ? ` (${characterType})` : ''}.
 ${details ? `Details: ${details}.` : ''}
 
-Audience: children's storybook app, ages 5-8. Make the character appealing, memorable, and kid-friendly.`;
+Audience: children's storybook app, ages 5-8. Make the character appealing, memorable, and kid-appropriate. Match the mood the details ask for (friendly, brave, fierce, spooky, mischievous, etc.) — do NOT force it to be cute or smiling. Keep it storybook-safe, never gory or genuinely frightening.${anthroGuard}`;
   }
 
   // Photo-based real_photo path. The "do NOT photorealistically copy" guard is
@@ -540,7 +547,7 @@ export async function openaiGenerateDescriptionOnlyPreview(
   params: DescriptionOnlyPreviewParams
 ): Promise<DescriptionOnlyPreviewResult> {
   const startTime = Date.now();
-  const { name, characterType, description } = params;
+  const { name, characterType, description, subjectType } = params;
 
   const prompt = buildPrompt({
     style: 'pixar',
@@ -549,6 +556,7 @@ export async function openaiGenerateDescriptionOnlyPreview(
     characterType,
     details: description,
     hasReference: false,
+    subjectType,
   });
 
   const { b64, mimeType } = await callOpenAIImage({
@@ -574,7 +582,7 @@ export async function openaiGenerateDescriptionOnlyPreviewClassic(
   styleVariant: ArtStyleType = 'classic'
 ): Promise<DescriptionOnlyPreviewResult> {
   const startTime = Date.now();
-  const { name, characterType, description } = params;
+  const { name, characterType, description, subjectType } = params;
 
   const prompt = buildPrompt({
     style: styleVariant,
@@ -583,6 +591,7 @@ export async function openaiGenerateDescriptionOnlyPreviewClassic(
     characterType,
     details: description,
     hasReference: false,
+    subjectType,
   });
 
   const { b64, mimeType } = await callOpenAIImage({

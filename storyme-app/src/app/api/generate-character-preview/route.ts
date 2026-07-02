@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
       description?.otherFeatures,
       description?.age,
       description?.hairColor ? `${description.hairColor} coloring` : null,
-    ].filter(Boolean).join(', ') || 'cute and friendly';
+    ].filter(Boolean).join(', ');
 
     // Resolve subject type ONCE (shared by single- and legacy-both paths).
     if (isDescriptionOnly) {
@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
       const isPixar = style === 'pixar';
       const classicStyle = style as ClassicPreviewStyle; // only used on the non-pixar branch
       if (isDescriptionOnly) {
-        const descParams = { name: name.trim(), characterType: characterType!, description: descriptionText, modelId: geminiModelId, provider };
+        const descParams = { name: name.trim(), characterType: characterType!, description: descriptionText, modelId: geminiModelId, provider, subjectType: detectedSubjectType };
         const r = isPixar
           ? await generateDescriptionOnlyPreview(descParams)
           : await generateDescriptionOnlyPreviewClassic({ ...descParams, styleVariant: classicStyle });

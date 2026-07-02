@@ -2668,6 +2668,8 @@ export interface DescriptionOnlyPreviewParams {
   provider?: ImageProvider;
   /** Classic-family look (classic/ghibli/realistic/coloring). Consumed by the *Classic generator. */
   styleVariant?: ClassicPreviewStyle;
+  /** Detected subject type — gates the anti-anthropomorphism guard (animals/creatures only). */
+  subjectType?: SubjectType;
 }
 
 export interface DescriptionOnlyPreviewResult {
@@ -2686,10 +2688,11 @@ export async function generateDescriptionOnlyPreview({
   description,
   modelId,
   provider,
+  subjectType,
 }: DescriptionOnlyPreviewParams): Promise<DescriptionOnlyPreviewResult> {
   // Provider branch — delegate to OpenAI sibling when admin selects gpt-image-2
   if (provider && isOpenAIProvider(provider)) {
-    return openaiGenerateDescriptionOnlyPreview({ name, characterType, description });
+    return openaiGenerateDescriptionOnlyPreview({ name, characterType, description, subjectType });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -2706,39 +2709,45 @@ export async function generateDescriptionOnlyPreview({
   const hasChubbyDescription = description ?
     /\b(chubby|plump|round|fat|chunky|pudgy|stocky|big)\b/i.test(description) : false;
 
+  // For real animals/creatures, keep them animal — the anthropomorphism guard
+  // stops Gemini from adding human clothing or human poses (waving, standing up).
+  const anthroGuard = (subjectType === 'animal' || subjectType === 'creature')
+    ? `\n- Keep it a real ${characterType} with natural animal anatomy and pose — do NOT add human clothing, accessories, or human gestures (no standing upright, waving, or raised hands) unless the description explicitly asks for them.`
+    : '';
+
   // Build description-based prompt for 3D style
   const fullPrompt = `Create a 3D animated character portrait showing: ${name} (a ${characterType})
 
 === CRITICAL RENDERING STYLE (MANDATORY) ===
 - Render as a 3D ANIMATED/ILLUSTRATED character (Pixar/Disney Junior style)
-- This is a ${characterType} character - create a cute, appealing animated version
+- This is a ${characterType} character - create an appealing animated version that matches the described personality
 - Style: Modern 3D animation like Pixar, Disney Junior, or Cocomelon
-- The character should be expressive, friendly, and kid-appropriate
+- The character should be expressive and kid-appropriate. Match the mood the description asks for (friendly, brave, fierce, spooky, mischievous, etc.) — do NOT force it to be cute or smiling. Keep it storybook-safe, never gory or genuinely frightening${anthroGuard}
 
 === ART STYLE ===
 - 3D rendered character portrait (like Pixar, Disney Junior, Cocomelon)
 - ${hasChubbyDescription ? 'Soft, rounded features' : 'Balanced, well-proportioned body with normal features'} with warm, flattering lighting
-- Vibrant, cheerful colors
+- Vibrant colors that suit the character (bright and cheerful, or bold and moody, per the description)
 - Smooth textures (stylized, not photorealistic)
-- Large expressive eyes typical of animation
-- Friendly, approachable expression (gentle smile or curious look)
+- Expressive eyes typical of animation
+- Expression and mood that match the description — not necessarily a smile
 - Clean background (soft gradient or simple solid color)
 - Head/upper body composition (portrait style)
 
 === CHARACTER DETAILS ===
 - Name: ${name}
 - Type: ${characterType}
-- Additional details: ${description || 'cute and friendly appearance'}
+- Additional details: ${description || 'appearance based on the character type'}
 
 === CHARACTER RULES ===
-1. Make the character appealing and kid-friendly
+1. Make the character appealing and kid-appropriate
 2. Use the character type description to determine species/form
-3. Add personality through expression and pose
-4. Keep colors vibrant and cheerful
-5. Expression: Friendly, happy, approachable
+3. Add personality through expression and pose, following the described mood
+4. Use colors that fit the character's personality
+5. Expression: whatever the description implies (friendly, brave, fierce, curious, etc.), never forced cheerfulness
 6. ${hasChubbyDescription ? 'Character has a chubby/plump body as described' : 'IMPORTANT: Use normal, balanced proportions - avoid making the character overly round or chubby unless specified in description'}
 
-This is a CHARACTER PREVIEW for a children's storybook app. The character should look appealing, memorable, and perfect for children's stories.`;
+This is a CHARACTER PREVIEW for a children's storybook app. The character should look appealing, memorable, and true to how the child described it.`;
 
   // Build content parts (text only - no reference image)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2815,11 +2824,12 @@ export async function generateDescriptionOnlyPreviewClassic({
   modelId,
   provider,
   styleVariant = 'classic',
+  subjectType,
 }: DescriptionOnlyPreviewParams): Promise<DescriptionOnlyPreviewResult> {
   // Provider branch — delegate to OpenAI sibling when admin selects gpt-image-2.
   // OpenAI sibling renders the same styleVariant (pixar handled separately).
   if (provider && isOpenAIProvider(provider)) {
-    return openaiGenerateDescriptionOnlyPreviewClassic({ name, characterType, description }, styleVariant);
+    return openaiGenerateDescriptionOnlyPreviewClassic({ name, characterType, description, subjectType }, styleVariant);
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -2836,23 +2846,28 @@ export async function generateDescriptionOnlyPreviewClassic({
   const hasChubbyDescription = description ?
     /\b(chubby|plump|round|fat|chunky|pudgy|stocky|big)\b/i.test(description) : false;
 
+  // For real animals/creatures, keep them animal — no human clothing or poses.
+  const anthroGuard = (subjectType === 'animal' || subjectType === 'creature')
+    ? `\n- Keep it a real ${characterType} with natural animal anatomy and pose — do NOT add human clothing, accessories, or human gestures (no standing upright, waving, or raised hands) unless the description explicitly asks for them.`
+    : '';
+
   // Style-dependent block reuses the storybook-page STYLE mechanism (see buildPreviewStyleBlock).
   const styleBlock = buildPreviewStyleBlock(styleVariant);
   const fullPrompt = `Create a ${styleBlock.openingMedium} showing: ${name} (a ${characterType})
 
 ${styleBlock.renderingRules}
-- ${hasChubbyDescription ? 'Soft, rounded body shape as described' : 'Balanced, well-proportioned body with normal features'}
+- ${hasChubbyDescription ? 'Soft, rounded body shape as described' : 'Balanced, well-proportioned body with normal features'}${anthroGuard}
 
 === CHARACTER DETAILS ===
 - Name: ${name}
 - Type: ${characterType}
-- Additional details: ${description || 'cute and friendly appearance'}
+- Additional details: ${description || 'appearance based on the character type'}
 
 === CHARACTER RULES ===
-1. Make the character appealing and kid-friendly
+1. Make the character appealing and kid-appropriate
 2. Use the character type description to determine species/form
-3. Add personality through expression and pose
-4. Expression: Friendly, happy, gentle
+3. Add personality through expression and pose, following the described mood
+4. Expression: match the description (friendly, brave, fierce, curious, etc.) — do NOT force it to be cute or smiling. Keep it storybook-safe, never gory or genuinely frightening
 5. ${hasChubbyDescription ? 'Character has a chubby/plump body as described' : 'IMPORTANT: Use normal, balanced proportions - avoid making the character overly round or chubby unless specified in description'}
 
 This is a CHARACTER PREVIEW for a children's storybook app.`;
